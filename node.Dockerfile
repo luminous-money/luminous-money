@@ -18,10 +18,19 @@ RUN cmp -s /tmp/ledger-openapi.json packages/ledger-client/openapi.json \
 RUN cp -r packages /tmp/committed && pnpm -r generate \
   && diff -r --exclude=node_modules /tmp/committed packages \
   || { echo "generated code is stale: run 'pnpm generate' and commit the result" >&2; exit 1; }
-RUN pnpm -r build && pnpm -r typecheck && pnpm prettier
+RUN pnpm -r build && pnpm -r typecheck && pnpm test:unit && pnpm prettier
 
-# The end-to-end suite, pointed at the stack's Traefik by compose.e2e.yaml.
+# The end-to-end suites, pointed at the stack's Traefik by compose.e2e.yaml: the API suite on
+# plain Node, and the browser suite on Playwright's image, whose version must match
+# tests/ui/package.json.
 FROM workspace AS e2e
 RUN pnpm --filter "@fava-beans/e2e..." build
 ENV FAVA_BEANS_URL=http://traefik
 CMD ["pnpm", "--filter", "@fava-beans/e2e", "test"]
+
+FROM mcr.microsoft.com/playwright:v1.63.0-noble AS ui
+WORKDIR /repo
+COPY --from=workspace /repo /repo
+RUN corepack enable && pnpm --filter "@fava-beans/ui-tests..." build
+ENV FAVA_BEANS_URL=http://traefik
+CMD ["pnpm", "--filter", "@fava-beans/ui-tests", "test"]

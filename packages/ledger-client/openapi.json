@@ -1,6 +1,45 @@
 {
   "components": {
     "schemas": {
+      "Account": {
+        "properties": {
+          "close": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "currencies": {
+            "description": "Constraint from the open directive; empty means any.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Currencies",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open": {
+            "format": "date",
+            "title": "Open",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "open"
+        ],
+        "title": "Account",
+        "type": "object"
+      },
       "Amount": {
         "additionalProperties": false,
         "properties": {
@@ -686,6 +725,49 @@
           }
         },
         "summary": "Create Book"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts": {
+      "get": {
+        "operationId": "accounts_api_ledger_v1_books__book_id__accounts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Account"
+                  },
+                  "title": "Response Accounts Api Ledger V1 Books  Book Id  Accounts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accounts"
       }
     },
     "/api/ledger/v1/books/{book_id}/directives": {

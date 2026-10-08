@@ -10,8 +10,9 @@
   "scripts": {
     "build": "docker buildx bake",
     "test": "docker buildx bake test",
+    "test:unit": "pnpm -r --filter \"./packages/**\" --filter \"./services/**\" test",
     "e2e": "./scripts/e2e.sh",
-    "e2e:local": "pnpm --filter \"@fava-beans/e2e...\" build && pnpm --filter @fava-beans/e2e test",
+    "e2e:local": "pnpm --filter \"./tests/**...\" build && pnpm --filter @fava-beans/e2e test && ./scripts/ui-local.sh",
     "seed": "./scripts/seed-demo.sh",
     "generate": "docker buildx bake generate && pnpm -r generate",
     "release": "docker buildx bake release",

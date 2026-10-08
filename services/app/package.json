@@ -12,7 +12,8 @@
     "build": "vite build && tsc -p tsconfig.server.json",
     "start": "node dist/server/main.js",
     "clean": "rm -Rf ./dist",
-    "typecheck": "tsc -p tsconfig.web.json && tsc -p tsconfig.server.json --noEmit"
+    "typecheck": "tsc -p tsconfig.web.json && tsc -p tsconfig.server.json --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.3",
@@ -28,6 +29,8 @@
     "react-dom": "^19.3.0",
     "typescript": "^5.9.3",
     "vite": "^8.3.2",
-    "vite-plugin-pwa": "^2.0.0"
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.0.3",
+    "wouter": "^3.13.0"
   }
 }

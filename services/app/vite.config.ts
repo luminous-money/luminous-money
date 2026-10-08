@@ -1,5 +1,5 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
 
 // The PWA is served under /ui by the app service. In development, `pnpm dev` proxies /api to a
@@ -7,6 +7,7 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   base: "/ui/",
   build: { outDir: "dist/web", emptyOutDir: true },
+  test: { include: ["src/**/*.test.ts"] },
   server: {
     proxy: { "/api": process.env.FAVA_BEANS_URL ?? "http://localhost:8080" },
   },

@@ -222,7 +222,7 @@ class Store:
         flag: str | None = None,
         date_from: datetime.date | None = None,
         date_to: datetime.date | None = None,
-        limit: int = 500,
+        limit: int | None = 500,
     ) -> list[Row]:
         """The app's read path: plain SQL over the derived columns, no Beancount involved."""
         sql = ["SELECT DISTINCT d.* FROM directive d"]
@@ -244,7 +244,7 @@ class Store:
             where.append("d.date <= ?")
             args.append(date_to.isoformat())
         sql.append("WHERE " + " AND ".join(where) + " ORDER BY d.date, d.ordinal LIMIT ?")
-        args.append(limit)
+        args.append(-1 if limit is None else limit)
         return [_row(r) for r in self._conn.execute(" ".join(sql), args)]
 
     def _change(self, book_id: str, directive_id: str | None, op: str) -> int:

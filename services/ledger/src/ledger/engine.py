@@ -217,6 +217,23 @@ def transactions(texts: list[str]) -> list[models.Transaction]:
     return [_transaction_model(e) for e in entries if isinstance(e, data.Transaction)]
 
 
+def accounts(texts: list[str]) -> list[models.Account]:
+    """The chart of accounts declared by `open` and `close` directives, sorted by name."""
+    entries, errors, _ = parser.parse_string("\n".join(texts))
+    if errors:
+        raise ParseFailure([_message(e) for e in errors])
+    found: dict[str, models.Account] = {}
+    for entry in entries:
+        if isinstance(entry, data.Open):
+            found[entry.account] = models.Account(
+                name=entry.account, open=entry.date, currencies=list(entry.currencies or [])
+            )
+    for entry in entries:
+        if isinstance(entry, data.Close) and entry.account in found:
+            found[entry.account].close = entry.date
+    return sorted(found.values(), key=lambda a: a.name)
+
+
 def _transaction_model(entry: data.Transaction) -> models.Transaction:
     return models.Transaction(
         id=str(entry.meta[ID_KEY]),

@@ -29,7 +29,9 @@ the system.
 
 - [x] `app` service skeleton: PWA shell (React + Vite + `vite-plugin-pwa`) with a landing page at
       `/ui`, Hono serving `/api/app/v1`
-- [ ] Review queue: list staged entries, confirm with one tap, edit
+- [x] Review queue: list staged entries, skip, categorize, edit descriptions, confirm with one
+      tap; detail view with a full split editor and a live balance check
+- [x] Browser end-to-end tests (Playwright) as part of `pnpm e2e`
 - [ ] Bulk categorization
 - [ ] CSV import as a participant
 - [ ] Context builder (14-month window) and the resolver chain: `matcher`, then `rules`, with

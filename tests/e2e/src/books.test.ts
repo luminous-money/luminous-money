@@ -53,6 +53,19 @@ describe("books", () => {
     assert.equal(second, first);
   });
 
+  it("lists the chart of accounts with open dates and constraints", async () => {
+    const book_id = await newBook("accounts");
+
+    const { data } = await ledger.GET("/api/ledger/v1/books/{book_id}/accounts", {
+      params: { path: { book_id } },
+    });
+
+    assert.deepEqual(data, [
+      { name: "Assets:Bank:Checking", open: "2024-01-01", close: null, currencies: ["USD"] },
+      { name: "Expenses:Food", open: "2024-01-01", close: null, currencies: [] },
+    ]);
+  });
+
   it("answers 404 for a book that doesn't exist", async () => {
     const { response } = await ledger.GET("/api/ledger/v1/books/{book_id}/export", {
       params: { path: { book_id: uniqueBook("missing") } },

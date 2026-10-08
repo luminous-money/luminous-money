@@ -106,6 +106,16 @@ def test_bql_runs_over_the_booked_book(book):
     assert rows == [["Assets:Brokerage", ["5 VTI {200.00 USD, 2020-02-01}", '10 VTI {210.00 USD, 2020-03-01, "lot-2"}']]]
 
 
+def test_accounts_come_from_open_and_close_directives(book):
+    accounts = {a.name: a for a in book.accounts("book")}
+
+    assert accounts["Assets:Bank:Checking"].currencies == ["USD"]
+    assert accounts["Assets:Brokerage"].currencies == ["VTI", "USD"]
+    assert accounts["Assets:Cash"].close == datetime.date(2020, 12, 31)
+    assert accounts["Expenses:Food"].close is None
+    assert list(accounts) == sorted(accounts)
+
+
 def test_text_imports_refuse_includes(ledger):
     with pytest.raises(engine.ParseFailure):
         ledger.apply_text("book", 'include "other.beancount"\n')

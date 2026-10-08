@@ -458,6 +458,38 @@ The main custom build: a mobile-first PWA. Features, in priority order:
 It also needs a book switcher, and an editor for cross-book groups that shows every leg and won't
 save until they all balance.
 
+### How the review queue works
+
+The queue is every staged (`!`) transaction in a book, oldest first. It's built for the common
+case without hiding the general one.
+
+- **Splits are fully supported.** A transaction has any number of postings, in any currencies,
+  with lots and prices. The queue just doesn't make the common case pay for that.
+- **The happy path is a two-posting transaction,** as a bank feed delivers it.
+  - The **anchor** is the side on a bank or card account (`Assets:`/`Liabilities:`): where the
+    import came from. Its amount is shown on the card.
+  - The **counterpart** is the side being categorized, shown as a searchable account picker.
+    Accounts are filtered to those open on the transaction's date. Expense accounts are listed
+    first for money out, income first for money in.
+  - When both sides or neither are on the balance sheet (a transfer, say), the first posting is
+    the anchor.
+- **Anything else** (three or more postings, lots, prices) shows as a split summary that opens
+  the detail view.
+- **Skip moves an item to the end of the queue** and changes no data. Skips last for the browser
+  session.
+- **Edits save immediately and the item stays staged:** the description saves on blur or Enter,
+  the category on pick. Nothing typed is lost to a skipped or abandoned review.
+- **Confirm saves the current state with the `*` flag,** which takes the item out of the queue.
+  It's disabled while the counterpart is `Expenses:Uncategorized`.
+- **The detail view edits the whole transaction.**
+  - Fields: date, payee, description, and every posting.
+  - You can add and remove splits. One amount can be left blank, and Beancount balances it; the
+    editor shows the value it will get.
+  - A live balance check (exact decimal arithmetic, no floats) blocks saving while the
+    transaction is off.
+  - Lots and prices are preserved untouched and left to the ledger to check on save, since their
+    weights depend on booking.
+
 ## Components
 
 | Concern | Choice | Notes |

@@ -98,6 +98,10 @@ def create_app(ledger: Ledger, export_interval: float | None = None) -> FastAPI:
     def export(book_id: str) -> str:
         return ledger.export(book_id)
 
+    @api.get("/books/{book_id}/accounts")
+    def accounts(book_id: str) -> list[models.Account]:
+        return ledger.accounts(book_id)
+
     # Transactions, as JSON
 
     @api.get("/books/{book_id}/transactions")

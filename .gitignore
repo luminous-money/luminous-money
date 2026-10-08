@@ -5,3 +5,5 @@ __pycache__/
 *.sqlite-*
 node_modules/
 dist/
+test-results/
+playwright-report/

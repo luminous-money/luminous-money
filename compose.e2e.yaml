@@ -1,9 +1,17 @@
-# Overlay for the end-to-end suite. scripts/e2e.sh (`pnpm e2e`) runs the stack under its own
-# project name with fresh volumes, runs tests/e2e against it through Traefik, then tears it down.
+# Overlay for the end-to-end suites. scripts/e2e.sh (`pnpm e2e`) runs the stack under its own
+# project name with fresh volumes, runs each suite against it through Traefik with
+# `docker compose run`, then tears it down. The `tests` profile keeps `up` from starting them.
 services:
   traefik:
     ports: !reset []
 
   e2e:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/e2e:${FAVA_BEANS_VERSION:-dev}
+    profiles: [tests]
     depends_on: [traefik, ledger, app, fava]
+
+  ui:
+    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/ui-tests:${FAVA_BEANS_VERSION:-dev}
+    profiles: [tests]
+    depends_on: [traefik, ledger, app, fava]
+    ipc: host # Chromium needs more shared memory than Docker's default

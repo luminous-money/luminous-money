@@ -1,0 +1,17 @@
+{
+  "name": "@fava-beans/ui-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser tests of the PWA against a running stack. Playwright's version is pinned to the image in node.Dockerfile.",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@fava-beans/ledger-client": "workspace:*",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3"
+  }
+}

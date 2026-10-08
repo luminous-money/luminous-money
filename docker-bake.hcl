@@ -3,7 +3,7 @@
 #   docker buildx bake             build every service image for this machine
 #   docker buildx bake test        run every test suite and contract check
 #   docker buildx bake generate    export ledger's OpenAPI schema into packages/ledger-client
-#   docker buildx bake e2e         build the end-to-end test image (run it with `pnpm e2e`)
+#   docker buildx bake e2e ui-tests  build the end-to-end test images (run them with `pnpm e2e`)
 #   docker buildx bake release     build linux/amd64 + linux/arm64 and push (set REGISTRY, VERSION)
 #
 # The root package.json wraps these as `pnpm build`, `pnpm test`, `pnpm generate`, `pnpm release`.
@@ -89,13 +89,20 @@ target "workspace-check" {
   output = ["type=cacheonly"]
 }
 
-# The end-to-end suite, run against a throwaway stack by scripts/e2e.sh (`pnpm e2e`)
+# The end-to-end suites (API and browser), run against a throwaway stack by scripts/e2e.sh
 
 target "e2e" {
   context    = "."
   dockerfile = "node.Dockerfile"
   target     = "e2e"
   tags       = ["${REGISTRY}/e2e:${VERSION}"]
+}
+
+target "ui-tests" {
+  context    = "."
+  dockerfile = "node.Dockerfile"
+  target     = "ui"
+  tags       = ["${REGISTRY}/ui-tests:${VERSION}"]
 }
 
 # Release: both architectures (the Pi is arm64), pushed to REGISTRY

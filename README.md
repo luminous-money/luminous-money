@@ -30,7 +30,7 @@ Then open `http://localhost:8080/`, which redirects to the app at `/ui/`.
 
 | Path | What |
 |---|---|
-| `/ui/` | The PWA |
+| `/ui/` | The PWA: books, then each book's review queue |
 | `/fava/` | Fava, read-only, once a book exists |
 | `/api/ledger/v1/docs` | The ledger API's interactive docs |
 | `/api/app/v1/health` | The app API |
@@ -41,8 +41,9 @@ Then open `http://localhost:8080/`, which redirects to the app at `/ui/`.
 |---|---|
 | `pnpm build` | Build every service image for this machine |
 | `pnpm test` | Every test suite and contract check, in Docker (`docker buildx bake test`) |
-| `pnpm e2e` | Build everything and run the end-to-end suite against a throwaway stack |
-| `pnpm e2e:local` | Run the end-to-end suite against an already-running stack |
+| `pnpm e2e` | Build everything and run the end-to-end suites (API and browser) against a throwaway stack |
+| `pnpm e2e:local` | Run both end-to-end suites against an already-running stack |
+| `pnpm test:unit` | The TypeScript unit tests on the host (no Docker) |
 | `pnpm seed [book]` | Seed a demo book with recent purchases staged for review (default book: `demo`) |
 | `pnpm generate` | Regenerate `packages/ledger-client` after changing the ledger's API |
 | `pnpm release` | Build `linux/amd64` + `linux/arm64` images and push them (set `REGISTRY`, `VERSION`) |
@@ -67,7 +68,8 @@ services/
 packages/
   ledger-client/      typed client generated from the ledger's OpenAPI schema
 tests/
-  e2e/                end-to-end tests through Traefik
+  e2e/                API end-to-end tests through Traefik
+  ui/                 browser end-to-end tests (Playwright) through Traefik
 scripts/              helper scripts behind the pnpm commands
 docs/                 design
 ```

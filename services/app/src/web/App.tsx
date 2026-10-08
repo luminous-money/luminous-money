@@ -1,116 +1,39 @@
-import { useEffect, useState } from "react";
+import { Link, Route, Router, Switch } from "wouter";
 
-import { ledger } from "./ledger.js";
-
-type LedgerStatus =
-  { state: "checking" } | { state: "connected"; books: string[] } | { state: "unreachable" };
-
-function useLedgerStatus(): LedgerStatus {
-  const [status, setStatus] = useState<LedgerStatus>({ state: "checking" });
-  useEffect(() => {
-    let cancelled = false;
-    ledger
-      .GET("/api/ledger/v1/books")
-      .then(({ data, response }) => {
-        if (cancelled) return;
-        setStatus(
-          response.ok && data ? { state: "connected", books: data } : { state: "unreachable" }
-        );
-      })
-      .catch(() => !cancelled && setStatus({ state: "unreachable" }));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return status;
-}
+import { Home } from "./pages/Home.js";
+import { Review } from "./pages/Review.js";
+import { TransactionPage } from "./pages/TransactionPage.js";
 
 export function App() {
-  const status = useLedgerStatus();
-
   return (
-    <div className="shell">
-      <header className="masthead">
-        <img src="/ui/icon.svg" alt="" className="logo" />
-        <span className="wordmark">fava-beans</span>
-      </header>
+    <Router base="/ui">
+      <div className="shell">
+        <header className="masthead">
+          <Link href="/" className="brand">
+            <img src="/ui/icon.svg" alt="" className="logo" />
+            <span className="wordmark">fava-beans</span>
+          </Link>
+        </header>
 
-      <main>
-        <section className="hero">
-          <h1>Your books, reviewed in seconds.</h1>
-          <p>
-            Double-entry accounting with Beancount underneath and a review queue built for your
-            phone.
-          </p>
-        </section>
+        <Switch>
+          <Route path="/">
+            <Home />
+          </Route>
+          <Route path="/books/:book/review">{({ book }) => <Review book={book} />}</Route>
+          <Route path="/books/:book/transactions/:id">
+            {({ book, id }) => <TransactionPage key={id} book={book} id={id} />}
+          </Route>
+          <Route>
+            <main>
+              <p className="card">
+                Nothing here. <Link href="/">Back to your books</Link>
+              </p>
+            </main>
+          </Route>
+        </Switch>
 
-        <section className="card status" aria-live="polite">
-          <h2>Ledger</h2>
-          <StatusLine status={status} />
-        </section>
-
-        <section className="tiles">
-          <Tile title="Review queue" note="Confirm imported transactions with one tap." soon />
-          <Tile title="Import" note="Bank feeds and CSV uploads." soon />
-          <Tile title="Schedules" note="Recurring transactions across books." soon />
-          <Tile
-            title="Reports"
-            note="Balance sheet, income statement and queries in Fava."
-            href="/fava/"
-          />
-        </section>
-      </main>
-
-      <footer className="footer">Early build · nothing here touches real money yet</footer>
-    </div>
-  );
-}
-
-function StatusLine({ status }: { status: LedgerStatus }) {
-  switch (status.state) {
-    case "checking":
-      return <p className="muted">Checking…</p>;
-    case "unreachable":
-      return (
-        <p>
-          <span className="dot bad" /> Unreachable
-        </p>
-      );
-    case "connected":
-      return (
-        <p>
-          <span className="dot good" /> Connected · {status.books.length}{" "}
-          {status.books.length === 1 ? "book" : "books"}
-        </p>
-      );
-  }
-}
-
-function Tile({
-  title,
-  note,
-  href,
-  soon,
-}: {
-  title: string;
-  note: string;
-  href?: string;
-  soon?: boolean;
-}) {
-  const body = (
-    <>
-      <h3>
-        {title}
-        {soon && <span className="badge">Soon</span>}
-      </h3>
-      <p>{note}</p>
-    </>
-  );
-  return href ? (
-    <a className="card tile link" href={href}>
-      {body}
-    </a>
-  ) : (
-    <div className="card tile">{body}</div>
+        <footer className="footer">Early build · nothing here touches real money yet</footer>
+      </div>
+    </Router>
   );
 }

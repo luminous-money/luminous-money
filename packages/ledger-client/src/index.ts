@@ -17,6 +17,8 @@ export type Posting = Schemas["Posting"];
 export type Amount = Schemas["Amount"];
 export type Directive = Schemas["Directive"];
 export type Problem = Schemas["Problem"];
+export type Account = Schemas["Account"];
+export type Cost = Schemas["Cost"];
 export type Backup = Schemas["Backup"];
 
 export function createLedgerClient(options: ClientOptions) {

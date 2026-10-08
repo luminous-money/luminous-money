@@ -9,6 +9,6 @@
 - **Design decisions go in docs/design.md, with their reasons.** Undecided questions go in
   PLAN.md's open questions.
 - **Before calling a change done, run `pnpm test`, plus `pnpm e2e` if it touches the API, the
-  stack or routing.** If the ledger's API changed, run `pnpm generate` and commit the result; the
-  check fails otherwise.
+  stack, routing or the UI.** UI behavior gets a browser test in `tests/ui`. If the ledger's API
+  changed, run `pnpm generate` and commit the result; the check fails otherwise.
 - **No real financial data** goes anywhere in this repo or its test fixtures.

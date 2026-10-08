@@ -20,17 +20,24 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   - **Concurrency:** one SQLite connection per thread (the end-to-end suite caught a shared-
     connection bug).
   - **Benchmarks** are recorded in [docs/design.md](docs/design.md#performance-over-decades-of-data).
-- **`services/app`** (TypeScript) serves a PWA shell with a landing page at `/ui/`. It's React +
-  Vite + `vite-plugin-pwa`, with Hono serving `/api/app/v1`. The landing page's live "Ledger"
-  card calls the ledger through the generated typed client.
+- **`services/app`** (TypeScript) serves the PWA at `/ui/`: React + Vite + `vite-plugin-pwa`,
+  served by Hono, which also serves `/api/app/v1`.
+  - **Home:** books with their queue sizes.
+  - **Review queue:** skip, categorize with a searchable picker, edit the description, confirm.
+  - **Detail view:** a full split editor with a live, exact balance check.
+  - The rules are in [docs/design.md](docs/design.md#how-the-review-queue-works). The pure logic
+    (`src/web/lib`) has Vitest unit tests.
+- **`ledger`** also serves the chart of accounts (`/accounts`) for the picker.
 - **Stack:** Traefik routes by top-level prefix (`/api`, `/ui`, `/fava`) from its file provider.
   - `/api/ledger/v1` → `ledger`
   - `/api/app/v1` and `/ui` → `app`
   - `/fava` → Fava, read-only
   - `/` → redirects to `/ui/`
 - **Tests, all passing:**
-  - `pnpm test`: 46 ledger tests, the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 22 tests through Traefik against a throwaway stack
+  - `pnpm test`: 47 ledger tests, 19 app unit tests, the client drift check, typechecks and
+    Prettier
+  - `pnpm e2e`: 23 API tests and 6 browser tests (Playwright, phone-sized Chromium) through
+    Traefik, against a throwaway stack
 - **Demo data:** `pnpm seed [book]` imports a 2-year `bean-example` history whose last 45 days of
   card and checking purchases are staged for review: flagged `!`, with `source: "demo-import"`
   metadata, and roughly half (chosen by a hash of the ID) moved to `Expenses:Uncategorized`.
@@ -41,9 +48,9 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
 
 ## Next steps
 
-1. **Review queue UI** in the PWA: list `!` entries, confirm with one tap, edit. Use the JSON
-   endpoints (`/transactions`) and the types exported by `@fava-beans/ledger-client`. Start the
-   Vite dev server with `pnpm --filter @fava-beans/app dev` against the seeded stack.
+1. **Use the review queue for real on a phone** (`http://<laptop-ip>:8080/ui/`) and collect
+   friction. Likely candidates: suggested categories from payee history (the `rules` resolver),
+   bulk categorization, and showing validation problems in the UI.
 2. **Asynchronous, debounced validation in `ledger`.** Today `problems` validates on demand,
    synchronously.
 3. **`auth` service + forwardAuth,** before the stack is exposed beyond localhost.
@@ -55,6 +62,11 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   `docker compose down -v && docker compose up -d && pnpm seed` (this wipes the dev stack's data).
 - **Fava takes its list of books at startup.** After creating a book, run
   `docker compose restart fava`. (Open question in PLAN.md.)
+- **Playwright is pinned to 1.63.0** in `tests/ui/package.json` and in `node.Dockerfile`'s `ui`
+  stage. They must match, because the image's preinstalled browsers belong to that version. Bump
+  both together.
+- **The UI calls the ledger API directly** through Traefik. Nothing proxies through `app` yet;
+  that changes once auth exists.
 - **TypeScript is pinned to 5.x.** `openapi-typescript` needs the TypeScript 5 compiler API, and
   pnpm will offer TypeScript 7, which breaks generation.
 - **pnpm 11 checks the lockfile against a supply-chain policy, which needs registry access.**

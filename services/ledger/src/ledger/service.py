@@ -167,6 +167,11 @@ class Ledger:
         self._header(book_id)
         return engine.transactions([r.text for r in self.store.find(book_id, kind="transaction", **filters)])
 
+    def accounts(self, book_id: str) -> list[models.Account]:
+        self._header(book_id)
+        rows = [r for kind in ("open", "close") for r in self.store.find(book_id, kind=kind, limit=None)]
+        return engine.accounts([r.text for r in rows])
+
     def _insert(self, book_id: str, directive: engine.Directive) -> engine.Directive:
         self._header(book_id)
         with self.store.transaction():

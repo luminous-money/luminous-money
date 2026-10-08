@@ -72,6 +72,13 @@ class Transaction(TransactionIn):
     id: str
 
 
+class Account(BaseModel):
+    name: str
+    open: datetime.date
+    close: datetime.date | None = None
+    currencies: list[str] = Field(default_factory=list, description="Constraint from the open directive; empty means any.")
+
+
 class Directive(BaseModel):
     """Any directive, as its canonical Beancount text plus the columns derived from it."""
 
