@@ -14,7 +14,7 @@ the system.
       fidelity, incremental backups (`services/ledger`)
 - [x] Decades-scale benchmark harness (`services/ledger/bench`)
 - [x] Monorepo tooling: bake, pnpm workspace, generated `ledger-client` with a drift check
-- [x] Compose stack and routing shell: Traefik, `ledger`, `app`, Fava; `/api/*` and `/ui/*`
+- [x] Compose stack and routing shell: Traefik, `ledger`, `app`, Fava; `/api/*`, `/ui/*`, `/fava/*`
 - [x] End-to-end test harness against a throwaway stack (`pnpm e2e`, `tests/e2e`)
 - [ ] Deploy with `docker stack deploy` on a real Swarm. `docker stack config` already accepts
       the file; the Pi is the natural place to do this.

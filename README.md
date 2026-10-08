@@ -31,7 +31,7 @@ Then open `http://localhost:8080/`, which redirects to the app at `/ui/`.
 | Path | What |
 |---|---|
 | `/ui/` | The PWA |
-| `/ui/fava/` | Fava, read-only, once a book exists |
+| `/fava/` | Fava, read-only, once a book exists |
 | `/api/ledger/v1/docs` | The ledger API's interactive docs |
 | `/api/app/v1/health` | The app API |
 
@@ -58,7 +58,7 @@ compose.e2e.yaml      overlay that adds the end-to-end runner
 docker-bake.hcl       every image, test target and release platform
 node.Dockerfile       the shared TypeScript workspace stage, its checks, and the e2e image
 deploy/
-  traefik/            routing (file provider): /api/* and /ui/*
+  traefik/            routing (file provider): /api/*, /ui/*, /fava/*
   fava/               Fava image, pinned to the ledger's Beancount version
 services/
   ledger/             Python: system of record, Beancount engine      → /api/ledger/v1

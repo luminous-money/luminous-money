@@ -1,6 +1,5 @@
-# Routing: two top-level prefixes. Everything under /api is an API, everything under /ui is a
-# user interface. Services serve under their full prefix, so nothing is stripped. When two rules
-# overlap (/ui and /ui/fava), Traefik prefers the longer rule.
+# Routing by top-level prefix: /api for every API, /ui for the PWA, /fava for Fava (a different
+# UI with its own life). Services serve under their full prefix, so nothing is stripped.
 #
 # Auth: once the `auth` service exists, add a forwardAuth middleware pointing at its verify
 # endpoint and attach it to every router except /api/auth/v1 login.
@@ -18,8 +17,8 @@ http:
       rule: PathPrefix(`/ui`)
       entryPoints: [web]
       service: app
-    fava-ui:
-      rule: PathPrefix(`/ui/fava`)
+    fava:
+      rule: PathPrefix(`/fava`)
       entryPoints: [web]
       service: fava
     root:

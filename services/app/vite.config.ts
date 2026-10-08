@@ -31,9 +31,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Fava lives under /ui/fava and the APIs under /api; neither is part of the app shell.
         navigateFallback: "/ui/index.html",
-        navigateFallbackDenylist: [/^\/ui\/fava(\/|$)/, /^\/api\//],
       },
     }),
   ],

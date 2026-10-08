@@ -60,20 +60,22 @@ describe("routing through Traefik", () => {
       assert.match(await route.text(), /<div id="root">/);
       assert.equal(asset.status, 404);
     });
+  });
 
-    it("routes /ui/fava to a read-only Fava once a book has been exported", async () => {
+  describe("/fava", () => {
+    it("routes /fava to a read-only Fava once a book has been exported", async () => {
       await newBook("routing");
 
       // Fava starts once the first export exists, so the first run of a fresh stack waits here.
       const home = await eventually(async () => {
-        const response = await fetch(`${BASE_URL}/ui/fava/`, { redirect: "manual" });
+        const response = await fetch(`${BASE_URL}/fava/`, { redirect: "manual" });
         assert.equal(response.status, 302);
         return response.headers.get("location") ?? "";
       });
-      const slug = new URL(home, BASE_URL).pathname.split("/")[3];
+      const slug = new URL(home, BASE_URL).pathname.split("/")[2];
       assert.ok(slug, `expected a ledger slug in ${home}`);
 
-      const edit = await fetch(`${BASE_URL}/ui/fava/${slug}/api/source`, {
+      const edit = await fetch(`${BASE_URL}/fava/${slug}/api/source`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ file_path: "/exports/x.beancount", source: "", sha256sum: "" }),

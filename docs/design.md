@@ -231,8 +231,10 @@ job, Syncthing into the hierarchy, offsite storage) decide where they go.
 
 ### Routing and auth: Traefik + forwardAuth
 
-Traefik is the only exposed port. One box serves both the UI and the APIs, so there are **two
-top-level prefixes: `/api` for every API and `/ui` for every user interface.**
+Traefik is the only exposed port. One box serves the UIs and the APIs, so routing is by
+**top-level prefix: `/api` for every API, `/ui` for the PWA, and `/fava` for Fava.** Fava is a
+UI too, but a different one with its own life, so it gets its own prefix rather than sharing the
+PWA's (where the PWA's service worker would also have to be told to leave it alone).
 
 - **Each service serves under its full prefix,** so Traefik strips nothing.
 - **Routes come from Traefik's file provider** (`deploy/traefik/routes.yml`), not Docker labels.
@@ -243,12 +245,10 @@ top-level prefixes: `/api` for every API and `/ui` for every user interface.**
 | `/api/auth/v1` | `auth` | Login, token issuance, refresh. Login is exempt from the auth check. (Not built yet.) |
 | `/api/ledger/v1` | `ledger` | Books API: entries, staging, cross-book groups, BQL, import/export, backup. |
 | `/api/app/v1` | `app` | Review queue, the resolver pipeline, schedules, import sources. |
-| `/ui/fava` | `fava` | Desktop reporting, read-only. Fava runs with `--prefix /ui/fava`. |
+| `/fava` | `fava` | Desktop reporting, read-only. Fava runs with `--prefix /fava`. |
 | `/ui` | `app` | The review PWA. Unknown paths under `/ui` get the app shell, for client-side routing. |
 | `/` | (redirect) | Redirects to `/ui/`. |
 
-The PWA's service worker controls everything under `/ui/`, so it excludes `/ui/fava` (and `/api`)
-from its navigation fallback. Otherwise it would serve the app shell for Fava's pages.
 
 How auth works:
 
@@ -390,7 +390,7 @@ The design separates four things:
                         ┌──────────── traefik (upstream) ────────────┐
   operator's proxy ───▶ │  path routing · forwardAuth ─▶ auth /verify │
                         └───┬──────────────┬───────────────┬──────┬──┘
-              /api/auth/v1  │ /api/app/v1, │ /api/ledger/v1│      │ /ui/fava
+              /api/auth/v1  │ /api/app/v1, │ /api/ledger/v1│      │ /fava
                             │ /ui          │               │      │
                             ▼              ▼               │      ▼
                      ┌──────────┐ ┌─────────────────────┐  │  ┌──────────────────┐
@@ -438,7 +438,7 @@ save until they all balance.
 |---|---|---|
 | System of record | SQLite, behind an interface | One ledger database for all books. |
 | Accounting engine | Beancount v3 | Also the import/export and backup format. |
-| Desktop reporting | Fava | Read-only, optional, under `/ui/fava`. |
+| Desktop reporting | Fava | Read-only, optional, under `/fava`. |
 | Mobile UI | PWA: React + Vite + `vite-plugin-pwa` | Served by `app` under `/ui`. |
 | App API server | Hono on Node | Small footprint for the Pi. |
 | Routing | Traefik | forwardAuth to `auth`, no plugins. |

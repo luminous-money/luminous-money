@@ -56,7 +56,7 @@ export function App() {
           <Tile
             title="Reports"
             note="Balance sheet, income statement and queries in Fava."
-            href="/ui/fava/"
+            href="/fava/"
           />
         </section>
       </main>

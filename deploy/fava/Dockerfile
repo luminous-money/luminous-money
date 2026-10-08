@@ -7,6 +7,6 @@ FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.12 /uv /usr/local/bin/uv
 RUN uv pip install --system --no-cache "fava==1.30.16" "beancount==3.2.3"
 COPY entrypoint.sh /usr/local/bin/fava-entrypoint
-ENV FAVA_HOST=0.0.0.0 FAVA_PORT=5000 FAVA_PREFIX=/ui/fava EXPORT_DIR=/exports
+ENV FAVA_HOST=0.0.0.0 FAVA_PORT=5000 FAVA_PREFIX=/fava EXPORT_DIR=/exports
 EXPOSE 5000
 ENTRYPOINT ["fava-entrypoint"]

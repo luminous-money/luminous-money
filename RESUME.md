@@ -20,10 +20,10 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
 - **`services/app`** (TypeScript) serves a PWA shell with a landing page at `/ui/`. It's React +
   Vite + `vite-plugin-pwa`, with Hono serving `/api/app/v1`. The landing page's live "Ledger"
   card calls the ledger through the generated typed client.
-- **Stack:** Traefik routes `/api/*` and `/ui/*` from its file provider.
+- **Stack:** Traefik routes by top-level prefix (`/api`, `/ui`, `/fava`) from its file provider.
   - `/api/ledger/v1` → `ledger`
   - `/api/app/v1` and `/ui` → `app`
-  - `/ui/fava` → Fava, read-only
+  - `/fava` → Fava, read-only
   - `/` → redirects to `/ui/`
 - **Tests, all passing:**
   - `pnpm test`: 27 ledger tests, the client drift check, typechecks and Prettier
@@ -49,8 +49,6 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
 
 - **Fava takes its list of books at startup.** After creating a book, run
   `docker compose restart fava`. (Open question in PLAN.md.)
-- **The PWA's service worker covers `/ui/`.** Fava under `/ui/fava` is excluded from its
-  navigation fallback in `services/app/vite.config.ts`; keep it that way.
 - **TypeScript is pinned to 5.x.** `openapi-typescript` needs the TypeScript 5 compiler API, and
   pnpm will offer TypeScript 7, which breaks generation.
 - **pnpm 11 checks the lockfile against a supply-chain policy, which needs registry access.**
