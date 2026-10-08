@@ -43,6 +43,7 @@ Then open `http://localhost:8080/`, which redirects to the app at `/ui/`.
 | `pnpm test` | Every test suite and contract check, in Docker (`docker buildx bake test`) |
 | `pnpm e2e` | Build everything and run the end-to-end suite against a throwaway stack |
 | `pnpm e2e:local` | Run the end-to-end suite against an already-running stack |
+| `pnpm seed [book]` | Seed a demo book with recent purchases staged for review (default book: `demo`) |
 | `pnpm generate` | Regenerate `packages/ledger-client` after changing the ledger's API |
 | `pnpm release` | Build `linux/amd64` + `linux/arm64` images and push them (set `REGISTRY`, `VERSION`) |
 | `pnpm --filter @fava-beans/app dev` | Vite dev server for the PWA, proxying `/api` to a running stack |

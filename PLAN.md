@@ -34,7 +34,9 @@ the system.
 - [ ] CSV import as a participant
 - [ ] Context builder (14-month window) and the resolver chain: `matcher`, then `rules`, with
       `external` as a configurable slot
-- [ ] Synthetic data generator for demos and UI work
+- [x] Demo books for UI work: `pnpm seed` stages recent purchases of a `bean-example` history
+- [ ] Richer synthetic data: denser purchase history, more payees, several books with cross-book
+      pairs (needed by Phase 3)
 
 ## Phase 3: Many books
 

@@ -27,6 +27,12 @@ service that writes book data. Served at `/api/ledger/v1`.
 
   A backup chunk is exactly such text, one per changed book, with the directives in ordinal order.
 
+## Demo data
+
+`python -m ledger.demo` prints a demo ledger: a `bean-example` history whose recent card and
+checking purchases are staged (`!`, `source: "demo-import"`), about half of them moved to
+`Expenses:Uncategorized`. `pnpm seed` at the repo root imports it into a running stack.
+
 ## Development
 
 Everything runs in Docker; nothing needs installing on the host.

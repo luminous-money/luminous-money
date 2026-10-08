@@ -12,6 +12,7 @@
     "test": "docker buildx bake test",
     "e2e": "./scripts/e2e.sh",
     "e2e:local": "pnpm --filter \"@fava-beans/e2e...\" build && pnpm --filter @fava-beans/e2e test",
+    "seed": "./scripts/seed-demo.sh",
     "generate": "docker buildx bake generate && pnpm -r generate",
     "release": "docker buildx bake release",
     "up": "docker buildx bake && docker compose up",
