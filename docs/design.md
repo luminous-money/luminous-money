@@ -73,6 +73,32 @@ proposed match or categorization. The **review queue is every `!` entry**, and c
 changes its flag to `*`. Staged entries are real entries from the moment they're created. In the
 database, the flag is a status column on the entry, and an export writes it out as the flag.
 
+### Writes: JSON for transactions, Beancount text for everything
+
+The ledger API accepts writes in two forms, and both store the same canonical row:
+
+- **Transactions as JSON** (`/api/ledger/v1/books/{book}/transactions`). This is what the app uses
+  when it composes or edits a transaction from form fields. `ledger` renders the Beancount text
+  itself, so Beancount syntax never leaves the one service that understands it.
+- **Any directive as Beancount text** (`/directives`, `/import`). This covers raw editing, every
+  directive type, bulk import and restore.
+
+Anything written one way reads back the other way. The JSON is designed to lose nothing:
+
+- **Numbers are decimal strings,** never JSON numbers, so amounts can't pick up floating-point
+  error between a form field and the ledger.
+- **Metadata values keep their Beancount type:** text, boolean, `{"number"}`, `{"date"}` or an
+  amount. A read → edit → write cycle therefore changes nothing it didn't mean to.
+- **Validation happens in two layers.**
+  - The schema rejects malformed shapes: bad decimals, floats, unknown fields, empty postings.
+  - Re-parsing the rendered text rejects anything Beancount wouldn't accept, such as account
+    names, flags and metadata keys.
+- **Incomplete amounts** (an elided number with an explicit currency) have no JSON form and read
+  back as omitted. They're rare and still fully supported through the text endpoints.
+
+Every endpoint has a typed response model, so the generated TypeScript client describes real
+request and response bodies.
+
 ### Start fresh, no GnuCash conversion
 
 The GnuCash book is too big to be worth converting. The new books start from opening balances on

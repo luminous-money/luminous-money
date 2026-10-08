@@ -21,10 +21,15 @@ from typing import Any
 
 import beanquery
 from beancount import loader
+from beancount.core import amount as bc_amount
 from beancount.core import data
 from beancount.core.inventory import Inventory
 from beancount.core.number import MISSING
+from beancount.core.position import Cost as BookedCost
+from beancount.core.position import CostSpec
 from beancount.parser import parser, printer
+
+from . import models
 
 ID_KEY = "id"
 TOMBSTONE_TYPE = "fava-beans"
@@ -171,6 +176,143 @@ def parse_one(text: str, directive_id: str | None = None) -> Directive:
     if directive_id is not None and given is not None and str(given) != directive_id:
         raise ParseFailure([f"directive id {given} does not match {directive_id}"])
     return to_directive(entries[0], directive_id)
+
+
+def transaction_directive(t: models.TransactionIn, directive_id: str | None = None) -> Directive:
+    """Render a structured transaction as a canonical directive.
+
+    The printed text is parsed again before it's returned. That validates what Pydantic can't
+    (account names, currencies, flags, metadata keys) and guarantees the stored text is exactly
+    what parsing it would produce.
+    """
+    entry = data.Transaction(
+        meta=_meta_in(t.meta),
+        date=t.date,
+        flag=t.flag,
+        payee=t.payee,
+        narration=t.narration,
+        tags=frozenset(t.tags),
+        links=frozenset(t.links),
+        postings=[
+            data.Posting(
+                account=p.account,
+                units=_amount_in(p.units) if p.units else MISSING,
+                cost=_cost_in(p.cost),
+                price=_amount_in(p.price) if p.price else None,
+                flag=p.flag,
+                meta=_meta_in(p.meta) or None,
+            )
+            for p in t.postings
+        ],
+    )
+    directive = to_directive(entry, directive_id)
+    return parse_one(directive.text, directive.id)
+
+
+def transactions(texts: list[str]) -> list[models.Transaction]:
+    """Structured views of stored transactions, in the given order. Non-transactions are skipped."""
+    entries, errors, _ = parser.parse_string("\n".join(texts))
+    if errors:
+        raise ParseFailure([_message(e) for e in errors])
+    return [_transaction_model(e) for e in entries if isinstance(e, data.Transaction)]
+
+
+def _transaction_model(entry: data.Transaction) -> models.Transaction:
+    return models.Transaction(
+        id=str(entry.meta[ID_KEY]),
+        date=entry.date,
+        flag=entry.flag,
+        payee=entry.payee,
+        narration=entry.narration or "",
+        tags=sorted(entry.tags or ()),
+        links=sorted(entry.links or ()),
+        meta=_meta_out(entry.meta),
+        postings=[
+            models.Posting(
+                account=p.account,
+                units=_amount_out(p.units),
+                cost=_cost_out(p.cost),
+                price=_amount_out(p.price),
+                flag=p.flag,
+                meta=_meta_out(p.meta),
+            )
+            for p in entry.postings
+        ],
+    )
+
+
+def _num(number: Decimal) -> str:
+    return format(number, "f")
+
+
+def _amount_in(a: models.Amount) -> bc_amount.Amount:
+    return bc_amount.Amount(Decimal(a.number), a.currency)
+
+
+def _amount_out(a: Any) -> models.Amount | None:
+    """Incomplete amounts (an elided number or currency) have no JSON form and come back as None."""
+    if a is None or a is MISSING or a.number is MISSING or a.currency is MISSING:
+        return None
+    return models.Amount(number=_num(a.number), currency=a.currency)
+
+
+def _cost_in(c: models.Cost | None) -> CostSpec | None:
+    if c is None:
+        return None
+    return CostSpec(
+        number_per=MISSING if c.number is None else Decimal(c.number),
+        number_total=None if c.total is None else Decimal(c.total),
+        currency=c.currency or MISSING,
+        date=c.date,
+        label=c.label,
+        merge=False,
+    )
+
+
+def _cost_out(c: Any) -> models.Cost | None:
+    if c is None:
+        return None
+    if isinstance(c, BookedCost):
+        number, total = c.number, None
+    else:
+        number, total = c.number_per, c.number_total
+    return models.Cost(
+        number=None if number in (None, MISSING) else _num(number),
+        total=None if total in (None, MISSING) else _num(total),
+        currency=None if c.currency is MISSING else c.currency,
+        date=c.date,
+        label=c.label,
+    )
+
+
+def _meta_in(meta: models.Meta) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in meta.items():
+        if isinstance(value, models.MetaNumber):
+            out[key] = Decimal(value.number)
+        elif isinstance(value, models.MetaDate):
+            out[key] = value.date
+        elif isinstance(value, models.Amount):
+            out[key] = _amount_in(value)
+        else:
+            out[key] = value
+    return out
+
+
+def _meta_out(meta: dict[str, Any] | None) -> models.Meta:
+    out: models.Meta = {}
+    for key, value in (meta or {}).items():
+        if key in ("filename", "lineno", ID_KEY) or key.startswith("__"):
+            continue
+        if isinstance(value, (bool, str)):
+            out[key] = value
+        elif isinstance(value, Decimal):
+            out[key] = models.MetaNumber(number=_num(value))
+        elif isinstance(value, datetime.date):
+            out[key] = models.MetaDate(date=value)
+        elif isinstance(value, bc_amount.Amount) and (converted := _amount_out(value)):
+            out[key] = converted
+    return out
 
 
 def with_flag(text: str, flag: str) -> Directive:

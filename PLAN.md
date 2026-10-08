@@ -19,7 +19,8 @@ the system.
 - [ ] Deploy with `docker stack deploy` on a real Swarm. `docker stack config` already accepts
       the file; the Pi is the natural place to do this.
 - [ ] Asynchronous, debounced validation in `ledger`; writes do structural checks only
-- [ ] Structured (JSON) writes in `ledger`, so Beancount syntax stays in one service
+- [x] Structured (JSON) writes in `ledger`, so Beancount syntax stays in one service; typed
+      responses throughout the API
 - [ ] `auth` service: users, login, JWT issuance, the forwardAuth verify endpoint; attach
       forwardAuth to every route
 - [ ] Fava picks up newly created books
@@ -67,10 +68,6 @@ the system.
 
 ## Open questions
 
-- **Structured writes:** the app will compose transactions from form fields. Does `ledger` accept
-  JSON and render it to Beancount text, or does the app render the text itself? The leaning is
-  JSON in `ledger`, so Beancount syntax stays in one service and the generated client types
-  describe real request bodies.
 - **Asynchronous validation:** how do the app and the user see that a book is being re-validated
   and that its problem list is stale?
 - **Fava and new books:** Fava gets its list of ledgers at startup. When a book is created, does

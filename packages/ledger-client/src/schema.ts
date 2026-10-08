@@ -62,11 +62,11 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Find */
-    get: operations["find_api_ledger_v1_books__book_id__directives_get"];
+    /** List Directives */
+    get: operations["list_directives_api_ledger_v1_books__book_id__directives_get"];
     put?: never;
-    /** Create */
-    post: operations["create_api_ledger_v1_books__book_id__directives_post"];
+    /** Create Directive */
+    post: operations["create_directive_api_ledger_v1_books__book_id__directives_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -80,13 +80,13 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get */
-    get: operations["get_api_ledger_v1_books__book_id__directives__directive_id__get"];
-    /** Update */
-    put: operations["update_api_ledger_v1_books__book_id__directives__directive_id__put"];
+    /** Get Directive */
+    get: operations["get_directive_api_ledger_v1_books__book_id__directives__directive_id__get"];
+    /** Update Directive */
+    put: operations["update_directive_api_ledger_v1_books__book_id__directives__directive_id__put"];
     post?: never;
-    /** Delete */
-    delete: operations["delete_api_ledger_v1_books__book_id__directives__directive_id__delete"];
+    /** Delete Directive */
+    delete: operations["delete_directive_api_ledger_v1_books__book_id__directives__directive_id__delete"];
     options?: never;
     head?: never;
     patch?: never;
@@ -177,14 +177,246 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/transactions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Transactions */
+    get: operations["list_transactions_api_ledger_v1_books__book_id__transactions_get"];
+    put?: never;
+    /** Create Transaction */
+    post: operations["create_transaction_api_ledger_v1_books__book_id__transactions_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/transactions/{directive_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Transaction */
+    get: operations["get_transaction_api_ledger_v1_books__book_id__transactions__directive_id__get"];
+    /** Update Transaction */
+    put: operations["update_transaction_api_ledger_v1_books__book_id__transactions__directive_id__put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** Amount */
+    Amount: {
+      /** Currency */
+      currency: string;
+      /** Number */
+      number: string;
+    };
+    /** Applied */
+    Applied: {
+      /** Deleted */
+      deleted: number;
+      /** Put */
+      put: number;
+    };
+    /** Backup */
+    Backup: {
+      /**
+       * Chunks
+       * @description Book ID to a Beancount chunk.
+       */
+      chunks: {
+        [key: string]: string;
+      };
+      /** Cursor */
+      cursor: number;
+      /** Since */
+      since: number;
+    };
+    /** Book */
+    Book: {
+      /** Id */
+      id: string;
+    };
+    /**
+     * Cost
+     * @description A cost basis, as written in `{...}`. All fields empty is `{}`: let booking pick the lot.
+     */
+    Cost: {
+      /** Currency */
+      currency?: string | null;
+      /** Date */
+      date?: string | null;
+      /** Label */
+      label?: string | null;
+      /**
+       * Number
+       * @description Per-unit cost.
+       */
+      number?: string | null;
+      /**
+       * Total
+       * @description Total cost, as in `{{...}}`.
+       */
+      total?: string | null;
+    };
+    /**
+     * Directive
+     * @description Any directive, as its canonical Beancount text plus the columns derived from it.
+     */
+    Directive: {
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Flag */
+      flag: string | null;
+      /** Id */
+      id: string;
+      /** Kind */
+      kind: string;
+      /** Text */
+      text: string;
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
+    };
+    /** MetaDate */
+    MetaDate: {
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+    };
+    /** MetaNumber */
+    MetaNumber: {
+      /** Number */
+      number: string;
+    };
+    /** Posting */
+    Posting: {
+      /** Account */
+      account: string;
+      cost?: components["schemas"]["Cost"] | null;
+      /** Flag */
+      flag?: string | null;
+      /** Meta */
+      meta?: {
+        [key: string]:
+          | string
+          | boolean
+          | components["schemas"]["MetaNumber"]
+          | components["schemas"]["MetaDate"]
+          | components["schemas"]["Amount"];
+      };
+      /** @description Per-unit price, as in `@`. */
+      price?: components["schemas"]["Amount"] | null;
+      /** @description Omit to let booking fill in the balancing amount. */
+      units?: components["schemas"]["Amount"] | null;
+    };
+    /** Problem */
+    Problem: {
+      /** Directive Id */
+      directive_id: string | null;
+      /** Message */
+      message: string;
+    };
+    /** QueryResult */
+    QueryResult: {
+      /** Columns */
+      columns: string[];
+      /** Rows */
+      rows: unknown[][];
+    };
+    /** Transaction */
+    Transaction: {
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /**
+       * Flag
+       * @description `!` is staged for review; `*` is confirmed.
+       * @default !
+       */
+      flag: string;
+      /** Id */
+      id: string;
+      /** Links */
+      links?: string[];
+      /** Meta */
+      meta?: {
+        [key: string]:
+          | string
+          | boolean
+          | components["schemas"]["MetaNumber"]
+          | components["schemas"]["MetaDate"]
+          | components["schemas"]["Amount"];
+      };
+      /**
+       * Narration
+       * @default
+       */
+      narration: string;
+      /** Payee */
+      payee?: string | null;
+      /** Postings */
+      postings: components["schemas"]["Posting"][];
+      /** Tags */
+      tags?: string[];
+    };
+    /** TransactionIn */
+    TransactionIn: {
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /**
+       * Flag
+       * @description `!` is staged for review; `*` is confirmed.
+       * @default !
+       */
+      flag: string;
+      /** Links */
+      links?: string[];
+      /** Meta */
+      meta?: {
+        [key: string]:
+          | string
+          | boolean
+          | components["schemas"]["MetaNumber"]
+          | components["schemas"]["MetaDate"]
+          | components["schemas"]["Amount"];
+      };
+      /**
+       * Narration
+       * @default
+       */
+      narration: string;
+      /** Payee */
+      payee?: string | null;
+      /** Postings */
+      postings: components["schemas"]["Posting"][];
+      /** Tags */
+      tags?: string[];
     };
     /** ValidationError */
     ValidationError: {
@@ -225,9 +457,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["Backup"];
         };
       };
       /** @description Validation Error */
@@ -278,9 +508,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["Book"];
         };
       };
       /** @description Validation Error */
@@ -294,9 +522,10 @@ export interface operations {
       };
     };
   };
-  find_api_ledger_v1_books__book_id__directives_get: {
+  list_directives_api_ledger_v1_books__book_id__directives_get: {
     parameters: {
       query?: {
+        /** @description An account and its subaccounts. */
         account?: string | null;
         flag?: string | null;
         from?: string | null;
@@ -317,9 +546,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          }[];
+          "application/json": components["schemas"]["Directive"][];
         };
       };
       /** @description Validation Error */
@@ -333,7 +560,7 @@ export interface operations {
       };
     };
   };
-  create_api_ledger_v1_books__book_id__directives_post: {
+  create_directive_api_ledger_v1_books__book_id__directives_post: {
     parameters: {
       query?: never;
       header?: never;
@@ -354,9 +581,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["Directive"];
         };
       };
       /** @description Validation Error */
@@ -370,7 +595,7 @@ export interface operations {
       };
     };
   };
-  get_api_ledger_v1_books__book_id__directives__directive_id__get: {
+  get_directive_api_ledger_v1_books__book_id__directives__directive_id__get: {
     parameters: {
       query?: never;
       header?: never;
@@ -388,9 +613,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["Directive"];
         };
       };
       /** @description Validation Error */
@@ -404,7 +627,7 @@ export interface operations {
       };
     };
   };
-  update_api_ledger_v1_books__book_id__directives__directive_id__put: {
+  update_directive_api_ledger_v1_books__book_id__directives__directive_id__put: {
     parameters: {
       query?: never;
       header?: never;
@@ -426,9 +649,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["Directive"];
         };
       };
       /** @description Validation Error */
@@ -442,7 +663,7 @@ export interface operations {
       };
     };
   };
-  delete_api_ledger_v1_books__book_id__directives__directive_id__delete: {
+  delete_directive_api_ledger_v1_books__book_id__directives__directive_id__delete: {
     parameters: {
       query?: never;
       header?: never;
@@ -490,9 +711,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["Directive"];
         };
       };
       /** @description Validation Error */
@@ -558,9 +777,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["Applied"];
         };
       };
       /** @description Validation Error */
@@ -591,9 +808,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          }[];
+          "application/json": components["schemas"]["Problem"][];
         };
       };
       /** @description Validation Error */
@@ -628,9 +843,148 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["QueryResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_transactions_api_ledger_v1_books__book_id__transactions_get: {
+    parameters: {
+      query?: {
+        /** @description An account and its subaccounts. */
+        account?: string | null;
+        flag?: string | null;
+        from?: string | null;
+        to?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Transaction"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_transaction_api_ledger_v1_books__book_id__transactions_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TransactionIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Transaction"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_transaction_api_ledger_v1_books__book_id__transactions__directive_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+        directive_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Transaction"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_transaction_api_ledger_v1_books__book_id__transactions__directive_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+        directive_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TransactionIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Transaction"];
         };
       };
       /** @description Validation Error */

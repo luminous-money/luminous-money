@@ -1,6 +1,194 @@
 {
   "components": {
     "schemas": {
+      "Amount": {
+        "additionalProperties": false,
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "number": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "currency"
+        ],
+        "title": "Amount",
+        "type": "object"
+      },
+      "Applied": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "integer"
+          },
+          "put": {
+            "title": "Put",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "put",
+          "deleted"
+        ],
+        "title": "Applied",
+        "type": "object"
+      },
+      "Backup": {
+        "properties": {
+          "chunks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Book ID to a Beancount chunk.",
+            "title": "Chunks",
+            "type": "object"
+          },
+          "cursor": {
+            "title": "Cursor",
+            "type": "integer"
+          },
+          "since": {
+            "title": "Since",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "since",
+          "cursor",
+          "chunks"
+        ],
+        "title": "Backup",
+        "type": "object"
+      },
+      "Book": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "Book",
+        "type": "object"
+      },
+      "Cost": {
+        "additionalProperties": false,
+        "description": "A cost basis, as written in `{...}`. All fields empty is `{}`: let booking pick the lot.",
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Per-unit cost.",
+            "title": "Number"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Total cost, as in `{{...}}`.",
+            "title": "Total"
+          }
+        },
+        "title": "Cost",
+        "type": "object"
+      },
+      "Directive": {
+        "description": "Any directive, as its canonical Beancount text plus the columns derived from it.",
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flag"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "kind",
+          "flag",
+          "text"
+        ],
+        "title": "Directive",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -12,6 +200,343 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "MetaDate": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "title": "MetaDate",
+        "type": "object"
+      },
+      "MetaNumber": {
+        "additionalProperties": false,
+        "properties": {
+          "number": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number"
+        ],
+        "title": "MetaNumber",
+        "type": "object"
+      },
+      "Posting": {
+        "additionalProperties": false,
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cost"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "maxLength": 1,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flag"
+          },
+          "meta": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "$ref": "#/components/schemas/MetaNumber"
+                },
+                {
+                  "$ref": "#/components/schemas/MetaDate"
+                },
+                {
+                  "$ref": "#/components/schemas/Amount"
+                }
+              ]
+            },
+            "title": "Meta",
+            "type": "object"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Per-unit price, as in `@`."
+          },
+          "units": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omit to let booking fill in the balancing amount."
+          }
+        },
+        "required": [
+          "account"
+        ],
+        "title": "Posting",
+        "type": "object"
+      },
+      "Problem": {
+        "properties": {
+          "directive_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Directive Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "directive_id"
+        ],
+        "title": "Problem",
+        "type": "object"
+      },
+      "QueryResult": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "items": {},
+              "type": "array"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "columns",
+          "rows"
+        ],
+        "title": "QueryResult",
+        "type": "object"
+      },
+      "Transaction": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "flag": {
+            "default": "!",
+            "description": "`!` is staged for review; `*` is confirmed.",
+            "maxLength": 1,
+            "minLength": 1,
+            "title": "Flag",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "links": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "meta": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "$ref": "#/components/schemas/MetaNumber"
+                },
+                {
+                  "$ref": "#/components/schemas/MetaDate"
+                },
+                {
+                  "$ref": "#/components/schemas/Amount"
+                }
+              ]
+            },
+            "title": "Meta",
+            "type": "object"
+          },
+          "narration": {
+            "default": "",
+            "title": "Narration",
+            "type": "string"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "postings": {
+            "items": {
+              "$ref": "#/components/schemas/Posting"
+            },
+            "minItems": 1,
+            "title": "Postings",
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "date",
+          "postings",
+          "id"
+        ],
+        "title": "Transaction",
+        "type": "object"
+      },
+      "TransactionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "flag": {
+            "default": "!",
+            "description": "`!` is staged for review; `*` is confirmed.",
+            "maxLength": 1,
+            "minLength": 1,
+            "title": "Flag",
+            "type": "string"
+          },
+          "links": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "meta": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "$ref": "#/components/schemas/MetaNumber"
+                },
+                {
+                  "$ref": "#/components/schemas/MetaDate"
+                },
+                {
+                  "$ref": "#/components/schemas/Amount"
+                }
+              ]
+            },
+            "title": "Meta",
+            "type": "object"
+          },
+          "narration": {
+            "default": "",
+            "title": "Narration",
+            "type": "string"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "postings": {
+            "items": {
+              "$ref": "#/components/schemas/Posting"
+            },
+            "minItems": 1,
+            "title": "Postings",
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "date",
+          "postings"
+        ],
+        "title": "TransactionIn",
         "type": "object"
       },
       "ValidationError": {
@@ -82,9 +607,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Backup Api Ledger V1 Backup Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Backup"
                 }
               }
             },
@@ -145,9 +668,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Book Api Ledger V1 Books  Book Id  Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Book"
                 }
               }
             },
@@ -169,7 +690,7 @@
     },
     "/api/ledger/v1/books/{book_id}/directives": {
       "get": {
-        "operationId": "find_api_ledger_v1_books__book_id__directives_get",
+        "operationId": "list_directives_api_ledger_v1_books__book_id__directives_get",
         "parameters": [
           {
             "in": "path",
@@ -181,6 +702,7 @@
             }
           },
           {
+            "description": "An account and its subaccounts.",
             "in": "query",
             "name": "account",
             "required": false,
@@ -193,6 +715,7 @@
                   "type": "null"
                 }
               ],
+              "description": "An account and its subaccounts.",
               "title": "Account"
             }
           },
@@ -263,10 +786,9 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/Directive"
                   },
-                  "title": "Response Find Api Ledger V1 Books  Book Id  Directives Get",
+                  "title": "Response List Directives Api Ledger V1 Books  Book Id  Directives Get",
                   "type": "array"
                 }
               }
@@ -284,10 +806,10 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Find"
+        "summary": "List Directives"
       },
       "post": {
-        "operationId": "create_api_ledger_v1_books__book_id__directives_post",
+        "operationId": "create_directive_api_ledger_v1_books__book_id__directives_post",
         "parameters": [
           {
             "in": "path",
@@ -315,9 +837,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Api Ledger V1 Books  Book Id  Directives Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Directive"
                 }
               }
             },
@@ -334,12 +854,12 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Create"
+        "summary": "Create Directive"
       }
     },
     "/api/ledger/v1/books/{book_id}/directives/{directive_id}": {
       "delete": {
-        "operationId": "delete_api_ledger_v1_books__book_id__directives__directive_id__delete",
+        "operationId": "delete_directive_api_ledger_v1_books__book_id__directives__directive_id__delete",
         "parameters": [
           {
             "in": "path",
@@ -375,10 +895,10 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Delete"
+        "summary": "Delete Directive"
       },
       "get": {
-        "operationId": "get_api_ledger_v1_books__book_id__directives__directive_id__get",
+        "operationId": "get_directive_api_ledger_v1_books__book_id__directives__directive_id__get",
         "parameters": [
           {
             "in": "path",
@@ -404,9 +924,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Api Ledger V1 Books  Book Id  Directives  Directive Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Directive"
                 }
               }
             },
@@ -423,10 +941,10 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Get"
+        "summary": "Get Directive"
       },
       "put": {
-        "operationId": "update_api_ledger_v1_books__book_id__directives__directive_id__put",
+        "operationId": "update_directive_api_ledger_v1_books__book_id__directives__directive_id__put",
         "parameters": [
           {
             "in": "path",
@@ -463,9 +981,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Update Api Ledger V1 Books  Book Id  Directives  Directive Id  Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Directive"
                 }
               }
             },
@@ -482,7 +998,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Update"
+        "summary": "Update Directive"
       }
     },
     "/api/ledger/v1/books/{book_id}/directives/{directive_id}/confirm": {
@@ -513,9 +1029,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Confirm Api Ledger V1 Books  Book Id  Directives  Directive Id  Confirm Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Directive"
                 }
               }
             },
@@ -604,9 +1118,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Import Text Api Ledger V1 Books  Book Id  Import Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Applied"
                 }
               }
             },
@@ -646,8 +1158,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/Problem"
                   },
                   "title": "Response Problems Api Ledger V1 Books  Book Id  Problems Get",
                   "type": "array"
@@ -700,9 +1211,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Query Api Ledger V1 Books  Book Id  Query Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/QueryResult"
                 }
               }
             },
@@ -720,6 +1229,278 @@
           }
         },
         "summary": "Query"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/transactions": {
+      "get": {
+        "operationId": "list_transactions_api_ledger_v1_books__book_id__transactions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "An account and its subaccounts.",
+            "in": "query",
+            "name": "account",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An account and its subaccounts.",
+              "title": "Account"
+            }
+          },
+          {
+            "in": "query",
+            "name": "flag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Flag"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Transaction"
+                  },
+                  "title": "Response List Transactions Api Ledger V1 Books  Book Id  Transactions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Transactions"
+      },
+      "post": {
+        "operationId": "create_transaction_api_ledger_v1_books__book_id__transactions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Transaction"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/transactions/{directive_id}": {
+      "get": {
+        "operationId": "get_transaction_api_ledger_v1_books__book_id__transactions__directive_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "directive_id",
+            "required": true,
+            "schema": {
+              "title": "Directive Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Transaction"
+      },
+      "put": {
+        "operationId": "update_transaction_api_ledger_v1_books__book_id__transactions__directive_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "directive_id",
+            "required": true,
+            "schema": {
+              "title": "Directive Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Transaction"
       }
     }
   }

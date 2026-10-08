@@ -217,6 +217,7 @@ class Store:
         self,
         book_id: str,
         *,
+        kind: str | None = None,
         account: str | None = None,
         flag: str | None = None,
         date_from: datetime.date | None = None,
@@ -230,6 +231,9 @@ class Store:
             sql.append("JOIN posting p ON p.directive_id = d.id")
             where.append("(p.account = ? OR p.account LIKE ?)")
             args += [account, account + ":%"]
+        if kind is not None:
+            where.append("d.kind = ?")
+            args.append(kind)
         if flag is not None:
             where.append("d.flag = ?")
             args.append(flag)

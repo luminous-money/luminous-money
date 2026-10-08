@@ -5,15 +5,15 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 
-import { createLedgerClient } from "@fava-beans/ledger-client";
+import { createLedgerClient, type TransactionIn } from "@fava-beans/ledger-client";
 
 export const BASE_URL = process.env.FAVA_BEANS_URL ?? "http://localhost:8080";
 
 export const ledger = createLedgerClient({ baseUrl: BASE_URL });
 
 /**
- * Request options for endpoints that take Beancount text. openapi-fetch serializes bodies as JSON
- * by default; these pass the text through unchanged.
+ * Request options for the endpoints that take Beancount text (import, raw directives, BQL).
+ * openapi-fetch serializes bodies as JSON by default; these pass the text through unchanged.
  */
 export function beancount(text: string) {
   return {
@@ -62,8 +62,34 @@ option "operating_currency" "USD"
 2024-01-01 open Expenses:Food
 `;
 
-export function staged(narration: string, amount = "4.50"): string {
+/** A staged purchase, as the app would send it. */
+export function purchase(narration: string, amount = "4.50"): TransactionIn {
+  return {
+    date: "2024-03-01",
+    flag: "!",
+    payee: "Corner Cafe",
+    narration,
+    postings: [
+      { account: "Expenses:Food", units: { number: amount, currency: "USD" } },
+      { account: "Assets:Bank:Checking" },
+    ],
+  };
+}
+
+/** The same purchase as Beancount text, for the text endpoints. */
+export function stagedText(narration: string, amount = "4.50"): string {
   return `2024-03-01 ! "Corner Cafe" "${narration}"\n  Expenses:Food  ${amount} USD\n  Assets:Bank:Checking\n`;
+}
+
+/** Stage a purchase through the JSON API and return the stored transaction. */
+export async function stage(book_id: string, narration: string, amount = "4.50") {
+  const { data, response } = await ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+    params: { path: { book_id } },
+    body: purchase(narration, amount),
+  });
+  assert.equal(response.status, 201);
+  assert.ok(data);
+  return data;
 }
 
 /** Create a book from OPENING and return its ID. */

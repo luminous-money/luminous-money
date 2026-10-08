@@ -6,9 +6,18 @@
  */
 import createClient, { type ClientOptions } from "openapi-fetch";
 
-import type { paths } from "./schema.js";
+import type { components, paths } from "./schema.js";
 
 export type { components, operations, paths } from "./schema.js";
+
+type Schemas = components["schemas"];
+export type Transaction = Schemas["Transaction"];
+export type TransactionIn = Schemas["TransactionIn"];
+export type Posting = Schemas["Posting"];
+export type Amount = Schemas["Amount"];
+export type Directive = Schemas["Directive"];
+export type Problem = Schemas["Problem"];
+export type Backup = Schemas["Backup"];
 
 export function createLedgerClient(options: ClientOptions) {
   return createClient<paths>(options);

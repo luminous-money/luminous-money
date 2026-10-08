@@ -12,7 +12,7 @@ import os
 import threading
 from dataclasses import dataclass
 
-from . import engine
+from . import engine, models
 from .store import Row, Store
 
 DEFAULT_HEADER = ['option "operating_currency" "USD"']
@@ -141,27 +141,48 @@ class Ledger:
         return row
 
     def create(self, book_id: str, text: str) -> engine.Directive:
+        return self._insert(book_id, engine.parse_one(text))
+
+    def update(self, book_id: str, directive_id: str, text: str) -> engine.Directive:
+        self.get(book_id, directive_id)
+        return self._put(book_id, engine.parse_one(text, directive_id))
+
+    def create_transaction(self, book_id: str, t: models.TransactionIn) -> engine.Directive:
+        return self._insert(book_id, engine.transaction_directive(t))
+
+    def update_transaction(self, book_id: str, directive_id: str, t: models.TransactionIn) -> engine.Directive:
+        if self.get(book_id, directive_id).kind != "transaction":
+            raise ValueError(f"directive {directive_id} is not a transaction")
+        return self._put(book_id, engine.transaction_directive(t, directive_id))
+
+    def transaction(self, book_id: str, directive_id: str) -> models.Transaction:
+        row = self.get(book_id, directive_id)
+        found = engine.transactions([row.text])
+        if not found:
+            raise NotFound(directive_id)
+        return found[0]
+
+    def transactions(self, book_id: str, **filters) -> list[models.Transaction]:
+        """Transactions matching `Store.find` filters, structured, in ledger order."""
         self._header(book_id)
-        directive = engine.parse_one(text)
+        return engine.transactions([r.text for r in self.store.find(book_id, kind="transaction", **filters)])
+
+    def _insert(self, book_id: str, directive: engine.Directive) -> engine.Directive:
+        self._header(book_id)
         with self.store.transaction():
             if self.store.get(book_id, directive.id) is not None:
                 raise ValueError(f"directive {directive.id} already exists")
             self.store.put(book_id, [directive])
         return directive
 
-    def update(self, book_id: str, directive_id: str, text: str) -> engine.Directive:
-        self.get(book_id, directive_id)
-        directive = engine.parse_one(text, directive_id)
+    def _put(self, book_id: str, directive: engine.Directive) -> engine.Directive:
         with self.store.transaction():
             self.store.put(book_id, [directive])
         return directive
 
     def set_flag(self, book_id: str, directive_id: str, flag: str) -> engine.Directive:
         """Confirm (`*`) or re-stage (`!`) a transaction."""
-        directive = engine.with_flag(self.get(book_id, directive_id).text, flag)
-        with self.store.transaction():
-            self.store.put(book_id, [directive])
-        return directive
+        return self._put(book_id, engine.with_flag(self.get(book_id, directive_id).text, flag))
 
     def delete(self, book_id: str, directive_id: str) -> None:
         self.get(book_id, directive_id)
