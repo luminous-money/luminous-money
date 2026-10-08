@@ -477,6 +477,16 @@ case without hiding the general one.
   the detail view.
 - **Skip moves an item to the end of the queue** and changes no data. Skips last for the browser
   session.
+- **Swipe right to confirm, left to skip.**
+  - The card follows the finger. Releasing past about a third of its width, or flicking, commits
+    the action; anything less springs back. A label underneath shows what releasing will do and
+    emphasizes once committing (with a short vibration on Android).
+  - A card that can't be confirmed yet drags stiffly and springs back on release, and its
+    category field shakes to point at what's missing.
+  - Swipes can start anywhere on the card, buttons included; a drag never counts as a tap. Text
+    fields and the open account picker keep their own gestures. Vertical drags still scroll.
+  - The buttons stay, for keyboards, desktops and accessibility. Reduced-motion settings turn
+    off the animations.
 - **Edits save immediately and the item stays staged:** the description saves on blur or Enter,
   the category on pick. Nothing typed is lost to a skipped or abandoned review.
 - **Confirm saves the current state with the `*` flag,** which takes the item out of the queue.

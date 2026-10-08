@@ -31,6 +31,7 @@ the system.
       `/ui`, Hono serving `/api/app/v1`
 - [x] Review queue: list staged entries, skip, categorize, edit descriptions, confirm with one
       tap; detail view with a full split editor and a live balance check
+- [x] Swipe right to confirm, left to skip; cards that aren't ready spring back
 - [x] Browser end-to-end tests (Playwright) as part of `pnpm e2e`
 - [ ] Bulk categorization
 - [ ] CSV import as a participant

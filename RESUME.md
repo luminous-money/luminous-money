@@ -1,7 +1,7 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-07._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-08._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
@@ -24,6 +24,7 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   served by Hono, which also serves `/api/app/v1`.
   - **Home:** books with their queue sizes.
   - **Review queue:** skip, categorize with a searchable picker, edit the description, confirm.
+    Swipe right to confirm and left to skip; cards that aren't ready spring back.
   - **Detail view:** a full split editor with a live, exact balance check.
   - The rules are in [docs/design.md](docs/design.md#how-the-review-queue-works). The pure logic
     (`src/web/lib`) has Vitest unit tests.
@@ -34,10 +35,10 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   - `/fava` → Fava, read-only
   - `/` → redirects to `/ui/`
 - **Tests, all passing:**
-  - `pnpm test`: 47 ledger tests, 19 app unit tests, the client drift check, typechecks and
+  - `pnpm test`: 47 ledger tests, 27 app unit tests, the client drift check, typechecks and
     Prettier
-  - `pnpm e2e`: 23 API tests and 6 browser tests (Playwright, phone-sized Chromium) through
-    Traefik, against a throwaway stack
+  - `pnpm e2e`: 23 API tests and 12 browser tests (Playwright, phone-sized Chromium, including
+    real touch swipes via the DevTools protocol) through Traefik, against a throwaway stack
 - **Demo data:** `pnpm seed [book]` imports a 2-year `bean-example` history whose last 45 days of
   card and checking purchases are staged for review: flagged `!`, with `source: "demo-import"`
   metadata, and roughly half (chosen by a hash of the ID) moved to `Expenses:Uncategorized`.
@@ -62,6 +63,8 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   `docker compose down -v && docker compose up -d && pnpm seed` (this wipes the dev stack's data).
 - **Fava takes its list of books at startup.** After creating a book, run
   `docker compose restart fava`. (Open question in PLAN.md.)
+- **`pnpm e2e:local` leaves test books in the dev stack** (`ui-…`, `review-…` and so on). To
+  clean up, run `docker compose down -v && docker compose up -d && pnpm seed`.
 - **Playwright is pinned to 1.63.0** in `tests/ui/package.json` and in `node.Dockerfile`'s `ui`
   stage. They must match, because the image's preinstalled browsers belong to that version. Bump
   both together.
