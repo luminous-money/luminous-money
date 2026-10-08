@@ -1,0 +1,47 @@
+# Routing: two top-level prefixes. Everything under /api is an API, everything under /ui is a
+# user interface. Services serve under their full prefix, so nothing is stripped. When two rules
+# overlap (/ui and /ui/fava), Traefik prefers the longer rule.
+#
+# Auth: once the `auth` service exists, add a forwardAuth middleware pointing at its verify
+# endpoint and attach it to every router except /api/auth/v1 login.
+http:
+  routers:
+    ledger-api:
+      rule: PathPrefix(`/api/ledger/v1`)
+      entryPoints: [web]
+      service: ledger
+    app-api:
+      rule: PathPrefix(`/api/app/v1`)
+      entryPoints: [web]
+      service: app
+    app-ui:
+      rule: PathPrefix(`/ui`)
+      entryPoints: [web]
+      service: app
+    fava-ui:
+      rule: PathPrefix(`/ui/fava`)
+      entryPoints: [web]
+      service: fava
+    root:
+      rule: Path(`/`)
+      entryPoints: [web]
+      service: app
+      middlewares: [to-ui]
+  middlewares:
+    to-ui:
+      redirectRegex:
+        regex: ^(https?://[^/]+)/$
+        replacement: ${1}/ui/
+  services:
+    ledger:
+      loadBalancer:
+        servers:
+          - url: http://ledger:8000
+    app:
+      loadBalancer:
+        servers:
+          - url: http://app:3000
+    fava:
+      loadBalancer:
+        servers:
+          - url: http://fava:5000

@@ -1,0 +1,51 @@
+# The product: the whole fava-beans stack. Works with both
+#   docker compose up -d
+#   docker stack deploy -c compose.yaml fava-beans
+# so it sticks to Compose-spec features both support and uses prebuilt images (no `build:`).
+# Build the images with `docker buildx bake` (see docker-bake.hcl).
+
+x-restart: &restart
+  restart_policy:
+    condition: any
+
+services:
+  traefik:
+    image: traefik:v3
+    command: ["--configFile=/etc/traefik/traefik.yml"]
+    ports:
+      - "${FAVA_BEANS_PORT:-8080}:80"
+    configs:
+      - source: traefik-static
+        target: /etc/traefik/traefik.yml
+      - source: traefik-routes
+        target: /etc/traefik/routes.yml
+    deploy: *restart
+
+  ledger:
+    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/ledger:${FAVA_BEANS_VERSION:-dev}
+    environment:
+      LEDGER_EXPORT_DIR: /exports
+    volumes:
+      - data:/data          # the system of record: back this up (or use the backup API)
+      - exports:/exports    # derived Beancount exports for Fava; rebuilt automatically
+    deploy: *restart
+
+  app:
+    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/app:${FAVA_BEANS_VERSION:-dev}
+    deploy: *restart
+
+  fava:
+    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/fava:${FAVA_BEANS_VERSION:-dev}
+    volumes:
+      - exports:/exports:ro
+    deploy: *restart
+
+configs:
+  traefik-static:
+    file: ./deploy/traefik/traefik.yml
+  traefik-routes:
+    file: ./deploy/traefik/routes.yml
+
+volumes:
+  data:
+  exports:

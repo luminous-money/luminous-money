@@ -1,0 +1,9 @@
+# Overlay for the end-to-end suite. scripts/e2e.sh (`pnpm e2e`) runs the stack under its own
+# project name with fresh volumes, runs tests/e2e against it through Traefik, then tears it down.
+services:
+  traefik:
+    ports: !reset []
+
+  e2e:
+    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/e2e:${FAVA_BEANS_VERSION:-dev}
+    depends_on: [traefik, ledger, app, fava]

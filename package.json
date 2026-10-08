@@ -1,0 +1,29 @@
+{
+  "name": "@fava-beans/monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hostable, database-driven double-entry accounting with Beancount as the engine.",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.24.0",
+  "scripts": {
+    "build": "docker buildx bake",
+    "test": "docker buildx bake test",
+    "e2e": "./scripts/e2e.sh",
+    "e2e:local": "pnpm --filter \"@fava-beans/e2e...\" build && pnpm --filter @fava-beans/e2e test",
+    "generate": "docker buildx bake generate && pnpm -r generate",
+    "release": "docker buildx bake release",
+    "up": "docker buildx bake && docker compose up",
+    "typecheck": "pnpm -r typecheck",
+    "format": "prettier --write \"{packages,services,tests}/*/src/**/*.{ts,tsx,css}\"",
+    "prettier": "prettier --check \"{packages,services,tests}/*/src/**/*.{ts,tsx,css}\""
+  },
+  "prettier": {
+    "printWidth": 100,
+    "trailingComma": "es5"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9"
+  }
+}

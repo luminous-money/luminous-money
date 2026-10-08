@@ -1,0 +1,77 @@
+; Exercises Beancount features that a database round trip could plausibly lose.
+option "title" "Feature fixture"
+option "operating_currency" "USD"
+option "booking_method" "FIFO"
+plugin "beancount.plugins.implicit_prices"
+
+include "features-prices.beancount"
+
+2020-01-01 commodity USD
+  name: "US Dollar"
+2020-01-01 commodity VTI
+  name: "Vanguard Total Stock Market"
+  asset-class: "equity"
+
+2020-01-01 open Assets:Bank:Checking USD
+  institution: "First Bank"
+  opened-on: 2019-12-15
+2020-01-01 open Assets:Brokerage VTI,USD "FIFO"
+2020-01-01 open Assets:Cash
+2020-01-01 open Expenses:Food
+2020-01-01 open Expenses:Travel
+2020-01-01 open Income:Salary
+2020-01-01 open Income:Gains
+2020-01-01 open Equity:Opening-Balances
+2020-01-01 open Liabilities:CreditCard USD
+
+2020-01-01 pad Assets:Bank:Checking Equity:Opening-Balances
+2020-01-02 balance Assets:Bank:Checking 5000.00 USD
+
+pushtag #household
+2020-01-03 * "Grocer" "Weekly groceries" ^receipt-001 #food
+  receipt: "a multi
+line string"
+  verified: TRUE
+  Expenses:Food                 123.45 USD
+    category-hint: Expenses:Food
+  ! Assets:Bank:Checking
+poptag #household
+
+2020-01-04 ! "Pending import"
+  Expenses:Food        10 USD
+  Liabilities:CreditCard
+
+2020-01-05 txn "Payroll"
+  Assets:Bank:Checking      3000.00 USD
+  Income:Salary            -3000.00 USD
+
+2020-02-01 * "Buy" "First lot"
+  Assets:Brokerage   10 VTI {200.00 USD}
+  Assets:Bank:Checking
+
+2020-03-01 * "Buy" "Second lot"
+  Assets:Brokerage   10 VTI {210.00 USD, 2020-03-01, "lot-2"}
+  Assets:Bank:Checking
+
+2020-06-01 * "Sell" "FIFO reduces the first lot"
+  Assets:Brokerage  -5 VTI {} @ 250.00 USD
+  Assets:Bank:Checking  1250.00 USD
+  Income:Gains
+
+2020-06-02 * "Trip" "Total-price conversion"
+  Expenses:Travel   100 EUR @@ 110.00 USD
+  Assets:Bank:Checking
+
+2020-06-02 * "Same day, ordered second"
+  Assets:Cash        20 USD
+  Assets:Bank:Checking
+
+2020-06-02 * "Same day, ordered third"
+  Assets:Cash       -20 USD
+  Assets:Bank:Checking
+
+2020-06-30 note Assets:Bank:Checking "Called the bank about fees"
+2020-06-30 event "location" "Lisbon"
+2020-06-30 query "food" "SELECT date, narration, position WHERE account ~ 'Food'"
+2020-06-30 custom "budget" Expenses:Food "monthly" 400.00 USD TRUE
+2020-12-31 close Assets:Cash

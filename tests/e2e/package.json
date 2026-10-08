@@ -1,0 +1,18 @@
+{
+  "name": "@fava-beans/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "End-to-end tests against a running stack, through Traefik.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --experimental-strip-types --no-warnings=ExperimentalWarning \"src/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fava-beans/ledger-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3"
+  }
+}

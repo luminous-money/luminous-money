@@ -1,0 +1,151 @@
+:root {
+  --green: #2f5d34;
+  --green-soft: #b5d98a;
+  --paper: #f6f4ec;
+  --card: #ffffff;
+  --ink: #1d2a1f;
+  --muted: #5d6b5f;
+  --line: #e2dfd3;
+  --good: #3c9a4a;
+  --bad: #c2453a;
+  color-scheme: light dark;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #141a15;
+    --card: #1d251e;
+    --ink: #e7eee5;
+    --muted: #9aa99c;
+    --line: #2c372d;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.shell {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1.5rem, env(safe-area-inset-bottom));
+}
+
+.masthead {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.25rem 0 1.5rem;
+}
+
+.logo {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.wordmark {
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+
+.hero h1 {
+  font-size: clamp(1.8rem, 7vw, 2.6rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.75rem;
+}
+
+.hero p {
+  color: var(--muted);
+  margin: 0 0 1.5rem;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 1rem 1.1rem;
+}
+
+.card h2,
+.card h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.card p {
+  margin: 0;
+}
+
+.status {
+  margin-bottom: 1rem;
+}
+
+.muted,
+.tile p {
+  color: var(--muted);
+}
+
+.dot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  margin-right: 0.35rem;
+}
+
+.dot.good {
+  background: var(--good);
+}
+
+.dot.bad {
+  background: var(--bad);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.75rem;
+}
+
+.tile.link {
+  color: inherit;
+  text-decoration: none;
+  border-color: var(--green);
+}
+
+.tile.link:active {
+  transform: scale(0.99);
+}
+
+.badge {
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.footer {
+  margin-top: 2rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
