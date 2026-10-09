@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 
 const coffee = (page: Page) => page.getByRole("article", { name: /^Corner Cafe/ });
 const dialog = (page: Page) => page.getByRole("dialog", { name: "Create account" });
-const nameField = (page: Page) => dialog(page).getByRole("textbox", { name: "Account" });
+const nameField = (page: Page) => dialog(page).getByRole("combobox", { name: "Account" });
 
 async function startCreating(page: Page, card: Locator, search: string) {
   await card.getByRole("button", { name: /^Category:/ }).click();
@@ -68,17 +68,81 @@ test("names the ledger would refuse are explained and can't be created", async (
   for (const [name, reason] of [
     ["Expenses:Food:Groceries:Organic", "Expenses:Food:Groceries holds transactions"],
     ["Expenses:Food:Groceries", "already exists"],
+    ["Expenses:Food", "can't hold transactions"],
     ["Stuff:Things", "Start with one of"],
-    ["Expenses:coffee", "isn't valid"],
   ]) {
     await nameField(page).fill(name!);
     await expect(dialog(page)).toContainText(reason!);
     await expect(create).toBeDisabled();
   }
+});
+
+test("typing turns spaces into dashes and capitalizes each part", async ({ page }) => {
+  await startCreating(page, coffee(page), "x");
+
+  await nameField(page).fill("");
+  await nameField(page).pressSequentially("expenses:late night snacks");
+
+  await expect(nameField(page)).toHaveValue("Expenses:Late-night-snacks");
+  await expect(dialog(page).getByRole("button", { name: "Create" })).toBeEnabled();
+});
+
+test("there's no leaf or node choice: it's a leaf, with nodes created on the way", async ({
+  page,
+}) => {
+  await startCreating(page, coffee(page), "x");
+  await expect(dialog(page).getByRole("radio")).toHaveCount(0);
 
   await nameField(page).fill("Expenses:Home:Garden:Tools");
-  await expect(dialog(page)).toContainText("also adds Expenses:Home:Garden to hold it");
-  await expect(create).toBeEnabled();
+  await expect(dialog(page)).toContainText("also creates Expenses:Home:Garden");
+  await dialog(page).getByRole("button", { name: "Create" }).click();
+
+  await expect(coffee(page).getByRole("button", { name: /^Category:/ })).toContainText(
+    "Garden:Tools"
+  );
+  const tree = await accounts(seeded.book);
+  expect(tree.find((a) => a.name === "Expenses:Home:Garden:Tools")?.kind).toBe("leaf");
+  expect(tree.find((a) => a.name === "Expenses:Home:Garden")).toMatchObject({
+    kind: "node",
+    implicit: false,
+  });
+});
+
+test("Tab fills in the next portion of a matching node, again and again", async ({ page }) => {
+  await startCreating(page, coffee(page), "x");
+  const suggestions = dialog(page).getByRole("listbox", { name: "Accounts to continue into" });
+
+  await nameField(page).fill("exp");
+  await expect(suggestions.getByRole("option").first()).toHaveText(/Expenses/);
+  await nameField(page).press("Tab");
+  await expect(nameField(page)).toHaveValue("Expenses");
+
+  // Expenses:Food has no nodes under it, so this fills to the end of its name.
+  await nameField(page).press("Tab");
+  await expect(nameField(page)).toHaveValue("Expenses:Food");
+  await expect(nameField(page)).toBeFocused();
+
+  // Nothing further matches, so Tab does what Tab normally does (no keyboard trap).
+  await nameField(page).press("Tab");
+  await expect(nameField(page)).toHaveValue("Expenses:Food");
+  await expect(nameField(page)).not.toBeFocused();
+
+  await nameField(page).click();
+  await nameField(page).press("End");
+  await nameField(page).pressSequentially(":coffee");
+  await expect(nameField(page)).toHaveValue("Expenses:Food:Coffee");
+});
+
+test("tapping a suggestion fills in its next portion", async ({ page }) => {
+  await startCreating(page, coffee(page), "x");
+  await nameField(page).fill("Expenses:");
+
+  await dialog(page)
+    .getByRole("option", { name: /Expenses:Home/ })
+    .click();
+
+  await expect(nameField(page)).toHaveValue("Expenses:Home");
+  await expect(nameField(page)).toBeFocused();
 });
 
 test("cancelling returns to the dropdown as it was", async ({ page }) => {
@@ -90,32 +154,6 @@ test("cancelling returns to the dropdown as it was", async ({ page }) => {
   await expect(search).toHaveValue("zzz");
   await expect(search).toBeFocused();
   await expect(coffee(page).getByRole("option")).toHaveText(["+ Create account “zzz”"]);
-});
-
-test("a new node can't be picked, so the search moves into it for a leaf", async ({ page }) => {
-  await startCreating(page, coffee(page), "utilities");
-  await expect(nameField(page)).toHaveValue("Expenses:Utilities");
-  await dialog(page)
-    .getByRole("radio", { name: /Sub-accounts/ })
-    .check();
-  await dialog(page).getByRole("button", { name: "Create" }).click();
-
-  const search = coffee(page).getByRole("combobox", { name: "Category" });
-  await expect(search).toHaveValue("Expenses:Utilities:");
-  await search.fill("Expenses:Utilities:power");
-  await coffee(page)
-    .getByRole("option", { name: /Create account/ })
-    .click();
-
-  await expect(nameField(page)).toHaveValue("Expenses:Utilities:Power");
-  await dialog(page).getByRole("button", { name: "Create" }).click();
-
-  await expect(coffee(page).getByRole("button", { name: /^Category:/ })).toContainText(
-    "Utilities:Power"
-  );
-  const tree = await accounts(seeded.book);
-  expect(tree.find((a) => a.name === "Expenses:Utilities")?.kind).toBe("node");
-  expect(tree.find((a) => a.name === "Expenses:Utilities:Power")?.kind).toBe("leaf");
 });
 
 test("the dialog is full screen on a phone", async ({ page }) => {

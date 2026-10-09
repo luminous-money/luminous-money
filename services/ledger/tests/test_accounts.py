@@ -105,14 +105,22 @@ def test_account_rules(book, name, kind, message):
     assert message in str(failure.value)
 
 
-def test_missing_levels_in_between_become_implicit_nodes(book):
+def test_missing_levels_in_between_are_opened_as_nodes(book):
     account = create(book, "Expenses:Home:Garden:Tools")
 
     accounts = tree(book)
     assert account.kind == "leaf"
-    assert (accounts["Expenses:Home"].kind, accounts["Expenses:Home"].implicit) == ("node", True)
-    assert (accounts["Expenses:Home:Garden"].kind, accounts["Expenses:Home:Garden"].implicit) == ("node", True)
+    for name in ("Expenses:Home", "Expenses:Home:Garden"):
+        assert (accounts[name].kind, accounts[name].implicit, accounts[name].open) == ("node", False, account.open)
     assert book.problems("book") == []
+
+
+def test_implicit_parents_on_the_way_stay_implicit(book):
+    create(book, "Assets:Bank:Savings:Emergency")
+
+    accounts = tree(book)
+    assert accounts["Assets:Bank"].implicit  # existed (implicitly) already
+    assert (accounts["Assets:Bank:Savings"].kind, accounts["Assets:Bank:Savings"].implicit) == ("node", False)
 
 
 def test_an_existing_account_cant_be_created_again(book):

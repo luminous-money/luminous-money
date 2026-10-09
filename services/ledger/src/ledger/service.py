@@ -192,7 +192,7 @@ class Ledger:
 
         Top-level accounts are built in, so a new account is always below one. Its nearest existing
         ancestor must be a node: leaves hold transactions, not sub-accounts. Levels in between that
-        don't exist yet become implicit nodes, as any unopened parent does. A name that's only
+        don't exist at all are opened as nodes along the way, in the same write. A name that's only
         implicit so far can be opened explicitly, but only as a node, since it already has
         accounts under it.
         """
@@ -217,7 +217,12 @@ class Ledger:
             raise engine.ParseFailure([f"{ancestor.name} is closed"])
 
         opened = a.open or self._default_open(book_id, ancestor, tree)
-        self._insert(book_id, engine.open_directive(a.name, opened, a.kind))
+        depth = ancestor.name.count(":") + 1
+        en_route = [":".join(segments[:i]) for i in range(depth + 1, len(segments))]
+        directives = [engine.open_directive(name, opened, "node") for name in en_route]
+        directives.append(engine.open_directive(a.name, opened, a.kind))
+        with self.store.transaction():
+            self.store.put(book_id, directives)
         return next(x for x in self.accounts(book_id) if x.name == a.name)
 
     def _default_open(self, book_id: str, parent: models.Account, tree: dict[str, models.Account]) -> datetime.date:

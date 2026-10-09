@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   checkNewAccount,
+  completeWith,
+  completions,
+  typed,
   isSegment,
   postable,
   preferredRoots,
@@ -106,19 +109,17 @@ describe("a new account's full name", () => {
   });
 
   it("is checked against the ledger's rules", () => {
-    const check = (name: string, kind: "leaf" | "node" = "leaf") =>
-      checkNewAccount(name, kind, accounts);
+    const check = (name: string) => checkNewAccount(name, accounts);
 
-    expect(check("Expenses:Utilities:Power")).toEqual({ ok: true, type: "expense", adds: [] });
+    expect(check("Expenses:Utilities:Power")).toEqual({ ok: true, type: "expense", creates: [] });
     expect(check("Expenses:Home:Garden:Tools")).toEqual({
       ok: true,
       type: "expense",
-      adds: ["Expenses:Home", "Expenses:Home:Garden"],
+      creates: ["Expenses:Home", "Expenses:Home:Garden"],
     });
-    expect(check("Expenses:Food", "node")).toMatchObject({ ok: true });
     expect(check("Expenses:Food")).toMatchObject({
       ok: false,
-      message: expect.stringContaining("can only hold them"),
+      message: expect.stringContaining("can't hold transactions"),
     });
     expect(check("Expenses:Food:Groceries")).toMatchObject({
       ok: false,
@@ -148,6 +149,51 @@ describe("a new account's full name", () => {
       ok: false,
       message: expect.stringContaining('"coffee" isn\'t valid'),
     });
+  });
+});
+
+describe("typing a new account's name", () => {
+  const nodes = [
+    "Assets",
+    "Liabilities",
+    "Equity",
+    "Income",
+    "Expenses",
+    "Expenses:Food",
+    "Expenses:Food:Dining",
+    "Expenses:Fun",
+  ].map((name) => account(name, { kind: "node" }));
+  const tree = [
+    ...nodes,
+    account("Expenses:Food:Groceries"),
+    account("Expenses:Gone", { kind: "node", close: "2021-01-01" }),
+  ];
+
+  it("turns spaces into dashes and capitalizes each part, keeping the length", () => {
+    expect(typed("expenses:coffee shops")).toBe("Expenses:Coffee-shops");
+    expect(typed("Expenses:Food:Late night")).toBe("Expenses:Food:Late-night");
+    expect(typed("expenses:food:x y").length).toBe("expenses:food:x y".length);
+  });
+
+  it("suggests open node accounts that continue what's typed, ignoring case", () => {
+    expect(completions("exp", tree)).toEqual([
+      "Expenses",
+      "Expenses:Fun",
+      "Expenses:Food",
+      "Expenses:Food:Dining",
+    ]);
+    expect(completions("Expenses:Fo", tree)).toEqual(["Expenses:Food", "Expenses:Food:Dining"]);
+    expect(completions("Expenses:Food:", tree)).toEqual(["Expenses:Food:Dining"]); // not the leaf
+    expect(completions("Expenses:G", tree)).toEqual([]); // closed
+  });
+
+  it("fills one portion at a time: through the next colon, or to the end", () => {
+    expect(completeWith("exp", "Expenses:Food:Dining")).toBe("Expenses:");
+    expect(completeWith("exp", "Expenses")).toBe("Expenses");
+    expect(completeWith("Expenses", "Expenses:Food:Dining")).toBe("Expenses:Food:");
+    expect(completeWith("Expenses:", "Expenses:Food:Dining")).toBe("Expenses:Food:");
+    expect(completeWith("Expenses:Food:", "Expenses:Food:Dining")).toBe("Expenses:Food:Dining");
+    expect(completeWith("expenses:fo", "Expenses:Food")).toBe("Expenses:Food");
   });
 });
 

@@ -2,14 +2,14 @@ import type { Account } from "@fava-beans/ledger-client";
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { search, suggestName } from "../lib/accounts.js";
-import type { AccountKind } from "../lib/ledger.js";
 import { CreateAccountDialog } from "./CreateAccountDialog.js";
 
 /** Offering "Create account" at the bottom of the picker. */
 export type AccountCreation = {
   /** The book's chart of accounts. */
   accounts: Account[];
-  submit: (name: string, kind: AccountKind) => Promise<Account>;
+  /** Creates a leaf by its full name, with any nodes it needs on the way. */
+  submit: (name: string) => Promise<Account>;
 };
 
 type Props = {
@@ -30,8 +30,7 @@ const CREATE = Symbol("create");
  *
  * With `create`, the last option is always "Create account", which opens the creation dialog
  * prefilled from the search. While the dialog is open the picker stays open underneath, search
- * and all, so cancelling lands right back where you were. A created leaf is picked; a created
- * node can't hold transactions, so the search moves into it instead, ready for a leaf under it.
+ * and all, so cancelling lands right back where you were. The created account is picked.
  */
 export function AccountPicker({
   accounts,
@@ -146,10 +145,7 @@ export function AccountPicker({
           onCreated={(account) => {
             creatingNow.current = false;
             setCreating(false);
-            if (account.kind === "leaf") return choose(account.name);
-            setQuery(`${account.name}:`);
-            setActive(0);
-            setTimeout(() => input.current?.focus());
+            choose(account.name);
           }}
         />
       )}

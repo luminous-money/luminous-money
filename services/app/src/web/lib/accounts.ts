@@ -111,23 +111,53 @@ export function suggestName(query: string, accounts: Account[], preferredRoot: s
   return `${preferredRoot}:${toSegment(parts.join(" "))}`;
 }
 
-export type NewAccountCheck =
-  { ok: true; type: Account["type"]; adds: string[] } | { ok: false; message: string };
+/**
+ * Fix up a name as it's typed, the way Beancount needs it: spaces become dashes, and each part
+ * starts with a capital. The length never changes, so the cursor can stay where it was.
+ */
+export function typed(text: string): string {
+  return text
+    .replace(/\s/g, "-")
+    .replace(/(^|:)(\p{Ll})/gu, (_, start: string, letter: string) => start + letter.toUpperCase());
+}
 
 /**
- * Whether `name` can be created as a `kind` account, by the ledger's rules, so the dialog can
- * say why before submitting. The ledger checks again on create.
+ * Node accounts the name could continue into: the open nodes that start with what's typed
+ * (ignoring case), other than exactly what's typed. Shortest first, then alphabetically.
+ */
+export function completions(input: string, accounts: Account[]): string[] {
+  const prefix = input.toLowerCase();
+  return accounts
+    .filter((a) => a.kind === "node" && !a.close)
+    .map((a) => a.name)
+    .filter((name) => name.toLowerCase().startsWith(prefix) && name.length > input.length)
+    .sort((a, b) => a.length - b.length || a.localeCompare(b));
+}
+
+/**
+ * Fill in the next portion of `account` after what's typed: up to and including the next colon,
+ * or to the end of the account's name, whichever comes first. What's already typed takes the
+ * account's own capitalization.
+ */
+export function completeWith(input: string, account: string): string {
+  const rest = account.slice(input.length);
+  const colon = rest.indexOf(":", 1);
+  return account.slice(0, input.length) + (colon === -1 ? rest : rest.slice(0, colon + 1));
+}
+
+export type NewAccountCheck =
+  { ok: true; type: Account["type"]; creates: string[] } | { ok: false; message: string };
+
+/**
+ * Whether `name` can be created as a new leaf, by the ledger's rules, so the dialog can say why
+ * before submitting. The ledger checks again on create.
  *
  * - The root must be one of the top-level accounts, and the name must go below it.
  * - Each part starts with a capital letter or digit, then letters, digits and dashes.
- * - The nearest existing ancestor must be an open node. Missing levels in between are fine: they
- *   become nodes (`adds`).
+ * - The nearest existing ancestor must be an open node. Levels in between that don't exist yet
+ *   are created as nodes along the way (`creates`).
  */
-export function checkNewAccount(
-  name: string,
-  kind: "leaf" | "node",
-  accounts: Account[]
-): NewAccountCheck {
+export function checkNewAccount(name: string, accounts: Account[]): NewAccountCheck {
   const byName = new Map(accounts.map((a) => [a.name, a]));
   const roots = accounts.filter((a) => !a.name.includes(":")).map((a) => a.name);
   const parts = name.split(":");
@@ -147,14 +177,17 @@ export function checkNewAccount(
 
   const existing = byName.get(name);
   if (existing && !existing.implicit) return { ok: false, message: `${name} already exists` };
-  if (existing && kind === "leaf")
-    return { ok: false, message: `${name} has sub-accounts, so it can only hold them` };
+  if (existing)
+    return {
+      ok: false,
+      message: `${name} already has accounts under it, so it can't hold transactions`,
+    };
 
-  const adds: string[] = [];
+  const creates: string[] = [];
   for (let i = parts.length - 1; i > 0; i--) {
     const ancestor = byName.get(parts.slice(0, i).join(":"));
     if (!ancestor) {
-      adds.unshift(parts.slice(0, i).join(":"));
+      creates.unshift(parts.slice(0, i).join(":"));
       continue;
     }
     if (ancestor.kind === "leaf")
@@ -165,5 +198,5 @@ export function checkNewAccount(
     if (ancestor.close) return { ok: false, message: `${ancestor.name} is closed` };
     break;
   }
-  return { ok: true, type: root.type, adds };
+  return { ok: true, type: root.type, creates };
 }

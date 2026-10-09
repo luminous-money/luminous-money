@@ -18,8 +18,8 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
     409. `PATCH /transactions/{id}` changes only the given fields. JSON is snake_case.
   - **Accounts:** leaves hold transactions and nodes hold sub-accounts. Top-level accounts and
     unopened parents are implicit nodes. `POST /accounts` takes a fully qualified name whose
-    nearest existing ancestor must be a node; missing levels become implicit nodes. Postings to
-    nodes are refused.
+    nearest existing ancestor must be a node; levels on the way that don't exist are opened as
+    nodes in the same write. Postings to nodes are refused.
   - **Migrations:** `migrations.py`, with every table created through `create_table` (non-null
     `created_at`/`updated_at`), enforced by a lint test.
   - **Proven:** round trips are exact, validation problems map to the directive that caused them,
@@ -33,7 +33,8 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   - **Review queue:** skip, categorize with a searchable picker, edit the description, confirm.
     Swipe right to confirm and left to skip; cards that aren't ready spring back, and the
     stack slides up after each one. "Create account" is the last option in every
-    posting-account picker; it takes a fully qualified name, prefilled from the search.
+    posting-account picker; it takes a fully qualified name, prefilled from the search, with
+    Tab/tap autofill through node accounts. It always creates a leaf.
   - **Data layer:** TanStack Query over the generated client. Edits to one transaction run in
     order, each with the latest version.
   - **Detail view:** a full split editor with a live, exact balance check.
@@ -46,9 +47,9 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   - `/api/app/v1` and `/ui` → `app`
   - `/` → redirects to `/ui/`
 - **Tests, all passing:**
-  - `pnpm test`: 78 ledger tests (including the table lint), 32 app unit tests, the client
+  - `pnpm test`: 80 ledger tests (including the table lint), 35 app unit tests, the client
     drift check, typechecks and Prettier
-  - `pnpm e2e`: 25 API tests and 23 browser tests (Playwright, phone-sized Chromium, including
+  - `pnpm e2e`: 25 API tests and 26 browser tests (Playwright, phone-sized Chromium, including
     real touch swipes via the DevTools protocol) through Traefik, against a throwaway stack
 - **Demo data:** `pnpm seed [book]` imports a 2-year `bean-example` history whose last 45 days of
   card and checking purchases are staged for review: flagged `!`, with `source: "demo-import"`

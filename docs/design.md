@@ -133,10 +133,14 @@ Beancount:
   parent can be opened explicitly, but only as a node.
 - **New accounts are named in full and always sit below a top-level account,** whose root sets
   the type (asset, liability, equity, income, expense). The nearest existing ancestor must be an
-  open node. Levels in between that don't exist yet are fine: like any unopened parent, they
-  become implicit nodes. The account opens when its nearest opened ancestor did, else with the
-  earliest account under it, else at the book's first entry, so it can take any of the book's
-  transactions.
+  open node. Levels in between that don't exist at all are opened as explicit nodes along the
+  way, in the same write, so they persist on their own (and show up in the chart of accounts).
+  Everything opens when the nearest opened ancestor did, else with the earliest account under
+  it, else at the book's first entry, so it can take any of the book's transactions.
+- **Names follow Beancount's account syntax:** each part starts with a capital letter or digit,
+  then letters, digits and dashes. That's Beancount's rule, not ours: account names are bare
+  tokens in its file format, so a space would end one. The UI turns spaces into dashes as you
+  type.
 - **Postings to node accounts are refused on write** (422). Imported data that does it is flagged
   as a validation problem. That check runs after Beancount's loader rather than through its
   `extra_validations` hook: Beancount 3.2 appends those to its global list of validations on
@@ -560,11 +564,18 @@ case without hiding the general one.
     money in). A typed root is kept ("assets:cash wallet" becomes `Assets:Cash-Wallet`), and a
     typed path whose front names a node goes under it ("utilities:power" becomes
     `Expenses:Utilities:Power`).
+  - Typing fixes the name up as you go: spaces become dashes, and each part starts with a
+    capital, as Beancount requires.
+  - **Autofill:** node accounts that continue what's typed (ignoring case) are listed under the
+    field. Tab, or tapping one, fills in its next portion, through the next colon or to the end
+    of its name. While more nodes still match, it fills the next portion again. The arrow keys
+    choose which suggestion Tab uses. With nothing left to fill, Tab moves focus as usual, so it
+    never traps the keyboard.
   - The dialog checks the name against the ledger's rules as you type, says why when it can't
-    be created, and names any intermediate levels it will add as nodes.
-  - Leaf or node defaults to leaf.
-  - **Create** opens the account and picks it for the card. A new node can't hold transactions,
-    so instead the search moves into it (`Expenses:Utilities:`), ready to create a leaf under it.
+    be created, and lists any levels on the way it will create as nodes.
+  - **It always creates a leaf;** there's no leaf/node choice. The API can still create nodes,
+    for the chart of accounts.
+  - **Create** opens the account (and any nodes on the way) and picks it for the card.
   - **Cancel** returns to the dropdown exactly as it was, search included.
 - **Edits save immediately and the item stays staged:** the description saves on blur or Enter,
   the category on pick. Nothing typed is lost to a skipped or abandoned review.

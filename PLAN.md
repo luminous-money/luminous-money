@@ -34,7 +34,8 @@ the system.
       up after a confirm or skip
 - [x] Leaf and node accounts; "Create account" from any posting-account picker
 - [x] Versioned, partial edits (PATCH with `updated_at`, 409 on conflict); TanStack Query
-- [x] Create accounts by fully qualified name, prefilled from the search
+- [x] Create accounts by fully qualified name, prefilled from the search: spaces become dashes,
+      Tab/tap autofill through node accounts, always a leaf, nodes created on the way
 - [x] snake_case everywhere, the API's JSON included
 - [x] Migration framework: every table through `create_table` (created/updated timestamps), with
       a lint check

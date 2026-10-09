@@ -649,36 +649,30 @@ button:focus-visible,
   color: var(--muted);
 }
 
-.choice {
+.completions {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
   border: 1px solid var(--line);
   border-radius: 0.7rem;
-  padding: 0.25rem 0.75rem 0.5rem;
-  margin: 0;
-  display: grid;
-  gap: 0.25rem;
+  background: var(--card);
 }
 
-.choice legend {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--muted);
-  padding: 0 0.25rem;
-}
-
-.editor .choice label {
+.completions li {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.6rem;
-  min-height: 2.5rem;
-  font-size: 1rem;
-  font-weight: 400;
-  color: var(--ink);
+  padding: 0.6rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
 }
 
-.choice input {
-  width: 1.2rem;
-  min-height: auto;
-  accent-color: var(--green);
+.completions li[aria-selected="true"] {
+  background: color-mix(in srgb, var(--green-soft) 45%, transparent);
+}
+
+.completions kbd {
+  font-family: inherit;
 }
 
 .preview {

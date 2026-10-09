@@ -110,7 +110,7 @@ export function useAccountCreation(book: string): AccountCreation | undefined {
   if (!accounts.data) return undefined;
   return {
     accounts: accounts.data,
-    submit: (name, kind) => create.mutateAsync({ name, kind }),
+    submit: (name) => create.mutateAsync({ name, kind: "leaf" }),
   };
 }
 

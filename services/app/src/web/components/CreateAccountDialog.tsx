@@ -1,16 +1,24 @@
 import type { Account } from "@fava-beans/ledger-client";
-import { useId, useState, type SyntheticEvent } from "react";
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+  type SyntheticEvent,
+} from "react";
 import { createPortal } from "react-dom";
 
-import { checkNewAccount, TYPE_LABELS } from "../lib/accounts.js";
-import type { AccountKind } from "../lib/ledger.js";
+import { checkNewAccount, completeWith, completions, typed, TYPE_LABELS } from "../lib/accounts.js";
+import { AccountName } from "./AccountPicker.js";
 
 type Props = {
   initialName: string;
-  /** The book's chart of accounts, to check the name against. */
+  /** The book's chart of accounts, to check and complete the name against. */
   accounts: Account[];
-  /** Creates the account; rejects with a readable error. */
-  submit: (name: string, kind: AccountKind) => Promise<Account>;
+  /** Creates the leaf (and any nodes on the way); rejects with a readable error. */
+  submit: (name: string) => Promise<Account>;
   onCreated: (account: Account) => void;
   onCancel: () => void;
 };
@@ -20,25 +28,70 @@ type Props = {
 const contain = (e: SyntheticEvent) => e.stopPropagation();
 
 /**
- * Create an account by its fully qualified name, prefilled from the search and freely editable.
- * The root sets the type; whether it holds transactions (a leaf) or sub-accounts (a node) is
- * chosen here. Full screen on phones.
+ * Create a leaf account by its fully qualified name, prefilled from the search and freely
+ * editable. Full screen on phones.
+ *
+ * - Typing fixes the name up as Beancount needs it: spaces become dashes, parts start capitalized.
+ * - Node accounts that continue what's typed are suggested underneath. Tab (or tapping one)
+ *   fills in its next portion, through the next colon; while more still match, again fills the
+ *   next. The arrow keys choose which suggestion Tab uses.
+ * - The name is checked against the ledger's rules as it's typed. Levels on the way that don't
+ *   exist yet are created as nodes.
  */
 export function CreateAccountDialog({ initialName, accounts, submit, onCreated, onCancel }: Props) {
   const [name, setName] = useState(initialName);
-  const [kind, setKind] = useState<AccountKind>("leaf");
+  const [active, setActive] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const field = useRef<HTMLInputElement>(null);
   const titleId = useId();
   const nameId = useId();
-  const check = checkNewAccount(name.trim(), kind, accounts);
+  const listId = useId();
+  const check = checkNewAccount(name, accounts);
+  const suggestions = completions(name, accounts).slice(0, 8);
 
+  // After a fill, the cursor belongs at the end, ready for the next part. Setting the value
+  // doesn't reliably put it there, so it's moved once the new value has rendered.
+  const caretToEnd = useRef(true); // also on opening, after the prefilled name
+  useLayoutEffect(() => {
+    const el = field.current;
+    if (!caretToEnd.current || !el) return;
+    caretToEnd.current = false;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [name]);
+
+  const fill = (account: string) => {
+    caretToEnd.current = true;
+    setName(completeWith(name, account));
+    setActive(0);
+  };
+  const onChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const el = e.currentTarget;
+    const next = typed(el.value);
+    if (next !== el.value) {
+      // Same length, so the cursor can stay exactly where it was.
+      const [start, end] = [el.selectionStart, el.selectionEnd];
+      el.value = next;
+      el.setSelectionRange(start, end);
+    }
+    setName(next);
+    setActive(0);
+  };
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Tab" && !e.shiftKey && suggestions[active]) fill(suggestions[active]);
+    else if (e.key === "ArrowDown" && suggestions.length)
+      setActive((i) => Math.min(i + 1, suggestions.length - 1));
+    else if (e.key === "ArrowUp" && suggestions.length) setActive((i) => Math.max(i - 1, 0));
+    else return;
+    e.preventDefault();
+  };
   const create = async () => {
     if (!check.ok || busy) return;
     setBusy(true);
     setError(null);
     try {
-      onCreated(await submit(name.trim(), kind));
+      onCreated(await submit(name));
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -71,51 +124,54 @@ export function CreateAccountDialog({ initialName, accounts, submit, onCreated, 
               Account
             </label>
             <input
+              ref={field}
               id={nameId}
-              autoFocus
-              autoCapitalize="words"
-              spellCheck={false}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              // Start at the end, where the new part of the name goes.
-              onFocus={(e) => e.currentTarget.setSelectionRange(name.length, name.length)}
+              role="combobox"
+              aria-expanded={suggestions.length > 0}
+              aria-controls={listId}
+              aria-autocomplete="list"
               aria-invalid={!check.ok}
               aria-describedby={`${nameId}-hint`}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              value={name}
+              onChange={onChange}
+              onKeyDown={onKeyDown}
             />
             <p id={`${nameId}-hint`} className={`small ${check.ok ? "muted" : "error"}`}>
               {check.ok
                 ? `${check.type ? `${TYPE_LABELS[check.type]} account` : "Account"}${
-                    check.adds.length ? ` · also adds ${check.adds.join(", ")} to hold it` : ""
+                    check.creates.length ? ` · also creates ${check.creates.join(", ")}` : ""
                   }`
                 : check.message}
             </p>
+            {suggestions.length > 0 && (
+              <ul
+                id={listId}
+                role="listbox"
+                aria-label="Accounts to continue into"
+                className="completions"
+              >
+                {suggestions.map((account, i) => (
+                  <li
+                    key={account}
+                    role="option"
+                    aria-selected={i === active}
+                    // mousedown, not click: keep the name field focused.
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      fill(account);
+                    }}
+                  >
+                    <AccountName name={account} />
+                    {i === active && <kbd className="muted small">Tab</kbd>}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-
-          <fieldset className="choice">
-            <legend>Holds</legend>
-            <label>
-              <input
-                type="radio"
-                name="kind"
-                checked={kind === "leaf"}
-                onChange={() => setKind("leaf")}
-              />
-              <span>
-                Transactions <span className="muted">· leaf</span>
-              </span>
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="kind"
-                checked={kind === "node"}
-                onChange={() => setKind("node")}
-              />
-              <span>
-                Sub-accounts <span className="muted">· node</span>
-              </span>
-            </label>
-          </fieldset>
 
           {error && <p className="error">{error}</p>}
 
