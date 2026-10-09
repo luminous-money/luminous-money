@@ -68,7 +68,9 @@ the system.
   - [ ] Confirmed or not is a transaction-level checkbox.
   - [ ] Any transaction's date can be set by hand. That's the transaction's date, separate from
         `created_at`.
-  - [ ] Scopable to a single account, so the same component is each account's ledger.
+  - [ ] Scopable to a single account, so the same component is each account's ledger. Scoped to
+        an account, every line shows that account's running balance, and pending (`!`)
+        transactions count toward it.
 
 ## Phase 4: Reports
 
@@ -133,9 +135,7 @@ the system.
   - What does confidence mean, and is it comparable across resolvers?
   - Can a resolver return a partial answer (e.g. a match with a suggested split)?
   - Should high-confidence matches ever auto-confirm, or does everything go through review?
-- **Budget display across periods:** budgets can have any period. How does a view show
-  accounts whose budgets have different periods side by side (normalize to a common period,
+- **Budget display across periods** (to revisit): budgets can have any period. How does a view
+  show accounts whose budgets have different periods side by side (normalize to a common period,
   show each in its own period, or something else)?
-- **General ledger running balance:** when the ledger is scoped to one account, do split rows
-  show that account's running balance? How do staged (`!`) transactions count toward it?
 - **Cutover:** deferred until hydration.
