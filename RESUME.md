@@ -60,6 +60,10 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
 
 ## Next steps
 
+The roadmap now continues past the review app with the chart of accounts and general ledger
+(Phase 3), reports (Phase 4) and budgeting (Phase 5); see [PLAN.md](PLAN.md). Their open questions
+are listed there and are worth settling before starting each phase.
+
 1. **Use the review queue for real on a phone** (`http://<laptop-ip>:8080/ui/`) and collect
    friction. Likely candidates: suggested categories from payee history (the `rules` resolver),
    bulk categorization, and showing validation problems in the UI.

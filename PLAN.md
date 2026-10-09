@@ -37,7 +37,6 @@ the system.
 - [x] Versioned, partial edits (PATCH with `updatedAt`, 409 on conflict); TanStack Query
 - [x] Migration framework: every table through `create_table` (created/updated timestamps), with
       a lint check
-- [ ] Manage accounts: rename and move (carrying their history), close
 - [x] Browser end-to-end tests (Playwright) as part of `pnpm e2e`
 - [ ] Bulk categorization
 - [ ] CSV import as a participant
@@ -45,27 +44,68 @@ the system.
       `external` as a configurable slot
 - [x] Demo books for UI work: `pnpm seed` stages recent purchases of a `bean-example` history
 - [ ] Richer synthetic data: denser purchase history, more payees, several books with cross-book
-      pairs (needed by Phase 3)
+      pairs (needed by Phase 6)
 
-## Phase 3: Many books
+## Phase 3: Chart of accounts and the general ledger
+
+- [ ] **Chart of accounts:** a UI for viewing and managing a book's accounts.
+  - [ ] View the tree: nodes and leaves, types, open and close dates.
+  - [ ] Create accounts (reusing the create-account dialog).
+  - [ ] Edit accounts: rename, change leaf/node where the rules allow, close.
+  - [ ] Move accounts between parents, carrying their history.
+  - [ ] Open any account's ledger from the tree.
+- [ ] **General ledger:** every split in the book, in chronological transaction order.
+  - [ ] The split is the primary unit of the list. Transactions are visually demarcated.
+  - [ ] Reversed and paginated: the most recent transactions at the bottom, and earlier pages
+        load automatically when scrolling toward the top.
+  - [ ] The bottom row is always an empty transaction. Entering one commits it in place and
+        opens a new empty row below.
+  - [ ] A simple, intuitive way to add and remove splits. A transaction won't save unless its
+        splits balance.
+  - [ ] Any transaction's date can be set by hand. That's the transaction's date, separate from
+        `createdAt`.
+  - [ ] Scopable to a single account, so the same component is each account's ledger.
+
+## Phase 4: Reports
+
+- [ ] **Check what already exists before building anything:** libraries that generalize reports
+      and graphs over ledgers, and graphing libraries to wrap.
+- [ ] **Two separate, independent libraries,** because ledgers are a generic class of object
+      worth generalizing over:
+  - [ ] `@luminous-money/ledger-graphs-api`: a plugin for a ledger's API. It returns data sets
+        for the requested graph and parameters.
+  - [ ] `@luminous-money/ledger-graphs-ui`: a wrapper around a good graphing library that renders
+        those data sets.
+- [ ] **Expense pie chart:** selectable account depth, number of slices, date bounds, and optional
+      averaging per period.
+- [ ] **Income pie chart:** the same options.
+- [ ] More reports to come (details to follow).
+
+## Phase 5: Budgeting
+
+- [ ] A target budget on any account.
+- [ ] Validation: no descendant account may have a higher budget than its ancestor.
+- [ ] Each budget target can roll over month to month, or not.
+
+## Phase 6: Many books
 
 - [ ] Cross-book groups: account pairs, mirroring, pair-balance assertions
 - [ ] Group editor: edit every leg at once; save only when all of them balance
 - [ ] Scheduled templates, including multi-book templates (salary)
 - [ ] Matching imports to scheduled legs
 
-## Phase 4: Feeds and prices
+## Phase 7: Feeds and prices
 
 - [ ] SimpleFIN importer
 - [ ] `bean-price` on a schedule; manual price entry for illiquid assets
 
-## Phase 5: Deploy to the Pi
+## Phase 8: Deploy to the Pi
 
 - [ ] Run `bench.py` on the Pi 3 and revisit the performance assumptions
 - [ ] Publish multi-arch release images; operator docs for standing up the stack
 - [ ] Optional: a Pi image that wraps the Compose file
 
-## Phase 6: Hydration
+## Phase 9: Hydration
 
 - [ ] Choose the cutover date and the source of opening balances
 - [ ] Open real accounts, connect live feeds, retire GnuCash to read-only
@@ -87,4 +127,22 @@ the system.
   - What does confidence mean, and is it comparable across resolvers?
   - Can a resolver return a partial answer (e.g. a match with a suggested split)?
   - Should high-confidence matches ever auto-confirm, or does everything go through review?
+- **Fava's future:** if we build our own reports (Phase 4), do we keep Fava at all? It's already
+  optional in the Compose file. Removing it would also remove the export loop and the exports
+  volume.
+- **Where the ledger-graphs libraries live:** they're meant to be independent of fava-beans, under
+  `@luminous-money`. Do they start in this repo as workspace packages and move out once stable,
+  or start in their own repo? And how does the API plugin attach to a ledger: an interface each
+  ledger implements, or something else?
+- **Moving and renaming accounts:** Beancount has no rename. Rewriting the account name in every
+  directive that mentions it changes history in exports and backups. Is that acceptable, or should
+  renames be recorded some other way?
+- **Budgets:**
+  - The budget requirements included an unfinished thought ("…and it should,"). What was the
+    rest?
+  - Are budgets monthly only, or can other periods be set?
+  - How does rollover interact with the "no descendant higher than its ancestor" rule: on the
+    base amounts, or on the amounts after rollover?
+- **General ledger and splits:** does a split row show a running balance (natural when scoped to
+  one account)? How do staged (`!`) transactions appear in it?
 - **Cutover:** deferred until hydration.
