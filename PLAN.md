@@ -48,7 +48,7 @@ the system.
 - [ ] Richer synthetic data: denser purchase history, more payees, several books with cross-book
       pairs (needed by Phase 6)
 
-## Phase 3: Chart of accounts and the general ledger
+## Phase 3: Chart of accounts, ledgers and money accounts
 
 - [ ] **Chart of accounts:** a UI for viewing and managing a book's accounts.
   - [ ] View the tree: nodes and leaves, types, open and close dates.
@@ -72,6 +72,19 @@ the system.
   - [ ] Scopable to a single account, so the same component is each account's ledger. Scoped to
         an account, every line shows that account's running balance, and pending (`!`)
         transactions count toward it.
+
+- [ ] **Money accounts:** some accounts are special because they're linked to a real institution
+      and actually hold money: bank accounts, credit cards, brokerage accounts, other asset
+      accounts, loans. The system should honor that throughout.
+  - [ ] Mark an account as a money account (see the open question on how).
+  - [ ] **Home screen:** lists every money account with its current balance. Tapping one opens
+        its ledger.
+  - [ ] Other places that should treat them specially (to collect as they come up). Likely
+        candidates: the anchor side of imported transactions, bank feeds and CSV imports,
+        reconciliation and balance assertions, and net worth.
+- [ ] **Read-only ledger view:** a prettier, one-line-per-transaction rendering of a ledger, for
+      reading rather than editing. Tapping a transaction opens it for editing, including complex
+      splits.
 
 ## Phase 4: Reports
 
@@ -139,4 +152,10 @@ the system.
 - **Budget display across periods** (to revisit): budgets can have any period. How does a view
   show accounts whose budgets have different periods side by side (normalize to a common period,
   show each in its own period, or something else)?
+- **Marking money accounts:** is it an explicit property of the account (metadata on its `open`
+  directive, such as the institution's name), or derived from where it sits (leaves under
+  `Assets` and `Liabilities`)? Derived is simpler, but not every asset leaf is held at an
+  institution, and some may never be (a car, say).
+- **Read-only ledger format:** the note said "a prettier one-time format". I read it as
+  one-line-per-transaction; confirm.
 - **Cutover:** deferred until hydration.
