@@ -112,3 +112,55 @@ test("real touch swipes work, and a vertical drag still scrolls instead", async 
   await expect(queue(page)).toHaveCount(2);
   await expect.poll(async () => (await stored(seeded.book, seeded.ids["Grocer"]!)).flag).toBe("*");
 });
+
+test("swipes can start on the description field, where a thumb lands", async ({ page }) => {
+  const description = (payee: string) =>
+    item(page, payee).getByRole("textbox", { name: "Description" });
+
+  await swipe(page, item(page, "Corner Cafe"), -0.6, { from: description("Corner Cafe") });
+  await expect(queue(page).last()).toContainText("Corner Cafe");
+
+  await swipe(page, item(page, "Grocer"), 0.6, { from: description("Grocer") });
+  await expect(queue(page)).toHaveCount(2);
+  await expect.poll(async () => (await stored(seeded.book, seeded.ids["Grocer"]!)).flag).toBe("*");
+  expect((await stored(seeded.book, seeded.ids["Grocer"]!)).narration).toBe("Weekly shop");
+});
+
+test("a description edited just before swiping is kept, and the item stays confirmed", async ({
+  page,
+}) => {
+  const grocer = item(page, "Grocer");
+  const description = grocer.getByRole("textbox", { name: "Description" });
+  await description.fill("Weekly shop and snacks");
+
+  // Still focused: the swipe races the field's save-on-blur.
+  await swipe(page, grocer, 0.6, { from: description });
+
+  await expect(queue(page)).toHaveCount(2);
+  await expect.poll(async () => (await stored(seeded.book, seeded.ids["Grocer"]!)).flag).toBe("*");
+  await page.waitForTimeout(500);
+  const after = await stored(seeded.book, seeded.ids["Grocer"]!);
+  expect(after.flag).toBe("*");
+  expect(after.narration).toBe("Weekly shop and snacks");
+});
+
+test("a touch swipe on the description field doesn't focus it", async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  const coffee = item(page, "Corner Cafe");
+  const description = coffee.getByRole("textbox", { name: "Description" });
+  const box = (await description.boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+  for (let i = 1; i <= 10; i++) {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: x - 25 * i, y }],
+    });
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+
+  await expect(queue(page).last()).toContainText("Corner Cafe");
+  await expect(description).not.toBeFocused();
+});

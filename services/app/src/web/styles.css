@@ -503,6 +503,12 @@ button:focus-visible,
   -webkit-user-select: text;
 }
 
+.swipe-surface.dragging,
+.swipe-surface.dragging * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .swipe-under {
   position: absolute;
   inset: 0;

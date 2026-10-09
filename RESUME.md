@@ -37,7 +37,7 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
 - **Tests, all passing:**
   - `pnpm test`: 47 ledger tests, 27 app unit tests, the client drift check, typechecks and
     Prettier
-  - `pnpm e2e`: 23 API tests and 12 browser tests (Playwright, phone-sized Chromium, including
+  - `pnpm e2e`: 23 API tests and 15 browser tests (Playwright, phone-sized Chromium, including
     real touch swipes via the DevTools protocol) through Traefik, against a throwaway stack
 - **Demo data:** `pnpm seed [book]` imports a 2-year `bean-example` history whose last 45 days of
   card and checking purchases are staged for review: flagged `!`, with `source: "demo-import"`

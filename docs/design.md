@@ -483,8 +483,12 @@ case without hiding the general one.
     emphasizes once committing (with a short vibration on Android).
   - A card that can't be confirmed yet drags stiffly and springs back on release, and its
     category field shakes to point at what's missing.
-  - Swipes can start anywhere on the card, buttons included; a drag never counts as a tap. Text
-    fields and the open account picker keep their own gestures. Vertical drags still scroll.
+  - Swipes can start anywhere on the card, wherever a thumb lands: the description field,
+    buttons and links included. A drag never counts as a tap, never focuses a field (so the
+    keyboard doesn't open), and suspends text selection. Vertical drags still scroll.
+- **Saves on a card run one at a time, in order, and stop once it's confirmed.** A description's
+  save-on-blur can otherwise race a confirm and land second, putting the transaction back in the
+  queue.
   - The buttons stay, for keyboards, desktops and accessibility. Reduced-motion settings turn
     off the animations.
 - **Edits save immediately and the item stays staged:** the description saves on blur or Enter,

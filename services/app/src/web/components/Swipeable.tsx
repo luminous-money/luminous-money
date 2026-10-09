@@ -14,10 +14,6 @@ type Props = {
   disabled?: boolean;
 };
 
-/** Text fields and an open account picker keep their own gestures. Buttons and links don't:
- * a swipe may start on them, and a drag never counts as a tap. */
-const OWN_GESTURES = "input, textarea, select, [role=combobox], [role=listbox]";
-
 const reducedMotion = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
@@ -36,6 +32,9 @@ type Drag = {
  * Swipe right to confirm, left to skip. The card follows the finger; releasing past the threshold
  * (or flicking) flies it off and runs the action, and anything less springs back. Position is
  * written straight to the element's style during a drag, so React doesn't re-render per frame.
+ *
+ * A swipe may start anywhere on the card, including on fields, buttons and links: wherever a
+ * thumb lands. A drag never counts as a tap, and text selection is suspended while dragging.
  */
 export function Swipeable({ children, onConfirm, onSkip, canConfirm, onBlocked, disabled }: Props) {
   const surface = useRef<HTMLDivElement>(null);
@@ -67,13 +66,14 @@ export function Swipeable({ children, onConfirm, onSkip, canConfirm, onBlocked, 
 
   const reset = () => {
     drag.current = null;
+    surface.current?.classList.remove("dragging");
     armedNow.current = false;
     setDirection(null);
     setArmed(false);
   };
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (disabled || e.button !== 0 || (e.target as Element).closest(OWN_GESTURES)) return;
+    if (disabled || e.button !== 0) return;
     dragged.current = false;
     drag.current = {
       id: e.pointerId,
@@ -96,6 +96,9 @@ export function Swipeable({ children, onConfirm, onSkip, canConfirm, onBlocked, 
       if (d.axis === "y") return void (drag.current = null); // a scroll, not a swipe
       if (d.axis === "x") {
         surface.current?.setPointerCapture(e.pointerId);
+        surface.current?.classList.add("dragging");
+        // A drag that began in a text field would otherwise be selecting its text.
+        window.getSelection()?.removeAllRanges();
         dragged.current = true;
       }
     }

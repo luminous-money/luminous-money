@@ -1,5 +1,5 @@
 import type { Transaction, TransactionIn } from "@fava-beans/ledger-client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 
 import { AccountName, AccountPicker } from "../components/AccountPicker.js";
@@ -70,23 +70,36 @@ function QueueItem({ book, transaction: t, accounts, onSave, onConfirm, onSkip }
   const input = toInput(t);
   const detail = `/books/${book}/transactions/${t.id}`;
 
-  const run = async (action: () => Promise<unknown>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await action();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+  // Saves on a card run one at a time, in order, and stop once it's confirmed. Otherwise a
+  // description's save-on-blur racing a confirm could land second and re-stage the transaction.
+  const pending = useRef<Promise<unknown>>(Promise.resolve());
+  const confirmed = useRef(false);
+  const run = (action: () => Promise<unknown>) => {
+    const next = pending.current.then(async () => {
+      if (confirmed.current) return;
+      setBusy(true);
+      setError(null);
+      try {
+        await action();
+      } catch (e) {
+        setError((e as Error).message);
+      } finally {
+        setBusy(false);
+      }
+    });
+    pending.current = next;
+    return next;
   };
   const saveNarration = () => {
     if (narration !== t.narration) void run(() => onSave({ ...input, narration }));
   };
 
   const uncategorized = t.postings.some((p) => p.account === UNCATEGORIZED);
-  const confirm = () => run(() => onConfirm({ ...input, narration }));
+  const confirm = () =>
+    run(async () => {
+      await onConfirm({ ...input, narration });
+      confirmed.current = true;
+    });
 
   return (
     <Swipeable
