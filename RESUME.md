@@ -47,7 +47,7 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   - `/api/app/v1` and `/ui` → `app`
   - `/` → redirects to `/ui/`
 - **Tests, all passing:**
-  - `pnpm test`: 80 ledger tests (including the table lint), 35 app unit tests, the client
+  - `pnpm test`: 79 ledger tests (including the table lint), 35 app unit tests, the client
     drift check, typechecks and Prettier
   - `pnpm e2e`: 25 API tests and 26 browser tests (Playwright, phone-sized Chromium, including
     real touch swipes via the DevTools protocol) through Traefik, against a throwaway stack
