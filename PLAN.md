@@ -31,7 +31,13 @@ the system.
       `/ui`, Hono serving `/api/app/v1`
 - [x] Review queue: list staged entries, skip, categorize, edit descriptions, confirm with one
       tap; detail view with a full split editor and a live balance check
-- [x] Swipe right to confirm, left to skip; cards that aren't ready spring back
+- [x] Swipe right to confirm, left to skip; cards that aren't ready spring back; the stack slides
+      up after a confirm or skip
+- [x] Leaf and node accounts; "Create account" from any posting-account picker
+- [x] Versioned, partial edits (PATCH with `updatedAt`, 409 on conflict); TanStack Query
+- [x] Migration framework: every table through `create_table` (created/updated timestamps), with
+      a lint check
+- [ ] Manage accounts: rename and move (carrying their history), close
 - [x] Browser end-to-end tests (Playwright) as part of `pnpm e2e`
 - [ ] Bulk categorization
 - [ ] CSV import as a participant

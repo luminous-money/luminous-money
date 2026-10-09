@@ -1,17 +1,35 @@
-import type { Transaction, TransactionIn } from "@fava-beans/ledger-client";
+import type { Transaction } from "@fava-beans/ledger-client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 
-import { AccountName, AccountPicker } from "../components/AccountPicker.js";
-import { Swipeable } from "../components/Swipeable.js";
-import { openOn, preferredRoots, shortName } from "../lib/accounts.js";
+import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
+import { Swipeable, type SwipeHandle } from "../components/Swipeable.js";
+import { postable, preferredRoots, shortName } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";
-import { useAccounts, useQueue } from "../lib/hooks.js";
-import { simple, toInput, UNCATEGORIZED, withCounterpart } from "../lib/split.js";
+import {
+  explain,
+  readSkipped,
+  useAccountCreation,
+  useAccounts,
+  useEditTransaction,
+  useQueue,
+  writeSkipped,
+} from "../lib/queries.js";
+import { simple, UNCATEGORIZED, withCounterpart } from "../lib/split.js";
 
 export function Review({ book }: { book: string }) {
   const queue = useQueue(book);
   const accounts = useAccounts(book);
+  const create = useAccountCreation(book);
+  const [skipped, setSkipped] = useState(() => readSkipped(book));
+  useEffect(() => writeSkipped(book, skipped), [book, skipped]);
+
+  // Oldest first; skipped items go to the end, most recently skipped last.
+  const items = queue.data ?? [];
+  const ordered = [
+    ...items.filter((t) => !skipped.includes(t.id)),
+    ...skipped.flatMap((id) => items.filter((t) => t.id === id)),
+  ];
 
   return (
     <main>
@@ -22,26 +40,25 @@ export function Review({ book }: { book: string }) {
         <h1>Review</h1>
         <p className="muted">
           {book}
-          {queue.loaded.state === "ready" && ` · ${queue.items.length} left`}
+          {queue.data && ` · ${ordered.length} left`}
         </p>
       </header>
 
-      {queue.loaded.state === "loading" && <p className="muted">Loading…</p>}
-      {queue.loaded.state === "failed" && <p className="card error">{queue.loaded.error}</p>}
-      {queue.loaded.state === "ready" && queue.items.length === 0 && (
+      {queue.isPending && <p className="muted">Loading…</p>}
+      {queue.error && <p className="card error">{explain(queue.error)}</p>}
+      {queue.data && ordered.length === 0 && (
         <p className="card done">All caught up. Nothing is waiting for review.</p>
       )}
 
       <ol className="queue">
-        {queue.items.map((t) => (
+        {ordered.map((t) => (
           <li key={t.id}>
             <QueueItem
               book={book}
               transaction={t}
-              accounts={accounts.state === "ready" ? openOn(accounts.value, t.date) : []}
-              onSave={(input) => queue.save(t.id, input)}
-              onConfirm={(input) => queue.confirm(t.id, input)}
-              onSkip={() => queue.skip(t.id)}
+              accounts={accounts.data ? postable(accounts.data, t.date) : []}
+              create={create}
+              onSkip={() => setSkipped((s) => [...s.filter((x) => x !== t.id), t.id])}
             />
           </li>
         ))}
@@ -54,60 +71,47 @@ type ItemProps = {
   book: string;
   transaction: Transaction;
   accounts: string[];
-  onSave: (input: TransactionIn) => Promise<unknown>;
-  onConfirm: (input: TransactionIn) => Promise<unknown>;
+  create?: AccountCreation;
   onSkip: () => void;
 };
 
-function QueueItem({ book, transaction: t, accounts, onSave, onConfirm, onSkip }: ItemProps) {
-  const [busy, setBusy] = useState(false);
+function QueueItem({ book, transaction: t, accounts, create, onSkip }: ItemProps) {
+  const edit = useEditTransaction(book, t.id);
+  const swipe = useRef<SwipeHandle>(null);
   const [error, setError] = useState<string | null>(null);
   const [narration, setNarration] = useState(t.narration);
   const [nudge, setNudge] = useState(0);
   useEffect(() => setNarration(t.narration), [t.narration]);
 
   const view = useMemo(() => simple(t), [t]);
-  const input = toInput(t);
   const detail = `/books/${book}/transactions/${t.id}`;
+  const busy = edit.isPending;
+  const uncategorized = t.postings.some((p) => p.account === UNCATEGORIZED);
 
-  // Saves on a card run one at a time, in order, and stop once it's confirmed. Otherwise a
-  // description's save-on-blur racing a confirm could land second and re-stage the transaction.
-  const pending = useRef<Promise<unknown>>(Promise.resolve());
-  const confirmed = useRef(false);
-  const run = (action: () => Promise<unknown>) => {
-    const next = pending.current.then(async () => {
-      if (confirmed.current) return;
-      setBusy(true);
-      setError(null);
-      try {
-        await action();
-      } catch (e) {
-        setError((e as Error).message);
-      } finally {
-        setBusy(false);
+  // Edits to this transaction queue up in order (see lib/queries), so these can fire freely.
+  const save = (changes: Parameters<typeof edit.mutateAsync>[0]) => {
+    setError(null);
+    return edit.mutateAsync(changes).then(
+      () => true,
+      (e: unknown) => {
+        setError(explain(e));
+        return false;
       }
-    });
-    pending.current = next;
-    return next;
+    );
   };
   const saveNarration = () => {
-    if (narration !== t.narration) void run(() => onSave({ ...input, narration }));
+    if (narration !== t.narration) void save({ narration });
   };
-
-  const uncategorized = t.postings.some((p) => p.account === UNCATEGORIZED);
-  const confirm = () =>
-    run(async () => {
-      await onConfirm({ ...input, narration });
-      confirmed.current = true;
-    });
+  // Confirming carries the description too, in case it was edited without leaving the field.
+  const confirm = () => save({ flag: "*", narration });
 
   return (
     <Swipeable
+      handle={swipe}
       onConfirm={confirm}
       onSkip={onSkip}
-      canConfirm={!busy && !uncategorized}
+      canConfirm={!uncategorized}
       onBlocked={() => setNudge((n) => n + 1)}
-      disabled={busy}
     >
       <article
         className={`card item${busy ? " busy" : ""}`}
@@ -130,7 +134,6 @@ function QueueItem({ book, transaction: t, accounts, onSave, onConfirm, onSkip }
           aria-label="Description"
           placeholder="Add a description"
           value={narration}
-          disabled={busy}
           onChange={(e) => setNarration(e.target.value)}
           onBlur={saveNarration}
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
@@ -147,10 +150,8 @@ function QueueItem({ book, transaction: t, accounts, onSave, onConfirm, onSkip }
               accounts={accounts}
               value={view.counterpart.account === UNCATEGORIZED ? "" : view.counterpart.account}
               prefer={preferredRoots(isNegative(view.amount))}
-              disabled={busy}
-              onChange={(account) =>
-                void run(() => onSave(withCounterpart({ ...input, narration }, account)))
-              }
+              create={create}
+              onChange={(account) => void save({ postings: withCounterpart(t, account).postings })}
             />
           </div>
         ) : (
@@ -167,7 +168,7 @@ function QueueItem({ book, transaction: t, accounts, onSave, onConfirm, onSkip }
         {error && <p className="error">{error}</p>}
 
         <div className="actions">
-          <button type="button" onClick={onSkip} disabled={busy}>
+          <button type="button" onClick={() => void swipe.current?.commit("skip")}>
             Skip
           </button>
           <Link href={detail} className="button">
@@ -176,9 +177,9 @@ function QueueItem({ book, transaction: t, accounts, onSave, onConfirm, onSkip }
           <button
             type="button"
             className="primary"
-            disabled={busy || uncategorized}
+            disabled={uncategorized}
             title={uncategorized ? "Choose a category first" : undefined}
-            onClick={() => void confirm()}
+            onClick={() => void swipe.current?.commit("confirm")}
           >
             Confirm
           </button>

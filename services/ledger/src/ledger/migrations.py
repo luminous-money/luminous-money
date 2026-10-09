@@ -1,0 +1,120 @@
+"""Schema migrations for the ledger database, applied in order and tracked by SQLite's
+`user_version`.
+
+Every table is created through `create_table`, which adds the columns every table must have:
+`created_at` and `updated_at`. They're non-null with no defaults, so a write that forgets to set
+them fails loudly instead of silently recording nothing. `tests/test_lint.py` fails the build if
+`CREATE TABLE` appears anywhere but here.
+
+To change the schema, append a migration; never edit one that has shipped.
+"""
+
+from __future__ import annotations
+
+import datetime
+import sqlite3
+
+TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+
+def create_table(name: str, columns: list[str], constraints: list[str] | None = None) -> str:
+    """CREATE TABLE with the required timestamp columns. Table constraints (composite keys and
+    the like) go in `constraints`, since SQL wants them after every column."""
+    parts = [*columns, "created_at TEXT NOT NULL", "updated_at TEXT NOT NULL", *(constraints or [])]
+    return f"CREATE TABLE {name} (\n    " + ",\n    ".join(parts) + "\n)"
+
+
+def now() -> str:
+    """A timestamp: ISO 8601, UTC, microseconds, fixed width, so text order is time order."""
+    return datetime.datetime.now(datetime.UTC).strftime(TIMESTAMP_FORMAT)
+
+
+def after(previous: str | None) -> str:
+    """A timestamp strictly later than `previous`.
+
+    `updated_at` is a row's version, so it must change on every write even if the clock hasn't
+    moved, or has gone backwards (a Pi has no hardware clock and can jump at boot).
+    """
+    stamp = now()
+    if previous is not None and stamp <= previous:
+        later = datetime.datetime.strptime(previous, TIMESTAMP_FORMAT) + datetime.timedelta(microseconds=1)
+        stamp = later.strftime(TIMESTAMP_FORMAT)
+    return stamp
+
+
+MIGRATIONS: list[list[str]] = [
+    # 1: the baseline.
+    [
+        create_table(
+            "book",
+            [
+                "id TEXT PRIMARY KEY",
+                "header TEXT NOT NULL",  # option/plugin lines, newline-separated
+                "seq INTEGER NOT NULL",
+            ],
+        ),
+        create_table(
+            "change",
+            [
+                "seq INTEGER PRIMARY KEY AUTOINCREMENT",  # the backup cursor
+                "book_id TEXT NOT NULL",
+                "directive_id TEXT",  # NULL for book-level changes
+                "op TEXT NOT NULL",  # 'book' | 'put' | 'delete'
+            ],
+        ),
+        create_table(
+            "directive",
+            [
+                "id TEXT PRIMARY KEY",
+                "book_id TEXT NOT NULL REFERENCES book(id)",
+                "date TEXT NOT NULL",
+                "kind TEXT NOT NULL",
+                "flag TEXT",
+                "ordinal INTEGER NOT NULL",  # tie-breaker within a date, preserving entry order
+                "text TEXT",  # NULL once deleted
+                "deleted INTEGER NOT NULL DEFAULT 0",
+                "seq INTEGER NOT NULL",
+            ],
+        ),
+        "CREATE INDEX directive_live ON directive(book_id, deleted, date, ordinal)",
+        "CREATE INDEX directive_seq ON directive(book_id, seq)",
+        create_table(
+            "posting",
+            [
+                "directive_id TEXT NOT NULL REFERENCES directive(id) ON DELETE CASCADE",
+                "idx INTEGER NOT NULL",
+                "account TEXT NOT NULL",
+                "number TEXT",  # decimal string; NULL when elided
+                "currency TEXT",
+            ],
+            constraints=["PRIMARY KEY (directive_id, idx)"],
+        ),
+        "CREATE INDEX posting_account ON posting(account)",
+    ],
+]
+
+
+class MigrationError(RuntimeError):
+    pass
+
+
+def migrate(conn: sqlite3.Connection) -> int:
+    """Bring the database up to date. Returns the schema version."""
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if version == 0 and conn.execute("SELECT count(*) FROM sqlite_master WHERE type = 'table'").fetchone()[0]:
+        raise MigrationError(
+            "this database predates schema migrations. Nothing real was stored before hydration, so recreate it."
+        )
+    if version > len(MIGRATIONS):
+        raise MigrationError(f"this database is at schema {version}, newer than this ledger ({len(MIGRATIONS)})")
+    for number, statements in enumerate(MIGRATIONS[version:], start=version + 1):
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            for statement in statements:
+                conn.execute(statement)
+            conn.execute(f"PRAGMA user_version = {number}")
+        except BaseException:
+            conn.execute("ROLLBACK")
+            raise
+        conn.execute("COMMIT")
+    return len(MIGRATIONS)

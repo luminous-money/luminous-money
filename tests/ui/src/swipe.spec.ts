@@ -164,3 +164,18 @@ test("a touch swipe on the description field doesn't focus it", async ({ page })
   await expect(queue(page).last()).toContainText("Corner Cafe");
   await expect(description).not.toBeFocused();
 });
+
+test("the cards below slide up after a confirm or a skip, by button too", async ({ page }) => {
+  const top = async (payee: string) => (await item(page, payee).boundingBox())!.y;
+  const first = await top("Corner Cafe");
+  const second = await top("Grocer");
+
+  await item(page, "Corner Cafe").getByRole("button", { name: "Skip" }).click();
+  await expect.poll(() => top("Grocer")).toBe(first);
+  await expect(queue(page).last()).toContainText("Corner Cafe");
+
+  await item(page, "Grocer").getByRole("button", { name: "Confirm" }).click();
+  await expect.poll(() => top("Costco")).toBe(first);
+  await expect(queue(page)).toHaveCount(2);
+  expect(second).toBeGreaterThan(first);
+});

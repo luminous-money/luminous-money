@@ -44,14 +44,14 @@ def demo_ledger(history: str, staged_days: int, today: datetime.date) -> str:
     texts = [engine.parse_one(f"{first.isoformat()} open {UNCATEGORIZED}\n").text]
     for directive in parsed.directives:
         if directive.kind == "transaction" and directive.date >= since:
-            [transaction] = engine.transactions([directive.text])
+            [(_, transaction)] = engine.transactions([directive.text])
             if is_purchase(transaction):
-                directive = engine.transaction_directive(stage(transaction), directive.id)
+                directive = engine.transaction_directive(stage(directive.id, transaction), directive.id)
         texts.append(directive.text)
     return engine.render(parsed.header, texts)
 
 
-def is_purchase(t: models.Transaction) -> bool:
+def is_purchase(t: models.TransactionIn) -> bool:
     """One expense paid from one bank or card account: what a bank feed delivers."""
     if len(t.postings) != 2:
         return False
@@ -59,14 +59,14 @@ def is_purchase(t: models.Transaction) -> bool:
     return expense.account.startswith("Expenses:") and funding.account.startswith(FUNDING) and expense.units is not None
 
 
-def stage(t: models.Transaction) -> models.TransactionIn:
-    uncategorized = int(hashlib.sha256(t.id.encode()).hexdigest(), 16) % 2 == 0
+def stage(directive_id: str, t: models.TransactionIn) -> models.TransactionIn:
+    uncategorized = int(hashlib.sha256(directive_id.encode()).hexdigest(), 16) % 2 == 0
     postings = [
         p.model_copy(update={"account": UNCATEGORIZED}) if uncategorized and p.account.startswith("Expenses:") else p
         for p in t.postings
     ]
     return models.TransactionIn(
-        **t.model_dump(exclude={"id", "flag", "meta", "postings"}),
+        **t.model_dump(exclude={"flag", "meta", "postings"}),
         flag="!",
         meta={**t.meta, "source": "demo-import"},
         postings=postings,

@@ -67,9 +67,10 @@ def book(ledger):
     return ledger
 
 
-def roundtrip(payload: dict) -> tuple[engine.Directive, models.Transaction]:
+def roundtrip(payload: dict) -> tuple[engine.Directive, models.TransactionIn]:
     directive = engine.transaction_directive(models.TransactionIn.model_validate(payload))
-    [back] = engine.transactions([directive.text])
+    [(directive_id, back)] = engine.transactions([directive.text])
+    assert directive_id == directive.id
     return directive, back
 
 
@@ -78,8 +79,7 @@ def test_json_round_trips_through_canonical_text_without_loss(payload):
     directive, back = roundtrip(payload)
 
     expected = models.TransactionIn.model_validate(payload).model_dump()
-    assert back.model_dump(exclude={"id"}) == expected
-    assert back.id == directive.id
+    assert back.model_dump() == expected
 
 
 def test_the_rendered_text_is_ordinary_beancount():
@@ -171,8 +171,12 @@ def test_json_api_over_http(book):
     assert [t["id"] for t in listed] == [directive_id]
     assert listed[0]["postings"][0]["units"] == {"number": "4.50", "currency": "USD"}
 
-    updated = client.put(f"/api/ledger/v1/books/book/transactions/{directive_id}", json={**COFFEE, "flag": "*"})
+    version = listed[0]["updatedAt"]
+    updated = client.put(
+        f"/api/ledger/v1/books/book/transactions/{directive_id}", json={**COFFEE, "flag": "*", "updatedAt": version}
+    )
     assert updated.json()["flag"] == "*"
+    assert updated.json()["updatedAt"] > version
 
     assert client.post("/api/ledger/v1/books/book/transactions", json={**COFFEE, "postings": []}).status_code == 422
     assert client.post("/api/ledger/v1/books/book/transactions", json={**COFFEE, "flag": "x"}).status_code == 422

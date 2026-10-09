@@ -1,6 +1,16 @@
+import type { Account } from "@fava-beans/ledger-client";
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
-import { search } from "../lib/accounts.js";
+import { search, suggestNew } from "../lib/accounts.js";
+import type { AccountKind } from "../lib/ledger.js";
+import { CreateAccountDialog } from "./CreateAccountDialog.js";
+
+/** Offering "Create account" at the bottom of the picker. */
+export type AccountCreation = {
+  /** Where a new account can go: node accounts. */
+  parents: Account[];
+  submit: (name: string, kind: AccountKind) => Promise<Account>;
+};
 
 type Props = {
   accounts: string[];
@@ -10,33 +20,64 @@ type Props = {
   prefer?: string[];
   label: string;
   disabled?: boolean;
+  create?: AccountCreation;
 };
 
-/** A searchable account picker: tap to open, type any part of the name, pick with tap or Enter. */
-export function AccountPicker({ accounts, value, onChange, prefer, label, disabled }: Props) {
+const CREATE = Symbol("create");
+
+/**
+ * A searchable account picker: tap to open, type any part of the name, pick with tap or Enter.
+ *
+ * With `create`, the last option is always "Create account", which opens the creation dialog
+ * prefilled from the search. While the dialog is open the picker stays open underneath, search
+ * and all, so cancelling lands right back where you were. A created leaf is picked; a created
+ * node can't hold transactions, so the search moves into it instead, ready for a leaf under it.
+ */
+export function AccountPicker({
+  accounts,
+  value,
+  onChange,
+  prefer,
+  label,
+  disabled,
+  create,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [creating, setCreating] = useState(false);
+  const creatingNow = useRef(false); // read during blur, before state catches up
   const listId = useId();
   const input = useRef<HTMLInputElement>(null);
-  const results = useMemo(
+  const matches = useMemo(
     () => search(accounts, query, prefer).slice(0, 50),
     [accounts, query, prefer]
   );
+  const options: (string | typeof CREATE)[] = create ? [...matches, CREATE] : matches;
 
   const close = () => {
     setOpen(false);
     setQuery("");
     setActive(0);
   };
-  const choose = (account: string) => {
+  const choose = (option: string | typeof CREATE) => {
+    if (option === CREATE) {
+      creatingNow.current = true;
+      setCreating(true);
+      return;
+    }
     close();
-    if (account !== value) onChange(account);
+    if (option !== value) onChange(option);
+  };
+  const stopCreating = () => {
+    creatingNow.current = false;
+    setCreating(false);
+    setTimeout(() => input.current?.focus());
   };
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "ArrowDown") setActive((i) => Math.min(i + 1, results.length - 1));
+    if (e.key === "ArrowDown") setActive((i) => Math.min(i + 1, options.length - 1));
     else if (e.key === "ArrowUp") setActive((i) => Math.max(i - 1, 0));
-    else if (e.key === "Enter" && results[active]) choose(results[active]);
+    else if (e.key === "Enter" && options[active] !== undefined) choose(options[active]);
     else if (e.key === "Escape") close();
     else return;
     e.preventDefault();
@@ -56,6 +97,13 @@ export function AccountPicker({ accounts, value, onChange, prefer, label, disabl
     );
   }
 
+  const suggestion =
+    create &&
+    suggestNew(
+      query,
+      create.parents.map((p) => p.name)
+    );
+
   return (
     <div className="picker">
       <input
@@ -72,25 +120,48 @@ export function AccountPicker({ accounts, value, onChange, prefer, label, disabl
           setActive(0);
         }}
         onKeyDown={onKeyDown}
-        onBlur={close}
+        onBlur={() => !creatingNow.current && close()}
       />
-      <ul id={listId} role="listbox">
-        {results.map((name, i) => (
+      <ul id={listId} role="listbox" aria-label={label}>
+        {options.map((option, i) => (
           <li
-            key={name}
+            key={option === CREATE ? "create" : option}
             role="option"
             aria-selected={i === active}
+            className={option === CREATE ? "create" : undefined}
             // mousedown, not click: it fires before the input's blur closes the list.
             onMouseDown={(e) => {
               e.preventDefault();
-              choose(name);
+              choose(option);
             }}
           >
-            <AccountName name={name} />
+            {option === CREATE ? (
+              <span>+ Create account{query.trim() ? ` “${query.trim()}”` : ""}</span>
+            ) : (
+              <AccountName name={option} />
+            )}
           </li>
         ))}
-        {results.length === 0 && <li className="muted">No matching accounts</li>}
+        {!create && matches.length === 0 && <li className="muted">No matching accounts</li>}
       </ul>
+      {creating && create && suggestion && (
+        <CreateAccountDialog
+          initialName={suggestion.name}
+          initialParent={suggestion.parent}
+          parents={create.parents}
+          prefer={prefer}
+          submit={create.submit}
+          onCancel={stopCreating}
+          onCreated={(account) => {
+            creatingNow.current = false;
+            setCreating(false);
+            if (account.kind === "leaf") return choose(account.name);
+            setQuery(`${account.name}:`);
+            setActive(0);
+            setTimeout(() => input.current?.focus());
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -5,7 +5,11 @@ plus columns derived from that text for SQL reads. Deleted directives stay behin
 rows so incremental backups can carry deletions.
 
 Every change appends to `change`, whose autoincrementing `seq` is the global, monotonic cursor
-for backups. Wall-clock time is recorded but never used for ordering.
+for backups.
+
+Every row has `created_at` and `updated_at` (see `migrations`). A directive's `updated_at` is also
+its version: edits name the version they read, and a write against any other version is refused
+(`StaleVersion`), so two clients can't silently overwrite each other.
 """
 
 from __future__ import annotations
@@ -18,43 +22,15 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 from .engine import Directive
+from .migrations import after, migrate, now
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS book (
-    id      TEXT PRIMARY KEY,
-    header  TEXT NOT NULL,             -- option/plugin lines, newline-separated
-    seq     INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS change (
-    seq          INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id      TEXT NOT NULL,
-    directive_id TEXT,                 -- NULL for book-level changes
-    op           TEXT NOT NULL,        -- 'book' | 'put' | 'delete'
-    at           TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS directive (
-    id       TEXT PRIMARY KEY,
-    book_id  TEXT NOT NULL REFERENCES book(id),
-    date     TEXT NOT NULL,
-    kind     TEXT NOT NULL,
-    flag     TEXT,
-    ordinal  INTEGER NOT NULL,         -- tie-breaker within a date, preserving entry order
-    text     TEXT,                     -- NULL once deleted
-    deleted  INTEGER NOT NULL DEFAULT 0,
-    seq      INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS directive_live ON directive(book_id, deleted, date, ordinal);
-CREATE INDEX IF NOT EXISTS directive_seq ON directive(book_id, seq);
-CREATE TABLE IF NOT EXISTS posting (
-    directive_id TEXT NOT NULL REFERENCES directive(id) ON DELETE CASCADE,
-    idx          INTEGER NOT NULL,
-    account      TEXT NOT NULL,
-    number       TEXT,                 -- decimal string; NULL when elided
-    currency     TEXT,
-    PRIMARY KEY (directive_id, idx)
-);
-CREATE INDEX IF NOT EXISTS posting_account ON posting(account);
-"""
+class StaleVersion(Exception):
+    """A write named a version that's no longer current."""
+
+    def __init__(self, directive_id: str, current: str):
+        super().__init__(f"{directive_id} has changed since it was read (now at {current})")
+        self.directive_id = directive_id
+        self.current = current
 
 
 @dataclass(frozen=True)
@@ -67,6 +43,8 @@ class Row:
     text: str | None
     deleted: bool
     seq: int
+    created_at: str
+    updated_at: str
 
 
 class Store:
@@ -79,7 +57,8 @@ class Store:
         self._path = path
         self._local = threading.local()
         self._lock = threading.RLock()
-        self._conn.executescript(SCHEMA)
+        with self._lock:
+            migrate(self._conn)
 
     @property
     def _conn(self) -> sqlite3.Connection:
@@ -116,10 +95,13 @@ class Store:
 
     def put_book(self, book_id: str, header: list[str]) -> None:
         seq = self._change(book_id, None, "book")
+        previous = self._conn.execute("SELECT updated_at FROM book WHERE id = ?", (book_id,)).fetchone()
+        stamp = after(previous["updated_at"] if previous else None)
         self._conn.execute(
-            "INSERT INTO book (id, header, seq) VALUES (?, ?, ?)"
-            " ON CONFLICT (id) DO UPDATE SET header = excluded.header, seq = excluded.seq",
-            (book_id, "\n".join(header), seq),
+            "INSERT INTO book (id, header, seq, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+            " ON CONFLICT (id) DO UPDATE SET header = excluded.header, seq = excluded.seq,"
+            " updated_at = excluded.updated_at",
+            (book_id, "\n".join(header), seq, stamp, stamp),
         )
 
     def book_seq(self, book_id: str) -> int:
@@ -141,7 +123,7 @@ class Store:
         ).fetchone()[0]
         for d in directives:
             existing = self._conn.execute(
-                "SELECT book_id, ordinal FROM directive WHERE id = ?", (d.id,)
+                "SELECT book_id, ordinal, updated_at FROM directive WHERE id = ?", (d.id,)
             ).fetchone()
             if existing is not None and existing["book_id"] != book_id:
                 raise KeyError(f"directive {d.id} belongs to book {existing['book_id']}")
@@ -150,18 +132,22 @@ class Store:
             else:
                 ordinal = existing["ordinal"]
             seq = self._change(book_id, d.id, "put")
+            stamp = after(existing["updated_at"] if existing else None)
             self._conn.execute(
-                "INSERT OR REPLACE INTO directive"
-                " (id, book_id, date, kind, flag, ordinal, text, deleted, seq)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)",
-                (d.id, book_id, d.date.isoformat(), d.kind, d.flag, ordinal, d.text, seq),
+                "INSERT INTO directive"
+                " (id, book_id, date, kind, flag, ordinal, text, deleted, seq, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)"
+                " ON CONFLICT (id) DO UPDATE SET date = excluded.date, kind = excluded.kind,"
+                " flag = excluded.flag, text = excluded.text, deleted = 0, seq = excluded.seq,"
+                " updated_at = excluded.updated_at",
+                (d.id, book_id, d.date.isoformat(), d.kind, d.flag, ordinal, d.text, seq, stamp, stamp),
             )
             self._conn.execute("DELETE FROM posting WHERE directive_id = ?", (d.id,))
             self._conn.executemany(
-                "INSERT INTO posting (directive_id, idx, account, number, currency)"
-                " VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO posting (directive_id, idx, account, number, currency, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 [
-                    (d.id, i, p.account, None if p.number is None else str(p.number), p.currency)
+                    (d.id, i, p.account, None if p.number is None else str(p.number), p.currency, stamp, stamp)
                     for i, p in enumerate(d.postings)
                 ],
             )
@@ -171,19 +157,25 @@ class Store:
         deleted = []
         for directive_id in directive_ids:
             row = self._conn.execute(
-                "SELECT 1 FROM directive WHERE id = ? AND book_id = ? AND deleted = 0",
+                "SELECT updated_at FROM directive WHERE id = ? AND book_id = ? AND deleted = 0",
                 (directive_id, book_id),
             ).fetchone()
             if row is None:
                 continue
             seq = self._change(book_id, directive_id, "delete")
             self._conn.execute(
-                "UPDATE directive SET text = NULL, deleted = 1, seq = ? WHERE id = ?",
-                (seq, directive_id),
+                "UPDATE directive SET text = NULL, deleted = 1, seq = ?, updated_at = ? WHERE id = ?",
+                (seq, after(row["updated_at"]), directive_id),
             )
             self._conn.execute("DELETE FROM posting WHERE directive_id = ?", (directive_id,))
             deleted.append(directive_id)
         return deleted
+
+    def check_version(self, book_id: str, directive_id: str, expected: str) -> None:
+        """Refuse a write that read an older version. Call inside the write's transaction."""
+        row = self.get(book_id, directive_id)
+        if row is not None and row.updated_at != expected:
+            raise StaleVersion(directive_id, row.updated_at)
 
     def get(self, book_id: str, directive_id: str) -> Row | None:
         row = self._conn.execute(
@@ -248,10 +240,10 @@ class Store:
         return [_row(r) for r in self._conn.execute(" ".join(sql), args)]
 
     def _change(self, book_id: str, directive_id: str | None, op: str) -> int:
-        at = datetime.datetime.now(datetime.UTC).isoformat()
+        stamp = now()
         cur = self._conn.execute(
-            "INSERT INTO change (book_id, directive_id, op, at) VALUES (?, ?, ?, ?)",
-            (book_id, directive_id, op, at),
+            "INSERT INTO change (book_id, directive_id, op, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            (book_id, directive_id, op, stamp, stamp),
         )
         return cur.lastrowid
 
@@ -266,4 +258,6 @@ def _row(r: sqlite3.Row) -> Row:
         text=r["text"],
         deleted=bool(r["deleted"]),
         seq=r["seq"],
+        created_at=r["created_at"],
+        updated_at=r["updated_at"],
     )

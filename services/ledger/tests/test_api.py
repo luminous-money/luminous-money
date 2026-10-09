@@ -28,7 +28,10 @@ def test_review_flow_over_http(client):
     queue = client.get("/api/ledger/v1/books/kael/directives", params={"flag": "!"}).json()
     assert [d["id"] for d in queue] == [directive_id]
 
-    confirmed = client.post(f"/api/ledger/v1/books/kael/directives/{directive_id}/confirm").json()
+    version = queue[0]["updatedAt"]
+    confirmed = client.patch(
+        f"/api/ledger/v1/books/kael/transactions/{directive_id}", json={"flag": "*", "updatedAt": version}
+    ).json()
     assert confirmed["flag"] == "*"
     assert client.get("/api/ledger/v1/books/kael/problems").json() == []
 

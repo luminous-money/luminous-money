@@ -23,21 +23,100 @@
             "title": "Currencies",
             "type": "array"
           },
+          "implicit": {
+            "default": false,
+            "description": "Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.",
+            "title": "Implicit",
+            "type": "boolean"
+          },
+          "kind": {
+            "description": "Leaf accounts hold transactions; node accounts hold sub-accounts.",
+            "enum": [
+              "leaf",
+              "node"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
           "name": {
             "title": "Name",
             "type": "string"
           },
           "open": {
-            "format": "date",
-            "title": "Open",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "asset",
+                  "liability",
+                  "equity",
+                  "income",
+                  "expense"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "From the top-level account; None for an unrecognized root.",
+            "title": "Type"
           }
         },
         "required": [
           "name",
-          "open"
+          "type",
+          "kind"
         ],
         "title": "Account",
+        "type": "object"
+      },
+      "AccountIn": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "default": "leaf",
+            "enum": [
+              "leaf",
+              "node"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "description": "The full name. Its parent must be a node account; the parent's root sets the type.",
+            "title": "Name",
+            "type": "string"
+          },
+          "open": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Defaults to when the parent opened, else the earliest account under it, else the book's first entry.",
+            "title": "Open"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "AccountIn",
         "type": "object"
       },
       "Amount": {
@@ -189,6 +268,10 @@
       "Directive": {
         "description": "Any directive, as its canonical Beancount text plus the columns derived from it.",
         "properties": {
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
           "date": {
             "format": "date",
             "title": "Date",
@@ -216,6 +299,11 @@
           "text": {
             "title": "Text",
             "type": "string"
+          },
+          "updatedAt": {
+            "description": "Changes on every write; send it back with edits.",
+            "title": "Updatedat",
+            "type": "string"
           }
         },
         "required": [
@@ -223,7 +311,9 @@
           "date",
           "kind",
           "flag",
-          "text"
+          "text",
+          "createdAt",
+          "updatedAt"
         ],
         "title": "Directive",
         "type": "object"
@@ -355,7 +445,7 @@
       },
       "Problem": {
         "properties": {
-          "directive_id": {
+          "directiveId": {
             "anyOf": [
               {
                 "type": "string"
@@ -364,7 +454,7 @@
                 "type": "null"
               }
             ],
-            "title": "Directive Id"
+            "title": "Directiveid"
           },
           "message": {
             "title": "Message",
@@ -373,7 +463,7 @@
         },
         "required": [
           "message",
-          "directive_id"
+          "directiveId"
         ],
         "title": "Problem",
         "type": "object"
@@ -406,6 +496,10 @@
       "Transaction": {
         "additionalProperties": false,
         "properties": {
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
           "date": {
             "format": "date",
             "title": "Date",
@@ -483,12 +577,19 @@
             },
             "title": "Tags",
             "type": "array"
+          },
+          "updatedAt": {
+            "description": "Changes on every write; send it back with edits.",
+            "title": "Updatedat",
+            "type": "string"
           }
         },
         "required": [
           "date",
           "postings",
-          "id"
+          "id",
+          "createdAt",
+          "updatedAt"
         ],
         "title": "Transaction",
         "type": "object"
@@ -576,6 +677,234 @@
           "postings"
         ],
         "title": "TransactionIn",
+        "type": "object"
+      },
+      "TransactionPatch": {
+        "additionalProperties": false,
+        "description": "Change only the fields given. `postings`, when given, replaces all of them.",
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "maxLength": 1,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flag"
+          },
+          "links": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Links"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MetaNumber"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MetaDate"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Amount"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "narration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narration"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "postings": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Posting"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postings"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "updatedAt": {
+            "description": "The `updatedAt` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "updatedAt"
+        ],
+        "title": "TransactionPatch",
+        "type": "object"
+      },
+      "TransactionUpdate": {
+        "additionalProperties": false,
+        "description": "A full replacement.",
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "flag": {
+            "default": "!",
+            "description": "`!` is staged for review; `*` is confirmed.",
+            "maxLength": 1,
+            "minLength": 1,
+            "title": "Flag",
+            "type": "string"
+          },
+          "links": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "meta": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "$ref": "#/components/schemas/MetaNumber"
+                },
+                {
+                  "$ref": "#/components/schemas/MetaDate"
+                },
+                {
+                  "$ref": "#/components/schemas/Amount"
+                }
+              ]
+            },
+            "title": "Meta",
+            "type": "object"
+          },
+          "narration": {
+            "default": "",
+            "title": "Narration",
+            "type": "string"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "postings": {
+            "items": {
+              "$ref": "#/components/schemas/Posting"
+            },
+            "minItems": 1,
+            "title": "Postings",
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "updatedAt": {
+            "description": "The `updatedAt` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "postings",
+          "updatedAt"
+        ],
+        "title": "TransactionUpdate",
         "type": "object"
       },
       "ValidationError": {
@@ -768,6 +1097,53 @@
           }
         },
         "summary": "Accounts"
+      },
+      "post": {
+        "operationId": "create_account_api_ledger_v1_books__book_id__accounts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Account"
       }
     },
     "/api/ledger/v1/books/{book_id}/directives": {
@@ -960,11 +1336,25 @@
               "title": "Directive Id",
               "type": "string"
             }
+          },
+          {
+            "description": "The `updatedAt` this edit was based on.",
+            "in": "query",
+            "name": "updatedAt",
+            "required": true,
+            "schema": {
+              "description": "The `updatedAt` this edit was based on.",
+              "title": "Updatedat",
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
           },
           "422": {
             "content": {
@@ -1045,6 +1435,17 @@
               "title": "Directive Id",
               "type": "string"
             }
+          },
+          {
+            "description": "The `updatedAt` this edit was based on.",
+            "in": "query",
+            "name": "updatedAt",
+            "required": true,
+            "schema": {
+              "description": "The `updatedAt` this edit was based on.",
+              "title": "Updatedat",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1069,6 +1470,9 @@
             },
             "description": "Successful Response"
           },
+          "409": {
+            "description": "Stale version"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -1081,54 +1485,6 @@
           }
         },
         "summary": "Update Directive"
-      }
-    },
-    "/api/ledger/v1/books/{book_id}/directives/{directive_id}/confirm": {
-      "post": {
-        "operationId": "confirm_api_ledger_v1_books__book_id__directives__directive_id__confirm_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "book_id",
-            "required": true,
-            "schema": {
-              "title": "Book Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "directive_id",
-            "required": true,
-            "schema": {
-              "title": "Directive Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Directive"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Confirm"
       }
     },
     "/api/ledger/v1/books/{book_id}/export": {
@@ -1528,8 +1884,8 @@
         },
         "summary": "Get Transaction"
       },
-      "put": {
-        "operationId": "update_transaction_api_ledger_v1_books__book_id__transactions__directive_id__put",
+      "patch": {
+        "operationId": "patch_transaction_api_ledger_v1_books__book_id__transactions__directive_id__patch",
         "parameters": [
           {
             "in": "path",
@@ -1554,7 +1910,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TransactionIn"
+                "$ref": "#/components/schemas/TransactionPatch"
               }
             }
           },
@@ -1571,6 +1927,9 @@
             },
             "description": "Successful Response"
           },
+          "409": {
+            "description": "Stale version"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -1582,7 +1941,66 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Update Transaction"
+        "summary": "Patch Transaction"
+      },
+      "put": {
+        "operationId": "replace_transaction_api_ledger_v1_books__book_id__transactions__directive_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "directive_id",
+            "required": true,
+            "schema": {
+              "title": "Directive Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace Transaction"
       }
     }
   }

@@ -12,6 +12,8 @@ const posting = (account: string, units?: string, rest: Partial<Posting> = {}): 
 
 const card: Transaction = {
   id: "t1",
+  createdAt: "2026-09-18T00:00:00.000000Z",
+  updatedAt: "2026-09-18T00:00:00.000000Z",
   date: "2026-09-18",
   flag: "!",
   payee: "Kin Soy",
@@ -72,6 +74,7 @@ describe("the happy path", () => {
     expect(moved.postings[0]?.units).toEqual(usd("-14.93"));
     expect(moved.meta).toEqual(card.meta);
     expect("id" in moved).toBe(false);
+    expect("updatedAt" in moved).toBe(false);
   });
 });
 

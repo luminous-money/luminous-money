@@ -99,6 +99,50 @@ Anything written one way reads back the other way. The JSON is designed to lose 
 Every endpoint has a typed response model, so the generated TypeScript client describes real
 request and response bodies.
 
+### Versioned, partial edits
+
+Every directive's `updated_at` (`updatedAt` in JSON) is its version.
+
+- **Every write moves it forward,** to a timestamp strictly later than before, even when the
+  clock hasn't moved or has gone backwards (a Pi has no hardware clock).
+- **Every edit sends the version it read:** in the body for JSON, and as a query parameter for
+  text edits and deletes. If the stored version has moved on, the edit is refused with
+  **409 Conflict** (which includes the current version). The check runs inside the write's
+  database transaction.
+- **Edits are partial: `PATCH /transactions/{id}` changes only the fields it names.** Confirming
+  is `PATCH {flag: "*"}`, and a description edit is `PATCH {narration}`. A late save can never
+  overwrite fields it didn't touch. `PUT` remains for full replacement, and is versioned too.
+- **Imports and restores apply Beancount text by ID** and aren't versioned: they're bulk
+  operations with their own semantics.
+
+The API's JSON is camelCase (`updatedAt`, `createdAt`, `directiveId`), generated from snake_case
+Python names.
+
+### Accounts: leaves hold transactions, nodes hold sub-accounts
+
+Beancount has no notion of node accounts, so fava-beans layers one on, using only ordinary
+Beancount:
+
+- **A leaf** is a plain `open` directive. It holds transactions and can't have sub-accounts.
+- **A node** is an `open` with `kind: "node"` metadata. It holds sub-accounts and can't hold
+  transactions.
+- **The five top-level accounts are built-in nodes in every book,** a new book included.
+  Beancount can't `open` a bare root, so they exist without directives. Their names follow the
+  book's `name_*` options.
+- **A parent that was never opened but has accounts under it is an implicit node.** Beancount
+  already refuses postings to it. Imported books get a sensible tree this way, and an implicit
+  parent can be opened explicitly, but only as a node.
+- **Creating an account always needs a parent, and the parent must be a node.** The parent's
+  root sets the type (asset, liability, equity, income, expense). The account opens when its
+  parent did, else with the earliest account under the parent, else at the book's first entry,
+  so it can take any of the book's transactions.
+- **Postings to node accounts are refused on write** (422). Imported data that does it is flagged
+  as a validation problem. That check runs after Beancount's loader rather than through its
+  `extra_validations` hook: Beancount 3.2 appends those to its global list of validations on
+  every load, so they'd run once more each time.
+- **Pickers offer only leaves open on the transaction's date** as posting targets, and only
+  nodes as parents.
+
 ### Start fresh, no GnuCash conversion
 
 The GnuCash book is too big to be worth converting. The new books start from opening balances on
@@ -177,6 +221,15 @@ separate repos and connect over HTTP.)
   - `pnpm test` fails if the committed client has drifted from the service, so an API change
     breaks the TypeScript build rather than a running Pi.
 
+### Front-end data: TanStack Query over a generated client
+
+- **`openapi-fetch`** with the generated `@fava-beans/ledger-client` types is the transport.
+- **TanStack Query** handles caching, refetching and mutations. Reads are queries, and edits are
+  mutations that update every cached copy of what they change.
+- **Edits to one transaction share a mutation scope,** so they run one at a time in order. Each
+  reads the transaction's latest version from the cache when it runs, not when it was queued.
+- **A 409 refetches the book's data** and says it changed elsewhere.
+
 ### Many books, one ledger database
 
 - A book is a first-class record, and every ledger API is scoped to a book.
@@ -196,6 +249,16 @@ SQLite ships by default, on the data volume. Each database has exactly one ownin
 
 Database access goes through a small interface in each service, so another database could be
 swapped in later without touching callers.
+
+**Every table has non-null `created_at` and `updated_at` columns.**
+
+- Tables are only ever created through the migration framework's `create_table` helper, which
+  adds both columns. A lint check in `pnpm test` fails on any other `CREATE TABLE`.
+- The columns have no defaults, so a write that forgets them fails loudly.
+- Timestamps are ISO 8601 UTC with microseconds and fixed width, so text order is time order.
+- Migrations are numbered, append-only, and tracked by SQLite's `user_version`.
+- Migration 1 is the baseline. A database from before migrations is refused with a message to
+  recreate it, which is safe because no real data exists before hydration.
 
 ### Performance over decades of data
 
@@ -486,11 +549,23 @@ case without hiding the general one.
   - Swipes can start anywhere on the card, wherever a thumb lands: the description field,
     buttons and links included. A drag never counts as a tap, never focuses a field (so the
     keyboard doesn't open), and suspends text selection. Vertical drags still scroll.
-- **Saves on a card run one at a time, in order, and stop once it's confirmed.** A description's
-  save-on-blur can otherwise race a confirm and land second, putting the transaction back in the
-  queue.
   - The buttons stay, for keyboards, desktops and accessibility. Reduced-motion settings turn
     off the animations.
+- **Confirming or skipping slides the stack up.** By swipe or by button, the card flies off and
+  its space collapses, so the cards below slide up. A skipped card reappears at the end; a card
+  whose save fails comes back in place with the error.
+- **Edits to a card apply in order, and only to their own fields.** Each is a PATCH, queued per
+  transaction and sent with the version current when it runs (see "Versioned, partial edits").
+  A description saved on blur and a confirm a moment later can't undo each other.
+- **"Create account" is always the last option** in a posting-account picker.
+  - It opens a dialog (full screen on phones) with the search prefilled as a valid name
+    ("coffee shops" becomes `Coffee-Shops`).
+  - The parent is chosen with the same picker, limited to node accounts and without Create.
+    A typed path whose front names a node ("utilities:power") preselects it.
+  - Leaf or node defaults to leaf.
+  - **Create** opens the account and picks it for the card. A new node can't hold transactions,
+    so instead the search moves into it (`Expenses:Utilities:`), ready to create a leaf under it.
+  - **Cancel** returns to the dropdown exactly as it was, search included.
 - **Edits save immediately and the item stays staged:** the description saves on blur or Enter,
   the category on pick. Nothing typed is lost to a skipped or abandoned review.
 - **Confirm saves the current state with the `*` flag,** which takes the item out of the queue.

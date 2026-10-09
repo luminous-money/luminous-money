@@ -85,6 +85,13 @@ export async function stored(book: string, id: string): Promise<Transaction> {
   return data!;
 }
 
+export async function accounts(book: string) {
+  const { data } = await ledger.GET("/api/ledger/v1/books/{book_id}/accounts", {
+    params: { path: { book_id: book } },
+  });
+  return data!;
+}
+
 export async function problems(book: string) {
   const { data } = await ledger.GET("/api/ledger/v1/books/{book_id}/problems", {
     params: { path: { book_id: book } },

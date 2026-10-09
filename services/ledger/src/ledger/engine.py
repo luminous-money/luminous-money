@@ -10,6 +10,7 @@ the full pipeline (booking, plugins, validation). A Beancount upgrade has one pl
 
 from __future__ import annotations
 
+import collections
 import datetime
 import glob
 import os
@@ -32,6 +33,17 @@ from beancount.parser import parser, printer
 from . import models
 
 ID_KEY = "id"
+KIND_KEY = "kind"
+NODE = "node"
+ROOT_OPTIONS = (
+    ("name_assets", "asset"),
+    ("name_liabilities", "liability"),
+    ("name_equity", "equity"),
+    ("name_income", "income"),
+    ("name_expenses", "expense"),
+)
+
+NodePostingError = collections.namedtuple("NodePostingError", "source message entry")
 TOMBSTONE_TYPE = "fava-beans"
 TOMBSTONE_VALUE = "deleted"
 
@@ -209,34 +221,83 @@ def transaction_directive(t: models.TransactionIn, directive_id: str | None = No
     return parse_one(directive.text, directive.id)
 
 
-def transactions(texts: list[str]) -> list[models.Transaction]:
-    """Structured views of stored transactions, in the given order. Non-transactions are skipped."""
+def transactions(texts: list[str]) -> list[tuple[str, models.TransactionIn]]:
+    """Structured views of stored transactions as (id, transaction), in the given order.
+    Non-transactions are skipped."""
     entries, errors, _ = parser.parse_string("\n".join(texts))
     if errors:
         raise ParseFailure([_message(e) for e in errors])
-    return [_transaction_model(e) for e in entries if isinstance(e, data.Transaction)]
+    return [(str(e.meta[ID_KEY]), _transaction_model(e)) for e in entries if isinstance(e, data.Transaction)]
 
 
-def accounts(texts: list[str]) -> list[models.Account]:
-    """The chart of accounts declared by `open` and `close` directives, sorted by name."""
+def accounts(header: list[str], texts: list[str]) -> list[models.Account]:
+    """The chart of accounts, sorted by name.
+
+    - Opened accounts come from `open` and `close` directives. An `open` with `kind: "node"`
+      metadata is a node (holds sub-accounts); any other is a leaf (holds transactions).
+    - The five top-level accounts always exist as nodes. Beancount can't open them, and every
+      book has them.
+    - A parent that was never opened but has accounts under it is an implicit node. Beancount
+      won't accept postings to it either.
+    """
+    types = root_types(header)
     entries, errors, _ = parser.parse_string("\n".join(texts))
     if errors:
         raise ParseFailure([_message(e) for e in errors])
+
+    def type_of(name: str):
+        return types.get(name.split(":")[0])
+
     found: dict[str, models.Account] = {}
     for entry in entries:
         if isinstance(entry, data.Open):
             found[entry.account] = models.Account(
-                name=entry.account, open=entry.date, currencies=list(entry.currencies or [])
+                name=entry.account,
+                type=type_of(entry.account),
+                kind="node" if entry.meta.get(KIND_KEY) == NODE else "leaf",
+                open=entry.date,
+                currencies=list(entry.currencies or []),
             )
     for entry in entries:
         if isinstance(entry, data.Close) and entry.account in found:
             found[entry.account].close = entry.date
+
+    parents = {":".join(name.split(":")[:i]) for name in found for i in range(1, name.count(":") + 1)}
+    for name in [*types, *parents]:
+        if name not in found:
+            found[name] = models.Account(name=name, type=type_of(name), kind="node", implicit=True)
     return sorted(found.values(), key=lambda a: a.name)
 
 
-def _transaction_model(entry: data.Transaction) -> models.Transaction:
-    return models.Transaction(
-        id=str(entry.meta[ID_KEY]),
+def root_types(header: list[str]) -> dict[str, str]:
+    """Top-level account names (renamable with options) and the type each stands for."""
+    _, _, options = parser.parse_string("\n".join(header))
+    return {options[key]: type_ for key, type_ in ROOT_OPTIONS}
+
+
+def open_directive(name: str, date: datetime.date, kind: str) -> Directive:
+    meta = f'  {KIND_KEY}: "{NODE}"\n' if kind == NODE else ""
+    return parse_one(f"{date.isoformat()} open {name}\n{meta}")
+
+
+def node_posting_message(account: str) -> str:
+    return f"{account} is a node account and can't hold transactions; post to one of its sub-accounts"
+
+
+def _validate_node_postings(entries: list[data.Directive], _options: dict) -> list[NodePostingError]:
+    """Imported data can post to a node account; flag it like any other ledger problem."""
+    nodes = {e.account for e in entries if isinstance(e, data.Open) and e.meta.get(KIND_KEY) == NODE}
+    return [
+        NodePostingError(entry.meta, node_posting_message(p.account), entry)
+        for entry in entries
+        if isinstance(entry, data.Transaction)
+        for p in entry.postings
+        if p.account in nodes
+    ]
+
+
+def _transaction_model(entry: data.Transaction) -> models.TransactionIn:
+    return models.TransactionIn(
         date=entry.date,
         flag=entry.flag,
         payee=entry.payee,
@@ -353,6 +414,9 @@ def render(header: list[str], texts: list[str]) -> str:
 def load(header: list[str], texts: list[str]) -> Loaded:
     """Book, run plugins over, and validate a ledger. This is the full Beancount pipeline."""
     entries, errors, options = loader.load_string(render(header, texts))
+    # Run here rather than through `extra_validations`: Beancount 3.2 appends those to its global
+    # list of validations on every load, so they'd run once more each time.
+    errors = [*errors, *_validate_node_postings(entries, options)]
     return Loaded(entries=entries, options=options, problems=[_problem(e) for e in errors])
 
 

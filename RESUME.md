@@ -1,7 +1,7 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-08._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-09._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
@@ -14,6 +14,13 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   - **Writes:** transactions as JSON (`/transactions`, what the app uses) or any directive as
     Beancount text (`/directives`, `/import`). Every endpoint has a typed response, so
     `@fava-beans/ledger-client` exports real types (`Transaction`, `TransactionIn`, ...).
+  - **Versioned, partial edits:** every edit sends the `updatedAt` it read, and a stale one gets
+    409. `PATCH /transactions/{id}` changes only the given fields. The JSON is camelCase.
+  - **Accounts:** leaves hold transactions and nodes hold sub-accounts. Top-level accounts and
+    unopened parents are implicit nodes. `POST /accounts` creates under nodes only, and
+    postings to nodes are refused.
+  - **Migrations:** `migrations.py`, with every table created through `create_table` (non-null
+    `created_at`/`updated_at`), enforced by a lint test.
   - **Proven:** round trips are exact, validation problems map to the directive that caused them,
     BQL works, and incremental backups are made of Beancount chunks.
   - **Fava:** exports for Fava are rewritten automatically about 2 s after a change.
@@ -24,7 +31,11 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   served by Hono, which also serves `/api/app/v1`.
   - **Home:** books with their queue sizes.
   - **Review queue:** skip, categorize with a searchable picker, edit the description, confirm.
-    Swipe right to confirm and left to skip; cards that aren't ready spring back.
+    Swipe right to confirm and left to skip; cards that aren't ready spring back, and the
+    stack slides up after each one. "Create account" is the last option in every
+    posting-account picker.
+  - **Data layer:** TanStack Query over the generated client. Edits to one transaction run in
+    order, each with the latest version.
   - **Detail view:** a full split editor with a live, exact balance check.
   - The rules are in [docs/design.md](docs/design.md#how-the-review-queue-works). The pure logic
     (`src/web/lib`) has Vitest unit tests.
@@ -35,9 +46,9 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   - `/fava` → Fava, read-only
   - `/` → redirects to `/ui/`
 - **Tests, all passing:**
-  - `pnpm test`: 47 ledger tests, 27 app unit tests, the client drift check, typechecks and
-    Prettier
-  - `pnpm e2e`: 23 API tests and 15 browser tests (Playwright, phone-sized Chromium, including
+  - `pnpm test`: 77 ledger tests (including the table lint), 31 app unit tests, the client
+    drift check, typechecks and Prettier
+  - `pnpm e2e`: 26 API tests and 22 browser tests (Playwright, phone-sized Chromium, including
     real touch swipes via the DevTools protocol) through Traefik, against a throwaway stack
 - **Demo data:** `pnpm seed [book]` imports a 2-year `bean-example` history whose last 45 days of
   card and checking purchases are staged for review: flagged `!`, with `source: "demo-import"`
@@ -70,6 +81,12 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   both together.
 - **The UI calls the ledger API directly** through Traefik. Nothing proxies through `app` yet;
   that changes once auth exists.
+- **Databases from before the migration framework are refused** with a message to recreate them
+  (`docker compose down -v`). No real data exists yet, so there's no backfill.
+- **Beancount 3.2's `extra_validations` leaks:** each load appends them to a global list. Run
+  extra checks after loading instead (see `engine.load`).
+- **`openapi-typescript` treats fields with defaults as required,** so the generated request
+  types ask for `flag` and `narration` even though the API defaults them.
 - **TypeScript is pinned to 5.x.** `openapi-typescript` needs the TypeScript 5 compiler API, and
   pnpm will offer TypeScript 7, which breaks generation.
 - **pnpm 11 checks the lockfile against a supply-chain policy, which needs registry access.**

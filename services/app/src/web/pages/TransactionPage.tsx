@@ -1,12 +1,17 @@
-import type { Posting, Transaction, TransactionIn } from "@fava-beans/ledger-client";
+import type { Posting, Transaction } from "@fava-beans/ledger-client";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 import { AccountPicker } from "../components/AccountPicker.js";
-import { openOn } from "../lib/accounts.js";
+import { postable } from "../lib/accounts.js";
 import { formatMoney, isDecimal } from "../lib/decimal.js";
-import { useAccounts, useLoad } from "../lib/hooks.js";
-import { api } from "../lib/ledger.js";
+import {
+  explain,
+  useAccountCreation,
+  useAccounts,
+  useEditTransaction,
+  useTransaction,
+} from "../lib/queries.js";
 import { checkBalance, simple, UNCATEGORIZED } from "../lib/split.js";
 
 /** A posting being edited. The amount stays a raw string until it's valid; anything the form
@@ -45,7 +50,7 @@ function toPostings(rows: Row[]): Posting[] {
 }
 
 export function TransactionPage({ book, id }: { book: string; id: string }) {
-  const [loaded] = useLoad(`transaction:${book}:${id}`, () => api.transaction(book, id));
+  const loaded = useTransaction(book, id);
   const back = `/books/${book}/review`;
 
   return (
@@ -56,9 +61,9 @@ export function TransactionPage({ book, id }: { book: string; id: string }) {
         </Link>
         <h1>Transaction</h1>
       </header>
-      {loaded.state === "loading" && <p className="muted">Loading…</p>}
-      {loaded.state === "failed" && <p className="card error">{loaded.error}</p>}
-      {loaded.state === "ready" && <Editor book={book} transaction={loaded.value} back={back} />}
+      {loaded.isPending && <p className="muted">Loading…</p>}
+      {loaded.error && <p className="card error">{explain(loaded.error)}</p>}
+      {loaded.data && <Editor book={book} transaction={loaded.data} back={back} />}
     </main>
   );
 }
@@ -74,15 +79,17 @@ function Editor({
 }) {
   const [, navigate] = useLocation();
   const accounts = useAccounts(book);
+  const create = useAccountCreation(book);
+  const edit = useEditTransaction(book, t.id);
   const [date, setDate] = useState(t.date);
   const [payee, setPayee] = useState(t.payee ?? "");
   const [narration, setNarration] = useState(t.narration);
   const fallbackCurrency = useMemo(() => currencyOf(t), [t]);
   const [rows, setRows] = useState(() => toRows(t.postings, fallbackCurrency));
-  const [busy, setBusy] = useState(false);
+  const busy = edit.isPending;
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
   useEffect(() => setRows(toRows(t.postings, fallbackCurrency)), [t, fallbackCurrency]);
-  const names = accounts.state === "ready" ? openOn(accounts.value, date) : [];
+  const names = accounts.data ? postable(accounts.data, date) : [];
   const badAmount = rows.some(
     (r) => r.number.trim() && (!isDecimal(r.number.trim()) || !r.currency.trim())
   );
@@ -100,26 +107,13 @@ function Editor({
     setRows((all) => all.map((r) => (r.key === key ? { ...r, ...change } : r)));
 
   const submit = async (flag: string, then?: string) => {
-    const body: TransactionIn = {
-      date,
-      flag,
-      payee: payee.trim() || null,
-      narration,
-      tags: t.tags,
-      links: t.links,
-      meta: t.meta,
-      postings,
-    };
-    setBusy(true);
     setMessage(null);
     try {
-      await api.save(book, t.id, body);
+      await edit.mutateAsync({ date, flag, payee: payee.trim() || null, narration, postings });
       if (then) navigate(then);
       else setMessage({ kind: "ok", text: "Saved" });
     } catch (e) {
-      setMessage({ kind: "error", text: (e as Error).message });
-    } finally {
-      setBusy(false);
+      setMessage({ kind: "error", text: explain(e) });
     }
   };
 
@@ -152,6 +146,7 @@ function Editor({
               label="Account"
               accounts={names}
               value={r.account === UNCATEGORIZED ? "" : r.account}
+              create={create}
               onChange={(account) => update(r.key, { account })}
             />
             <div className="posting-amount">

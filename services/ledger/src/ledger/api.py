@@ -9,6 +9,10 @@ Two ways to write:
   bulk import and restore.
 
 Both write the same rows, and both read back either way.
+
+Edits are versioned. Every directive carries `updatedAt`, which changes on every write; an edit
+sends back the `updatedAt` it read (in the body for JSON, as a query parameter for text and
+deletes), and if the stored one has moved on, the edit is refused with 409 Conflict.
 """
 
 from __future__ import annotations
@@ -25,9 +29,10 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 
 from . import engine, models
 from .service import Ledger, NotFound
-from .store import Row, Store
+from .store import Row, StaleVersion, Store
 
 BeancountText = Annotated[str, Body(media_type="text/plain")]
+VersionParam = Annotated[str, Query(alias="updatedAt", description="The `updatedAt` this edit was based on.")]
 
 log = logging.getLogger(__name__)
 
@@ -74,6 +79,10 @@ def create_app(ledger: Ledger, export_interval: float | None = None) -> FastAPI:
     async def unparseable(_, exc: engine.ParseFailure):
         return JSONResponse({"detail": exc.errors}, status_code=422)
 
+    @app.exception_handler(StaleVersion)
+    async def stale(_, exc: StaleVersion):
+        return JSONResponse({"detail": str(exc), "updatedAt": exc.current}, status_code=409)
+
     @app.exception_handler(ValueError)
     async def invalid(_, exc: ValueError):
         return JSONResponse({"detail": str(exc)}, status_code=409)
@@ -102,6 +111,10 @@ def create_app(ledger: Ledger, export_interval: float | None = None) -> FastAPI:
     def accounts(book_id: str) -> list[models.Account]:
         return ledger.accounts(book_id)
 
+    @api.post("/books/{book_id}/accounts", status_code=201)
+    def create_account(book_id: str, account: models.AccountIn) -> models.Account:
+        return ledger.create_account(book_id, account)
+
     # Transactions, as JSON
 
     @api.get("/books/{book_id}/transactions")
@@ -116,11 +129,17 @@ def create_app(ledger: Ledger, export_interval: float | None = None) -> FastAPI:
     def get_transaction(book_id: str, directive_id: str) -> models.Transaction:
         return ledger.transaction(book_id, directive_id)
 
-    @api.put("/books/{book_id}/transactions/{directive_id}")
-    def update_transaction(
-        book_id: str, directive_id: str, transaction: models.TransactionIn
+    @api.put("/books/{book_id}/transactions/{directive_id}", responses={409: {"description": "Stale version"}})
+    def replace_transaction(
+        book_id: str, directive_id: str, transaction: models.TransactionUpdate
     ) -> models.Transaction:
-        ledger.update_transaction(book_id, directive_id, transaction)
+        body = models.TransactionIn.model_validate(transaction.model_dump(exclude={"updated_at"}))
+        ledger.update_transaction(book_id, directive_id, body, expected=transaction.updated_at)
+        return ledger.transaction(book_id, directive_id)
+
+    @api.patch("/books/{book_id}/transactions/{directive_id}", responses={409: {"description": "Stale version"}})
+    def patch_transaction(book_id: str, directive_id: str, patch: models.TransactionPatch) -> models.Transaction:
+        ledger.patch_transaction(book_id, directive_id, patch)
         return ledger.transaction(book_id, directive_id)
 
     # Any directive, as Beancount text
@@ -131,23 +150,26 @@ def create_app(ledger: Ledger, export_interval: float | None = None) -> FastAPI:
 
     @api.post("/books/{book_id}/directives", status_code=201)
     def create_directive(book_id: str, text: BeancountText) -> models.Directive:
-        return _directive(ledger.create(book_id, text))
+        return _row(ledger.get(book_id, ledger.create(book_id, text).id))
 
     @api.get("/books/{book_id}/directives/{directive_id}")
     def get_directive(book_id: str, directive_id: str) -> models.Directive:
         return _row(ledger.get(book_id, directive_id))
 
-    @api.put("/books/{book_id}/directives/{directive_id}")
-    def update_directive(book_id: str, directive_id: str, text: BeancountText) -> models.Directive:
-        return _directive(ledger.update(book_id, directive_id, text))
+    @api.put("/books/{book_id}/directives/{directive_id}", responses={409: {"description": "Stale version"}})
+    def update_directive(
+        book_id: str, directive_id: str, text: BeancountText, updated_at: VersionParam
+    ) -> models.Directive:
+        ledger.update(book_id, directive_id, text, expected=updated_at)
+        return _row(ledger.get(book_id, directive_id))
 
-    @api.post("/books/{book_id}/directives/{directive_id}/confirm")
-    def confirm(book_id: str, directive_id: str) -> models.Directive:
-        return _directive(ledger.set_flag(book_id, directive_id, "*"))
-
-    @api.delete("/books/{book_id}/directives/{directive_id}", status_code=204)
-    def delete_directive(book_id: str, directive_id: str) -> None:
-        ledger.delete(book_id, directive_id)
+    @api.delete(
+        "/books/{book_id}/directives/{directive_id}",
+        status_code=204,
+        responses={409: {"description": "Stale version"}},
+    )
+    def delete_directive(book_id: str, directive_id: str, updated_at: VersionParam) -> None:
+        ledger.delete(book_id, directive_id, expected=updated_at)
 
     # The engine
 
@@ -172,11 +194,15 @@ def create_app(ledger: Ledger, export_interval: float | None = None) -> FastAPI:
 
 
 def _row(r: Row) -> models.Directive:
-    return models.Directive(id=r.id, date=datetime.date.fromisoformat(r.date), kind=r.kind, flag=r.flag, text=r.text)
-
-
-def _directive(d: engine.Directive) -> models.Directive:
-    return models.Directive(id=d.id, date=d.date, kind=d.kind, flag=d.flag, text=d.text)
+    return models.Directive(
+        id=r.id,
+        date=datetime.date.fromisoformat(r.date),
+        kind=r.kind,
+        flag=r.flag,
+        text=r.text,
+        created_at=r.created_at,
+        updated_at=r.updated_at,
+    )
 
 
 def _export_loop(ledger: Ledger, interval: float, stop: threading.Event) -> None:

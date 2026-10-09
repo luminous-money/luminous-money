@@ -1,17 +1,9 @@
 import { Link } from "wouter";
 
-import { api } from "../lib/ledger.js";
-import { useLoad } from "../lib/hooks.js";
-
-type BookSummary = { id: string; staged: number };
-
-async function loadBooks(): Promise<BookSummary[]> {
-  const books = await api.books();
-  return Promise.all(books.map(async (id) => ({ id, staged: (await api.staged(id)).length })));
-}
+import { explain, useBooks } from "../lib/queries.js";
 
 export function Home() {
-  const [books] = useLoad("books", loadBooks);
+  const books = useBooks();
 
   return (
     <main>
@@ -24,24 +16,23 @@ export function Home() {
 
       <section className="stack" aria-live="polite">
         <h2 className="section-title">Books</h2>
-        {books.state === "loading" && <p className="muted">Loading…</p>}
-        {books.state === "failed" && (
+        {books.isPending && <p className="muted">Loading…</p>}
+        {books.error && (
           <p className="card">
-            <span className="dot bad" /> Ledger unreachable: {books.error}
+            <span className="dot bad" /> Ledger unreachable: {explain(books.error)}
           </p>
         )}
-        {books.state === "ready" && books.value.length === 0 && (
+        {books.data?.length === 0 && (
           <p className="card muted">No books yet. Seed a demo with `pnpm seed`.</p>
         )}
-        {books.state === "ready" &&
-          books.value.map((book) => (
-            <Link key={book.id} href={`/books/${book.id}/review`} className="card book link">
-              <h3>{book.id}</h3>
-              <p className={book.staged ? "" : "muted"}>
-                {book.staged ? `${book.staged} to review` : "All caught up"}
-              </p>
-            </Link>
-          ))}
+        {books.data?.map((book) => (
+          <Link key={book.id} href={`/books/${book.id}/review`} className="card book link">
+            <h3>{book.id}</h3>
+            <p className={book.staged ? "" : "muted"}>
+              {book.staged ? `${book.staged} to review` : "All caught up"}
+            </p>
+          </Link>
+        ))}
       </section>
 
       <section className="tiles">

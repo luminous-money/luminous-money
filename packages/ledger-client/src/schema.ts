@@ -65,7 +65,8 @@ export interface paths {
     /** Accounts */
     get: operations["accounts_api_ledger_v1_books__book_id__accounts_get"];
     put?: never;
-    post?: never;
+    /** Create Account */
+    post: operations["create_account_api_ledger_v1_books__book_id__accounts_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -104,23 +105,6 @@ export interface paths {
     post?: never;
     /** Delete Directive */
     delete: operations["delete_directive_api_ledger_v1_books__book_id__directives__directive_id__delete"];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/ledger/v1/books/{book_id}/directives/{directive_id}/confirm": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Confirm */
-    post: operations["confirm_api_ledger_v1_books__book_id__directives__directive_id__confirm_post"];
-    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -221,13 +205,14 @@ export interface paths {
     };
     /** Get Transaction */
     get: operations["get_transaction_api_ledger_v1_books__book_id__transactions__directive_id__get"];
-    /** Update Transaction */
-    put: operations["update_transaction_api_ledger_v1_books__book_id__transactions__directive_id__put"];
+    /** Replace Transaction */
+    put: operations["replace_transaction_api_ledger_v1_books__book_id__transactions__directive_id__put"];
     post?: never;
     delete?: never;
     options?: never;
     head?: never;
-    patch?: never;
+    /** Patch Transaction */
+    patch: operations["patch_transaction_api_ledger_v1_books__book_id__transactions__directive_id__patch"];
     trace?: never;
   };
 }
@@ -243,13 +228,46 @@ export interface components {
        * @description Constraint from the open directive; empty means any.
        */
       currencies?: string[];
+      /**
+       * Implicit
+       * @description Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.
+       * @default false
+       */
+      implicit: boolean;
+      /**
+       * Kind
+       * @description Leaf accounts hold transactions; node accounts hold sub-accounts.
+       * @enum {string}
+       */
+      kind: "leaf" | "node";
       /** Name */
+      name: string;
+      /** Open */
+      open?: string | null;
+      /**
+       * Type
+       * @description From the top-level account; None for an unrecognized root.
+       */
+      type: ("asset" | "liability" | "equity" | "income" | "expense") | null;
+    };
+    /** AccountIn */
+    AccountIn: {
+      /**
+       * Kind
+       * @default leaf
+       * @enum {string}
+       */
+      kind: "leaf" | "node";
+      /**
+       * Name
+       * @description The full name. Its parent must be a node account; the parent's root sets the type.
+       */
       name: string;
       /**
        * Open
-       * Format: date
+       * @description Defaults to when the parent opened, else the earliest account under it, else the book's first entry.
        */
-      open: string;
+      open?: string | null;
     };
     /** Amount */
     Amount: {
@@ -311,6 +329,8 @@ export interface components {
      * @description Any directive, as its canonical Beancount text plus the columns derived from it.
      */
     Directive: {
+      /** Createdat */
+      createdAt: string;
       /**
        * Date
        * Format: date
@@ -324,6 +344,11 @@ export interface components {
       kind: string;
       /** Text */
       text: string;
+      /**
+       * Updatedat
+       * @description Changes on every write; send it back with edits.
+       */
+      updatedAt: string;
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -366,8 +391,8 @@ export interface components {
     };
     /** Problem */
     Problem: {
-      /** Directive Id */
-      directive_id: string | null;
+      /** Directiveid */
+      directiveId: string | null;
       /** Message */
       message: string;
     };
@@ -380,6 +405,8 @@ export interface components {
     };
     /** Transaction */
     Transaction: {
+      /** Createdat */
+      createdAt: string;
       /**
        * Date
        * Format: date
@@ -415,6 +442,11 @@ export interface components {
       postings: components["schemas"]["Posting"][];
       /** Tags */
       tags?: string[];
+      /**
+       * Updatedat
+       * @description Changes on every write; send it back with edits.
+       */
+      updatedAt: string;
     };
     /** TransactionIn */
     TransactionIn: {
@@ -451,6 +483,84 @@ export interface components {
       postings: components["schemas"]["Posting"][];
       /** Tags */
       tags?: string[];
+    };
+    /**
+     * TransactionPatch
+     * @description Change only the fields given. `postings`, when given, replaces all of them.
+     */
+    TransactionPatch: {
+      /** Date */
+      date?: string | null;
+      /** Flag */
+      flag?: string | null;
+      /** Links */
+      links?: string[] | null;
+      /** Meta */
+      meta?: {
+        [key: string]:
+          | string
+          | boolean
+          | components["schemas"]["MetaNumber"]
+          | components["schemas"]["MetaDate"]
+          | components["schemas"]["Amount"];
+      } | null;
+      /** Narration */
+      narration?: string | null;
+      /** Payee */
+      payee?: string | null;
+      /** Postings */
+      postings?: components["schemas"]["Posting"][] | null;
+      /** Tags */
+      tags?: string[] | null;
+      /**
+       * Updatedat
+       * @description The `updatedAt` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       */
+      updatedAt: string;
+    };
+    /**
+     * TransactionUpdate
+     * @description A full replacement.
+     */
+    TransactionUpdate: {
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /**
+       * Flag
+       * @description `!` is staged for review; `*` is confirmed.
+       * @default !
+       */
+      flag: string;
+      /** Links */
+      links?: string[];
+      /** Meta */
+      meta?: {
+        [key: string]:
+          | string
+          | boolean
+          | components["schemas"]["MetaNumber"]
+          | components["schemas"]["MetaDate"]
+          | components["schemas"]["Amount"];
+      };
+      /**
+       * Narration
+       * @default
+       */
+      narration: string;
+      /** Payee */
+      payee?: string | null;
+      /** Postings */
+      postings: components["schemas"]["Posting"][];
+      /** Tags */
+      tags?: string[];
+      /**
+       * Updatedat
+       * @description The `updatedAt` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       */
+      updatedAt: string;
     };
     /** ValidationError */
     ValidationError: {
@@ -587,6 +697,41 @@ export interface operations {
       };
     };
   };
+  create_account_api_ledger_v1_books__book_id__accounts_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AccountIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Account"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   list_directives_api_ledger_v1_books__book_id__directives_get: {
     parameters: {
       query?: {
@@ -694,7 +839,10 @@ export interface operations {
   };
   update_directive_api_ledger_v1_books__book_id__directives__directive_id__put: {
     parameters: {
-      query?: never;
+      query: {
+        /** @description The `updatedAt` this edit was based on. */
+        updatedAt: string;
+      };
       header?: never;
       path: {
         book_id: string;
@@ -717,31 +865,8 @@ export interface operations {
           "application/json": components["schemas"]["Directive"];
         };
       };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  delete_directive_api_ledger_v1_books__book_id__directives__directive_id__delete: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        book_id: string;
-        directive_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      204: {
+      /** @description Stale version */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -758,9 +883,12 @@ export interface operations {
       };
     };
   };
-  confirm_api_ledger_v1_books__book_id__directives__directive_id__confirm_post: {
+  delete_directive_api_ledger_v1_books__book_id__directives__directive_id__delete: {
     parameters: {
-      query?: never;
+      query: {
+        /** @description The `updatedAt` this edit was based on. */
+        updatedAt: string;
+      };
       header?: never;
       path: {
         book_id: string;
@@ -771,13 +899,18 @@ export interface operations {
     requestBody?: never;
     responses: {
       /** @description Successful Response */
-      200: {
+      204: {
         headers: {
           [name: string]: unknown;
         };
-        content: {
-          "application/json": components["schemas"]["Directive"];
+        content?: never;
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
         };
+        content?: never;
       };
       /** @description Validation Error */
       422: {
@@ -1027,7 +1160,7 @@ export interface operations {
       };
     };
   };
-  update_transaction_api_ledger_v1_books__book_id__transactions__directive_id__put: {
+  replace_transaction_api_ledger_v1_books__book_id__transactions__directive_id__put: {
     parameters: {
       query?: never;
       header?: never;
@@ -1039,7 +1172,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["TransactionIn"];
+        "application/json": components["schemas"]["TransactionUpdate"];
       };
     };
     responses: {
@@ -1051,6 +1184,56 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["Transaction"];
         };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  patch_transaction_api_ledger_v1_books__book_id__transactions__directive_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+        directive_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TransactionPatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Transaction"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {
