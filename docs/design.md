@@ -561,7 +561,9 @@ case without hiding the general one.
   - It opens a dialog (full screen on phones) with one field: the account's **fully qualified
     name**, prefilled from the search and freely editable. "Groceries" becomes
     `Expenses:Groceries`, under the root money flowed to (expenses for money out, income for
-    money in). A typed root is kept ("assets:cash wallet" becomes `Assets:Cash-Wallet`), and a
+    money in). A typed root is kept ("assets:cash wallet" becomes `Assets:Cash-wallet`), a typed
+    path keeps its colons ("Gifts and Giving:Friends" becomes
+    `Expenses:Gifts-and-Giving:Friends`), and a
     typed path whose front names a node goes under it ("utilities:power" becomes
     `Expenses:Utilities:Power`).
   - Typing fixes the name up as you go: spaces become dashes, and each part starts with a

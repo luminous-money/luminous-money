@@ -68,10 +68,11 @@ describe("which accounts are offered", () => {
 
 describe("naming a new account", () => {
   it("makes a valid segment from what was typed", () => {
-    expect(toSegment("coffee shops")).toBe("Coffee-Shops");
+    expect(toSegment("coffee shops")).toBe("Coffee-shops");
+    expect(toSegment("Gifts and Giving")).toBe("Gifts-and-Giving");
     expect(toSegment("  café  ")).toBe("Café");
-    expect(toSegment("Kids' toys!")).toBe("Kids-Toys");
-    expect(toSegment("401k match")).toBe("401k-Match");
+    expect(toSegment("Kids' toys!")).toBe("Kids-toys");
+    expect(toSegment("401k match")).toBe("401k-match");
   });
 
   it("knows a valid segment", () => {
@@ -97,13 +98,22 @@ describe("a new account's full name", () => {
 
   it("starts from the search, under the preferred root", () => {
     expect(suggestName("Groceries", accounts, "Expenses")).toBe("Expenses:Groceries");
-    expect(suggestName("coffee shops", accounts, "Expenses")).toBe("Expenses:Coffee-Shops");
+    expect(suggestName("coffee shops", accounts, "Expenses")).toBe("Expenses:Coffee-shops");
     expect(suggestName("salary", accounts, "Income")).toBe("Income:Salary");
     expect(suggestName("", accounts, "Expenses")).toBe("Expenses:");
   });
 
+  it("keeps the colons of a typed path", () => {
+    expect(suggestName("Gifts and Giving:Friends", accounts, "Expenses")).toBe(
+      "Expenses:Gifts-and-Giving:Friends"
+    );
+    expect(suggestName("home:garden tools", accounts, "Expenses")).toBe(
+      "Expenses:Home:Garden-tools"
+    );
+  });
+
   it("keeps a typed root, and goes under a typed node", () => {
-    expect(suggestName("assets:cash wallet", accounts, "Expenses")).toBe("Assets:Cash-Wallet");
+    expect(suggestName("assets:cash wallet", accounts, "Expenses")).toBe("Assets:Cash-wallet");
     expect(suggestName("utilities:power", accounts, "Expenses")).toBe("Expenses:Utilities:Power");
     expect(suggestName("Expenses:Utilities:", accounts, "Expenses")).toBe("Expenses:Utilities:");
   });

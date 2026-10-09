@@ -43,7 +43,7 @@ test("the search becomes a full account name under the preferred root", async ({
 
 test("editing the full name and creating a leaf selects it for the card", async ({ page }) => {
   await startCreating(page, coffee(page), "coffee shops");
-  await expect(nameField(page)).toHaveValue("Expenses:Coffee-Shops");
+  await expect(nameField(page)).toHaveValue("Expenses:Coffee-shops");
 
   await nameField(page).fill("Expenses:Food:Coffee-Shops");
   await dialog(page).getByRole("button", { name: "Create" }).click();
@@ -59,6 +59,21 @@ test("editing the full name and creating a leaf selects it for the card", async 
     (a) => a.name === "Expenses:Food:Coffee-Shops"
   );
   expect(created?.kind).toBe("leaf");
+});
+
+test("a typed path keeps its colons, with each part tidied up", async ({ page }) => {
+  await startCreating(page, coffee(page), "Gifts and Giving:Friends");
+
+  await expect(nameField(page)).toHaveValue("Expenses:Gifts-and-Giving:Friends");
+  await expect(dialog(page)).toContainText("also creates Expenses:Gifts-and-Giving");
+  await dialog(page).getByRole("button", { name: "Create" }).click();
+
+  await expect(coffee(page).getByRole("button", { name: /^Category:/ })).toContainText(
+    "Gifts-and-Giving:Friends"
+  );
+  const tree = await accounts(seeded.book);
+  expect(tree.find((a) => a.name === "Expenses:Gifts-and-Giving")?.kind).toBe("node");
+  expect(tree.find((a) => a.name === "Expenses:Gifts-and-Giving:Friends")?.kind).toBe("leaf");
 });
 
 test("names the ledger would refuse are explained and can't be created", async ({ page }) => {

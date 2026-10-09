@@ -69,14 +69,18 @@ export function isSegment(text: string): boolean {
   return SEGMENT.test(text);
 }
 
-/** Turn whatever was typed into a valid segment: "coffee shops" becomes "Coffee-Shops". */
+/**
+ * Turn what was typed for one part of a name into a valid part, as typing does: spaces become
+ * dashes, characters Beancount doesn't allow are dropped, and the first letter is capitalized.
+ * Otherwise the casing is kept: "gifts and giving" becomes "Gifts-and-giving".
+ */
 export function toSegment(text: string): string {
-  return text
+  const part = text
     .split(/[\s_]+/)
     .map((word) => word.replace(/[^\p{L}\p{Nd}-]/gu, ""))
     .filter(Boolean)
-    .map((word) => word[0]!.toUpperCase() + word.slice(1))
     .join("-");
+  return part.charAt(0).toUpperCase() + part.slice(1);
 }
 
 /**
@@ -108,7 +112,7 @@ export function suggestName(query: string, accounts: Account[], preferredRoot: s
       nodes.find((n) => n.toLowerCase().endsWith(`:${path}`));
     if (parent) return `${parent}:${toSegment(parts.at(-1)!)}`;
   }
-  return `${preferredRoot}:${toSegment(parts.join(" "))}`;
+  return [preferredRoot, ...parts.map(toSegment)].join(":");
 }
 
 /**
