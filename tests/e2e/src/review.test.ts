@@ -13,7 +13,7 @@ async function queue(book_id: string) {
 function patch(
   book_id: string,
   directive_id: string,
-  body: Record<string, unknown> & { updatedAt: string }
+  body: Record<string, unknown> & { updated_at: string }
 ) {
   return ledger.PATCH("/api/ledger/v1/books/{book_id}/transactions/{directive_id}", {
     params: { path: { book_id, directive_id } },
@@ -34,7 +34,7 @@ describe("reviewing staged transactions (JSON)", () => {
 
     const { data: confirmed } = await patch(book_id, entry.id, {
       flag: "*",
-      updatedAt: entry.updatedAt,
+      updated_at: entry.updated_at,
     });
 
     assert.equal(confirmed?.flag, "*");
@@ -47,21 +47,24 @@ describe("reviewing staged transactions (JSON)", () => {
 
     const { data } = await patch(book_id, entry.id, {
       narration: "Latte",
-      updatedAt: entry.updatedAt,
+      updated_at: entry.updated_at,
     });
 
     assert.equal(data?.narration, "Latte");
     assert.equal(data?.flag, "!");
     assert.deepEqual(data?.postings, entry.postings);
-    assert.ok(data!.updatedAt > entry.updatedAt);
+    assert.ok(data!.updated_at > entry.updated_at);
   });
 
   it("refuses an edit made against an old version", async () => {
     const book_id = await newBook("stale");
     const entry = await stage(book_id, "Coffee");
-    await patch(book_id, entry.id, { flag: "*", updatedAt: entry.updatedAt });
+    await patch(book_id, entry.id, { flag: "*", updated_at: entry.updated_at });
 
-    const late = await patch(book_id, entry.id, { narration: "Latte", updatedAt: entry.updatedAt });
+    const late = await patch(book_id, entry.id, {
+      narration: "Latte",
+      updated_at: entry.updated_at,
+    });
 
     assert.equal(late.response.status, 409);
     const { data: stored } = await ledger.GET(
@@ -82,7 +85,7 @@ describe("reviewing staged transactions (JSON)", () => {
       "/api/ledger/v1/books/{book_id}/transactions/{directive_id}",
       {
         params: { path: { book_id, directive_id: entry.id } },
-        body: { ...purchase("Coffee", "5.25"), flag: "*", updatedAt: entry.updatedAt },
+        body: { ...purchase("Coffee", "5.25"), flag: "*", updated_at: entry.updated_at },
       }
     );
 
@@ -99,13 +102,13 @@ describe("reviewing staged transactions (JSON)", () => {
     const unversioned = await ledger.DELETE(
       "/api/ledger/v1/books/{book_id}/directives/{directive_id}",
       {
-        params: { path, query: {} as { updatedAt: string } },
+        params: { path, query: {} as { updated_at: string } },
       }
     );
     const deleted = await ledger.DELETE(
       "/api/ledger/v1/books/{book_id}/directives/{directive_id}",
       {
-        params: { path, query: { updatedAt: entry.updatedAt } },
+        params: { path, query: { updated_at: entry.updated_at } },
       }
     );
     const fetched = await ledger.GET("/api/ledger/v1/books/{book_id}/transactions/{directive_id}", {
@@ -145,7 +148,7 @@ describe("reviewing staged transactions (JSON)", () => {
         { account: "Expenses:Food", units: { number: "5", currency: "USD" } },
         { account: "Assets:Bank:Checking", units: { number: "-4", currency: "USD" } },
       ],
-      updatedAt: bad.updatedAt,
+      updated_at: bad.updated_at,
     });
 
     const { data: problems } = await ledger.GET("/api/ledger/v1/books/{book_id}/problems", {
@@ -153,7 +156,7 @@ describe("reviewing staged transactions (JSON)", () => {
     });
 
     assert.deepEqual(
-      problems?.map((p) => p.directiveId),
+      problems?.map((p) => p.directive_id),
       [bad.id]
     );
   });
@@ -197,7 +200,7 @@ describe("raw directives (Beancount text)", () => {
     );
 
     assert.equal(asJson?.narration, "Coffee");
-    assert.equal(asJson?.updatedAt, written?.updatedAt);
+    assert.equal(asJson?.updated_at, written?.updated_at);
     assert.match(asText?.text ?? "", /^2024-03-01 ! "Corner Cafe" "Muffin"$/m);
   });
 

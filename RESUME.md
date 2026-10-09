@@ -14,16 +14,16 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   - **Writes:** transactions as JSON (`/transactions`, what the app uses) or any directive as
     Beancount text (`/directives`, `/import`). Every endpoint has a typed response, so
     `@fava-beans/ledger-client` exports real types (`Transaction`, `TransactionIn`, ...).
-  - **Versioned, partial edits:** every edit sends the `updatedAt` it read, and a stale one gets
-    409. `PATCH /transactions/{id}` changes only the given fields. The JSON is camelCase.
+  - **Versioned, partial edits:** every edit sends the `updated_at` it read, and a stale one gets
+    409. `PATCH /transactions/{id}` changes only the given fields. JSON is snake_case.
   - **Accounts:** leaves hold transactions and nodes hold sub-accounts. Top-level accounts and
-    unopened parents are implicit nodes. `POST /accounts` creates under nodes only, and
-    postings to nodes are refused.
+    unopened parents are implicit nodes. `POST /accounts` takes a fully qualified name whose
+    nearest existing ancestor must be a node; missing levels become implicit nodes. Postings to
+    nodes are refused.
   - **Migrations:** `migrations.py`, with every table created through `create_table` (non-null
     `created_at`/`updated_at`), enforced by a lint test.
   - **Proven:** round trips are exact, validation problems map to the directive that caused them,
     BQL works, and incremental backups are made of Beancount chunks.
-  - **Fava:** exports for Fava are rewritten automatically about 2 s after a change.
   - **Concurrency:** one SQLite connection per thread (the end-to-end suite caught a shared-
     connection bug).
   - **Benchmarks** are recorded in [docs/design.md](docs/design.md#performance-over-decades-of-data).
@@ -33,22 +33,22 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
   - **Review queue:** skip, categorize with a searchable picker, edit the description, confirm.
     Swipe right to confirm and left to skip; cards that aren't ready spring back, and the
     stack slides up after each one. "Create account" is the last option in every
-    posting-account picker.
+    posting-account picker; it takes a fully qualified name, prefilled from the search.
   - **Data layer:** TanStack Query over the generated client. Edits to one transaction run in
     order, each with the latest version.
   - **Detail view:** a full split editor with a live, exact balance check.
   - The rules are in [docs/design.md](docs/design.md#how-the-review-queue-works). The pure logic
     (`src/web/lib`) has Vitest unit tests.
 - **`ledger`** also serves the chart of accounts (`/accounts`) for the picker.
-- **Stack:** Traefik routes by top-level prefix (`/api`, `/ui`, `/fava`) from its file provider.
+- **Stack:** Traefik routes by top-level prefix (`/api`, `/ui`) from its file provider. Fava was
+  dropped; reports will be our own (PLAN.md, Phase 4).
   - `/api/ledger/v1` → `ledger`
   - `/api/app/v1` and `/ui` → `app`
-  - `/fava` → Fava, read-only
   - `/` → redirects to `/ui/`
 - **Tests, all passing:**
-  - `pnpm test`: 77 ledger tests (including the table lint), 31 app unit tests, the client
+  - `pnpm test`: 78 ledger tests (including the table lint), 32 app unit tests, the client
     drift check, typechecks and Prettier
-  - `pnpm e2e`: 26 API tests and 22 browser tests (Playwright, phone-sized Chromium, including
+  - `pnpm e2e`: 25 API tests and 23 browser tests (Playwright, phone-sized Chromium, including
     real touch swipes via the DevTools protocol) through Traefik, against a throwaway stack
 - **Demo data:** `pnpm seed [book]` imports a 2-year `bean-example` history whose last 45 days of
   card and checking purchases are staged for review: flagged `!`, with `source: "demo-import"`
@@ -76,8 +76,6 @@ are listed there and are worth settling before starting each phase.
 - **`pnpm seed` refuses to seed a book that already exists,** because the demo gets new IDs on
   every run and importing twice would duplicate everything. To start over, run
   `docker compose down -v && docker compose up -d && pnpm seed` (this wipes the dev stack's data).
-- **Fava takes its list of books at startup.** After creating a book, run
-  `docker compose restart fava`. (Open question in PLAN.md.)
 - **`pnpm e2e:local` leaves test books in the dev stack** (`ui-…`, `review-…` and so on). To
   clean up, run `docker compose down -v && docker compose up -d && pnpm seed`.
 - **Playwright is pinned to 1.63.0** in `tests/ui/package.json` and in `node.Dockerfile`'s `ui`

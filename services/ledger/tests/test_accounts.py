@@ -90,8 +90,9 @@ def test_an_explicit_open_date_wins(book):
     "name, kind, message",
     [
         ("Expenses:Food:Snacks", "leaf", "Expenses:Food is a leaf account and can't have sub-accounts"),
-        ("Expenses:Nowhere:Thing", "leaf", "there's no Expenses:Nowhere account"),
+        ("Expenses:Food:Snacks:Chips", "leaf", "Expenses:Food is a leaf account"),  # at any depth
         ("Assets", "node", "top-level accounts are built in"),
+        ("Stuff:Things", "leaf", "account names start with one of Assets"),
         ("Assets:Bank", "leaf", "already has sub-accounts, so it can only be a node"),
         ("Assets:Cash:Coins", "leaf", "Assets:Cash is a leaf account"),
         ("Expenses:lowercase", "leaf", "Invalid token"),
@@ -102,6 +103,16 @@ def test_account_rules(book, name, kind, message):
         create(book, name, kind=kind)
 
     assert message in str(failure.value)
+
+
+def test_missing_levels_in_between_become_implicit_nodes(book):
+    account = create(book, "Expenses:Home:Garden:Tools")
+
+    accounts = tree(book)
+    assert account.kind == "leaf"
+    assert (accounts["Expenses:Home"].kind, accounts["Expenses:Home"].implicit) == ("node", True)
+    assert (accounts["Expenses:Home:Garden"].kind, accounts["Expenses:Home:Garden"].implicit) == ("node", True)
+    assert book.problems("book") == []
 
 
 def test_an_existing_account_cant_be_created_again(book):

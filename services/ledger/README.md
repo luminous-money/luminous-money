@@ -30,7 +30,7 @@ service that writes book data. Served at `/api/ledger/v1`.
 - **Migrations** (`src/ledger/migrations.py`) are numbered and tracked by `user_version`. Every
   table is created with `create_table`, which adds non-null `created_at`/`updated_at`; a lint
   test enforces it.
-- **Versions:** a directive's `updated_at` is its version. Edits send it back (`updatedAt`), and a
+- **Versions:** a directive's `updated_at` is its version. Edits send it back, and a
   stale one gets 409. `PATCH /transactions/{id}` changes only the given fields.
 - **Accounts:** a plain `open` is a leaf; one with `kind: "node"` is a node. Top-level accounts
   and unopened parents are implicit nodes. New accounts go under nodes only, and postings to
@@ -72,4 +72,4 @@ To build for the Pi (or both architectures):
 | Variable | Default | Purpose |
 |---|---|---|
 | `LEDGER_DATA_DIR` | `/data` | Holds `ledger.sqlite`. |
-| `LEDGER_EXPORT_DIR` | unset | Where book exports for Fava are written. |
+

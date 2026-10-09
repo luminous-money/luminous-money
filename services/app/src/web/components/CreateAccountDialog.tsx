@@ -2,15 +2,13 @@ import type { Account } from "@fava-beans/ledger-client";
 import { useId, useState, type SyntheticEvent } from "react";
 import { createPortal } from "react-dom";
 
-import { isSegment, TYPE_LABELS } from "../lib/accounts.js";
+import { checkNewAccount, TYPE_LABELS } from "../lib/accounts.js";
 import type { AccountKind } from "../lib/ledger.js";
-import { AccountName, AccountPicker } from "./AccountPicker.js";
 
 type Props = {
   initialName: string;
-  initialParent: string;
-  parents: Account[];
-  prefer?: string[];
+  /** The book's chart of accounts, to check the name against. */
+  accounts: Account[];
   /** Creates the account; rejects with a readable error. */
   submit: (name: string, kind: AccountKind) => Promise<Account>;
   onCreated: (account: Account) => void;
@@ -22,36 +20,25 @@ type Props = {
 const contain = (e: SyntheticEvent) => e.stopPropagation();
 
 /**
- * Create an account: a name, a parent (a node, which also sets the account's type), and whether
- * it holds transactions (a leaf) or sub-accounts (a node). Full screen on phones.
+ * Create an account by its fully qualified name, prefilled from the search and freely editable.
+ * The root sets the type; whether it holds transactions (a leaf) or sub-accounts (a node) is
+ * chosen here. Full screen on phones.
  */
-export function CreateAccountDialog({
-  initialName,
-  initialParent,
-  parents,
-  prefer,
-  submit,
-  onCreated,
-  onCancel,
-}: Props) {
+export function CreateAccountDialog({ initialName, accounts, submit, onCreated, onCancel }: Props) {
   const [name, setName] = useState(initialName);
-  const [parent, setParent] = useState(initialParent);
   const [kind, setKind] = useState<AccountKind>("leaf");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const titleId = useId();
-
-  const parentAccount = parents.find((p) => p.name === parent);
-  const validName = isSegment(name);
-  const full = parent && name ? `${parent}:${name}` : "";
-  const ready = validName && !!parentAccount && !busy;
+  const nameId = useId();
+  const check = checkNewAccount(name.trim(), kind, accounts);
 
   const create = async () => {
-    if (!ready) return;
+    if (!check.ok || busy) return;
     setBusy(true);
     setError(null);
     try {
-      onCreated(await submit(full, kind));
+      onCreated(await submit(name.trim(), kind));
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -79,33 +66,29 @@ export function CreateAccountDialog({
             void create();
           }}
         >
-          <label>
-            Name
+          <div className="field">
+            <label className="field-label" htmlFor={nameId}>
+              Account
+            </label>
             <input
+              id={nameId}
               autoFocus
+              autoCapitalize="words"
+              spellCheck={false}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              aria-invalid={!!name && !validName}
+              // Start at the end, where the new part of the name goes.
+              onFocus={(e) => e.currentTarget.setSelectionRange(name.length, name.length)}
+              aria-invalid={!check.ok}
+              aria-describedby={`${nameId}-hint`}
             />
-          </label>
-          {name && !validName && (
-            <p className="error small">
-              Start with a capital letter or digit; then letters, digits and dashes.
+            <p id={`${nameId}-hint`} className={`small ${check.ok ? "muted" : "error"}`}>
+              {check.ok
+                ? `${check.type ? `${TYPE_LABELS[check.type]} account` : "Account"}${
+                    check.adds.length ? ` · also adds ${check.adds.join(", ")} to hold it` : ""
+                  }`
+                : check.message}
             </p>
-          )}
-
-          <div className="field">
-            <span className="field-label">Parent</span>
-            <AccountPicker
-              label="Parent"
-              accounts={parents.map((p) => p.name)}
-              value={parent}
-              onChange={setParent}
-              prefer={prefer}
-            />
-            {parentAccount?.type && (
-              <p className="muted small">{TYPE_LABELS[parentAccount.type]} account</p>
-            )}
           </div>
 
           <fieldset className="choice">
@@ -134,18 +117,13 @@ export function CreateAccountDialog({
             </label>
           </fieldset>
 
-          {full && validName && (
-            <p className="preview">
-              Creates <AccountName name={full} />
-            </p>
-          )}
           {error && <p className="error">{error}</p>}
 
           <div className="actions">
             <button type="button" onClick={onCancel}>
               Cancel
             </button>
-            <button type="submit" className="primary" disabled={!ready}>
+            <button type="submit" className="primary" disabled={!check.ok || busy}>
               Create
             </button>
           </div>

@@ -2,7 +2,7 @@
  * Server state, through TanStack Query: reads are queries, edits are mutations.
  *
  * Edits to a transaction run one at a time, in order (a mutation scope per transaction), and each
- * reads the transaction's current version (`updatedAt`) when it runs, not when it was queued. A
+ * reads the transaction's current version (`updated_at`) when it runs, not when it was queued. A
  * description saved on blur and a confirm a moment later therefore apply in order, and neither
  * can undo the other. Edits are partial (PATCH), so each one touches only its own fields. If the
  * version has moved on elsewhere (another tab or device), the edit is refused (409) and the data
@@ -12,7 +12,6 @@ import type { Account, Transaction } from "@fava-beans/ledger-client";
 import { QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { AccountCreation } from "../components/AccountPicker.js";
-import { parentChoices } from "./accounts.js";
 import { api, ApiError, type AccountKind, type TransactionChanges } from "./ledger.js";
 
 export const queryClient = new QueryClient({
@@ -78,7 +77,7 @@ export function useEditTransaction(book: string, id: string) {
     scope: { id: `transaction:${book}:${id}` },
     mutationFn: async (changes: TransactionChanges) => {
       const current = await latest(book, id);
-      return api.patch(book, id, changes, current.updatedAt);
+      return api.patch(book, id, changes, current.updated_at);
     },
     onSuccess: (saved) => remember(book, saved),
     onError: (error) => {
@@ -110,7 +109,7 @@ export function useAccountCreation(book: string): AccountCreation | undefined {
   const create = useCreateAccount(book);
   if (!accounts.data) return undefined;
   return {
-    parents: parentChoices(accounts.data),
+    accounts: accounts.data,
     submit: (name, kind) => create.mutateAsync({ name, kind }),
   };
 }

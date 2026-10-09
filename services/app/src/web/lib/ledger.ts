@@ -8,7 +8,7 @@ import {
 
 export const ledger = createLedgerClient({ baseUrl: window.location.origin });
 
-export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"], "updatedAt">;
+export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"], "updated_at">;
 export type AccountKind = components["schemas"]["AccountIn"]["kind"];
 
 /** An API error with its status, so callers can tell a conflict (409) from a rejection (422). */
@@ -83,12 +83,12 @@ export const api = {
     book_id: string,
     directive_id: string,
     changes: TransactionChanges,
-    updatedAt: string
+    version: string
   ): Promise<Transaction> =>
     unwrap(
       ledger.PATCH("/api/ledger/v1/books/{book_id}/transactions/{directive_id}", {
         params: { path: { book_id, directive_id } },
-        body: { ...changes, updatedAt },
+        body: { ...changes, updated_at: version },
       })
     ),
 };

@@ -8,10 +8,10 @@ services:
   e2e:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/e2e:${FAVA_BEANS_VERSION:-dev}
     profiles: [tests]
-    depends_on: [traefik, ledger, app, fava]
+    depends_on: [traefik, ledger, app]
 
   ui:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/ui-tests:${FAVA_BEANS_VERSION:-dev}
     profiles: [tests]
-    depends_on: [traefik, ledger, app, fava]
+    depends_on: [traefik, ledger, app]
     ipc: host # Chromium needs more shared memory than Docker's default

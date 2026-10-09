@@ -1,5 +1,5 @@
-# Routing by top-level prefix: /api for every API, /ui for the PWA, /fava for Fava (a different
-# UI with its own life). Services serve under their full prefix, so nothing is stripped.
+# Routing by top-level prefix: /api for every API, /ui for the PWA. Services serve under their
+# full prefix, so nothing is stripped.
 #
 # Auth: once the `auth` service exists, add a forwardAuth middleware pointing at its verify
 # endpoint and attach it to every router except /api/auth/v1 login.
@@ -17,10 +17,6 @@ http:
       rule: PathPrefix(`/ui`)
       entryPoints: [web]
       service: app
-    fava:
-      rule: PathPrefix(`/fava`)
-      entryPoints: [web]
-      service: fava
     root:
       rule: Path(`/`)
       entryPoints: [web]
@@ -40,7 +36,3 @@ http:
       loadBalancer:
         servers:
           - url: http://app:3000
-    fava:
-      loadBalancer:
-        servers:
-          - url: http://fava:5000

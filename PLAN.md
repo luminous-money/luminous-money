@@ -14,7 +14,7 @@ the system.
       fidelity, incremental backups (`services/ledger`)
 - [x] Decades-scale benchmark harness (`services/ledger/bench`)
 - [x] Monorepo tooling: bake, pnpm workspace, generated `ledger-client` with a drift check
-- [x] Compose stack and routing shell: Traefik, `ledger`, `app`, Fava; `/api/*`, `/ui/*`, `/fava/*`
+- [x] Compose stack and routing shell: Traefik, `ledger`, `app`; `/api/*` and `/ui/*`
 - [x] End-to-end test harness against a throwaway stack (`pnpm e2e`, `tests/e2e`)
 - [ ] Deploy with `docker stack deploy` on a real Swarm. `docker stack config` already accepts
       the file; the Pi is the natural place to do this.
@@ -23,7 +23,6 @@ the system.
       responses throughout the API
 - [ ] `auth` service: users, login, JWT issuance, the forwardAuth verify endpoint; attach
       forwardAuth to every route
-- [ ] Fava picks up newly created books
 
 ## Phase 2: The review app
 
@@ -34,7 +33,9 @@ the system.
 - [x] Swipe right to confirm, left to skip; cards that aren't ready spring back; the stack slides
       up after a confirm or skip
 - [x] Leaf and node accounts; "Create account" from any posting-account picker
-- [x] Versioned, partial edits (PATCH with `updatedAt`, 409 on conflict); TanStack Query
+- [x] Versioned, partial edits (PATCH with `updated_at`, 409 on conflict); TanStack Query
+- [x] Create accounts by fully qualified name, prefilled from the search
+- [x] snake_case everywhere, the API's JSON included
 - [x] Migration framework: every table through `create_table` (created/updated timestamps), with
       a lint check
 - [x] Browser end-to-end tests (Playwright) as part of `pnpm e2e`
@@ -52,7 +53,8 @@ the system.
   - [ ] View the tree: nodes and leaves, types, open and close dates.
   - [ ] Create accounts (reusing the create-account dialog).
   - [ ] Edit accounts: rename, change leaf/node where the rules allow, close.
-  - [ ] Move accounts between parents, carrying their history.
+  - [ ] Move accounts between parents, carrying their history. Renames and moves rewrite every
+        directive that mentions the account, history included (decided: acceptable).
   - [ ] Open any account's ledger from the tree.
 - [ ] **General ledger:** every split in the book, in chronological transaction order.
   - [ ] The split is the primary unit of the list. Transactions are visually demarcated.
@@ -62,16 +64,21 @@ the system.
         opens a new empty row below.
   - [ ] A simple, intuitive way to add and remove splits. A transaction won't save unless its
         splits balance.
+  - [ ] Each transaction shows how much is left to distribute across its splits.
+  - [ ] Confirmed or not is a transaction-level checkbox.
   - [ ] Any transaction's date can be set by hand. That's the transaction's date, separate from
-        `createdAt`.
+        `created_at`.
   - [ ] Scopable to a single account, so the same component is each account's ledger.
 
 ## Phase 4: Reports
 
+- [x] Drop Fava; reports are our own (2026-10-09). It can come back easily if it's ever wanted.
 - [ ] **Check what already exists before building anything:** libraries that generalize reports
       and graphs over ledgers, and graphing libraries to wrap.
 - [ ] **Two separate, independent libraries,** because ledgers are a generic class of object
-      worth generalizing over:
+      worth generalizing over. If we build them, they're built and published from a small public
+      monorepo in the luminous-money GitHub account, loosely based on the wymp monorepo proof of
+      concept:
   - [ ] `@luminous-money/ledger-graphs-api`: a plugin for a ledger's API. It returns data sets
         for the requested graph and parameters.
   - [ ] `@luminous-money/ledger-graphs-ui`: a wrapper around a good graphing library that renders
@@ -83,9 +90,10 @@ the system.
 
 ## Phase 5: Budgeting
 
-- [ ] A target budget on any account.
-- [ ] Validation: no descendant account may have a higher budget than its ancestor.
-- [ ] Each budget target can roll over month to month, or not.
+- [ ] A target budget on any account, for any period (monthly, quarterly, yearly, ...).
+- [ ] Validation: no descendant account may have a higher base budget than its ancestor (base
+      amounts, before any rollover).
+- [ ] Each budget target can roll over from period to period, or not.
 
 ## Phase 6: Many books
 
@@ -121,28 +129,13 @@ the system.
 
 - **Asynchronous validation:** how do the app and the user see that a book is being re-validated
   and that its problem list is stale?
-- **Fava and new books:** Fava gets its list of ledgers at startup. When a book is created, does
-  the Fava container restart, or does it watch a directory?
 - **Resolver contract:**
   - What does confidence mean, and is it comparable across resolvers?
   - Can a resolver return a partial answer (e.g. a match with a suggested split)?
   - Should high-confidence matches ever auto-confirm, or does everything go through review?
-- **Fava's future:** if we build our own reports (Phase 4), do we keep Fava at all? It's already
-  optional in the Compose file. Removing it would also remove the export loop and the exports
-  volume.
-- **Where the ledger-graphs libraries live:** they're meant to be independent of fava-beans, under
-  `@luminous-money`. Do they start in this repo as workspace packages and move out once stable,
-  or start in their own repo? And how does the API plugin attach to a ledger: an interface each
-  ledger implements, or something else?
-- **Moving and renaming accounts:** Beancount has no rename. Rewriting the account name in every
-  directive that mentions it changes history in exports and backups. Is that acceptable, or should
-  renames be recorded some other way?
-- **Budgets:**
-  - The budget requirements included an unfinished thought ("…and it should,"). What was the
-    rest?
-  - Are budgets monthly only, or can other periods be set?
-  - How does rollover interact with the "no descendant higher than its ancestor" rule: on the
-    base amounts, or on the amounts after rollover?
-- **General ledger and splits:** does a split row show a running balance (natural when scoped to
-  one account)? How do staged (`!`) transactions appear in it?
+- **Budget display across periods:** budgets can have any period. How does a view show
+  accounts whose budgets have different periods side by side (normalize to a common period,
+  show each in its own period, or something else)?
+- **General ledger running balance:** when the ledger is scoped to one account, do split rows
+  show that account's running balance? How do staged (`!`) transactions count toward it?
 - **Cutover:** deferred until hydration.

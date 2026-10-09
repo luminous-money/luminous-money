@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
 
-import { BASE_URL, eventually, newBook, stackIsUp } from "./support.ts";
+import { BASE_URL, stackIsUp } from "./support.ts";
 
 describe("routing through Traefik", () => {
   before(stackIsUp);
@@ -59,28 +59,6 @@ describe("routing through Traefik", () => {
       assert.equal(route.status, 200);
       assert.match(await route.text(), /<div id="root">/);
       assert.equal(asset.status, 404);
-    });
-  });
-
-  describe("/fava", () => {
-    it("routes /fava to a read-only Fava once a book has been exported", async () => {
-      await newBook("routing");
-
-      // Fava starts once the first export exists, so the first run of a fresh stack waits here.
-      const home = await eventually(async () => {
-        const response = await fetch(`${BASE_URL}/fava/`, { redirect: "manual" });
-        assert.equal(response.status, 302);
-        return response.headers.get("location") ?? "";
-      });
-      const slug = new URL(home, BASE_URL).pathname.split("/")[2];
-      assert.ok(slug, `expected a ledger slug in ${home}`);
-
-      const edit = await fetch(`${BASE_URL}/fava/${slug}/api/source`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ file_path: "/exports/x.beancount", source: "", sha256sum: "" }),
-      });
-      assert.ok(edit.status >= 400, `Fava accepted an edit (${edit.status})`);
     });
   });
 

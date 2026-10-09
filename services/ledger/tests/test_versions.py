@@ -49,36 +49,36 @@ def test_a_stale_edit_is_refused_and_changes_nothing(book, staged):
 
 
 def test_patch_changes_only_the_fields_given(client, staged):
-    response = client.patch(f"{BASE}/transactions/{staged.id}", json={"narration": "Latte", "updatedAt": staged.updated_at})
+    response = client.patch(f"{BASE}/transactions/{staged.id}", json={"narration": "Latte", "updated_at": staged.updated_at})
 
     body = response.json()
     assert response.status_code == 200
     assert (body["narration"], body["payee"], body["flag"]) == ("Latte", "Corner Cafe", "!")
-    assert body["postings"] == [p.model_dump(by_alias=True) for p in staged.postings]
+    assert body["postings"] == [p.model_dump() for p in staged.postings]
 
 
 def test_the_review_race_can_no_longer_restage_a_confirmed_transaction(client, staged):
     """A description save that read the old version, arriving after a confirm, is refused."""
-    confirmed = client.patch(f"{BASE}/transactions/{staged.id}", json={"flag": "*", "updatedAt": staged.updated_at})
-    late = client.patch(f"{BASE}/transactions/{staged.id}", json={"narration": "Latte", "updatedAt": staged.updated_at})
+    confirmed = client.patch(f"{BASE}/transactions/{staged.id}", json={"flag": "*", "updated_at": staged.updated_at})
+    late = client.patch(f"{BASE}/transactions/{staged.id}", json={"narration": "Latte", "updated_at": staged.updated_at})
 
     assert confirmed.status_code == 200
     assert late.status_code == 409
-    assert late.json()["updatedAt"] == confirmed.json()["updatedAt"]
+    assert late.json()["updated_at"] == confirmed.json()["updated_at"]
     assert client.get(f"{BASE}/transactions/{staged.id}").json()["flag"] == "*"
 
 
 def test_every_kind_of_edit_is_versioned(client, staged):
     stale = staged.updated_at
-    current = client.patch(f"{BASE}/transactions/{staged.id}", json={"flag": "*", "updatedAt": stale}).json()["updatedAt"]
-    full = staged.model_dump(mode="json", by_alias=True, include=set(models.TransactionIn.model_fields))
+    current = client.patch(f"{BASE}/transactions/{staged.id}", json={"flag": "*", "updated_at": stale}).json()["updated_at"]
+    full = staged.model_dump(mode="json", include=set(models.TransactionIn.model_fields))
     text = {"content": STAGED, "headers": {"content-type": "text/plain"}}
 
-    assert client.put(f"{BASE}/transactions/{staged.id}", json={**full, "updatedAt": stale}).status_code == 409
-    assert client.put(f"{BASE}/directives/{staged.id}", params={"updatedAt": stale}, **text).status_code == 409
-    assert client.delete(f"{BASE}/directives/{staged.id}", params={"updatedAt": stale}).status_code == 409
+    assert client.put(f"{BASE}/transactions/{staged.id}", json={**full, "updated_at": stale}).status_code == 409
+    assert client.put(f"{BASE}/directives/{staged.id}", params={"updated_at": stale}, **text).status_code == 409
+    assert client.delete(f"{BASE}/directives/{staged.id}", params={"updated_at": stale}).status_code == 409
 
-    assert client.put(f"{BASE}/directives/{staged.id}", params={"updatedAt": current}, **text).status_code == 200
+    assert client.put(f"{BASE}/directives/{staged.id}", params={"updated_at": current}, **text).status_code == 200
 
 
 def test_edits_must_name_a_version(client, staged):
@@ -86,8 +86,8 @@ def test_edits_must_name_a_version(client, staged):
     assert client.delete(f"{BASE}/directives/{staged.id}").status_code == 422
 
 
-def test_json_is_camel_case(client, staged):
+def test_json_is_snake_case(client, staged):
     body = client.get(f"{BASE}/transactions/{staged.id}").json()
 
-    assert {"createdAt", "updatedAt"} <= set(body)
-    assert "updated_at" not in body
+    assert {"created_at", "updated_at"} <= set(body)
+    assert "updatedAt" not in body

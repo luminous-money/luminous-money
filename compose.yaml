@@ -23,21 +23,12 @@ services:
 
   ledger:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/ledger:${FAVA_BEANS_VERSION:-dev}
-    environment:
-      LEDGER_EXPORT_DIR: /exports
     volumes:
-      - data:/data          # the system of record: back this up (or use the backup API)
-      - exports:/exports    # derived Beancount exports for Fava; rebuilt automatically
+      - data:/data # the system of record: back this up (or use the backup API)
     deploy: *restart
 
   app:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/app:${FAVA_BEANS_VERSION:-dev}
-    deploy: *restart
-
-  fava:
-    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/fava:${FAVA_BEANS_VERSION:-dev}
-    volumes:
-      - exports:/exports:ro
     deploy: *restart
 
 configs:
@@ -48,4 +39,3 @@ configs:
 
 volumes:
   data:
-  exports:

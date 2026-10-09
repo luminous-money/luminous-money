@@ -17,7 +17,7 @@ variable "VERSION" {
 }
 
 group "default" {
-  targets = ["ledger", "app", "fava"]
+  targets = ["ledger", "app"]
 }
 
 group "test" {
@@ -25,7 +25,7 @@ group "test" {
 }
 
 group "release" {
-  targets = ["ledger-release", "app-release", "fava-release"]
+  targets = ["ledger-release", "app-release"]
 }
 
 # Service images
@@ -42,11 +42,6 @@ target "app" {
     workspace = "target:workspace"
   }
   tags = ["${REGISTRY}/app:${VERSION}"]
-}
-
-target "fava" {
-  context = "deploy/fava"
-  tags    = ["${REGISTRY}/fava:${VERSION}"]
 }
 
 # The TypeScript workspace, installed once and shared by every TypeScript image
@@ -118,8 +113,4 @@ target "ledger-release" {
 
 target "app-release" {
   inherits = ["app", "_release"]
-}
-
-target "fava-release" {
-  inherits = ["fava", "_release"]
 }

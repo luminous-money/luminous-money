@@ -10,18 +10,15 @@ Two ways to write:
 
 Both write the same rows, and both read back either way.
 
-Edits are versioned. Every directive carries `updatedAt`, which changes on every write; an edit
-sends back the `updatedAt` it read (in the body for JSON, as a query parameter for text and
+Edits are versioned. Every directive carries `updated_at`, which changes on every write; an edit
+sends back the `updated_at` it read (in the body for JSON, as a query parameter for text and
 deletes), and if the stored one has moved on, the edit is refused with 409 Conflict.
 """
 
 from __future__ import annotations
 
 import datetime
-import logging
 import os
-import threading
-from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, FastAPI, Query
@@ -32,10 +29,7 @@ from .service import Ledger, NotFound
 from .store import Row, StaleVersion, Store
 
 BeancountText = Annotated[str, Body(media_type="text/plain")]
-VersionParam = Annotated[str, Query(alias="updatedAt", description="The `updatedAt` this edit was based on.")]
-
-log = logging.getLogger(__name__)
-
+VersionParam = Annotated[str, Query(description="The `updated_at` this edit was based on.")]
 
 class Filters:
     """Query parameters shared by the list endpoints."""
@@ -51,23 +45,11 @@ class Filters:
         self.values = dict(account=account, flag=flag, date_from=date_from, date_to=date_to, limit=limit)
 
 
-def create_app(ledger: Ledger, export_interval: float | None = None) -> FastAPI:
-    """With `export_interval` (seconds) and an export directory, books are re-exported for Fava
-    in the background whenever they change."""
-
-    @asynccontextmanager
-    async def lifespan(_):
-        stop = threading.Event()
-        if export_interval and ledger.export_dir:
-            threading.Thread(target=_export_loop, args=(ledger, export_interval, stop), daemon=True).start()
-        yield
-        stop.set()
-
+def create_app(ledger: Ledger) -> FastAPI:
     app = FastAPI(
         title="fava-beans ledger",
         docs_url="/api/ledger/v1/docs",
         openapi_url="/api/ledger/v1/openapi.json",
-        lifespan=lifespan,
     )
     api = APIRouter(prefix="/api/ledger/v1")
 
@@ -81,7 +63,7 @@ def create_app(ledger: Ledger, export_interval: float | None = None) -> FastAPI:
 
     @app.exception_handler(StaleVersion)
     async def stale(_, exc: StaleVersion):
-        return JSONResponse({"detail": str(exc), "updatedAt": exc.current}, status_code=409)
+        return JSONResponse({"detail": str(exc), "updated_at": exc.current}, status_code=409)
 
     @app.exception_handler(ValueError)
     async def invalid(_, exc: ValueError):
@@ -205,19 +187,6 @@ def _row(r: Row) -> models.Directive:
     )
 
 
-def _export_loop(ledger: Ledger, interval: float, stop: threading.Event) -> None:
-    written: dict[str, int] = {}
-    while not stop.is_set():
-        try:
-            for book_id in ledger.write_changed_exports(written):
-                log.info("exported %s", book_id)
-        except Exception:
-            log.exception("export failed; retrying")
-        stop.wait(interval)
-
-
 def from_env() -> FastAPI:
     data_dir = os.environ.get("LEDGER_DATA_DIR", "/data")
-    export_dir = os.environ.get("LEDGER_EXPORT_DIR")
-    interval = float(os.environ.get("LEDGER_EXPORT_INTERVAL", "2"))
-    return create_app(Ledger(Store(os.path.join(data_dir, "ledger.sqlite")), export_dir), interval)
+    return create_app(Ledger(Store(os.path.join(data_dir, "ledger.sqlite"))))

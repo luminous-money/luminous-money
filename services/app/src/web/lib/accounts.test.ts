@@ -2,13 +2,13 @@ import type { Account } from "@fava-beans/ledger-client";
 import { describe, expect, it } from "vitest";
 
 import {
+  checkNewAccount,
   isSegment,
-  parentChoices,
   postable,
   preferredRoots,
   search,
   shortName,
-  suggestNew,
+  suggestName,
   toSegment,
 } from "./accounts.js";
 
@@ -61,10 +61,6 @@ describe("which accounts are offered", () => {
     expect(postable(accounts, "2024-06-01")).toEqual(["Expenses:Always"]);
     expect(postable(accounts, "2025-01-01")).toEqual(["Expenses:New", "Expenses:Always"]);
   });
-
-  it("puts new accounts only under open nodes", () => {
-    expect(parentChoices(accounts).map((a) => a.name)).toEqual(["Expenses:Food"]);
-  });
 });
 
 describe("naming a new account", () => {
@@ -82,19 +78,76 @@ describe("naming a new account", () => {
     expect(isSegment("Coffee Shops")).toBe(false);
     expect(isSegment("")).toBe(false);
   });
+});
 
-  it("suggests a parent only when the typed path names a node", () => {
-    const parents = ["Expenses", "Expenses:Utilities", "Assets"];
-    expect(suggestNew("utilities:power", parents)).toEqual({
-      name: "Power",
-      parent: "Expenses:Utilities",
+describe("a new account's full name", () => {
+  const roots = ["Assets", "Liabilities", "Equity", "Income", "Expenses"].map((name) =>
+    account(name, { kind: "node", implicit: true, open: null })
+  );
+  const accounts = [
+    ...roots,
+    account("Expenses:Food", { kind: "node", implicit: true, open: null }),
+    account("Expenses:Food:Groceries"),
+    account("Expenses:Utilities", { kind: "node" }),
+    account("Expenses:Old", { kind: "node", close: "2021-01-01" }),
+  ];
+
+  it("starts from the search, under the preferred root", () => {
+    expect(suggestName("Groceries", accounts, "Expenses")).toBe("Expenses:Groceries");
+    expect(suggestName("coffee shops", accounts, "Expenses")).toBe("Expenses:Coffee-Shops");
+    expect(suggestName("salary", accounts, "Income")).toBe("Income:Salary");
+    expect(suggestName("", accounts, "Expenses")).toBe("Expenses:");
+  });
+
+  it("keeps a typed root, and goes under a typed node", () => {
+    expect(suggestName("assets:cash wallet", accounts, "Expenses")).toBe("Assets:Cash-Wallet");
+    expect(suggestName("utilities:power", accounts, "Expenses")).toBe("Expenses:Utilities:Power");
+    expect(suggestName("Expenses:Utilities:", accounts, "Expenses")).toBe("Expenses:Utilities:");
+  });
+
+  it("is checked against the ledger's rules", () => {
+    const check = (name: string, kind: "leaf" | "node" = "leaf") =>
+      checkNewAccount(name, kind, accounts);
+
+    expect(check("Expenses:Utilities:Power")).toEqual({ ok: true, type: "expense", adds: [] });
+    expect(check("Expenses:Home:Garden:Tools")).toEqual({
+      ok: true,
+      type: "expense",
+      adds: ["Expenses:Home", "Expenses:Home:Garden"],
     });
-    expect(suggestNew("Expenses:Utilities:", parents)).toEqual({
-      name: "",
-      parent: "Expenses:Utilities",
+    expect(check("Expenses:Food", "node")).toMatchObject({ ok: true });
+    expect(check("Expenses:Food")).toMatchObject({
+      ok: false,
+      message: expect.stringContaining("can only hold them"),
     });
-    expect(suggestNew("coffee shops", parents)).toEqual({ name: "Coffee-Shops", parent: "" });
-    expect(suggestNew("nowhere:thing", parents)).toEqual({ name: "Nowhere-Thing", parent: "" });
+    expect(check("Expenses:Food:Groceries")).toMatchObject({
+      ok: false,
+      message: expect.stringContaining("already exists"),
+    });
+    expect(check("Expenses:Food:Groceries:Organic")).toMatchObject({
+      ok: false,
+      message: expect.stringContaining("holds transactions"),
+    });
+    expect(check("Expenses:Old:Thing")).toMatchObject({
+      ok: false,
+      message: expect.stringContaining("is closed"),
+    });
+    expect(check("Stuff:Things")).toMatchObject({
+      ok: false,
+      message: expect.stringContaining("Start with one of"),
+    });
+    expect(check("Expenses")).toMatchObject({
+      ok: false,
+      message: "Name an account under Expenses",
+    });
+    expect(check("Expenses:Utilities:")).toMatchObject({
+      ok: false,
+      message: "Name an account under Expenses",
+    });
+    expect(check("Expenses:coffee")).toMatchObject({
+      ok: false,
+      message: expect.stringContaining('"coffee" isn\'t valid'),
+    });
   });
 });
 

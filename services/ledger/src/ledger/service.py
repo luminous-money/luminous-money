@@ -8,7 +8,6 @@ a backup means applying its chunks in cursor order.
 from __future__ import annotations
 
 import datetime
-import os
 import threading
 from dataclasses import dataclass
 
@@ -36,9 +35,8 @@ class Backup:
 
 
 class Ledger:
-    def __init__(self, store: Store, export_dir: str | None = None):
+    def __init__(self, store: Store):
         self.store = store
-        self.export_dir = export_dir
         self._loaded: dict[str, tuple[int, engine.Loaded]] = {}
         self._load_lock = threading.Lock()
 
@@ -81,32 +79,6 @@ class Ledger:
     def export(self, book_id: str) -> str:
         """The whole book as a self-contained Beancount ledger."""
         return engine.render(self._header(book_id), [r.text for r in self.store.live(book_id)])
-
-    def write_export(self, book_id: str) -> str:
-        """Write the book's export where Fava reads it. Writes a temp file then renames it, so Fava
-        never sees a half-written ledger."""
-        assert self.export_dir, "no export directory configured"
-        path = os.path.join(self.export_dir, f"{book_id}.beancount")
-        tmp = path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            f.write(self.export(book_id))
-        os.replace(tmp, path)
-        return path
-
-    def write_changed_exports(self, written: dict[str, int]) -> list[str]:
-        """Rewrite the export of every book that changed since it was last written.
-
-        `written` maps book ID to the book's seq at its last export, and is updated in place.
-        Called on a short interval, this batches a burst of writes into one export.
-        """
-        changed = []
-        for book_id in self.store.books():
-            seq = self.store.book_seq(book_id)
-            if written.get(book_id) != seq:
-                self.write_export(book_id)
-                written[book_id] = seq
-                changed.append(book_id)
-        return changed
 
     # Backups
 
@@ -216,30 +188,35 @@ class Ledger:
         return engine.accounts(header, [r.text for r in rows])
 
     def create_account(self, book_id: str, a: models.AccountIn) -> models.Account:
-        """Open an account under a node. The parent's root sets the account's type.
+        """Open an account by its fully qualified name. Its root sets the type.
 
-        Top-level accounts are built in, so every new account has a parent, and the parent must
-        be a node: leaves hold transactions, not sub-accounts. A parent that was only implicit can
-        be opened explicitly, but only as a node, since it already has accounts under it.
+        Top-level accounts are built in, so a new account is always below one. Its nearest existing
+        ancestor must be a node: leaves hold transactions, not sub-accounts. Levels in between that
+        don't exist yet become implicit nodes, as any unopened parent does. A name that's only
+        implicit so far can be opened explicitly, but only as a node, since it already has
+        accounts under it.
         """
         tree = {x.name: x for x in self.accounts(book_id)}
-        parent_name = a.name.rpartition(":")[0]
+        roots = engine.root_types(self._header(book_id))
+        segments = a.name.split(":")
         existing = tree.get(a.name)
-        if not parent_name:
-            raise engine.ParseFailure(["top-level accounts are built in; choose a parent account"])
+        if segments[0] not in roots:
+            raise engine.ParseFailure([f"account names start with one of {', '.join(roots)}"])
+        if len(segments) == 1:
+            raise engine.ParseFailure(["top-level accounts are built in; name an account under one"])
         if existing and not existing.implicit:
             raise ValueError(f"{a.name} already exists")
         if existing and a.kind == "leaf":
             raise engine.ParseFailure([f"{a.name} already has sub-accounts, so it can only be a node"])
-        parent = tree.get(parent_name)
-        if parent is None:
-            raise engine.ParseFailure([f"there's no {parent_name} account to put it under"])
-        if parent.kind != "node":
-            raise engine.ParseFailure([f"{parent_name} is a leaf account and can't have sub-accounts"])
-        if parent.close:
-            raise engine.ParseFailure([f"{parent_name} is closed"])
+        ancestor = next(
+            tree[name] for i in range(len(segments) - 1, 0, -1) if (name := ":".join(segments[:i])) in tree
+        )
+        if ancestor.kind != "node":
+            raise engine.ParseFailure([f"{ancestor.name} is a leaf account and can't have sub-accounts"])
+        if ancestor.close:
+            raise engine.ParseFailure([f"{ancestor.name} is closed"])
 
-        opened = a.open or self._default_open(book_id, parent, tree)
+        opened = a.open or self._default_open(book_id, ancestor, tree)
         self._insert(book_id, engine.open_directive(a.name, opened, a.kind))
         return next(x for x in self.accounts(book_id) if x.name == a.name)
 

@@ -39,14 +39,13 @@ So:
   currencies and commodities, validation (balancing, balance assertions), plugins and BQL all run
   in Beancount over entries loaded from the database. Rebuilding that would turn months of work
   into years.
-- **Beancount text is the interchange format.** It's used for imports, exports, backups and
-  feeding Fava. Exports carry each entry's ID in its metadata, so re-importing an export (e.g. a
-  restore) updates entries instead of duplicating them.
-- **Fava is the desktop reporting half, for free.** That includes the balance sheet, income
-  statement, trial balance, charts, journal browsing, the query UI, prices and switching books. It
-  reads a Beancount export that `ledger` regenerates whenever the books change. Fava is read-only
-  and optional: leave it out of the Compose file and nothing else breaks. We only build what Fava
-  does badly, which is the fast phone workflow.
+- **Beancount text is the interchange format.** It's used for imports, exports and backups.
+  Exports carry each entry's ID in its metadata, so re-importing an export (e.g. a restore)
+  updates entries instead of duplicating them.
+- **Reports are our own, not Fava's.** Fava was the original plan for desktop reporting, run
+  read-only over exports. It was dropped (2026-10-09) because it didn't look useful for our
+  purposes; reports will be built on the generic ledger-graphs libraries (PLAN.md, Phase 4).
+  Bringing Fava back would only take an image, a route, and a loop writing exports for it.
 
 **The engine spike is done and proved the approach** (see [`services/ledger`](services/ledger)):
 
@@ -101,7 +100,7 @@ request and response bodies.
 
 ### Versioned, partial edits
 
-Every directive's `updated_at` (`updatedAt` in JSON) is its version.
+Every directive's `updated_at` is its version.
 
 - **Every write moves it forward,** to a timestamp strictly later than before, even when the
   clock hasn't moved or has gone backwards (a Pi has no hardware clock).
@@ -115,8 +114,8 @@ Every directive's `updated_at` (`updatedAt` in JSON) is its version.
 - **Imports and restores apply Beancount text by ID** and aren't versioned: they're bulk
   operations with their own semantics.
 
-The API's JSON is camelCase (`updatedAt`, `createdAt`, `directiveId`), generated from snake_case
-Python names.
+The API's JSON is snake_case (`updated_at`, `created_at`, `directive_id`), like the database
+and the Python behind it. One convention everywhere.
 
 ### Accounts: leaves hold transactions, nodes hold sub-accounts
 
@@ -132,10 +131,12 @@ Beancount:
 - **A parent that was never opened but has accounts under it is an implicit node.** Beancount
   already refuses postings to it. Imported books get a sensible tree this way, and an implicit
   parent can be opened explicitly, but only as a node.
-- **Creating an account always needs a parent, and the parent must be a node.** The parent's
-  root sets the type (asset, liability, equity, income, expense). The account opens when its
-  parent did, else with the earliest account under the parent, else at the book's first entry,
-  so it can take any of the book's transactions.
+- **New accounts are named in full and always sit below a top-level account,** whose root sets
+  the type (asset, liability, equity, income, expense). The nearest existing ancestor must be an
+  open node. Levels in between that don't exist yet are fine: like any unopened parent, they
+  become implicit nodes. The account opens when its nearest opened ancestor did, else with the
+  earliest account under it, else at the book's first entry, so it can take any of the book's
+  transactions.
 - **Postings to node accounts are refused on write** (422). Imported data that does it is flagged
   as a validation problem. That check runs after Beancount's loader rather than through its
   `extra_validations` hook: Beancount 3.2 appends those to its global list of validations on
@@ -170,8 +171,7 @@ The test data has three layers:
 
 The goal is for someone else to run it with very little effort. A **Compose file is the product**:
 
-- The whole system is a set of images plus one data volume and one env file. (A second volume
-  holds the Beancount exports Fava reads; it's derived and rebuilt automatically.)
+- The whole system is a set of images plus one data volume and one env file.
 - `docker compose up` on any host runs it.
 - The same file also deploys to a single-node Docker Swarm with `docker stack deploy`. So we stick
   to Compose-spec features that both support, and ship prebuilt images rather than `build:` keys,
@@ -200,7 +200,7 @@ small set of services is fine, since performance isn't a concern on this workloa
 
 - **New services are TypeScript.**
 - **`ledger` is the one Python service,** because Beancount's engine only exists in Python.
-- **Traefik and Fava are used as is.**
+- **Traefik is used as is.**
 
 ### One monorepo, native tooling per language
 
@@ -283,13 +283,10 @@ The Pi 3 hasn't been measured yet. Expect it to be roughly an order of magnitude
   (Today's spike still validates on demand; making it asynchronous is the next step for
   `ledger`.)
 - **Memory is the binding constraint on a 1 GB Pi, not time.** `ledger` holds the booked book in
-  memory, and Fava holds its own copy of the same book. At decades scale those two together
-  approach half the Pi's RAM. That's fine for years, and when it stops being fine the levers are
-  already in the design: Fava is optional, and closed periods can be archived.
+  memory: about 200 MB at decades scale. That's comfortable, and archiving closed periods is the
+  lever if it ever isn't. (With Fava, a second copy of the book would have doubled that.)
 - **Price directives are about 45% of the synthetic book.** Their count, not transactions, may
   dominate growth, so `bean-price` should record at a sensible frequency (e.g. weekly, not daily).
-- **The Fava export is regenerated after changes,** debounced so a burst of writes triggers one
-  regeneration.
 
 ### Backups: incremental, cursor-based, and made of Beancount files
 
@@ -320,10 +317,10 @@ job, Syncthing into the hierarchy, offsite storage) decide where they go.
 
 ### Routing and auth: Traefik + forwardAuth
 
-Traefik is the only exposed port. One box serves the UIs and the APIs, so routing is by
-**top-level prefix: `/api` for every API, `/ui` for the PWA, and `/fava` for Fava.** Fava is a
-UI too, but a different one with its own life, so it gets its own prefix rather than sharing the
-PWA's (where the PWA's service worker would also have to be told to leave it alone).
+Traefik is the only exposed port. One box serves the UI and the APIs, so routing is by
+**top-level prefix: `/api` for every API and `/ui` for the PWA.** A future, separate UI would get
+its own top-level prefix rather than sharing `/ui`, where the PWA's service worker would also have
+to be told to leave it alone.
 
 - **Each service serves under its full prefix,** so Traefik strips nothing.
 - **Routes come from Traefik's file provider** (`deploy/traefik/routes.yml`), not Docker labels.
@@ -334,7 +331,6 @@ PWA's (where the PWA's service worker would also have to be told to leave it alo
 | `/api/auth/v1` | `auth` | Login, token issuance, refresh. Login is exempt from the auth check. (Not built yet.) |
 | `/api/ledger/v1` | `ledger` | Books API: entries, staging, cross-book groups, BQL, import/export, backup. |
 | `/api/app/v1` | `app` | Review queue, the resolver pipeline, schedules, import sources. |
-| `/fava` | `fava` | Desktop reporting, read-only. Fava runs with `--prefix /fava`. |
 | `/ui` | `app` | The review PWA. Unknown paths under `/ui` get the app shell, for client-side routing. |
 | `/` | (redirect) | Redirects to `/ui/`. |
 
@@ -347,7 +343,8 @@ How auth works:
 - **Services can read the token's claims (e.g. user ID) without verifying it again.** They're only
   reachable on the internal network, and on success Traefik passes the token, or headers derived
   from it, through to them.
-- **Browsers carry the token in a cookie,** so Fava and the PWA work without client changes.
+- **Browsers carry the token in a cookie,** so the PWA's requests are authenticated without
+  extra client code.
 - **There's a simple user concept, but no permissions yet.** Any authenticated user can use any
   book. The author is still recorded on every change, so per-book access can be added later
   without changing the data.
@@ -473,29 +470,29 @@ The design separates four things:
 
   Adding a source means adding a participant, not changing the pipeline.
 - **Routines:** the resolver chain, the context builder, and price fetching.
-- **Views:** the review PWA, and Fava.
+- **Views:** the PWA: the review queue now, then the chart of accounts, the general ledger and
+  reports.
 
 ```
                         ┌──────────── traefik (upstream) ────────────┐
   operator's proxy ───▶ │  path routing · forwardAuth ─▶ auth /verify │
-                        └───┬──────────────┬───────────────┬──────┬──┘
-              /api/auth/v1  │ /api/app/v1, │ /api/ledger/v1│      │ /fava
-                            │ /ui          │               │      │
-                            ▼              ▼               │      ▼
-                     ┌──────────┐ ┌─────────────────────┐  │  ┌──────────────────┐
-                     │ auth (TS)│ │ app (TS)            │  │  │ fava (upstream)  │
-                     │ users,JWT│ │ participants        │  │  │ read-only        │
-                     └──────────┘ │ context + resolvers │  │  └────────▲─────────┘
-                                  │ review PWA + API    │  │           │ reads
-                                  └──────────┬──────────┘  │           │
-                                             ▼             ▼           │
-                                  ┌─────────────────────────────────┐  │
-                                  │ ledger (Python)                  │  │
-                                  │ system of record (SQLite)        │  │
-                                  │ Beancount engine: booking,       │  │
-                                  │ validation, BQL                  │  │
-                                  │ import/export · backup chunks    │──┘
-                                  │ Fava export (debounced)          │
+                        └───┬──────────────┬───────────────┬─────────┘
+              /api/auth/v1  │ /api/app/v1, │ /api/ledger/v1│
+                            │ /ui          │               │
+                            ▼              ▼               │
+                     ┌──────────┐ ┌─────────────────────┐  │
+                     │ auth (TS)│ │ app (TS)            │  │
+                     │ users,JWT│ │ participants        │  │
+                     └──────────┘ │ context + resolvers │  │
+                                  │ PWA + API           │  │
+                                  └──────────┬──────────┘  │
+                                             ▼             ▼
+                                  ┌─────────────────────────────────┐
+                                  │ ledger (Python)                  │
+                                  │ system of record (SQLite)        │
+                                  │ Beancount engine: booking,       │
+                                  │ validation, BQL                  │
+                                  │ import/export · backup chunks    │
                                   └─────────────────────────────────┘
 ```
 
@@ -505,9 +502,8 @@ The design separates four things:
 |---|---|---|
 | `traefik` | upstream | The only exposed port. Routes by path prefix; forwardAuth to `auth`. |
 | `auth` | TypeScript | Login, JWT issuance and refresh, the verify endpoint for forwardAuth. Owns users. |
-| `ledger` | Python | System of record for all books. Runs the Beancount engine (booking, validation, BQL). Owns cross-book groups and their invariants, Beancount import/export, the change log, backup chunks, and the Fava export. |
+| `ledger` | Python | System of record for all books. Runs the Beancount engine (booking, validation, BQL). Owns cross-book groups and their invariants, Beancount import/export, the change log and backup chunks. |
 | `app` | TypeScript | Serves the review PWA (React + Vite + `vite-plugin-pwa`) and its API (Hono). Hosts the participants, the context builder and the resolver chain, and owns schedules and import config. Modules get split into their own services only when there's a reason. |
-| `fava` | upstream | Desktop reporting over the latest export, read-only and optional. |
 
 ## The review app
 
@@ -558,10 +554,14 @@ case without hiding the general one.
   transaction and sent with the version current when it runs (see "Versioned, partial edits").
   A description saved on blur and a confirm a moment later can't undo each other.
 - **"Create account" is always the last option** in a posting-account picker.
-  - It opens a dialog (full screen on phones) with the search prefilled as a valid name
-    ("coffee shops" becomes `Coffee-Shops`).
-  - The parent is chosen with the same picker, limited to node accounts and without Create.
-    A typed path whose front names a node ("utilities:power") preselects it.
+  - It opens a dialog (full screen on phones) with one field: the account's **fully qualified
+    name**, prefilled from the search and freely editable. "Groceries" becomes
+    `Expenses:Groceries`, under the root money flowed to (expenses for money out, income for
+    money in). A typed root is kept ("assets:cash wallet" becomes `Assets:Cash-Wallet`), and a
+    typed path whose front names a node goes under it ("utilities:power" becomes
+    `Expenses:Utilities:Power`).
+  - The dialog checks the name against the ledger's rules as you type, says why when it can't
+    be created, and names any intermediate levels it will add as nodes.
   - Leaf or node defaults to leaf.
   - **Create** opens the account and picks it for the card. A new node can't hold transactions,
     so instead the search moves into it (`Expenses:Utilities:`), ready to create a leaf under it.
@@ -585,7 +585,7 @@ case without hiding the general one.
 |---|---|---|
 | System of record | SQLite, behind an interface | One ledger database for all books. |
 | Accounting engine | Beancount v3 | Also the import/export and backup format. |
-| Desktop reporting | Fava | Read-only, optional, under `/fava`. |
+| Reports | Our own, on the ledger-graphs libraries | Planned (PLAN.md, Phase 4). Fava was dropped. |
 | Mobile UI | PWA: React + Vite + `vite-plugin-pwa` | Served by `app` under `/ui`. |
 | App API server | Hono on Node | Small footprint for the Pi. |
 | Routing | Traefik | forwardAuth to `auth`, no plugins. |

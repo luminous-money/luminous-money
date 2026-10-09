@@ -38,10 +38,7 @@ export function Home() {
       <section className="tiles">
         <Tile title="Import" note="Bank feeds and CSV uploads." soon />
         <Tile title="Schedules" note="Recurring transactions across books." soon />
-        <a className="card tile link" href="/fava/">
-          <h3>Reports</h3>
-          <p>Balance sheet, income statement and queries in Fava.</p>
-        </a>
+        <Tile title="Reports" note="Spending and income, by account and over time." soon />
       </section>
     </main>
   );

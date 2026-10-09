@@ -22,5 +22,4 @@ fi
 docker run --rm "$image" python -m ledger.demo "$@" \
   | curl -fsS -X POST -H "content-type: text/plain" --data-binary @- "$url/api/ledger/v1/books/$book/import"
 echo
-echo "Seeded '$book'. Fava lists books at startup, so restart it to see this one:"
-echo "  docker compose restart fava"
+echo "Seeded '$book'."

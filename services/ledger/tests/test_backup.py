@@ -69,17 +69,3 @@ def test_each_book_backs_up_separately(ledger):
     chunks = ledger.backup().chunks
 
     assert set(chunks) == {"personal", "shared"}
-
-
-def test_exports_are_rewritten_only_for_changed_books(ledger, tmp_path):
-    ledger.apply_file("personal", FEATURES)
-    ledger.create_book("shared")
-    written = {}
-
-    assert sorted(ledger.write_changed_exports(written)) == ["personal", "shared"]
-    assert ledger.write_changed_exports(written) == []
-
-    ledger.create("personal", STAGED)
-
-    assert ledger.write_changed_exports(written) == ["personal"]
-    assert STAGED.splitlines()[0] in (tmp_path / "personal.beancount").read_text()

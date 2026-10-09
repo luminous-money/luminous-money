@@ -3,12 +3,11 @@ fava-beans
 
 A self-hostable, database-driven, double-entry accounting system. It uses
 [Beancount](https://github.com/beancount/beancount) as its accounting engine and its import/export
-format, has a mobile-first app built for fast review and categorization, and uses
-[Fava](https://github.com/beancount/fava) for read-only reporting. One server hosts many books and
-handles transactions that span several of them.
+format, and has a mobile-first app built for fast review and categorization. One server hosts many
+books and handles transactions that span several of them.
 
-> **Status: early build.** The ledger service, the stack, routing and a PWA shell are running and
-> tested. Nothing here touches real money yet: the plan is to build and polish the UI against test
+> **Status: early build.** The ledger service, the stack and the PWA's review queue are running
+> and tested. Nothing here touches real money yet: the plan is to build and polish the UI against test
 > data first, and only then hydrate with real finances.
 
 - **[RESUME.md](RESUME.md):** where work stands and what to do next. Start here.
@@ -31,7 +30,6 @@ Then open `http://localhost:8080/`, which redirects to the app at `/ui/`.
 | Path | What |
 |---|---|
 | `/ui/` | The PWA: books, then each book's review queue |
-| `/fava/` | Fava, read-only, once a book exists |
 | `/api/ledger/v1/docs` | The ledger API's interactive docs |
 | `/api/app/v1/health` | The app API |
 
@@ -60,8 +58,7 @@ compose.e2e.yaml      overlay that adds the end-to-end runner
 docker-bake.hcl       every image, test target and release platform
 node.Dockerfile       the shared TypeScript workspace stage, its checks, and the e2e image
 deploy/
-  traefik/            routing (file provider): /api/*, /ui/*, /fava/*
-  fava/               Fava image, pinned to the ledger's Beancount version
+  traefik/            routing (file provider): /api/* and /ui/*
 services/
   ledger/             Python: system of record, Beancount engine      → /api/ledger/v1
   app/                TypeScript: PWA and app API                      → /ui, /api/app/v1

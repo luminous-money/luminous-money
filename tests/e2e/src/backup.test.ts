@@ -35,7 +35,10 @@ describe("backups", () => {
     const before = await backup();
 
     await ledger.DELETE("/api/ledger/v1/books/{book_id}/directives/{directive_id}", {
-      params: { path: { book_id, directive_id: entry.id }, query: { updatedAt: entry.updatedAt } },
+      params: {
+        path: { book_id, directive_id: entry.id },
+        query: { updated_at: entry.updated_at },
+      },
     });
     const increment = await backup(before.cursor);
 

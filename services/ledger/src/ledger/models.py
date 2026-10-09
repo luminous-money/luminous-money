@@ -5,9 +5,9 @@ anywhere between a form field and the ledger. Metadata values carry their Beanco
 boolean, number, date, amount), so reading a transaction, editing it and writing it back loses
 nothing.
 
-JSON field names are camelCase (`updatedAt`), from snake_case Python names.
+JSON field names are snake_case, the same as everywhere else.
 
-Every edit carries the `updatedAt` it read: the version. If the stored version has moved on, the
+Every edit carries the `updated_at` it read: the version. If the stored version has moved on, the
 edit is refused with 409 Conflict rather than overwriting someone else's change.
 """
 
@@ -17,24 +17,23 @@ import datetime
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
-from pydantic.alias_generators import to_camel
 
 DecimalStr = Annotated[str, StringConstraints(pattern=r"^-?\d+(\.\d+)?$")]
 Flag = Annotated[str, StringConstraints(min_length=1, max_length=1)]
 
 
 class Api(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    pass
 
 
 class Strict(Api):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
+    model_config = ConfigDict(extra="forbid")
 
 
 Version = Annotated[
     str,
     Field(
-        description="The `updatedAt` this edit was based on. If the stored one differs, the edit is "
+        description="The `updated_at` this edit was based on. If the stored one differs, the edit is "
         "refused with 409 Conflict."
     ),
 ]
@@ -131,10 +130,15 @@ class Account(Api):
 
 
 class AccountIn(Strict):
-    name: str = Field(description="The full name. Its parent must be a node account; the parent's root sets the type.")
+    name: str = Field(
+        description="The fully qualified name. Its root sets the type. Its nearest existing ancestor must be a "
+        "node; missing levels in between become implicit nodes."
+    )
     kind: AccountKind = "leaf"
     open: datetime.date | None = Field(
-        None, description="Defaults to when the parent opened, else the earliest account under it, else the book's first entry."
+        None,
+        description="Defaults to when the nearest opened ancestor opened, else the earliest account under it, "
+        "else the book's first entry.",
     )
 
 

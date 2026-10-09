@@ -14,6 +14,6 @@
 - **Every table is created through `migrations.create_table`** (it adds `created_at` and
   `updated_at`). A lint check in `pnpm test` enforces it. Schema changes are new migrations,
   never edits to shipped ones.
-- **Every edit is versioned:** the client sends the `updatedAt` it read, and the server refuses a
+- **Every edit is versioned:** the client sends the `updated_at` it read, and the server refuses a
   stale one with 409. Prefer PATCH, so an edit only touches its own fields.
 - **No real financial data** goes anywhere in this repo or its test fixtures.

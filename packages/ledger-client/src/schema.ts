@@ -260,12 +260,12 @@ export interface components {
       kind: "leaf" | "node";
       /**
        * Name
-       * @description The full name. Its parent must be a node account; the parent's root sets the type.
+       * @description The fully qualified name. Its root sets the type. Its nearest existing ancestor must be a node; missing levels in between become implicit nodes.
        */
       name: string;
       /**
        * Open
-       * @description Defaults to when the parent opened, else the earliest account under it, else the book's first entry.
+       * @description Defaults to when the nearest opened ancestor opened, else the earliest account under it, else the book's first entry.
        */
       open?: string | null;
     };
@@ -329,8 +329,8 @@ export interface components {
      * @description Any directive, as its canonical Beancount text plus the columns derived from it.
      */
     Directive: {
-      /** Createdat */
-      createdAt: string;
+      /** Created At */
+      created_at: string;
       /**
        * Date
        * Format: date
@@ -345,10 +345,10 @@ export interface components {
       /** Text */
       text: string;
       /**
-       * Updatedat
+       * Updated At
        * @description Changes on every write; send it back with edits.
        */
-      updatedAt: string;
+      updated_at: string;
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -391,8 +391,8 @@ export interface components {
     };
     /** Problem */
     Problem: {
-      /** Directiveid */
-      directiveId: string | null;
+      /** Directive Id */
+      directive_id: string | null;
       /** Message */
       message: string;
     };
@@ -405,8 +405,8 @@ export interface components {
     };
     /** Transaction */
     Transaction: {
-      /** Createdat */
-      createdAt: string;
+      /** Created At */
+      created_at: string;
       /**
        * Date
        * Format: date
@@ -443,10 +443,10 @@ export interface components {
       /** Tags */
       tags?: string[];
       /**
-       * Updatedat
+       * Updated At
        * @description Changes on every write; send it back with edits.
        */
-      updatedAt: string;
+      updated_at: string;
     };
     /** TransactionIn */
     TransactionIn: {
@@ -513,10 +513,10 @@ export interface components {
       /** Tags */
       tags?: string[] | null;
       /**
-       * Updatedat
-       * @description The `updatedAt` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       * Updated At
+       * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
        */
-      updatedAt: string;
+      updated_at: string;
     };
     /**
      * TransactionUpdate
@@ -557,10 +557,10 @@ export interface components {
       /** Tags */
       tags?: string[];
       /**
-       * Updatedat
-       * @description The `updatedAt` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       * Updated At
+       * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
        */
-      updatedAt: string;
+      updated_at: string;
     };
     /** ValidationError */
     ValidationError: {
@@ -840,8 +840,8 @@ export interface operations {
   update_directive_api_ledger_v1_books__book_id__directives__directive_id__put: {
     parameters: {
       query: {
-        /** @description The `updatedAt` this edit was based on. */
-        updatedAt: string;
+        /** @description The `updated_at` this edit was based on. */
+        updated_at: string;
       };
       header?: never;
       path: {
@@ -886,8 +886,8 @@ export interface operations {
   delete_directive_api_ledger_v1_books__book_id__directives__directive_id__delete: {
     parameters: {
       query: {
-        /** @description The `updatedAt` this edit was based on. */
-        updatedAt: string;
+        /** @description The `updated_at` this edit was based on. */
+        updated_at: string;
       };
       header?: never;
       path: {

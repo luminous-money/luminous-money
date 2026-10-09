@@ -171,12 +171,12 @@ def test_json_api_over_http(book):
     assert [t["id"] for t in listed] == [directive_id]
     assert listed[0]["postings"][0]["units"] == {"number": "4.50", "currency": "USD"}
 
-    version = listed[0]["updatedAt"]
+    version = listed[0]["updated_at"]
     updated = client.put(
-        f"/api/ledger/v1/books/book/transactions/{directive_id}", json={**COFFEE, "flag": "*", "updatedAt": version}
+        f"/api/ledger/v1/books/book/transactions/{directive_id}", json={**COFFEE, "flag": "*", "updated_at": version}
     )
     assert updated.json()["flag"] == "*"
-    assert updated.json()["updatedAt"] > version
+    assert updated.json()["updated_at"] > version
 
     assert client.post("/api/ledger/v1/books/book/transactions", json={**COFFEE, "postings": []}).status_code == 422
     assert client.post("/api/ledger/v1/books/book/transactions", json={**COFFEE, "flag": "x"}).status_code == 422

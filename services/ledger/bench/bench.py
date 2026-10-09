@@ -68,7 +68,7 @@ def main() -> None:
     with timed("generate synthetic ledger"):
         generate(source, opts.years, opts.copies)
 
-    ledger = Ledger(Store(os.path.join(work, "ledger.sqlite")), export_dir=work)
+    ledger = Ledger(Store(os.path.join(work, "ledger.sqlite")))
     with timed("import (parse, canonicalize, insert)"):
         ledger.apply_file("bench", source)
 
@@ -107,7 +107,7 @@ def main() -> None:
         )
 
     with timed("export (whole book as Beancount text)"):
-        ledger.write_export("bench")
+        exported = ledger.export("bench")
     with timed("backup: full"):
         full = ledger.backup()
     ledger.create("bench", STAGED.format(date=today))
@@ -123,7 +123,7 @@ def main() -> None:
     print(f"\nSynthetic book: {opts.years} years x {opts.copies} histories")
     print("  " + ", ".join(f"{n} {k}" for k, n in sorted(counts.items(), key=lambda kv: -kv[1])))
     print(f"  {len(loaded.entries)} booked entries, {len(problems)} problems, {len(context)} directives in the 14-month context")
-    print(f"  database {db_bytes / 1e6:.1f} MB, export {os.path.getsize(os.path.join(work, 'bench.beancount')) / 1e6:.1f} MB, peak RSS {peak_mb:.0f} MB\n")
+    print(f"  database {db_bytes / 1e6:.1f} MB, export {len(exported) / 1e6:.1f} MB, peak RSS {peak_mb:.0f} MB\n")
     width = max(len(label) for label, _ in results)
     for label, seconds in results:
         print(f"  {label:<{width}}  {seconds * 1000:>9.1f} ms")

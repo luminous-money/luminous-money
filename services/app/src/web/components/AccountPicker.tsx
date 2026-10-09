@@ -1,14 +1,14 @@
 import type { Account } from "@fava-beans/ledger-client";
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
-import { search, suggestNew } from "../lib/accounts.js";
+import { search, suggestName } from "../lib/accounts.js";
 import type { AccountKind } from "../lib/ledger.js";
 import { CreateAccountDialog } from "./CreateAccountDialog.js";
 
 /** Offering "Create account" at the bottom of the picker. */
 export type AccountCreation = {
-  /** Where a new account can go: node accounts. */
-  parents: Account[];
+  /** The book's chart of accounts. */
+  accounts: Account[];
   submit: (name: string, kind: AccountKind) => Promise<Account>;
 };
 
@@ -16,7 +16,7 @@ type Props = {
   accounts: string[];
   value: string;
   onChange: (account: string) => void;
-  /** Roots listed first before anything is typed. */
+  /** Roots listed first before anything is typed; the first also prefixes new account names. */
   prefer?: string[];
   label: string;
   disabled?: boolean;
@@ -97,13 +97,6 @@ export function AccountPicker({
     );
   }
 
-  const suggestion =
-    create &&
-    suggestNew(
-      query,
-      create.parents.map((p) => p.name)
-    );
-
   return (
     <div className="picker">
       <input
@@ -144,12 +137,10 @@ export function AccountPicker({
         ))}
         {!create && matches.length === 0 && <li className="muted">No matching accounts</li>}
       </ul>
-      {creating && create && suggestion && (
+      {creating && create && (
         <CreateAccountDialog
-          initialName={suggestion.name}
-          initialParent={suggestion.parent}
-          parents={create.parents}
-          prefer={prefer}
+          initialName={suggestName(query, create.accounts, prefer?.[0] ?? "Expenses")}
+          accounts={create.accounts}
           submit={create.submit}
           onCancel={stopCreating}
           onCreated={(account) => {

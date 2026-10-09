@@ -95,7 +95,7 @@
             "type": "string"
           },
           "name": {
-            "description": "The full name. Its parent must be a node account; the parent's root sets the type.",
+            "description": "The fully qualified name. Its root sets the type. Its nearest existing ancestor must be a node; missing levels in between become implicit nodes.",
             "title": "Name",
             "type": "string"
           },
@@ -109,7 +109,7 @@
                 "type": "null"
               }
             ],
-            "description": "Defaults to when the parent opened, else the earliest account under it, else the book's first entry.",
+            "description": "Defaults to when the nearest opened ancestor opened, else the earliest account under it, else the book's first entry.",
             "title": "Open"
           }
         },
@@ -268,8 +268,8 @@
       "Directive": {
         "description": "Any directive, as its canonical Beancount text plus the columns derived from it.",
         "properties": {
-          "createdAt": {
-            "title": "Createdat",
+          "created_at": {
+            "title": "Created At",
             "type": "string"
           },
           "date": {
@@ -300,9 +300,9 @@
             "title": "Text",
             "type": "string"
           },
-          "updatedAt": {
+          "updated_at": {
             "description": "Changes on every write; send it back with edits.",
-            "title": "Updatedat",
+            "title": "Updated At",
             "type": "string"
           }
         },
@@ -312,8 +312,8 @@
           "kind",
           "flag",
           "text",
-          "createdAt",
-          "updatedAt"
+          "created_at",
+          "updated_at"
         ],
         "title": "Directive",
         "type": "object"
@@ -445,7 +445,7 @@
       },
       "Problem": {
         "properties": {
-          "directiveId": {
+          "directive_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -454,7 +454,7 @@
                 "type": "null"
               }
             ],
-            "title": "Directiveid"
+            "title": "Directive Id"
           },
           "message": {
             "title": "Message",
@@ -463,7 +463,7 @@
         },
         "required": [
           "message",
-          "directiveId"
+          "directive_id"
         ],
         "title": "Problem",
         "type": "object"
@@ -496,8 +496,8 @@
       "Transaction": {
         "additionalProperties": false,
         "properties": {
-          "createdAt": {
-            "title": "Createdat",
+          "created_at": {
+            "title": "Created At",
             "type": "string"
           },
           "date": {
@@ -578,9 +578,9 @@
             "title": "Tags",
             "type": "array"
           },
-          "updatedAt": {
+          "updated_at": {
             "description": "Changes on every write; send it back with edits.",
-            "title": "Updatedat",
+            "title": "Updated At",
             "type": "string"
           }
         },
@@ -588,8 +588,8 @@
           "date",
           "postings",
           "id",
-          "createdAt",
-          "updatedAt"
+          "created_at",
+          "updated_at"
         ],
         "title": "Transaction",
         "type": "object"
@@ -803,14 +803,14 @@
             ],
             "title": "Tags"
           },
-          "updatedAt": {
-            "description": "The `updatedAt` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
-            "title": "Updatedat",
+          "updated_at": {
+            "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updated At",
             "type": "string"
           }
         },
         "required": [
-          "updatedAt"
+          "updated_at"
         ],
         "title": "TransactionPatch",
         "type": "object"
@@ -893,16 +893,16 @@
             "title": "Tags",
             "type": "array"
           },
-          "updatedAt": {
-            "description": "The `updatedAt` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
-            "title": "Updatedat",
+          "updated_at": {
+            "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updated At",
             "type": "string"
           }
         },
         "required": [
           "date",
           "postings",
-          "updatedAt"
+          "updated_at"
         ],
         "title": "TransactionUpdate",
         "type": "object"
@@ -1338,13 +1338,13 @@
             }
           },
           {
-            "description": "The `updatedAt` this edit was based on.",
+            "description": "The `updated_at` this edit was based on.",
             "in": "query",
-            "name": "updatedAt",
+            "name": "updated_at",
             "required": true,
             "schema": {
-              "description": "The `updatedAt` this edit was based on.",
-              "title": "Updatedat",
+              "description": "The `updated_at` this edit was based on.",
+              "title": "Updated At",
               "type": "string"
             }
           }
@@ -1437,13 +1437,13 @@
             }
           },
           {
-            "description": "The `updatedAt` this edit was based on.",
+            "description": "The `updated_at` this edit was based on.",
             "in": "query",
-            "name": "updatedAt",
+            "name": "updated_at",
             "required": true,
             "schema": {
-              "description": "The `updatedAt` this edit was based on.",
-              "title": "Updatedat",
+              "description": "The `updated_at` this edit was based on.",
+              "title": "Updated At",
               "type": "string"
             }
           }

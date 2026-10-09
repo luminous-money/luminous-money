@@ -16,7 +16,7 @@ FEATURES = os.path.join(FIXTURES, "features.beancount")
 
 @pytest.fixture
 def ledger(tmp_path) -> Ledger:
-    return Ledger(Store(str(tmp_path / "ledger.sqlite")), export_dir=str(tmp_path))
+    return Ledger(Store(str(tmp_path / "ledger.sqlite")))
 
 
 @pytest.fixture(scope="session")

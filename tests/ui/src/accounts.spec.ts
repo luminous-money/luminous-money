@@ -12,43 +12,40 @@ test.beforeEach(async ({ page }) => {
 
 const coffee = (page: Page) => page.getByRole("article", { name: /^Corner Cafe/ });
 const dialog = (page: Page) => page.getByRole("dialog", { name: "Create account" });
+const nameField = (page: Page) => dialog(page).getByRole("textbox", { name: "Account" });
 
-async function searchCategory(page: Page, card: Locator, text: string) {
+async function startCreating(page: Page, card: Locator, search: string) {
   await card.getByRole("button", { name: /^Category:/ }).click();
-  await card.getByRole("combobox", { name: "Category" }).fill(text);
-}
-
-async function chooseParent(page: Page, text: string) {
-  await dialog(page)
-    .getByRole("button", { name: /^Parent:/ })
-    .click();
-  await dialog(page).getByRole("combobox", { name: "Parent" }).fill(text);
-  await page.keyboard.press("Enter");
+  await card.getByRole("combobox", { name: "Category" }).fill(search);
+  await card.getByRole("option", { name: /Create account/ }).click();
+  await expect(dialog(page)).toBeVisible();
 }
 
 test("the dropdown always ends with Create account", async ({ page }) => {
   const options = coffee(page).getByRole("option");
 
-  await searchCategory(page, coffee(page), "groc");
+  await coffee(page)
+    .getByRole("button", { name: /^Category:/ })
+    .click();
+  await coffee(page).getByRole("combobox", { name: "Category" }).fill("groc");
   await expect(options).toHaveText(["Expenses:Food:Groceries", "+ Create account “groc”"]);
 
   await coffee(page).getByRole("combobox", { name: "Category" }).fill("zzz");
   await expect(options).toHaveText(["+ Create account “zzz”"]);
 });
 
-test("creating a leaf selects it for the card", async ({ page }) => {
-  await searchCategory(page, coffee(page), "coffee shops");
-  await coffee(page)
-    .getByRole("option", { name: /Create account/ })
-    .click();
+test("the search becomes a full account name under the preferred root", async ({ page }) => {
+  await startCreating(page, coffee(page), "Groceries");
 
-  await expect(dialog(page)).toBeVisible();
-  await expect(dialog(page).getByRole("textbox", { name: "Name" })).toHaveValue("Coffee-Shops");
-  await expect(dialog(page).getByRole("button", { name: "Create" })).toBeDisabled(); // a parent is required
-
-  await chooseParent(page, "food");
+  await expect(nameField(page)).toHaveValue("Expenses:Groceries");
   await expect(dialog(page)).toContainText("Expense account");
-  await expect(dialog(page)).toContainText("Creates Expenses:Food:Coffee-Shops");
+});
+
+test("editing the full name and creating a leaf selects it for the card", async ({ page }) => {
+  await startCreating(page, coffee(page), "coffee shops");
+  await expect(nameField(page)).toHaveValue("Expenses:Coffee-Shops");
+
+  await nameField(page).fill("Expenses:Food:Coffee-Shops");
   await dialog(page).getByRole("button", { name: "Create" }).click();
 
   await expect(dialog(page)).toBeHidden();
@@ -64,11 +61,28 @@ test("creating a leaf selects it for the card", async ({ page }) => {
   expect(created?.kind).toBe("leaf");
 });
 
+test("names the ledger would refuse are explained and can't be created", async ({ page }) => {
+  await startCreating(page, coffee(page), "x");
+  const create = dialog(page).getByRole("button", { name: "Create" });
+
+  for (const [name, reason] of [
+    ["Expenses:Food:Groceries:Organic", "Expenses:Food:Groceries holds transactions"],
+    ["Expenses:Food:Groceries", "already exists"],
+    ["Stuff:Things", "Start with one of"],
+    ["Expenses:coffee", "isn't valid"],
+  ]) {
+    await nameField(page).fill(name!);
+    await expect(dialog(page)).toContainText(reason!);
+    await expect(create).toBeDisabled();
+  }
+
+  await nameField(page).fill("Expenses:Home:Garden:Tools");
+  await expect(dialog(page)).toContainText("also adds Expenses:Home:Garden to hold it");
+  await expect(create).toBeEnabled();
+});
+
 test("cancelling returns to the dropdown as it was", async ({ page }) => {
-  await searchCategory(page, coffee(page), "zzz");
-  await coffee(page)
-    .getByRole("option", { name: /Create account/ })
-    .click();
+  await startCreating(page, coffee(page), "zzz");
   await dialog(page).getByRole("button", { name: "Cancel" }).click();
 
   await expect(dialog(page)).toBeHidden();
@@ -79,11 +93,8 @@ test("cancelling returns to the dropdown as it was", async ({ page }) => {
 });
 
 test("a new node can't be picked, so the search moves into it for a leaf", async ({ page }) => {
-  await searchCategory(page, coffee(page), "utilities");
-  await coffee(page)
-    .getByRole("option", { name: /Create account/ })
-    .click();
-  await chooseParent(page, "expenses");
+  await startCreating(page, coffee(page), "utilities");
+  await expect(nameField(page)).toHaveValue("Expenses:Utilities");
   await dialog(page)
     .getByRole("radio", { name: /Sub-accounts/ })
     .check();
@@ -96,10 +107,7 @@ test("a new node can't be picked, so the search moves into it for a leaf", async
     .getByRole("option", { name: /Create account/ })
     .click();
 
-  await expect(dialog(page).getByRole("textbox", { name: "Name" })).toHaveValue("Power");
-  await expect(dialog(page).getByRole("button", { name: /^Parent:/ })).toContainText(
-    "Expenses:Utilities"
-  );
+  await expect(nameField(page)).toHaveValue("Expenses:Utilities:Power");
   await dialog(page).getByRole("button", { name: "Create" }).click();
 
   await expect(coffee(page).getByRole("button", { name: /^Category:/ })).toContainText(
@@ -110,29 +118,8 @@ test("a new node can't be picked, so the search moves into it for a leaf", async
   expect(tree.find((a) => a.name === "Expenses:Utilities:Power")?.kind).toBe("leaf");
 });
 
-test("parents are nodes only, and their picker can't create", async ({ page }) => {
-  await searchCategory(page, coffee(page), "snacks");
-  await coffee(page)
-    .getByRole("option", { name: /Create account/ })
-    .click();
-  await dialog(page)
-    .getByRole("button", { name: /^Parent:/ })
-    .click();
-  const parents = dialog(page).getByRole("listbox", { name: "Parent" });
-
-  await dialog(page).getByRole("combobox", { name: "Parent" }).fill("food");
-  await expect(parents.getByRole("option")).toHaveText(["Expenses:Food"]); // not its leaves
-
-  await dialog(page).getByRole("combobox", { name: "Parent" }).fill("groceries");
-  await expect(parents.getByRole("option")).toHaveCount(0);
-  await expect(parents).toContainText("No matching accounts");
-});
-
 test("the dialog is full screen on a phone", async ({ page }) => {
-  await searchCategory(page, coffee(page), "x");
-  await coffee(page)
-    .getByRole("option", { name: /Create account/ })
-    .click();
+  await startCreating(page, coffee(page), "x");
 
   const box = (await dialog(page).boundingBox())!;
   const viewport = page.viewportSize()!;
