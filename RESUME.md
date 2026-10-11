@@ -1,12 +1,12 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-09._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-10._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
 
-Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
+The foundations and the review queue are done. See [PLAN.md](PLAN.md) for the milestones ahead.
 
 - **`services/ledger`** (Python) is the system of record.
   - **Storage:** each Beancount directive is a database row holding its canonical text.
@@ -42,7 +42,7 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
     (`src/web/lib`) has Vitest unit tests.
 - **`ledger`** also serves the chart of accounts (`/accounts`) for the picker.
 - **Stack:** Traefik routes by top-level prefix (`/api`, `/ui`) from its file provider. Fava was
-  dropped; reports will be our own (PLAN.md, Phase 4).
+  dropped; reports will be our own (PLAN.md, M10).
   - `/api/ledger/v1` → `ledger`
   - `/api/app/v1` and `/ui` → `app`
   - `/` → redirects to `/ui/`
@@ -61,16 +61,10 @@ Phase 1 (foundations) is mostly done. See [PLAN.md](PLAN.md) for the checklist.
 
 ## Next steps
 
-The roadmap now continues past the review app with the chart of accounts and general ledger
-(Phase 3), reports (Phase 4) and budgeting (Phase 5); see [PLAN.md](PLAN.md). Their open questions
-are listed there and are worth settling before starting each phase.
+Say "elaborate plan for M1".
 
-1. **Use the review queue for real on a phone** (`http://<laptop-ip>:8080/ui/`) and collect
-   friction. Likely candidates: suggested categories from payee history (the `rules` resolver),
-   bulk categorization, and showing validation problems in the UI.
-2. **Asynchronous, debounced validation in `ledger`.** Today `problems` validates on demand,
-   synchronously.
-3. **`auth` service + forwardAuth,** before the stack is exposed beyond localhost.
+The roadmap is now a sequence of milestones, each elaborated when it starts (see
+[PLAN.md](PLAN.md)). M1 is one bank account, end to end.
 
 ## Gotchas
 

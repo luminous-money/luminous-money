@@ -44,7 +44,7 @@ So:
   updates entries instead of duplicating them.
 - **Reports are our own, not Fava's.** Fava was the original plan for desktop reporting, run
   read-only over exports. It was dropped (2026-10-09) because it didn't look useful for our
-  purposes; reports will be built on the generic ledger-graphs libraries (PLAN.md, Phase 4).
+  purposes; reports will be built on the generic ledger-graphs libraries (PLAN.md, M10).
   Bringing Fava back would only take an image, a route, and a loop writing exports for it.
 
 **The engine spike is done and proved the approach** (see [`services/ledger`](services/ledger)):
@@ -598,7 +598,7 @@ case without hiding the general one.
 |---|---|---|
 | System of record | SQLite, behind an interface | One ledger database for all books. |
 | Accounting engine | Beancount v3 | Also the import/export and backup format. |
-| Reports | Our own, on the ledger-graphs libraries | Planned (PLAN.md, Phase 4). Fava was dropped. |
+| Reports | Our own, on the ledger-graphs libraries | Planned (PLAN.md, M10). Fava was dropped. |
 | Mobile UI | PWA: React + Vite + `vite-plugin-pwa` | Served by `app` under `/ui`. |
 | App API server | Hono on Node | Small footprint for the Pi. |
 | Routing | Traefik | forwardAuth to `auth`, no plugins. |
