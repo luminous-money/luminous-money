@@ -66,6 +66,8 @@ Two principles set the order:
 - [ ] **M9: Cross-book transactions.** A single transaction that straddles more than one book,
       such as a salary that flows into a personal and a shared bank account.
 - [ ] **M10: Reports.** From basic to more complex.
+- [ ] **M11: Budgets.**
+- [ ] **M12: SimpleFIN.** Bank feeds.
 
 ## Notes collected so far
 
@@ -121,12 +123,11 @@ elaborated.
     concept.
   - **At least:** expense and income pie charts with selectable account depth, number of slices,
     date bounds, and optional averaging per period.
-- **Budgeting** (not yet in a milestone):
+- **Budgeting** (M11):
   - a target budget on any account, for any period
   - no descendant may have a higher base budget than its ancestor (base amounts, before
     rollover)
   - each target can roll over from period to period, or not
-- **Bank feeds** (not yet in a milestone): a SimpleFIN importer.
 - **Infrastructure, when it's needed:**
   - **Background validation in `ledger`,** once a screen needs Beancount's full booking (lots,
     balance assertions, BQL) and it's too slow on the target hardware. Plain balances come from

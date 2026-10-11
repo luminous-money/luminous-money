@@ -61,10 +61,7 @@ The foundations and the review queue are done. See [PLAN.md](PLAN.md) for the mi
 
 ## Next steps
 
-Say "elaborate plan for M1".
-
-The roadmap is now a sequence of milestones, each elaborated when it starts (see
-[PLAN.md](PLAN.md)). M1 is one bank account, end to end.
+`elaborate plan for M1`
 
 ## Gotchas
 
