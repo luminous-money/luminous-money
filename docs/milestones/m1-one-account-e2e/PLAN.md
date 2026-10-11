@@ -81,11 +81,11 @@ The open question in [the global plan](../../PLAN.md#open-questions) gets answer
 - **The add-account flow** asks for:
   - **the name** (e.g. "PNC Checking")
   - **the type** (only "Bank account" in M1)
-  - **Proposed:** the current balance and its as-of date
+  - **the current balance and its as-of date** (decided)
 
-  It creates `Assets:Bank:PNC-Checking`, deriving the path from the name and showing it. If a
-  starting balance was given, it also records an opening-balance transaction against
-  `Equity:Opening-Balances` on that date, so the balance is right from the start.
+  It creates `Assets:Bank:PNC-Checking`, deriving the path from the name and showing it. It also
+  records an opening-balance transaction against `Equity:Opening-Balances` on the as-of date, so
+  the balance is right from the start.
 
 ### Balances and "last updated"
 
@@ -97,9 +97,9 @@ The open question in [the global plan](../../PLAN.md#open-questions) gets answer
   - Otherwise it stays NULL, and that account's balance falls back to Beancount. That's rare for
     bank accounts, and it's when background validation would become relevant.
 - **Pending (`!`) transactions count** toward balances (decided).
-- **"Last updated at": proposed** to be the most recent change to anything posting to the
-  account: the latest `updated_at` among its transactions. That covers imports and manual edits
-  alike.
+- **"Last updated at" is the account's last import** (decided; later, its last SimpleFIN sync).
+  `app` owns imports, so it reports each account's last import time (the latest `import_batch`
+  for the account). The home page shows it next to the ledger's balance, or "No imports yet".
 
 ### The account ledger API
 
@@ -138,7 +138,7 @@ The open question in [the global plan](../../PLAN.md#open-questions) gets answer
   metadata on the transaction it becomes. A row whose fingerprint already exists is skipped and
   reported as such.
 
-### The processing pipeline (matching only)
+### The processing pipeline (identifying and ranking matches only)
 
 - **The resolver interface is the one in the design,** so M4 can add resolvers without
   restructuring: a batch plus context in, resolutions out, with resolvers chained. M1's chain is
@@ -147,12 +147,13 @@ The open question in [the global plan](../../PLAN.md#open-questions) gets answer
 - **The matcher** compares each row with existing transactions in the account. It ranks
   candidates with the **same amount** by **closeness in date**, within a window
   (**proposed:** ±5 days), and returns a ranked array per row (decided: amount and date only).
-- **What happens to each row** _(spec pending: what's done with candidates)_.
-  - **Proposed for now:** every new row becomes a staged (`!`) transaction anchored on the
-    account. Its other side is `Expenses:Uncategorized` (money out) or `Income:Uncategorized`
-    (money in), since categorization is M4.
-  - The candidates are stored with the row, and the import results screen shows them. Then the
-    review queue handles the staged transactions as it does today.
+- **M1 builds only the mechanics of identifying and ranking matches** (decided). Acting on
+  matches comes later: a clear winner taking over, ranked options in the review queue, matches
+  cleared on confirm, matched rows falling out of the import. The notes are in the spec.
+- **So for now, every new row becomes a staged (`!`) transaction** anchored on the account. Its
+  other side is `Expenses:Uncategorized` (money out) or `Income:Uncategorized` (money in), since
+  categorization is M4. The row's ranked candidates are stored with it (on `import_row`) and
+  listed on the import results screen. Nothing acts on them yet.
 
 ### The PWA
 
@@ -168,8 +169,7 @@ The open question in [the global plan](../../PLAN.md#open-questions) gets answer
   - not logged in: the login screen
   - logged in with no books: setup
   - otherwise: home
-- **A hamburger menu** with **Home** and **Manage books**, plus **Log out**. **Proposed:** also a
-  **Review** entry while imported transactions land in the review queue (see Questions).
+- **A hamburger menu** with **Home**, **Manage books** and **Review** (decided), plus **Log out**.
 
 ## Work, in order
 
@@ -196,7 +196,9 @@ the docs, `docs/PLAN.md` and `RESUME.md` updated.
    - the ledger API (keyset pages, running balances, counterpart or `<multiple>`)
    - the ledger view with infinite scroll, and clicks opening the detail editor
    - a performance check against the decades-scale benchmark book
-6. **Add a transaction** _(spec pending)_.
+6. **Add a transaction:** a persistent line at the bottom of the account ledger opens an empty
+   transaction editor (decided). **Proposed:** it's empty apart from a split on this account and
+   today's date, since that's the one thing known. Saving adds the transaction to the ledger.
 7. **CSV import:**
    - the app database tables
    - the import console (account drop-down, file button and drop zone)
@@ -204,9 +206,8 @@ the docs, `docs/PLAN.md` and `RESUME.md` updated.
    - batch and row storage
 8. **The pipeline:**
    - the resolver interface and chain, the context builder, and the matcher with ranked
-     candidates
-   - staging rows, and the import results screen
-   - _(spec pending: what's done with candidates)_
+     candidates (identifying and ranking only)
+   - staging rows, and the import results screen listing each row's candidates
 9. **M1 wrap-up:**
    - one browser test walking the whole path: log in, set up, add the account, import, see it
      in the ledger
@@ -223,29 +224,26 @@ the docs, `docs/PLAN.md` and `RESUME.md` updated.
 
 ## Questions
 
-1. **Opening balance:** should adding an account ask for its current balance and an as-of date,
-   recorded as an opening-balance transaction? Without one, the balance starts at zero and only
-   reflects what's imported.
-2. **"Last updated at":** the most recent change to any of the account's transactions (proposed),
-   or specifically the last import?
-3. **Marking money accounts:** explicit metadata (`money`, `display-name`, `institution`;
+**Answered:**
+- **Opening balance:** yes.
+- **"Last updated at":** the last import (later, the last SimpleFIN sync).
+- **Review:** yes, in the menu.
+- **Match candidates:** M1 builds only identifying and ranking. The notes for later are in the
+  spec.
+- **Add transaction:** a persistent line at the bottom of the account ledger, opening an empty
+  transaction editor.
+
+**Still open.** The proposals stand as defaults unless changed:
+
+1. **Marking money accounts:** explicit metadata (`money`, `display-name`, `institution`;
    proposed), or derived from where the account sits?
-4. **Account names:** is the derived path (`Assets:Bank:PNC-Checking`) right, and should it be
+2. **Account names:** is the derived path (`Assets:Bank:PNC-Checking`) right, and should it be
    editable in the add-account flow, or hidden behind the display name?
-5. **Manage books in M1:** just list and rename (proposed), or also create and delete?
-6. **The review queue:** imported transactions land there for now. Should the menu include
-   **Review** (proposed), or should reviewing move into the account ledger?
-7. **Match candidates:** the spec stops at "returns a ranked array". What happens next:
-   - auto-link the top candidate above some confidence, or always ask?
-   - what does linking mean: the imported row confirms the existing transaction and is dropped,
-     or the two are merged?
-   - what does the import results screen show?
-8. **Matching window:** ±5 days (proposed)?
-9. **CSV fields:** besides date, amount (signed, or debit/credit) and description, should profiles
+3. **Manage books in M1:** just list and rename (proposed), or also create and delete?
+4. **Matching window:** ±5 days (proposed)?
+5. **CSV fields:** besides date, amount (signed, or debit/credit) and description, should profiles
    capture a bank transaction ID and a running balance? A running balance could feed balance
    checks.
-10. **Duplicate rows:** skip rows whose fingerprint was already imported (proposed), or show them
-    as duplicates for confirmation?
-11. **The add-transaction flow:** it's in the milestone but not the spec yet. Where does it start
-    (the home page, the account ledger, or both), and what does it ask for?
-12. **Sessions:** a 30-day JWT with no refresh until M6 (proposed)?
+6. **Duplicate rows:** skip rows whose fingerprint was already imported (proposed), or show them
+   as duplicates for confirmation?
+7. **Sessions:** a 30-day JWT with no refresh until M6 (proposed)?

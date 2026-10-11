@@ -64,9 +64,9 @@ The foundations and the review queue are done. See [docs/PLAN.md](docs/PLAN.md) 
 M1 is being specified and planned: [SPEC.md](docs/milestones/m1-one-account-e2e/SPEC.md) and
 [PLAN.md](docs/milestones/m1-one-account-e2e/PLAN.md).
 
-1. Finish the M1 spec (it's marked "to be continued").
-2. Answer the M1 plan's [questions](docs/milestones/m1-one-account-e2e/PLAN.md#questions) and fold
-   the answers into the plan.
+1. Finish the M1 spec (it's marked "to be continued"). Acting on matches is deliberately deferred.
+2. The plan's [remaining questions](docs/milestones/m1-one-account-e2e/PLAN.md#questions) are
+   open, but their proposals stand as defaults, so they don't block starting.
 3. Start slice 1: `packages/db`, the TypeScript migration framework.
 
 ## Gotchas

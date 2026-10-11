@@ -25,18 +25,21 @@ added by hand during setup, for the whole flow.
   - **Name your books,** e.g. "Kael Personal" or "Kael and Jess".
   - **Add some accounts.** For this milestone, just one, added by hand, and used for the whole
     flow.
+- **Adding an account asks for its current balance and an as-of date,** recorded as an opening
+  balance, so the account starts out correct.
 
 ## Navigation
 
-- After setup, the user sees a **hamburger menu** with **Home** and **Manage books**, and lands
-  on the home page.
+- After setup, the user sees a **hamburger menu** with **Home**, **Manage books** and **Review**
+  (imported transactions land in the review queue), and lands on the home page.
 
 ## Home page
 
 - Shows the user's **active accounts as cards**, each with:
   - the account name
   - the balance
-  - a "last updated at: (datetime)" line
+  - a "last updated at: (datetime)" line: the time of the account's **last import** (later, its
+    last sync with SimpleFIN)
 - Has a quick link to **"import transactions"**.
 
 ## Account ledger
@@ -47,6 +50,8 @@ added by hand during setup, for the whole flow.
 - **Simple two-split transactions** show the account of the other split on the transaction line.
 - **Multi-split transactions** show `<multiple>` in the account cell.
 - Either kind opens the **transaction details editor** on click.
+- **Adding a transaction:** a persistent line at the bottom of the account ledger. Clicking it
+  brings up an empty transaction editor.
 
 ## Importing transactions (CSV)
 
@@ -58,5 +63,12 @@ added by hand during setup, for the whole flow.
 - The imported batch is sent through the **processing pipeline**, which for now has only
   **matching**.
 - **Matching** is by amount and date, and returns a **ranked array of candidates**.
+- **For M1, build only the mechanics of identifying and ranking matches.** What happens to
+  matches has many more details to work out, and will be come back to. Notes so far:
+  - The strongest candidate wins; ties are broken arbitrarily.
+  - Ranked matches should be attached to a transaction somehow, so the review queue can show the
+    options. Matches are cleared on confirm.
+  - If there's only one clear winner, it's chosen without presenting the other options.
+  - A matched transaction should just fall out of the import.
 
 _To be continued._
