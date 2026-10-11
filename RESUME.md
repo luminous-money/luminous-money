@@ -61,7 +61,13 @@ The foundations and the review queue are done. See [docs/PLAN.md](docs/PLAN.md) 
 
 ## Next steps
 
-`elaborate plan for M1`
+M1 is being specified and planned: [SPEC.md](docs/milestones/m1-one-account-e2e/SPEC.md) and
+[PLAN.md](docs/milestones/m1-one-account-e2e/PLAN.md).
+
+1. Finish the M1 spec (it's marked "to be continued").
+2. Answer the M1 plan's [questions](docs/milestones/m1-one-account-e2e/PLAN.md#questions) and fold
+   the answers into the plan.
+3. Start slice 1: `packages/db`, the TypeScript migration framework.
 
 ## Gotchas
 

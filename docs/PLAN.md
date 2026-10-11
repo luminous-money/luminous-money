@@ -44,7 +44,8 @@ Each milestone's detailed plan lives in `milestones/<milestone>/PLAN.md` next to
 [milestones/m1-one-account-e2e](milestones/m1-one-account-e2e/PLAN.md)), written when the
 milestone starts.
 
-- [ ] **M1: One bank account end-to-end.**
+- [ ] **M1: One bank account end-to-end.** _In progress:_
+      [spec](milestones/m1-one-account-e2e/SPEC.md), [plan](milestones/m1-one-account-e2e/PLAN.md).
   - the "brand new empty user" homepage
   - the add-an-account flow
   - the homepage with accounts
