@@ -40,6 +40,10 @@ Two principles set the order:
 
 ## Milestones
 
+Each milestone's detailed plan lives in `docs/milestones/<milestone>/PLAN.md` (e.g.
+[docs/milestones/m1-one-account-e2e](docs/milestones/m1-one-account-e2e/PLAN.md)), written when the
+milestone starts.
+
 - [ ] **M1: One bank account end-to-end.**
   - the "brand new empty user" homepage
   - the add-an-account flow
