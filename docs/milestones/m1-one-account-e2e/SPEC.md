@@ -64,7 +64,7 @@ added by hand during setup, for the whole flow.
   **matching**.
 - **Matching** is by amount and date, and returns a **ranked array of candidates**.
 - **For M1, build only the mechanics of identifying and ranking matches.** What happens to
-  matches has many more details to work out, and will be come back to. Notes so far:
+  matches has many more details to work out, to be revisited. Notes so far:
   - The strongest candidate wins; ties are broken arbitrarily.
   - Ranked matches should be attached to a transaction somehow, so the review queue can show the
     options. Matches are cleared on confirm.
