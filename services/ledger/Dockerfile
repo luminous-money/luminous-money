@@ -32,6 +32,9 @@ COPY --from=openapi-build /openapi.json /
 
 FROM base AS runtime
 ENV LEDGER_DATA_DIR=/data
+# The same UID as the other services' `node` user, so all of them can share the data volume.
+RUN useradd --uid 1000 --create-home ledger && mkdir /data && chown ledger:ledger /data
+USER ledger
 VOLUME /data
 EXPOSE 8000
 CMD ["uvicorn", "ledger.api:from_env", "--factory", "--host", "0.0.0.0", "--port", "8000"]

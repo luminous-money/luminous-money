@@ -53,3 +53,10 @@ def test_the_cli_prints_a_ledger():
 
     assert 'source: "demo-import"' in out
     assert f"open {demo.UNCATEGORIZED}" in out
+
+
+def test_the_demo_has_a_title_and_a_money_account(ledger, history):
+    ledger.apply_text("demo", demo.demo_ledger(history, staged_days=21, today=TODAY))
+
+    assert ledger.book("demo").name == "Demo"
+    assert [(a.name, a.display_name) for a in ledger.money_accounts("demo")] == [(demo.MONEY_ACCOUNT, "BofA Checking")]

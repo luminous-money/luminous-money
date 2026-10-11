@@ -2,8 +2,13 @@
 import {
   createLedgerClient,
   type Account,
+  type Book,
   type components,
+  type LedgerPage,
+  type MoneyAccount,
+  type MoneyAccountIn,
   type Transaction,
+  type TransactionIn,
 } from "@fava-beans/ledger-client";
 
 export const ledger = createLedgerClient({ baseUrl: window.location.origin });
@@ -28,7 +33,7 @@ export class ApiError extends Error {
 type Result<T> = { data?: T; error?: unknown; response: Response };
 
 /** Unwrap a client call, turning API errors into readable exceptions. */
-async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
+export async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
   const { data, error, response } = await call;
   if (response.ok && data !== undefined) return data;
   throw new ApiError(
@@ -49,7 +54,46 @@ function describe(error: unknown): string | undefined {
 }
 
 export const api = {
-  books: () => unwrap(ledger.GET("/api/ledger/v1/books")),
+  books: (): Promise<Book[]> => unwrap(ledger.GET("/api/ledger/v1/books")),
+
+  createBook: (name: string): Promise<Book> =>
+    unwrap(ledger.POST("/api/ledger/v1/books", { body: { name } })),
+
+  renameBook: (book_id: string, name: string, version: string): Promise<Book> =>
+    unwrap(
+      ledger.PATCH("/api/ledger/v1/books/{book_id}", {
+        params: { path: { book_id } },
+        body: { name, updated_at: version },
+      })
+    ),
+
+  moneyAccounts: (book_id: string): Promise<MoneyAccount[]> =>
+    unwrap(
+      ledger.GET("/api/ledger/v1/books/{book_id}/money-accounts", { params: { path: { book_id } } })
+    ),
+
+  createMoneyAccount: (book_id: string, body: MoneyAccountIn): Promise<MoneyAccount> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/money-accounts", {
+        params: { path: { book_id } },
+        body,
+      })
+    ),
+
+  accountLedger: (book_id: string, account: string, cursor?: string): Promise<LedgerPage> =>
+    unwrap(
+      ledger.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/ledger", {
+        params: { path: { book_id, account }, query: { cursor, limit: 200 } },
+      })
+    ),
+
+  createTransaction: (book_id: string, body: TransactionIn): Promise<Transaction> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+        params: { path: { book_id } },
+        body,
+      })
+    ),
 
   accounts: (book_id: string): Promise<Account[]> =>
     unwrap(

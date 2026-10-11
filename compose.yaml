@@ -21,6 +21,19 @@ services:
         target: /etc/traefik/routes.yml
     deploy: *restart
 
+  # Every service keeps its database on the one data volume (ledger.sqlite, auth.sqlite,
+  # app.sqlite), so backing up the volume backs up everything. All run as UID 1000.
+  auth:
+    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/auth:${FAVA_BEANS_VERSION:-dev}
+    environment:
+      # Signs session tokens. Set your own (32+ characters) before exposing the stack.
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-insecure-development-secret-change-me-0123456789}
+      # Test stacks only: lets `login` take an email and log in a separate user for it.
+      AUTH_TEST_USERS: ${AUTH_TEST_USERS:-false}
+    volumes:
+      - data:/data
+    deploy: *restart
+
   ledger:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/ledger:${FAVA_BEANS_VERSION:-dev}
     volumes:
@@ -29,6 +42,10 @@ services:
 
   app:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/app:${FAVA_BEANS_VERSION:-dev}
+    environment:
+      LEDGER_URL: http://ledger:8000
+    volumes:
+      - data:/data
     deploy: *restart
 
 configs:

@@ -1,0 +1,83 @@
+"""Books belong to users: each user sees and touches only their own."""
+
+from conftest import FEATURES, USER, http
+
+from ledger import engine
+
+OTHER = "user-2"
+
+
+def test_a_named_book_gets_a_generated_id_and_its_name_as_its_title(ledger):
+    client = http(ledger)
+
+    created = client.post("/api/ledger/v1/books", json={"name": 'Kael & Jess "Shared"'})
+
+    book = created.json()
+    assert created.status_code == 201
+    assert book["name"] == 'Kael & Jess "Shared"'
+    assert len(book["id"]) == 32
+    assert 'option "title" "Kael & Jess \\"Shared\\""' in client.get(f"/api/ledger/v1/books/{book['id']}/export").text
+
+
+def test_users_see_only_their_own_books(ledger):
+    mine = http(ledger).post("/api/ledger/v1/books", json={"name": "Mine"}).json()
+    theirs = http(ledger, OTHER).post("/api/ledger/v1/books", json={"name": "Theirs"}).json()
+
+    assert [b["name"] for b in http(ledger).get("/api/ledger/v1/books").json()] == ["Mine"]
+    assert [b["name"] for b in http(ledger, OTHER).get("/api/ledger/v1/books").json()] == ["Theirs"]
+    assert http(ledger).get(f"/api/ledger/v1/books/{mine['id']}").status_code == 200
+
+
+def test_someone_elses_book_answers_as_if_it_did_not_exist(ledger):
+    theirs = http(ledger, OTHER).post("/api/ledger/v1/books", json={"name": "Theirs"}).json()["id"]
+    me = http(ledger)
+
+    for response in (
+        me.get(f"/api/ledger/v1/books/{theirs}"),
+        me.get(f"/api/ledger/v1/books/{theirs}/accounts"),
+        me.get(f"/api/ledger/v1/books/{theirs}/transactions"),
+        me.get(f"/api/ledger/v1/books/{theirs}/export"),
+        me.post(f"/api/ledger/v1/books/{theirs}/import", content="; hello\n", headers={"content-type": "text/plain"}),
+        me.patch(f"/api/ledger/v1/books/{theirs}", json={"name": "Mine now", "updated_at": "x"}),
+    ):
+        assert response.status_code == 404, response.request.url
+
+
+def test_every_route_needs_a_user(ledger):
+    anonymous = http(ledger, None)
+
+    assert anonymous.get("/api/ledger/v1/books").status_code == 401
+    assert anonymous.get("/api/ledger/v1/backup").status_code == 401
+
+
+def test_renaming_is_versioned_and_changes_the_title(ledger):
+    client = http(ledger)
+    book = client.post("/api/ledger/v1/books", json={"name": "Kael"}).json()
+
+    renamed = client.patch(f"/api/ledger/v1/books/{book['id']}", json={"name": "Kael Personal", "updated_at": book["updated_at"]})
+    stale = client.patch(f"/api/ledger/v1/books/{book['id']}", json={"name": "Nope", "updated_at": book["updated_at"]})
+
+    assert renamed.json()["name"] == "Kael Personal"
+    assert renamed.json()["updated_at"] > book["updated_at"]
+    assert stale.status_code == 409
+    assert engine.book_title(ledger.store.header(book["id"])) == "Kael Personal"
+
+
+def test_importing_into_a_new_book_makes_the_caller_its_owner(ledger):
+    with open(FEATURES) as f:
+        text = f.read().replace('include "features-prices.beancount"\n', "")
+
+    http(ledger).post("/api/ledger/v1/books/imported/import", content=text, headers={"content-type": "text/plain"})
+
+    assert ledger.owns("imported", USER)
+    assert [b["name"] for b in http(ledger).get("/api/ledger/v1/books").json()] == ["Feature fixture"]
+
+
+def test_backups_carry_only_the_callers_books(ledger):
+    http(ledger).post("/api/ledger/v1/books", json={"name": "Mine"})
+    http(ledger, OTHER).post("/api/ledger/v1/books", json={"name": "Theirs"})
+
+    chunks = http(ledger).get("/api/ledger/v1/backup").json()["chunks"]
+
+    assert len(chunks) == 1
+    assert '"Mine"' in next(iter(chunks.values()))

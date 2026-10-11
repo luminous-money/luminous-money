@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import hashlib
+import re
 import subprocess
 import sys
 
@@ -35,8 +36,15 @@ def generate(years: int, seed: int, today: datetime.date) -> str:
     ).stdout
 
 
+#: The demo's money account, so the home page has something to show.
+MONEY_ACCOUNT = "Assets:US:BofA:Checking"
+MONEY_META = '  money: "bank"\n  display-name: "BofA Checking"\n  institution: "Bank of America"\n'
+
+
 def demo_ledger(history: str, staged_days: int, today: datetime.date) -> str:
-    """Stage the recent purchases in `history` (a Beancount ledger) and return the new ledger."""
+    """Stage the recent purchases in `history` (a Beancount ledger) and return the new ledger,
+    titled "Demo", with its checking account marked as a money account."""
+    history = re.sub(rf"^(\d{{4}}-\d\d-\d\d open {re.escape(MONEY_ACCOUNT)}\b.*\n)", rf"\1{MONEY_META}", history, count=1, flags=re.M)
     parsed = engine.parse_text(history)
     since = today - datetime.timedelta(days=staged_days)
     first = min(d.date for d in parsed.directives)
@@ -48,7 +56,7 @@ def demo_ledger(history: str, staged_days: int, today: datetime.date) -> str:
             if is_purchase(transaction):
                 directive = engine.transaction_directive(stage(directive.id, transaction), directive.id)
         texts.append(directive.text)
-    return engine.render(parsed.header, texts)
+    return engine.render(engine.with_title(parsed.header, "Demo"), texts)
 
 
 def is_purchase(t: models.TransactionIn) -> bool:

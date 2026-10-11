@@ -9,7 +9,38 @@ import { createLedgerClient, type TransactionIn } from "@fava-beans/ledger-clien
 
 export const BASE_URL = process.env.FAVA_BEANS_URL ?? "http://localhost:8080";
 
+/**
+ * A session for the suite: logged in once, lazily, as the stub user. Every ledger call carries
+ * it as a Bearer token; `authed` does the same for plain fetches.
+ */
+let session: Promise<string> | undefined;
+
+export function token(): Promise<string> {
+  session ??= fetch(`${BASE_URL}/api/auth/v1/login`, { method: "POST" })
+    .then(async (response) => {
+      assert.equal(response.status, 200);
+      return ((await response.json()) as { token: string }).token;
+    })
+    .catch((error: unknown) => {
+      session = undefined;
+      throw error;
+    });
+  return session;
+}
+
+export async function authed(url: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  headers.set("authorization", `Bearer ${await token()}`);
+  return fetch(url, { ...init, headers });
+}
+
 export const ledger = createLedgerClient({ baseUrl: BASE_URL });
+ledger.use({
+  async onRequest({ request }) {
+    request.headers.set("authorization", `Bearer ${await token()}`);
+    return request;
+  },
+});
 
 /**
  * Request options for the endpoints that take Beancount text (import, raw directives, BQL).
@@ -48,7 +79,7 @@ export async function eventually<T>(
 export async function stackIsUp(): Promise<void> {
   await eventually(
     async () => {
-      const response = await fetch(`${BASE_URL}/api/ledger/v1/books`);
+      const response = await authed(`${BASE_URL}/api/ledger/v1/books`);
       assert.equal(response.status, 200);
     },
     { timeoutMs: 60_000 }

@@ -21,7 +21,7 @@ import datetime
 import os
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, FastAPI, Query
+from fastapi import APIRouter, Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from . import engine, models
@@ -45,12 +45,38 @@ class Filters:
         self.values = dict(account=account, flag=flag, date_from=date_from, date_to=date_to, limit=limit)
 
 
+def current_user(x_user_id: Annotated[str | None, Header(include_in_schema=False)] = None) -> str:
+    """The caller, from X-User-Id. Traefik sets it after checking the session with the auth
+    service, and this service is only reachable through Traefik. (Kept out of the published
+    schema: clients never send it themselves.)"""
+    if not x_user_id:
+        raise HTTPException(401, "not logged in")
+    return x_user_id
+
+
+User = Annotated[str, Depends(current_user)]
+
+
+def owned_book(book_id: str, user: User, request: Request) -> str:
+    """The book in the path, if the caller owns it. Anyone else gets 404, as if it didn't exist."""
+    if not request.app.state.ledger.owns(book_id, user):
+        raise NotFound(book_id)
+    return book_id
+
+
+OwnedBook = Annotated[str, Depends(owned_book)]
+
+
 def create_app(ledger: Ledger) -> FastAPI:
+    """Every route needs the caller's user ID (see `current_user`); book routes answer only for
+    books the caller owns (see `owned_book`)."""
+
     app = FastAPI(
         title="fava-beans ledger",
         docs_url="/api/ledger/v1/docs",
         openapi_url="/api/ledger/v1/openapi.json",
     )
+    app.state.ledger = ledger
     api = APIRouter(prefix="/api/ledger/v1")
 
     @app.exception_handler(NotFound)
@@ -72,75 +98,114 @@ def create_app(ledger: Ledger) -> FastAPI:
     # Books
 
     @api.get("/books")
-    def books() -> list[str]:
-        return ledger.books()
+    def books(user: User) -> list[models.Book]:
+        return ledger.books(user)
+
+    @api.post("/books", status_code=201)
+    def create_named_book(book: models.BookIn, user: User) -> models.Book:
+        return ledger.create_book(name=book.name, owner_id=user)
 
     @api.put("/books/{book_id}", status_code=201)
-    def create_book(book_id: str) -> models.Book:
-        ledger.create_book(book_id)
-        return models.Book(id=book_id)
+    def create_book(book_id: str, user: User) -> models.Book:
+        return ledger.create_book(book_id, owner_id=user)
+
+    @api.get("/books/{book_id}")
+    def get_book(book_id: OwnedBook) -> models.Book:
+        return ledger.book(book_id)
+
+    @api.patch("/books/{book_id}", responses={409: {"description": "Stale version"}})
+    def rename_book(book_id: OwnedBook, patch: models.BookPatch) -> models.Book:
+        return ledger.rename_book(book_id, patch.name, expected=patch.updated_at)
 
     @api.post("/books/{book_id}/import")
-    def import_text(book_id: str, text: BeancountText) -> models.Applied:
-        applied = ledger.apply_text(book_id, text)
+    def import_text(book_id: str, text: BeancountText, user: User) -> models.Applied:
+        """Apply Beancount text. Creates the book, owned by the caller, if it doesn't exist."""
+        if ledger.store.book(book_id) is not None and not ledger.owns(book_id, user):
+            raise NotFound(book_id)
+        applied = ledger.apply_text(book_id, text, owner_id=user)
         return models.Applied(put=applied.put, deleted=applied.deleted)
 
     @api.get("/books/{book_id}/export", response_class=PlainTextResponse)
-    def export(book_id: str) -> str:
+    def export(book_id: OwnedBook) -> str:
         return ledger.export(book_id)
 
     @api.get("/books/{book_id}/accounts")
-    def accounts(book_id: str) -> list[models.Account]:
+    def accounts(book_id: OwnedBook) -> list[models.Account]:
         return ledger.accounts(book_id)
 
     @api.post("/books/{book_id}/accounts", status_code=201)
-    def create_account(book_id: str, account: models.AccountIn) -> models.Account:
+    def create_account(book_id: OwnedBook, account: models.AccountIn) -> models.Account:
         return ledger.create_account(book_id, account)
+
+    # Money accounts and account ledgers
+
+    @api.get("/books/{book_id}/money-accounts")
+    def money_accounts(book_id: OwnedBook) -> list[models.MoneyAccount]:
+        return ledger.money_accounts(book_id)
+
+    @api.post("/books/{book_id}/money-accounts", status_code=201)
+    def create_money_account(book_id: OwnedBook, account: models.MoneyAccountIn) -> models.MoneyAccount:
+        return ledger.create_money_account(book_id, account)
+
+    @api.get("/books/{book_id}/accounts/{account}/ledger")
+    def account_ledger(
+        book_id: OwnedBook,
+        account: str,
+        cursor: str | None = None,
+        limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+    ) -> models.LedgerPage:
+        return ledger.account_ledger(book_id, account, cursor=cursor, limit=limit)
 
     # Transactions, as JSON
 
+    @api.post("/books/{book_id}/transactions/batch", status_code=201)
+    def create_transactions(book_id: OwnedBook, batch: list[models.TransactionIn]) -> list[models.Transaction]:
+        """Create many transactions in one atomic write: all of them, or none."""
+        created = ledger.create_transactions(book_id, batch)
+        return [ledger.transaction(book_id, d.id) for d in created]
+
     @api.get("/books/{book_id}/transactions")
-    def list_transactions(book_id: str, filters: Annotated[Filters, Depends()]) -> list[models.Transaction]:
+    def list_transactions(book_id: OwnedBook, filters: Annotated[Filters, Depends()]) -> list[models.Transaction]:
         return ledger.transactions(book_id, **filters.values)
 
     @api.post("/books/{book_id}/transactions", status_code=201)
-    def create_transaction(book_id: str, transaction: models.TransactionIn) -> models.Transaction:
+    def create_transaction(book_id: OwnedBook, transaction: models.TransactionIn) -> models.Transaction:
         return ledger.transaction(book_id, ledger.create_transaction(book_id, transaction).id)
 
     @api.get("/books/{book_id}/transactions/{directive_id}")
-    def get_transaction(book_id: str, directive_id: str) -> models.Transaction:
+    def get_transaction(book_id: OwnedBook, directive_id: str) -> models.Transaction:
         return ledger.transaction(book_id, directive_id)
 
     @api.put("/books/{book_id}/transactions/{directive_id}", responses={409: {"description": "Stale version"}})
     def replace_transaction(
-        book_id: str, directive_id: str, transaction: models.TransactionUpdate
+        book_id: OwnedBook, directive_id: str, transaction: models.TransactionUpdate
     ) -> models.Transaction:
         body = models.TransactionIn.model_validate(transaction.model_dump(exclude={"updated_at"}))
         ledger.update_transaction(book_id, directive_id, body, expected=transaction.updated_at)
         return ledger.transaction(book_id, directive_id)
 
     @api.patch("/books/{book_id}/transactions/{directive_id}", responses={409: {"description": "Stale version"}})
-    def patch_transaction(book_id: str, directive_id: str, patch: models.TransactionPatch) -> models.Transaction:
+    def patch_transaction(book_id: OwnedBook, directive_id: str, patch: models.TransactionPatch) -> models.Transaction:
         ledger.patch_transaction(book_id, directive_id, patch)
         return ledger.transaction(book_id, directive_id)
 
     # Any directive, as Beancount text
 
     @api.get("/books/{book_id}/directives")
-    def list_directives(book_id: str, filters: Annotated[Filters, Depends()]) -> list[models.Directive]:
+    def list_directives(book_id: OwnedBook, filters: Annotated[Filters, Depends()]) -> list[models.Directive]:
         return [_row(r) for r in ledger.store.find(book_id, **filters.values)]
 
     @api.post("/books/{book_id}/directives", status_code=201)
-    def create_directive(book_id: str, text: BeancountText) -> models.Directive:
+    def create_directive(book_id: OwnedBook, text: BeancountText) -> models.Directive:
         return _row(ledger.get(book_id, ledger.create(book_id, text).id))
 
     @api.get("/books/{book_id}/directives/{directive_id}")
-    def get_directive(book_id: str, directive_id: str) -> models.Directive:
+    def get_directive(book_id: OwnedBook, directive_id: str) -> models.Directive:
         return _row(ledger.get(book_id, directive_id))
 
     @api.put("/books/{book_id}/directives/{directive_id}", responses={409: {"description": "Stale version"}})
     def update_directive(
-        book_id: str, directive_id: str, text: BeancountText, updated_at: VersionParam
+        book_id: OwnedBook, directive_id: str, text: BeancountText, updated_at: VersionParam
     ) -> models.Directive:
         ledger.update(book_id, directive_id, text, expected=updated_at)
         return _row(ledger.get(book_id, directive_id))
@@ -150,25 +215,26 @@ def create_app(ledger: Ledger) -> FastAPI:
         status_code=204,
         responses={409: {"description": "Stale version"}},
     )
-    def delete_directive(book_id: str, directive_id: str, updated_at: VersionParam) -> None:
+    def delete_directive(book_id: OwnedBook, directive_id: str, updated_at: VersionParam) -> None:
         ledger.delete(book_id, directive_id, expected=updated_at)
 
     # The engine
 
     @api.get("/books/{book_id}/problems")
-    def problems(book_id: str) -> list[models.Problem]:
+    def problems(book_id: OwnedBook) -> list[models.Problem]:
         return [models.Problem(message=p.message, directive_id=p.directive_id) for p in ledger.problems(book_id)]
 
     @api.post("/books/{book_id}/query")
-    def query(book_id: str, bql: BeancountText) -> models.QueryResult:
+    def query(book_id: OwnedBook, bql: BeancountText) -> models.QueryResult:
         columns, rows = ledger.query(book_id, bql)
         return models.QueryResult(columns=columns, rows=rows)
 
     # Backups
 
     @api.get("/backup")
-    def backup(since: int = 0) -> models.Backup:
-        b = ledger.backup(since)
+    def backup(user: User, since: int = 0) -> models.Backup:
+        """The caller's books, changed since `since`."""
+        b = ledger.backup(since, books=ledger.store.books(user))
         return models.Backup(since=b.since, cursor=b.cursor, chunks=b.chunks)
 
     app.include_router(api)

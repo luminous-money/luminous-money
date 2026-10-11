@@ -1,7 +1,6 @@
 import pytest
-from fastapi.testclient import TestClient
+from conftest import http
 
-from ledger.api import create_app
 
 LEDGER = """\
 option "operating_currency" "USD"
@@ -15,7 +14,7 @@ TEXT = {"content-type": "text/plain"}
 
 @pytest.fixture
 def client(ledger):
-    return TestClient(create_app(ledger))
+    return http(ledger)
 
 
 def test_review_flow_over_http(client):

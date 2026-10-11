@@ -8,33 +8,191 @@
  * version has moved on elsewhere (another tab or device), the edit is refused (409) and the data
  * is refetched.
  */
-import type { Account, Transaction } from "@fava-beans/ledger-client";
-import { QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  Account,
+  Book,
+  MoneyAccountIn,
+  Transaction,
+  TransactionIn,
+} from "@fava-beans/ledger-client";
+import {
+  MutationCache,
+  QueryCache,
+  QueryClient,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import type { AccountCreation } from "../components/AccountPicker.js";
+import { appApi, type CsvProfile } from "./appApi.js";
 import { api, ApiError, type AccountKind, type TransactionChanges } from "./ledger.js";
+import { logIn, logOut, me, type User } from "./session.js";
+
+/** A 401 from anywhere means the session is over: forget the user, and the app shows login. */
+const onError = (error: unknown) => {
+  if (error instanceof ApiError && error.status === 401) queryClient.setQueryData(keys.me, null);
+};
 
 export const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 10_000, retry: 1 } },
+  defaultOptions: {
+    queries: {
+      staleTime: 10_000,
+      retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 1,
+    },
+  },
+  queryCache: new QueryCache({ onError }),
+  mutationCache: new MutationCache({ onError }),
 });
 
 export const keys = {
+  me: ["me"] as const,
   books: ["books"] as const,
   book: (book: string) => ["book", book] as const,
   accounts: (book: string) => ["book", book, "accounts"] as const,
+  money: (book: string) => ["book", book, "money"] as const,
+  lastImports: (book: string) => ["book", book, "last-imports"] as const,
+  ledger: (book: string, account: string) => ["book", book, "ledger", account] as const,
+  profile: (book: string, account: string) => ["book", book, "profile", account] as const,
   queue: (book: string) => ["book", book, "queue"] as const,
   transaction: (book: string, id: string) => ["book", book, "transaction", id] as const,
 };
 
-export type BookSummary = { id: string; staged: number };
+// Session
+
+export function useMe() {
+  return useQuery({ queryKey: keys.me, queryFn: me, staleTime: Infinity });
+}
+
+/** A new session (or none): forget everything cached for the old one, but keep the session
+ * query itself, which the app is watching (removing it would leave the app watching a query
+ * nothing updates any more). */
+function switchSession(client: QueryClient, user: User | null) {
+  client.removeQueries({ predicate: (query) => query.queryKey[0] !== keys.me[0] });
+  client.setQueryData(keys.me, user);
+}
+
+export function useLogIn() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: logIn,
+    onSuccess: (user: User) => switchSession(client, user),
+  });
+}
+
+export function useLogOut() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: logOut,
+    onSuccess: () => switchSession(client, null),
+  });
+}
+
+// Books
 
 export function useBooks() {
-  return useQuery({
-    queryKey: keys.books,
-    queryFn: async (): Promise<BookSummary[]> => {
-      const books = await api.books();
-      return Promise.all(books.map(async (id) => ({ id, staged: (await api.staged(id)).length })));
+  return useQuery({ queryKey: keys.books, queryFn: api.books });
+}
+
+/** The book the app shows. M1 users have exactly one; M7 makes this a choice. */
+export function useCurrentBook(): { book: Book | undefined; loading: boolean } {
+  const books = useBooks();
+  return { book: books.data?.[0], loading: books.isPending };
+}
+
+export function useCreateBook() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => api.createBook(name),
+    onSuccess: (book) =>
+      client.setQueryData<Book[]>(keys.books, (books) => [...(books ?? []), book]),
+  });
+}
+
+export function useRenameBook() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ book, name }: { book: Book; name: string }) =>
+      api.renameBook(book.id, name, book.updated_at),
+    onSuccess: (renamed) =>
+      client.setQueryData<Book[]>(keys.books, (books) =>
+        books?.map((b) => (b.id === renamed.id ? renamed : b))
+      ),
+    onError: (error) => {
+      if (error instanceof ApiError && error.conflict)
+        void client.invalidateQueries({ queryKey: keys.books });
     },
+  });
+}
+
+// Money accounts, ledgers and imports
+
+export function useMoneyAccounts(book: string | undefined) {
+  return useQuery({
+    queryKey: keys.money(book ?? ""),
+    queryFn: () => api.moneyAccounts(book!),
+    enabled: !!book,
+  });
+}
+
+export function useCreateMoneyAccount(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (account: MoneyAccountIn) => api.createMoneyAccount(book, account),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+export function useLastImports(book: string | undefined) {
+  return useQuery({
+    queryKey: keys.lastImports(book ?? ""),
+    queryFn: () => appApi.lastImports(book!),
+    enabled: !!book,
+  });
+}
+
+/** An account's ledger, newest first, 200 transactions a page, more as you scroll. */
+export function useAccountLedger(book: string, account: string) {
+  return useInfiniteQuery({
+    queryKey: keys.ledger(book, account),
+    queryFn: ({ pageParam }) => api.accountLedger(book, account, pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
+  });
+}
+
+export function useCreateTransaction(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (transaction: TransactionIn) => api.createTransaction(book, transaction),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+export function useProfile(book: string, account: string | undefined) {
+  return useQuery({
+    queryKey: keys.profile(book, account ?? ""),
+    queryFn: () => appApi.profile(book, account!),
+    enabled: !!account,
+  });
+}
+
+export function useSaveProfile(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ account, profile }: { account: string; profile: CsvProfile }) =>
+      appApi.saveProfile(book, account, profile),
+    onSuccess: (profile, { account }) => client.setQueryData(keys.profile(book, account), profile),
+  });
+}
+
+export function useImport(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ account, file }: { account: string; file: File }) =>
+      appApi.importFile(book, account, file),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
   });
 }
 
@@ -68,7 +226,8 @@ function remember(book: string, saved: Transaction) {
   queryClient.setQueryData<Transaction[]>(keys.queue(book), (queue) =>
     queue?.flatMap((t) => (t.id !== saved.id ? [t] : saved.flag === "!" ? [saved] : []))
   );
-  void queryClient.invalidateQueries({ queryKey: keys.books });
+  void queryClient.invalidateQueries({ queryKey: keys.money(book) });
+  void queryClient.invalidateQueries({ queryKey: ["book", book, "ledger"] });
 }
 
 export function useEditTransaction(book: string, id: string) {

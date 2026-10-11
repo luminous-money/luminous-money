@@ -19,6 +19,11 @@ export type Directive = Schemas["Directive"];
 export type Problem = Schemas["Problem"];
 export type Account = Schemas["Account"];
 export type Cost = Schemas["Cost"];
+export type Book = Schemas["Book"];
+export type MoneyAccount = Schemas["MoneyAccount"];
+export type MoneyAccountIn = Schemas["MoneyAccountIn"];
+export type LedgerPage = Schemas["LedgerPage"];
+export type LedgerRow = Schemas["LedgerRow"];
 export type Backup = Schemas["Backup"];
 
 export function createLedgerClient(options: ClientOptions) {

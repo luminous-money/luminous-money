@@ -1,6 +1,17 @@
 # app
 
-The review app: the PWA under `/ui` and the app API under `/api/app/v1`.
+The PWA under `/ui`, and the app API under `/api/app/v1`: CSV profiles and imports, run through
+the processing pipeline (`src/server/pipeline`), with import history in `app.sqlite`.
+
+| Route (under `/api/app/v1/books/{book}`) | What it does |
+|---|---|
+| `GET`/`PUT /profiles/{account}` | An account's CSV profile. |
+| `POST /imports` | Import a file (multipart: `account`, `file`). 409 with a `code` if the account needs a profile, or the file doesn't fit it. |
+| `GET /imports`, `GET /imports/{batch}` | Import history, and one batch's rows with their outcomes and candidates. |
+| `GET /imports/latest` | Each account's last import time. |
+
+Every route needs `X-User-Id` (Traefik sets it), and acts as that user toward the ledger, so a
+book they don't own answers 404.
 
 - **The PWA** (`src/web`) is React + Vite, made installable by `vite-plugin-pwa` (web app
   manifest and service worker). It talks to the other services through the same origin, using

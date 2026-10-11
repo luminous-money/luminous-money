@@ -3,12 +3,10 @@
 import datetime
 
 import pytest
-from conftest import FEATURES
-from fastapi.testclient import TestClient
+from conftest import FEATURES, USER, http
 from pydantic import ValidationError
 
 from ledger import engine, models
-from ledger.api import create_app
 
 COFFEE = {
     "date": "2024-03-01",
@@ -63,7 +61,7 @@ SELL = {
 
 @pytest.fixture
 def book(ledger):
-    ledger.apply_file("book", FEATURES)
+    ledger.apply_file("book", FEATURES, owner_id=USER)
     return ledger
 
 
@@ -161,7 +159,7 @@ def test_transactions_written_as_text_read_back_as_json(book):
 
 
 def test_json_api_over_http(book):
-    client = TestClient(create_app(book))
+    client = http(book)
 
     created = client.post("/api/ledger/v1/books/book/transactions", json=COFFEE)
     assert created.status_code == 201

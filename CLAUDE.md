@@ -11,8 +11,9 @@
 - **Before calling a change done, run `pnpm test`, plus `pnpm e2e` if it touches the API, the
   stack, routing or the UI.** UI behavior gets a browser test in `tests/ui`. If the ledger's API
   changed, run `pnpm generate` and commit the result; the check fails otherwise.
-- **Every table is created through `migrations.create_table`** (it adds `created_at` and
-  `updated_at`). A lint check in `pnpm test` enforces it. Schema changes are new migrations,
+- **Every table is created through the migration helper:** `migrations.create_table` in the
+  ledger (Python), `createTable` from `@fava-beans/db` in the TypeScript services. Both add
+  `created_at` and `updated_at`, and lint checks in `pnpm test` enforce it. Schema changes are new migrations,
   never edits to shipped ones.
 - **Every edit is versioned:** the client sends the `updated_at` it read, and the server refuses a
   stale one with 409. Prefer PATCH, so an edit only touches its own fields.

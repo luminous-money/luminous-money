@@ -1,21 +1,41 @@
 import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
 
-import { BASE_URL, stackIsUp } from "./support.ts";
+import { authed, BASE_URL, stackIsUp } from "./support.ts";
 
 describe("routing through Traefik", () => {
   before(stackIsUp);
 
   describe("/api", () => {
     it("routes /api/ledger/v1 to the ledger service", async () => {
-      const response = await fetch(`${BASE_URL}/api/ledger/v1/books`);
+      const response = await authed(`${BASE_URL}/api/ledger/v1/books`);
 
       assert.equal(response.status, 200);
       assert.ok(Array.isArray(await response.json()));
     });
 
+    it("refuses every API but auth's without a session", async () => {
+      for (const path of [
+        "/api/ledger/v1/books",
+        "/api/ledger/v1/openapi.json",
+        "/api/app/v1/health",
+      ]) {
+        assert.equal((await fetch(`${BASE_URL}${path}`)).status, 401, path);
+      }
+      assert.equal((await fetch(`${BASE_URL}/api/auth/v1/me`)).status, 401);
+      assert.equal((await fetch(`${BASE_URL}/api/auth/v1/login`, { method: "POST" })).status, 200);
+    });
+
+    it("ignores a user ID a client tries to send itself", async () => {
+      const spoofed = await fetch(`${BASE_URL}/api/ledger/v1/books`, {
+        headers: { "X-User-Id": "someone-else" },
+      });
+
+      assert.equal(spoofed.status, 401);
+    });
+
     it("serves the ledger's API schema under its prefix", async () => {
-      const schema = await fetch(`${BASE_URL}/api/ledger/v1/openapi.json`);
+      const schema = await authed(`${BASE_URL}/api/ledger/v1/openapi.json`);
       const body = (await schema.json()) as { info: { title: string } };
 
       assert.equal(schema.status, 200);
@@ -23,7 +43,7 @@ describe("routing through Traefik", () => {
     });
 
     it("routes /api/app/v1 to the app service", async () => {
-      const response = await fetch(`${BASE_URL}/api/app/v1/health`);
+      const response = await authed(`${BASE_URL}/api/app/v1/health`);
 
       assert.equal(response.status, 200);
       assert.deepEqual(await response.json(), { status: "ok" });

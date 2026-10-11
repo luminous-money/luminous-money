@@ -19,7 +19,7 @@ describe("books", () => {
 
     assert.equal(created.response.status, 201);
     assert.equal(again.response.status, 409);
-    assert.ok(books?.includes(book_id));
+    assert.ok(books?.some((b) => b.id === book_id));
   });
 
   it("imports Beancount text and exports it back with a stable ID on every directive", async () => {

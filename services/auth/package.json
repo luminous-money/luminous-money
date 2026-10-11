@@ -1,0 +1,28 @@
+{
+  "name": "@fava-beans/auth",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Users and sessions: login, logout, and the verify endpoint behind Traefik's forwardAuth.",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node --disable-warning=ExperimentalWarning dist/main.js",
+    "clean": "rm -Rf ./dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fava-beans/db": "workspace:*",
+    "@hono/node-server": "^2.1.3",
+    "hono": "^4.13.13",
+    "jose": "^6.2.12"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  }
+}

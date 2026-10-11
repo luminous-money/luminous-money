@@ -5,13 +5,18 @@ services:
   traefik:
     ports: !reset []
 
+  # Each test logs in a user of its own, so tests never share books.
+  auth:
+    environment:
+      AUTH_TEST_USERS: "true"
+
   e2e:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/e2e:${FAVA_BEANS_VERSION:-dev}
     profiles: [tests]
-    depends_on: [traefik, ledger, app]
+    depends_on: [traefik, auth, ledger, app]
 
   ui:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/ui-tests:${FAVA_BEANS_VERSION:-dev}
     profiles: [tests]
-    depends_on: [traefik, ledger, app]
+    depends_on: [traefik, auth, ledger, app]
     ipc: host # Chromium needs more shared memory than Docker's default

@@ -6,8 +6,8 @@ A self-hostable, database-driven, double-entry accounting system. It uses
 format, and has a mobile-first app built for fast review and categorization. One server hosts many
 books and handles transactions that span several of them.
 
-> **Status: early build.** The ledger service, the stack and the PWA's review queue are running
-> and tested. Nothing here touches real money yet: the plan is to build and polish the UI against test
+> **Status: early build.** M1 is built: log in, set up a book and a bank account, import its CSV,
+> and work through its ledger and the review queue. Nothing here touches real money yet: the plan is to build and polish the UI against test
 > data first, and only then hydrate with real finances.
 
 - **[RESUME.md](RESUME.md):** where work stands and what to do next. Start here.
@@ -25,11 +25,16 @@ pnpm build           # build every service image (docker buildx bake)
 docker compose up -d # run the stack on http://localhost:8080 (FAVA_BEANS_PORT to change)
 ```
 
-Then open `http://localhost:8080/`, which redirects to the app at `/ui/`.
+Then open `http://localhost:8080/`, which redirects to the app at `/ui/`. **Log in** logs in the
+stub user (real accounts come with M6); `pnpm seed` gives that user a demo book.
+
+Before exposing the stack beyond your machine, set `AUTH_JWT_SECRET` (32+ characters): it signs
+session tokens, and the Compose file only has a development default.
 
 | Path | What |
 |---|---|
 | `/ui/` | The PWA: books, then each book's review queue |
+| `/api/auth/v1/login` | Log in (`POST`); every other API needs the session it starts |
 | `/api/ledger/v1/docs` | The ledger API's interactive docs |
 | `/api/app/v1/health` | The app API |
 
@@ -40,7 +45,7 @@ Then open `http://localhost:8080/`, which redirects to the app at `/ui/`.
 | `pnpm build` | Build every service image for this machine |
 | `pnpm test` | Every test suite and contract check, in Docker (`docker buildx bake test`) |
 | `pnpm e2e` | Build everything and run the end-to-end suites (API and browser) against a throwaway stack |
-| `pnpm e2e:local` | Run both end-to-end suites against an already-running stack |
+| `pnpm e2e:local` | Run both end-to-end suites against an already-running stack (start it with `AUTH_TEST_USERS=true`) |
 | `pnpm test:unit` | The TypeScript unit tests on the host (no Docker) |
 | `pnpm seed [book]` | Seed a demo book with recent purchases staged for review (default book: `demo`) |
 | `pnpm generate` | Regenerate `packages/ledger-client` after changing the ledger's API |
@@ -60,10 +65,13 @@ node.Dockerfile       the shared TypeScript workspace stage, its checks, and the
 deploy/
   traefik/            routing (file provider): /api/* and /ui/*
 services/
+  auth/               TypeScript: users and sessions (a stub user for now) → /api/auth/v1
   ledger/             Python: system of record, Beancount engine      → /api/ledger/v1
-  app/                TypeScript: PWA and app API                      → /ui, /api/app/v1
+  app/                TypeScript: PWA, CSV imports, the pipeline       → /ui, /api/app/v1
 packages/
   ledger-client/      typed client generated from the ledger's OpenAPI schema
+  db/                 SQLite for the TypeScript services: migrations, timestamps, lint
+  csv-import/         bank CSVs: parsing, guessing a profile, reading rows
 tests/
   e2e/                API end-to-end tests through Traefik
   ui/                 browser end-to-end tests (Playwright) through Traefik

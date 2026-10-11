@@ -10,5 +10,5 @@
     "declarationMap": false,
     "types": ["vite/client", "node"]
   },
-  "include": ["src/web", "vite.config.ts"]
+  "include": ["src/web", "src/shared", "vite.config.ts"]
 }

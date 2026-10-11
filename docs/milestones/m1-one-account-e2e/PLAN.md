@@ -1,10 +1,12 @@
 M1: One bank account, end to end: plan
 ==================================================================================================
 
-How [SPEC.md](SPEC.md) gets built. The spec is still being written, so parts of this plan are
-placeholders, marked _(spec pending)_. Where the spec leaves a gap, this plan proposes something,
-marked **Proposed**; the choices that are really the user's call are collected under
-[Questions](#questions) at the end.
+How [SPEC.md](SPEC.md) gets built. Where the spec left a gap, this plan proposed something,
+marked **Proposed**.
+
+> **Status: built (2026-10-11).** Every slice below is done, with its unit, API and browser
+> tests. The open questions were answered with best guesses, and every guess and judgment call
+> is listed under [Decisions to review](#decisions-to-review) for the user to weigh in on.
 
 ## Approach
 
@@ -224,7 +226,7 @@ the docs, `docs/PLAN.md` and `RESUME.md` updated.
 
 ## Questions
 
-**Answered:**
+**Answered by the user:**
 - **Opening balance:** yes.
 - **"Last updated at":** the last import (later, the last SimpleFIN sync).
 - **Review:** yes, in the menu.
@@ -233,17 +235,98 @@ the docs, `docs/PLAN.md` and `RESUME.md` updated.
 - **Add transaction:** a persistent line at the bottom of the account ledger, opening an empty
   transaction editor.
 
-**Still open.** The proposals stand as defaults unless changed:
+**Answered by best guess** (the proposals, as built): marking money accounts explicitly, a derived
+account path, list-and-rename for Manage books, a ±5-day matching window, profiles that capture
+the bank's transaction ID and running balance, skipping duplicate rows, and 30-day sessions. All
+of them are in [Decisions to review](#decisions-to-review).
 
-1. **Marking money accounts:** explicit metadata (`money`, `display-name`, `institution`;
-   proposed), or derived from where the account sits?
-2. **Account names:** is the derived path (`Assets:Bank:PNC-Checking`) right, and should it be
-   editable in the add-account flow, or hidden behind the display name?
-3. **Manage books in M1:** just list and rename (proposed), or also create and delete?
-4. **Matching window:** ±5 days (proposed)?
-5. **CSV fields:** besides date, amount (signed, or debit/credit) and description, should profiles
-   capture a bank transaction ID and a running balance? A running balance could feed balance
-   checks.
-6. **Duplicate rows:** skip rows whose fingerprint was already imported (proposed), or show them
-   as duplicates for confirmation?
-7. **Sessions:** a 30-day JWT with no refresh until M6 (proposed)?
+## Decisions to review
+
+Guesses and judgment calls made while building M1, most consequential first. Each says where your
+input is wanted.
+
+### Accounts and balances
+
+1. **Opening balances and the as-of date.**
+   - The account opens on the as-of date, with an opening-balance transaction against
+     `Equity:Opening-Balances`.
+   - The balance means "at the end of that day", so **imported rows dated on or before the as-of
+     date are skipped** as already counted ("before the opening balance").
+
+   _Input wanted:_ is that the right reading? It also means history from before the as-of date
+   can't be imported; you'd add the account with an earlier date instead.
+2. **Money accounts are marked explicitly:** `money: "bank"`, `display-name` and `institution`
+   metadata on the `open` directive.
+   - **The path is derived** from the name (`Assets:Bank:PNC-Checking`). It's shown, but can't be
+     edited in the form.
+
+   _Input wanted:_ should the path be editable, or the parent (`Assets:Bank`) be choosable?
+3. **New transactions from the ledger's "Add transaction" line are saved confirmed (`*`),**
+   since they're written by hand. They start with a split on the account and today's date.
+   _Input wanted:_ or start them pending, or offer the confirmed checkbox planned for the general
+   ledger?
+4. **Balances and ledgers come from SQL, recomputed per request** from the account's whole history.
+   - That's about 90 ms a page on the laptop for the busiest account of a decades-scale book,
+     which is likely around a second on a Pi 3.
+   - Fine for now. If it isn't on the Pi, cache running balances.
+
+### Importing
+
+5. **There's no way to edit a saved CSV profile yet.** A later file with different columns is
+   refused ("this file's columns don't match"). _Input wanted:_ the next step would be an "edit
+   profile" action in the import console that re-profiles from a new file. Worth adding before M2?
+6. **Where CSV fields go:** the bank's description becomes the transaction's description
+   (narration), editable in the review queue. A payee column, if mapped, becomes the payee.
+   _Input wanted:_ would you rather the bank's description be the payee?
+7. **Duplicates are skipped and counted, not shown for confirmation.**
+   - A row is recognized by the bank's transaction ID if the profile maps one. Otherwise it's
+     the date, amount and description, plus which occurrence of those it is in the file, so two
+     identical coffees on one day both import.
+   - If you delete a staged transaction, re-importing the same file won't bring it back.
+8. **Guessing profiles:**
+   - Dates are read month-first when a file is ambiguous (every day 12 or under).
+   - Decimal commas ("1.234,56") aren't supported yet.
+   - A stray bad row doesn't stop the guess; it's reported as unreadable on import.
+9. **Uncategorized accounts:** `Expenses:Uncategorized` (money out) and `Income:Uncategorized`
+   (money in) are created on the first import that needs them.
+10. **Imports aren't one transaction across services.** The ledger write (staging) commits first,
+    then `app` records the batch. If `app` failed in between, the staged transactions would exist
+    unrecorded, and a re-import would duplicate them. That's rare, and acceptable until it isn't.
+11. **Matching:** the same amount within ±5 days, scored linearly by days apart, with ties broken
+    by ID. Candidates are stored on the import's rows and shown on the results screen. Nothing
+    attaches them to transactions or the review queue yet (deliberately deferred).
+
+### Users, sessions and books
+
+12. **Sessions:**
+    - a 30-day JWT (HS256) with no refresh
+    - an `HttpOnly`, `SameSite=Strict` cookie, made `Secure` only behind HTTPS (when Traefik
+      sees `X-Forwarded-Proto: https`)
+    - Bearer tokens also accepted, for scripts and tests
+    - logging out clears the cookie, but a stolen token stays valid until it expires (M6)
+13. **The JWT secret:** Compose ships a development default, and the auth service warns when it's
+    in use. _Input wanted:_ before the stack leaves your laptop, set `AUTH_JWT_SECRET`, and
+    decide whether a missing secret should refuse to start instead.
+14. **Test users (`AUTH_TEST_USERS`):** an opt-in auth mode, only for test stacks, where `login`
+    takes an email and logs in a separate user for it. Each browser and API test gets a user of
+    its own, so tests never share books. It's off unless set; `pnpm e2e` turns it on. _Input
+    wanted:_ an acceptable stand-in until M6's real accounts?
+15. **Book names are the book's Beancount `option "title"`,** so exports and backups carry them.
+    Book IDs are generated. Books from before ownership existed have no owner and are invisible.
+16. **Setup appears only for a user with no books,** and stays up until the first account is
+    added. A user with several books (only possible through the API in M1) sees the oldest.
+17. **Backups now cover only the caller's books.** A system-wide backup for the operator isn't
+    exposed through the API any more. _Input wanted:_ where should operator backups live? A CLI
+    in the ledger container, or an admin route behind its own auth?
+
+### Infrastructure
+
+18. **Every service shares the one data volume as UID 1000** (`ledger.sqlite`, `auth.sqlite`,
+    `app.sqlite`), so backing up the volume backs up everything. The ledger image gained a
+    `ledger` user for this.
+19. **The TypeScript services use Node's built-in `node:sqlite`,** which Node 22 calls
+    experimental; its warning is silenced. If it changes before going stable, the swap is
+    contained to `packages/db`.
+20. **Routing:** every API except auth's goes through Traefik's forwardAuth. A client-sent
+    `X-User-Id` is ignored: without a session it gets 401, and with one Traefik overwrites the
+    header.

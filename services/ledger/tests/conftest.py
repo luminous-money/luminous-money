@@ -7,11 +7,21 @@ import pytest
 from beancount.core import data
 from beancount.parser import printer
 
+from fastapi.testclient import TestClient
+
+from ledger.api import create_app
 from ledger.service import Ledger
 from ledger.store import Store
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
 FEATURES = os.path.join(FIXTURES, "features.beancount")
+
+USER = "user-1"
+
+
+def http(ledger: Ledger, user: str | None = USER) -> TestClient:
+    """The API as `user` sees it: Traefik sets X-User-Id after checking the session."""
+    return TestClient(create_app(ledger), headers={"X-User-Id": user} if user else {})
 
 
 @pytest.fixture

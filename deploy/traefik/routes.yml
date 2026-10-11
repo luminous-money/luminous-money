@@ -1,18 +1,25 @@
 # Routing by top-level prefix: /api for every API, /ui for the PWA. Services serve under their
 # full prefix, so nothing is stripped.
 #
-# Auth: once the `auth` service exists, add a forwardAuth middleware pointing at its verify
-# endpoint and attach it to every router except /api/auth/v1 login.
+# Every API route except auth's own goes through the `session` middleware: Traefik asks auth's
+# verify endpoint first, refuses the request (401) if there's no valid session, and otherwise
+# forwards it with X-User-Id set from auth's answer (replacing anything the client sent).
 http:
   routers:
+    auth-api:
+      rule: PathPrefix(`/api/auth/v1`)
+      entryPoints: [web]
+      service: auth
     ledger-api:
       rule: PathPrefix(`/api/ledger/v1`)
       entryPoints: [web]
       service: ledger
+      middlewares: [session]
     app-api:
       rule: PathPrefix(`/api/app/v1`)
       entryPoints: [web]
       service: app
+      middlewares: [session]
     app-ui:
       rule: PathPrefix(`/ui`)
       entryPoints: [web]
@@ -23,11 +30,19 @@ http:
       service: app
       middlewares: [to-ui]
   middlewares:
+    session:
+      forwardAuth:
+        address: http://auth:3000/api/auth/v1/verify
+        authResponseHeaders: [X-User-Id]
     to-ui:
       redirectRegex:
         regex: ^(https?://[^/]+)/$
         replacement: ${1}/ui/
   services:
+    auth:
+      loadBalancer:
+        servers:
+          - url: http://auth:3000
     ledger:
       loadBalancer:
         servers:

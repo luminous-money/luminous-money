@@ -5,7 +5,7 @@ import { seedBook, stored, type Seeded } from "./support.js";
 let seeded: Seeded;
 
 test.beforeEach(async ({ page }) => {
-  seeded = await seedBook();
+  seeded = await seedBook(page);
   await page.goto(`/ui/books/${seeded.book}/review`);
   await expect(queue(page)).toHaveCount(3);
 });

@@ -248,8 +248,13 @@ SQLite ships by default, on the data volume. Each database has exactly one ownin
 | Database | Owner | Holds |
 |---|---|---|
 | ledger | `ledger` | Books, directives, entry status, cross-book groups and account-pair config, the change log and backup cursors. |
-| app | `app` | Scheduled-transaction templates, import source config, categorizer config. |
-| auth | `auth` | Users and credentials. |
+| app | `app` | CSV profiles and import history (batches, rows, outcomes, candidates). Later: scheduled-transaction templates, categorizer config. |
+| auth | `auth` | Users (and, from M6, credentials). |
+
+All three live on the one data volume (`ledger.sqlite`, `app.sqlite`, `auth.sqlite`). Every
+service runs as UID 1000, so they can share it. The TypeScript services use `packages/db`: the
+same `createTable`, timestamp and migration rules as the ledger's, on Node's built-in
+`node:sqlite`, with its own lint check.
 
 Database access goes through a small interface in each service, so another database could be
 swapped in later without touching callers.
@@ -332,26 +337,76 @@ to be told to leave it alone.
 
 | Route | Goes to | Notes |
 |---|---|---|
-| `/api/auth/v1` | `auth` | Login, token issuance, refresh. Login is exempt from the auth check. (Not built yet.) |
+| `/api/auth/v1` | `auth` | Login, logout, who's logged in, and the verify endpoint. The only API without the session check. |
 | `/api/ledger/v1` | `ledger` | Books API: entries, staging, cross-book groups, BQL, import/export, backup. |
 | `/api/app/v1` | `app` | Review queue, the resolver pipeline, schedules, import sources. |
 | `/ui` | `app` | The review PWA. Unknown paths under `/ui` get the app shell, for client-side routing. |
 | `/` | (redirect) | Redirects to `/ui/`. |
 
 
-How auth works:
+How auth works (built in M1, with a stub user; M6 adds real accounts without changing the
+shape):
 
-- **Every route except login carries Traefik's forwardAuth check.** Before forwarding a request,
-  Traefik calls `auth`'s verify endpoint. Requests without a valid JWT never reach a service.
+- **Every API route except auth's carries Traefik's forwardAuth check** (the `session`
+  middleware).
+  - Before forwarding a request, Traefik calls `auth`'s `GET /verify`. Without a valid session
+    the answer is 401, and the request never reaches a service.
+  - On success, `auth` answers with `X-User-Id`, and Traefik sets that header on the forwarded
+    request, replacing anything the client sent.
 - **There's no Traefik plugin.** The token logic lives in the `auth` service, in TypeScript.
-- **Services can read the token's claims (e.g. user ID) without verifying it again.** They're only
-  reachable on the internal network, and on success Traefik passes the token, or headers derived
-  from it, through to them.
-- **Browsers carry the token in a cookie,** so the PWA's requests are authenticated without
-  extra client code.
-- **There's a simple user concept, but no permissions yet.** Any authenticated user can use any
-  book. The author is still recorded on every change, so per-book access can be added later
-  without changing the data.
+- **Services trust `X-User-Id`,** since they're only reachable through Traefik on the internal
+  network. `app` passes it on when it calls the ledger as that user.
+- **Sessions are HS256 JWTs** (30 days, no refresh yet), signed with `AUTH_JWT_SECRET`.
+  - The browser carries the token in an `HttpOnly`, `SameSite=Strict` cookie, `Secure` behind
+    HTTPS. The PWA never touches the token.
+  - Scripts and tests can send it as a Bearer token instead.
+- **The stub:** one user, created on startup; `POST /login` always logs that user in.
+  - For test stacks only, `AUTH_TEST_USERS=true` lets login take an email and log in a separate
+    user for it, so tests don't share state. It's off by default, and `pnpm e2e` turns it on.
+- **Books belong to users.** Every book has an owner, and a book endpoint answers only its owner:
+  anyone else gets 404, as if the book didn't exist. Sharing and permissions come in M8.
+
+### Books, money accounts and balances (M1)
+
+- **A book's name is its Beancount `option "title"`,** so exports and backups carry it. Book IDs
+  are generated, so books can be renamed (versioned, like any edit).
+- **Money accounts:** accounts held at a real institution, marked with metadata on their `open`
+  directive:
+  - `money: "bank"` (later `credit-card`, `brokerage`)
+  - `display-name`, a human name, spaces allowed
+  - `institution`
+- **Adding a bank account** opens `Assets:Bank:<Name>` on an as-of date, with an opening-balance
+  transaction against `Equity:Opening-Balances`. The balance means "at the end of that day", so
+  imported rows from that day or earlier are skipped as already counted.
+- **Balances and account ledgers come from plain SQL, not a Beancount load.**
+  - Each posting stores its change to its account, with an elided amount filled in when that's
+    unambiguous (one currency, no lots or prices).
+  - When it isn't, that account's balance falls back to Beancount.
+  - Pending transactions count.
+- **An account's ledger** is its transactions newest first, in keyset pages of 200. Each shows
+  its running balance and the other account (or `<multiple>`).
+
+### Importing CSVs (M1)
+
+- **A CSV profile per account** says how its bank's export is laid out: the preamble, header,
+  date column and format, signed or debit/credit amounts, description, and optionally payee,
+  bank ID and running balance.
+  - It's guessed from the first file (`packages/csv-import`, shared by the browser and the
+    server), confirmed by the user, and stored in `app`'s database.
+  - Later files must have the same columns.
+- **An import** reads every row with the profile and fingerprints it:
+  - **the fingerprint** is the bank's ID if mapped; otherwise the date, amount and description,
+    plus the row's occurrence among identical ones in the file
+  - **rows skipped:** duplicates of earlier imports, rows before the opening balance, and rows
+    that can't be read
+  - **the rest** go through the pipeline, then are staged in one atomic ledger batch as pending
+    transactions against `Expenses:Uncategorized` or `Income:Uncategorized`
+  - **recorded:** the batch and each row's outcome; the last batch's time is the account's
+    "last updated"
+- **The pipeline, as built:** a chain of resolvers over a batch and its context (the account's
+  transactions around the batch's dates). M1's only resolver is the matcher: the same amount,
+  within ±5 days, ranked by closeness in date. It identifies and ranks; nothing acts on matches
+  yet.
 
 ### Cross-book transactions
 
@@ -505,9 +560,9 @@ The design separates four things:
 | Service | Language | Role |
 |---|---|---|
 | `traefik` | upstream | The only exposed port. Routes by path prefix; forwardAuth to `auth`. |
-| `auth` | TypeScript | Login, JWT issuance and refresh, the verify endpoint for forwardAuth. Owns users. |
+| `auth` | TypeScript | Login, logout, who's logged in, and the verify endpoint for forwardAuth. Owns users (a stub until M6). |
 | `ledger` | Python | System of record for all books. Runs the Beancount engine (booking, validation, BQL). Owns cross-book groups and their invariants, Beancount import/export, the change log and backup chunks. |
-| `app` | TypeScript | Serves the review PWA (React + Vite + `vite-plugin-pwa`) and its API (Hono). Hosts the participants, the context builder and the resolver chain, and owns schedules and import config. Modules get split into their own services only when there's a reason. |
+| `app` | TypeScript | Serves the PWA (React + Vite + `vite-plugin-pwa`) and its API (Hono): CSV profiles and imports. Hosts the participants, the context builder and the resolver chain, and owns import history (later schedules too). Modules get split into their own services only when there's a reason. |
 
 ## The review app
 

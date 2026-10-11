@@ -1,11 +1,9 @@
 """Versioned edits: every edit names the version it read, and stale edits are refused."""
 
 import pytest
-from conftest import FEATURES, STAGED
-from fastapi.testclient import TestClient
+from conftest import FEATURES, STAGED, USER, http
 
 from ledger import models
-from ledger.api import create_app
 from ledger.store import StaleVersion
 
 BASE = "/api/ledger/v1/books/book"
@@ -13,13 +11,13 @@ BASE = "/api/ledger/v1/books/book"
 
 @pytest.fixture
 def book(ledger):
-    ledger.apply_file("book", FEATURES)
+    ledger.apply_file("book", FEATURES, owner_id=USER)
     return ledger
 
 
 @pytest.fixture
 def client(book):
-    return TestClient(create_app(book))
+    return http(book)
 
 
 @pytest.fixture

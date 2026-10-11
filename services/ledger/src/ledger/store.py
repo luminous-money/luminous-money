@@ -86,23 +86,37 @@ class Store:
 
     # Books
 
-    def books(self) -> list[str]:
-        return [r["id"] for r in self._conn.execute("SELECT id FROM book ORDER BY id")]
+    def books(self, owner_id: str | None = None) -> list[str]:
+        """Every book's ID, or just those `owner_id` owns."""
+        if owner_id is None:
+            return [r["id"] for r in self._conn.execute("SELECT id FROM book ORDER BY id")]
+        rows = self._conn.execute("SELECT id FROM book WHERE owner_id = ? ORDER BY created_at, id", (owner_id,))
+        return [r["id"] for r in rows]
+
+    def book(self, book_id: str) -> sqlite3.Row | None:
+        """The book's row: id, header, owner_id, created_at, updated_at."""
+        return self._conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
 
     def header(self, book_id: str) -> list[str] | None:
         row = self._conn.execute("SELECT header FROM book WHERE id = ?", (book_id,)).fetchone()
         return None if row is None else [line for line in row["header"].split("\n") if line]
 
-    def put_book(self, book_id: str, header: list[str]) -> None:
+    def put_book(self, book_id: str, header: list[str], owner_id: str | None = None) -> None:
+        """Create or update a book. The owner is set when the book is created and never changes here."""
         seq = self._change(book_id, None, "book")
         previous = self._conn.execute("SELECT updated_at FROM book WHERE id = ?", (book_id,)).fetchone()
         stamp = after(previous["updated_at"] if previous else None)
         self._conn.execute(
-            "INSERT INTO book (id, header, seq, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO book (id, header, seq, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
             " ON CONFLICT (id) DO UPDATE SET header = excluded.header, seq = excluded.seq,"
             " updated_at = excluded.updated_at",
-            (book_id, "\n".join(header), seq, stamp, stamp),
+            (book_id, "\n".join(header), seq, owner_id, stamp, stamp),
         )
+
+    def check_book_version(self, book_id: str, expected: str) -> None:
+        row = self.book(book_id)
+        if row is not None and row["updated_at"] != expected:
+            raise StaleVersion(book_id, row["updated_at"])
 
     def book_seq(self, book_id: str) -> int:
         """The latest change to anything in the book. Equal values mean an unchanged book."""
@@ -135,19 +149,30 @@ class Store:
             stamp = after(existing["updated_at"] if existing else None)
             self._conn.execute(
                 "INSERT INTO directive"
-                " (id, book_id, date, kind, flag, ordinal, text, deleted, seq, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)"
+                " (id, book_id, date, kind, flag, ordinal, text, deleted, seq, payee, narration, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)"
                 " ON CONFLICT (id) DO UPDATE SET date = excluded.date, kind = excluded.kind,"
                 " flag = excluded.flag, text = excluded.text, deleted = 0, seq = excluded.seq,"
-                " updated_at = excluded.updated_at",
-                (d.id, book_id, d.date.isoformat(), d.kind, d.flag, ordinal, d.text, seq, stamp, stamp),
+                " payee = excluded.payee, narration = excluded.narration, updated_at = excluded.updated_at",
+                (d.id, book_id, d.date.isoformat(), d.kind, d.flag, ordinal, d.text, seq, d.payee, d.narration, stamp, stamp),
             )
             self._conn.execute("DELETE FROM posting WHERE directive_id = ?", (d.id,))
             self._conn.executemany(
-                "INSERT INTO posting (directive_id, idx, account, number, currency, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO posting"
+                " (directive_id, idx, account, number, currency, amount, amount_currency, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
-                    (d.id, i, p.account, None if p.number is None else str(p.number), p.currency, stamp, stamp)
+                    (
+                        d.id,
+                        i,
+                        p.account,
+                        None if p.number is None else str(p.number),
+                        p.currency,
+                        None if p.amount is None else str(p.amount),
+                        p.amount_currency,
+                        stamp,
+                        stamp,
+                    )
                     for i, p in enumerate(d.postings)
                 ],
             )
@@ -204,6 +229,28 @@ class Store:
             "SELECT 1 FROM change WHERE book_id = ? AND seq > ? LIMIT 1", (book_id, seq)
         ).fetchone()
         return row is not None
+
+    def account_entries(self, book_id: str, account: str) -> list[sqlite3.Row]:
+        """Every live transaction posting to `account`, oldest first: what its ledger and balance
+        are made of. Each row has the transaction's id, date, ordinal, flag, payee, narration,
+        updated_at, its number of splits, the other accounts it posts to (comma-separated), and
+        the account's amounts in it (`amounts`, as "number currency" pairs, with "?" for an
+        amount only booking could say)."""
+        return self._conn.execute(
+            """
+            SELECT d.id, d.date, d.ordinal, d.flag, d.payee, d.narration, d.updated_at,
+                   (SELECT COUNT(*) FROM posting n WHERE n.directive_id = d.id) AS splits,
+                   (SELECT GROUP_CONCAT(DISTINCT o.account) FROM posting o
+                     WHERE o.directive_id = d.id AND o.account <> :account) AS others,
+                   (SELECT GROUP_CONCAT(COALESCE(a.amount || ' ' || a.amount_currency, '?'), ';') FROM posting a
+                     WHERE a.directive_id = d.id AND a.account = :account) AS amounts
+            FROM directive d
+            WHERE d.book_id = :book AND d.deleted = 0 AND d.kind = 'transaction'
+              AND d.id IN (SELECT directive_id FROM posting WHERE account = :account)
+            ORDER BY d.date, d.ordinal
+            """,
+            {"book": book_id, "account": account},
+        ).fetchall()
 
     def find(
         self,

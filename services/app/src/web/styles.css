@@ -47,6 +47,7 @@ body {
 .masthead {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.6rem;
   padding: 0.25rem 0 1.5rem;
 }
@@ -677,4 +678,326 @@ button:focus-visible,
 
 .preview {
   margin: 0;
+}
+
+/* Menu */
+
+.menu {
+  position: relative;
+}
+
+.menu-button {
+  font-size: 1.3rem;
+}
+
+.menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 50;
+  min-width: 12rem;
+  display: grid;
+  padding: 0.35rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.15);
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.7rem 0.8rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: none;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+  background: color-mix(in srgb, var(--green-soft) 35%, transparent);
+}
+
+/* Welcome and setup */
+
+.welcome .stack {
+  max-width: 22rem;
+}
+
+.center {
+  text-align: center;
+}
+
+.row-fields {
+  display: grid;
+  grid-template-columns: 1fr 6rem;
+  gap: 0.6rem;
+}
+
+select {
+  font: inherit;
+  color: inherit;
+  min-height: 2.75rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--paper);
+  width: 100%;
+}
+
+label.check,
+.profile-grid label.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+label.check input {
+  width: 1.1rem;
+  min-height: auto;
+  accent-color: var(--green);
+}
+
+.button.primary-link,
+a.primary-link {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+/* Home */
+
+.home-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.account-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.account-card h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.account-card .balance {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.account-card p {
+  margin: 0.25rem 0 0;
+}
+
+/* Account ledger */
+
+.ledger-page {
+  padding-bottom: 5rem;
+}
+
+.ledger {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.ledger li + li {
+  border-top: 1px solid var(--line);
+}
+
+.ledger-row {
+  width: 100%;
+  min-height: 3.5rem;
+  display: grid;
+  grid-template-columns: 5.6rem 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.55rem 0.8rem;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  font-weight: 400;
+}
+
+.ledger-row:hover {
+  background: color-mix(in srgb, var(--green-soft) 18%, transparent);
+}
+
+.ledger-row.pending {
+  font-style: italic;
+}
+
+.ledger-date {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-what {
+  display: grid;
+  min-width: 0;
+}
+
+.ledger-payee,
+.ledger-account {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-account {
+  font-size: 0.82rem;
+}
+
+.ledger-numbers {
+  display: grid;
+  justify-items: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-numbers .amount {
+  font-size: 1rem;
+}
+
+.ledger-end {
+  min-height: 2rem;
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.ledger-add {
+  position: sticky;
+  bottom: 0;
+  padding: 0.75rem 0 max(0.75rem, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--paper) 70%, transparent);
+}
+
+.ledger-add button {
+  width: 100%;
+}
+
+/* Import */
+
+.dropzone {
+  display: grid;
+  place-items: center;
+  min-height: 9rem;
+  padding: 1rem;
+  border: 2px dashed var(--line);
+  border-radius: 1rem;
+  text-align: center;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.dropzone.dragging {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green-soft) 25%, transparent);
+}
+
+.dropzone input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.75rem;
+}
+
+.profile-grid label,
+.stack > label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.preview-table th,
+.preview-table td {
+  padding: 0.4rem 0.3rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.preview-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-table tr.bad td {
+  background: color-mix(in srgb, var(--bad) 8%, transparent);
+}
+
+.import-rows {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.import-row.duplicate,
+.import-row.before-opening,
+.import-row.unreadable {
+  opacity: 0.7;
+}
+
+.pill.outcome-staged {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.pill.outcome-duplicate,
+.pill.outcome-before-opening {
+  background: var(--line);
+}
+
+.pill.outcome-unreadable {
+  background: color-mix(in srgb, var(--bad) 20%, transparent);
+}
+
+.candidates ol {
+  margin: 0.2rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+}
+
+/* Plain links */
+
+main a:not(.button):not(.card):not(.back):not(.menu-item) {
+  color: var(--green);
+  font-weight: 600;
 }

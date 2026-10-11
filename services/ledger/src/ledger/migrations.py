@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime
 import sqlite3
+from collections.abc import Callable
 
 TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
@@ -42,7 +43,21 @@ def after(previous: str | None) -> str:
     return stamp
 
 
-MIGRATIONS: list[list[str]] = [
+def _backfill_derived_columns(conn: sqlite3.Connection) -> None:
+    """Fill in migration 3's columns for directives written before it."""
+    from . import engine  # here, not at the top: engine is only needed for this backfill
+
+    for row in conn.execute("SELECT id, text FROM directive WHERE deleted = 0 AND kind = 'transaction'").fetchall():
+        directive = engine.parse_one(row[1], row[0])
+        conn.execute("UPDATE directive SET payee = ?, narration = ? WHERE id = ?", (directive.payee, directive.narration, row[0]))
+        for idx, p in enumerate(directive.postings):
+            conn.execute(
+                "UPDATE posting SET amount = ?, amount_currency = ? WHERE directive_id = ? AND idx = ?",
+                (None if p.amount is None else str(p.amount), p.amount_currency, row[0], idx),
+            )
+
+
+MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
     # 1: the baseline.
     [
         create_table(
@@ -91,6 +106,21 @@ MIGRATIONS: list[list[str]] = [
         ),
         "CREATE INDEX posting_account ON posting(account)",
     ],
+    # 2: books belong to users (M1). The name lives in the book's own `option "title"`.
+    [
+        "ALTER TABLE book ADD COLUMN owner_id TEXT",
+        "CREATE INDEX book_owner ON book(owner_id)",
+    ],
+    # 3: what balances and ledgers read with plain SQL (M1): each posting's change to its account
+    # (elided amounts filled in where unambiguous), and each transaction's payee and narration.
+    [
+        "ALTER TABLE posting ADD COLUMN amount TEXT",
+        "ALTER TABLE posting ADD COLUMN amount_currency TEXT",
+        "ALTER TABLE directive ADD COLUMN payee TEXT",
+        "ALTER TABLE directive ADD COLUMN narration TEXT",
+        "CREATE INDEX posting_account_directive ON posting(account, directive_id)",
+        _backfill_derived_columns,
+    ],
 ]
 
 
@@ -111,7 +141,10 @@ def migrate(conn: sqlite3.Connection) -> int:
         conn.execute("BEGIN IMMEDIATE")
         try:
             for statement in statements:
-                conn.execute(statement)
+                if callable(statement):
+                    statement(conn)
+                else:
+                    conn.execute(statement)
             conn.execute(f"PRAGMA user_version = {number}")
         except BaseException:
             conn.execute("ROLLBACK")

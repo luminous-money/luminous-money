@@ -127,6 +127,46 @@ class Account(Api):
     open: datetime.date | None = None
     close: datetime.date | None = None
     currencies: list[str] = Field(default_factory=list, description="Constraint from the open directive; empty means any.")
+    money: str | None = Field(None, description="Held at a real institution: the kind of account (`bank`, ...).")
+    display_name: str | None = None
+    institution: str | None = None
+
+
+class MoneyAccount(Account):
+    balance: list[Amount] = Field(
+        description="The current balance, pending transactions included: one amount per currency held."
+    )
+
+
+class MoneyAccountIn(Strict):
+    """A money account to add: a bank account, for now."""
+
+    display_name: str = Field(min_length=1, description='A human name, e.g. "PNC Checking".')
+    money: Literal["bank"] = "bank"
+    institution: str | None = None
+    currency: str = "USD"
+    balance: DecimalStr = Field("0", description="The balance on `as_of`, recorded as an opening balance.")
+    as_of: datetime.date = Field(description="The date `balance` was the balance; the account opens then.")
+
+
+class LedgerRow(Api):
+    """One transaction, as one account's ledger shows it."""
+
+    id: str
+    date: datetime.date
+    flag: str
+    payee: str | None
+    narration: str | None
+    amount: Amount | None = Field(description="The account's change in this transaction; None if only booking could say.")
+    balance: Amount | None = Field(description="The account's running balance after this transaction, pending included.")
+    counterpart: str | None = Field(description="The other split's account, for a two-split transaction; None for more.")
+    splits: int
+    updated_at: str
+
+
+class LedgerPage(Api):
+    rows: list[LedgerRow] = Field(description="Newest first.")
+    next_cursor: str | None = Field(description="Pass as `cursor` for the next (older) page; None at the end.")
 
 
 class AccountIn(Strict):
@@ -156,6 +196,18 @@ class Directive(Api):
 
 class Book(Api):
     id: str
+    name: str = Field(description="The book's `option \"title\"`, or its ID if it has none.")
+    created_at: str
+    updated_at: str
+
+
+class BookIn(Strict):
+    name: str = Field(min_length=1)
+
+
+class BookPatch(Strict):
+    name: str = Field(min_length=1)
+    updated_at: Version
 
 
 class Applied(Api):

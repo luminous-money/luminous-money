@@ -34,6 +34,11 @@ from . import models
 
 ID_KEY = "id"
 KIND_KEY = "kind"
+# Money accounts: accounts held at a real institution. `money` says what kind (bank,
+# credit-card, ...); the display name is a human one, since account names can't have spaces.
+MONEY_KEY = "money"
+DISPLAY_NAME_KEY = "display-name"
+INSTITUTION_KEY = "institution"
 NODE = "node"
 ROOT_OPTIONS = (
     ("name_assets", "asset"),
@@ -63,6 +68,10 @@ class Posting:
     account: str
     number: Decimal | None  # None when elided, to be filled in by booking
     currency: str | None
+    # The posting's change to its account in units, with an elided amount filled in when that's
+    # unambiguous (see `_amounts`). None when only full booking could say.
+    amount: Decimal | None = None
+    amount_currency: str | None = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +82,8 @@ class Directive:
     flag: str | None  # transactions only
     text: str
     postings: tuple[Posting, ...] = ()
+    payee: str | None = None  # transactions only
+    narration: str | None = None  # transactions only
 
 
 @dataclass(frozen=True)
@@ -155,13 +166,16 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
     entry = entry._replace(meta={ID_KEY: str(directive_id), **meta})
     postings = ()
     if isinstance(entry, data.Transaction):
+        amounts = _amounts(entry)
         postings = tuple(
             Posting(
                 account=p.account,
                 number=None if p.units is MISSING or p.units.number is MISSING else p.units.number,
                 currency=None if p.units is MISSING or p.units.currency is MISSING else p.units.currency,
+                amount=amount[0] if amount else None,
+                amount_currency=amount[1] if amount else None,
             )
-            for p in entry.postings
+            for p, amount in zip(entry.postings, amounts)
         )
     return Directive(
         id=str(directive_id),
@@ -170,7 +184,31 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
         flag=getattr(entry, "flag", None),
         text=printer.format_entry(entry).rstrip("\n") + "\n",
         postings=postings,
+        payee=getattr(entry, "payee", None),
+        narration=getattr(entry, "narration", None),
     )
+
+
+def _amounts(entry: data.Transaction) -> list[tuple[Decimal, str] | None]:
+    """Each posting's change to its account, in units, without full booking.
+
+    Explicit amounts are themselves. A single elided amount is filled in, as booking would, when
+    that's unambiguous: every other posting is in one currency with no cost or price, so the
+    elided one is minus their sum. Anything else (several elided amounts, mixed currencies, lots,
+    prices) is left to booking: None.
+    """
+    explicit = [
+        None if p.units is MISSING or p.units.number is MISSING or p.units.currency is MISSING else (p.units.number, p.units.currency)
+        for p in entry.postings
+    ]
+    elided = [i for i, amount in enumerate(explicit) if amount is None]
+    if len(elided) != 1:
+        return explicit
+    others = [p for i, p in enumerate(entry.postings) if i != elided[0]]
+    currencies = {amount[1] for amount in explicit if amount}
+    if len(currencies) == 1 and all(p.cost is None and p.price is None for p in others):
+        explicit[elided[0]] = (-sum((amount[0] for amount in explicit if amount), Decimal(0)), currencies.pop())
+    return explicit
 
 
 def parse_one(text: str, directive_id: str | None = None) -> Directive:
@@ -257,6 +295,9 @@ def accounts(header: list[str], texts: list[str]) -> list[models.Account]:
                 kind="node" if entry.meta.get(KIND_KEY) == NODE else "leaf",
                 open=entry.date,
                 currencies=list(entry.currencies or []),
+                money=entry.meta.get(MONEY_KEY),
+                display_name=entry.meta.get(DISPLAY_NAME_KEY),
+                institution=entry.meta.get(INSTITUTION_KEY),
             )
     for entry in entries:
         if isinstance(entry, data.Close) and entry.account in found:
@@ -269,15 +310,58 @@ def accounts(header: list[str], texts: list[str]) -> list[models.Account]:
     return sorted(found.values(), key=lambda a: a.name)
 
 
+def segment(text: str) -> str:
+    """Turn a human name into one valid account-name segment: "PNC checking" becomes
+    "PNC-checking". Letters, digits and dashes only, starting with a capital or digit."""
+    words = [re.sub(r"[^\w-]|_", "", word) for word in text.split()]
+    part = "-".join(w for w in words if w)
+    if not part:
+        raise ParseFailure([f"can't make an account name from {text!r}"])
+    return part[0].upper() + part[1:]
+
+
+def decimal_text(number: Decimal) -> str:
+    return format(number, "f")
+
+
+def book_title(header: list[str]) -> str | None:
+    """The book's name: its `option "title"`, if it has one."""
+    for line in header:
+        if line.startswith('option "title"'):
+            _, _, options = parser.parse_string(line)
+            return options["title"]
+    return None
+
+
+def with_title(header: list[str], title: str) -> list[str]:
+    """The header with its title set to `title`, replacing any existing one."""
+    escaped = title.replace("\\", "\\\\").replace('"', '\\"')
+    line = f'option "title" "{escaped}"'
+    _, errors, options = parser.parse_string(line)
+    if errors or options["title"] != title:
+        raise ParseFailure([f"can't use {title!r} as a book name"])
+    return [line, *(existing for existing in header if not existing.startswith('option "title"'))]
+
+
 def root_types(header: list[str]) -> dict[str, str]:
     """Top-level account names (renamable with options) and the type each stands for."""
     _, _, options = parser.parse_string("\n".join(header))
     return {options[key]: type_ for key, type_ in ROOT_OPTIONS}
 
 
-def open_directive(name: str, date: datetime.date, kind: str) -> Directive:
-    meta = f'  {KIND_KEY}: "{NODE}"\n' if kind == NODE else ""
-    return parse_one(f"{date.isoformat()} open {name}\n{meta}")
+def open_directive(
+    name: str,
+    date: datetime.date,
+    kind: str,
+    *,
+    currencies: list[str] | None = None,
+    meta: dict[str, str] | None = None,
+) -> Directive:
+    """An `open` directive. Built as an entry and printed, so metadata values are quoted and
+    escaped properly; parsed again to validate the name."""
+    entry_meta = {**({KIND_KEY: NODE} if kind == NODE else {}), **(meta or {})}
+    entry = data.Open(data.new_metadata("<new>", 0, entry_meta), date, name, currencies or None, None)
+    return parse_one(to_directive(entry).text)
 
 
 def node_posting_message(account: str) -> str:

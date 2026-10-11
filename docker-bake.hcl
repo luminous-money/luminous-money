@@ -17,7 +17,7 @@ variable "VERSION" {
 }
 
 group "default" {
-  targets = ["ledger", "app"]
+  targets = ["auth", "ledger", "app"]
 }
 
 group "test" {
@@ -25,7 +25,7 @@ group "test" {
 }
 
 group "release" {
-  targets = ["ledger-release", "app-release"]
+  targets = ["auth-release", "ledger-release", "app-release"]
 }
 
 # Service images
@@ -33,6 +33,15 @@ group "release" {
 target "ledger" {
   context = "services/ledger"
   tags    = ["${REGISTRY}/ledger:${VERSION}"]
+}
+
+target "auth" {
+  context    = "."
+  dockerfile = "services/auth/Dockerfile"
+  contexts = {
+    workspace = "target:workspace"
+  }
+  tags = ["${REGISTRY}/auth:${VERSION}"]
 }
 
 target "app" {
@@ -109,6 +118,10 @@ target "_release" {
 
 target "ledger-release" {
   inherits = ["ledger", "_release"]
+}
+
+target "auth-release" {
+  inherits = ["auth", "_release"]
 }
 
 target "app-release" {

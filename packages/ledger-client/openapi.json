@@ -23,11 +23,33 @@
             "title": "Currencies",
             "type": "array"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
           "implicit": {
             "default": false,
             "description": "Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.",
             "title": "Implicit",
             "type": "boolean"
+          },
+          "institution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution"
           },
           "kind": {
             "description": "Leaf accounts hold transactions; node accounts hold sub-accounts.",
@@ -37,6 +59,18 @@
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "money": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Held at a real institution: the kind of account (`bank`, ...).",
+            "title": "Money"
           },
           "name": {
             "title": "Name",
@@ -186,15 +220,67 @@
       },
       "Book": {
         "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "description": "The book's `option \"title\"`, or its ID if it has none.",
+            "title": "Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
             "type": "string"
           }
         },
         "required": [
-          "id"
+          "id",
+          "name",
+          "created_at",
+          "updated_at"
         ],
         "title": "Book",
+        "type": "object"
+      },
+      "BookIn": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "BookIn",
+        "type": "object"
+      },
+      "BookPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "updated_at"
+        ],
+        "title": "BookPatch",
         "type": "object"
       },
       "Cost": {
@@ -331,6 +417,132 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "LedgerPage": {
+        "properties": {
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as `cursor` for the next (older) page; None at the end.",
+            "title": "Next Cursor"
+          },
+          "rows": {
+            "description": "Newest first.",
+            "items": {
+              "$ref": "#/components/schemas/LedgerRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows",
+          "next_cursor"
+        ],
+        "title": "LedgerPage",
+        "type": "object"
+      },
+      "LedgerRow": {
+        "description": "One transaction, as one account's ledger shows it.",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The account's change in this transaction; None if only booking could say."
+          },
+          "balance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The account's running balance after this transaction, pending included."
+          },
+          "counterpart": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The other split's account, for a two-split transaction; None for more.",
+            "title": "Counterpart"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "flag": {
+            "title": "Flag",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "narration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narration"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "splits": {
+            "title": "Splits",
+            "type": "integer"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "flag",
+          "payee",
+          "narration",
+          "amount",
+          "balance",
+          "counterpart",
+          "splits",
+          "updated_at"
+        ],
+        "title": "LedgerRow",
+        "type": "object"
+      },
       "MetaDate": {
         "additionalProperties": false,
         "properties": {
@@ -359,6 +571,183 @@
           "number"
         ],
         "title": "MetaNumber",
+        "type": "object"
+      },
+      "MoneyAccount": {
+        "properties": {
+          "balance": {
+            "description": "The current balance, pending transactions included: one amount per currency held.",
+            "items": {
+              "$ref": "#/components/schemas/Amount"
+            },
+            "title": "Balance",
+            "type": "array"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "currencies": {
+            "description": "Constraint from the open directive; empty means any.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Currencies",
+            "type": "array"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "implicit": {
+            "default": false,
+            "description": "Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.",
+            "title": "Implicit",
+            "type": "boolean"
+          },
+          "institution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution"
+          },
+          "kind": {
+            "description": "Leaf accounts hold transactions; node accounts hold sub-accounts.",
+            "enum": [
+              "leaf",
+              "node"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "money": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Held at a real institution: the kind of account (`bank`, ...).",
+            "title": "Money"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "asset",
+                  "liability",
+                  "equity",
+                  "income",
+                  "expense"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "From the top-level account; None for an unrecognized root.",
+            "title": "Type"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "kind",
+          "balance"
+        ],
+        "title": "MoneyAccount",
+        "type": "object"
+      },
+      "MoneyAccountIn": {
+        "additionalProperties": false,
+        "description": "A money account to add: a bank account, for now.",
+        "properties": {
+          "as_of": {
+            "description": "The date `balance` was the balance; the account opens then.",
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "balance": {
+            "default": "0",
+            "description": "The balance on `as_of`, recorded as an opening balance.",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Balance",
+            "type": "string"
+          },
+          "currency": {
+            "default": "USD",
+            "title": "Currency",
+            "type": "string"
+          },
+          "display_name": {
+            "description": "A human name, e.g. \"PNC Checking\".",
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "institution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution"
+          },
+          "money": {
+            "const": "bank",
+            "default": "bank",
+            "title": "Money",
+            "type": "string"
+          }
+        },
+        "required": [
+          "display_name",
+          "as_of"
+        ],
+        "title": "MoneyAccountIn",
         "type": "object"
       },
       "Posting": {
@@ -957,6 +1346,7 @@
   "paths": {
     "/api/ledger/v1/backup": {
       "get": {
+        "description": "The caller's books, changed since `since`.",
         "operationId": "backup_api_ledger_v1_backup_get",
         "parameters": [
           {
@@ -1004,7 +1394,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/Book"
                   },
                   "title": "Response Books Api Ledger V1 Books Get",
                   "type": "array"
@@ -1012,12 +1402,145 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Books"
+      },
+      "post": {
+        "operationId": "create_named_book_api_ledger_v1_books_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Named Book"
       }
     },
     "/api/ledger/v1/books/{book_id}": {
+      "get": {
+        "operationId": "get_book_api_ledger_v1_books__book_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Book"
+      },
+      "patch": {
+        "operationId": "rename_book_api_ledger_v1_books__book_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Book"
+      },
       "put": {
         "operationId": "create_book_api_ledger_v1_books__book_id__put",
         "parameters": [
@@ -1144,6 +1667,82 @@
           }
         },
         "summary": "Create Account"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/ledger": {
+      "get": {
+        "operationId": "account_ledger_api_ledger_v1_books__book_id__accounts__account__ledger_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Account Ledger"
       }
     },
     "/api/ledger/v1/books/{book_id}/directives": {
@@ -1321,19 +1920,19 @@
         "parameters": [
           {
             "in": "path",
-            "name": "book_id",
+            "name": "directive_id",
             "required": true,
             "schema": {
-              "title": "Book Id",
+              "title": "Directive Id",
               "type": "string"
             }
           },
           {
             "in": "path",
-            "name": "directive_id",
+            "name": "book_id",
             "required": true,
             "schema": {
-              "title": "Directive Id",
+              "title": "Book Id",
               "type": "string"
             }
           },
@@ -1374,19 +1973,19 @@
         "parameters": [
           {
             "in": "path",
-            "name": "book_id",
+            "name": "directive_id",
             "required": true,
             "schema": {
-              "title": "Book Id",
+              "title": "Directive Id",
               "type": "string"
             }
           },
           {
             "in": "path",
-            "name": "directive_id",
+            "name": "book_id",
             "required": true,
             "schema": {
-              "title": "Directive Id",
+              "title": "Book Id",
               "type": "string"
             }
           }
@@ -1420,19 +2019,19 @@
         "parameters": [
           {
             "in": "path",
-            "name": "book_id",
+            "name": "directive_id",
             "required": true,
             "schema": {
-              "title": "Book Id",
+              "title": "Directive Id",
               "type": "string"
             }
           },
           {
             "in": "path",
-            "name": "directive_id",
+            "name": "book_id",
             "required": true,
             "schema": {
-              "title": "Directive Id",
+              "title": "Book Id",
               "type": "string"
             }
           },
@@ -1528,6 +2127,7 @@
     },
     "/api/ledger/v1/books/{book_id}/import": {
       "post": {
+        "description": "Apply Beancount text. Creates the book, owned by the caller, if it doesn't exist.",
         "operationId": "import_text_api_ledger_v1_books__book_id__import_post",
         "parameters": [
           {
@@ -1574,6 +2174,96 @@
           }
         },
         "summary": "Import Text"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/money-accounts": {
+      "get": {
+        "operationId": "money_accounts_api_ledger_v1_books__book_id__money_accounts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MoneyAccount"
+                  },
+                  "title": "Response Money Accounts Api Ledger V1 Books  Book Id  Money Accounts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Money Accounts"
+      },
+      "post": {
+        "operationId": "create_money_account_api_ledger_v1_books__book_id__money_accounts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoneyAccountIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoneyAccount"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Money Account"
       }
     },
     "/api/ledger/v1/books/{book_id}/problems": {
@@ -1837,9 +2527,10 @@
         "summary": "Create Transaction"
       }
     },
-    "/api/ledger/v1/books/{book_id}/transactions/{directive_id}": {
-      "get": {
-        "operationId": "get_transaction_api_ledger_v1_books__book_id__transactions__directive_id__get",
+    "/api/ledger/v1/books/{book_id}/transactions/batch": {
+      "post": {
+        "description": "Create many transactions in one atomic write: all of them, or none.",
+        "operationId": "create_transactions_api_ledger_v1_books__book_id__transactions_batch_post",
         "parameters": [
           {
             "in": "path",
@@ -1849,13 +2540,70 @@
               "title": "Book Id",
               "type": "string"
             }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/TransactionIn"
+                },
+                "title": "Batch",
+                "type": "array"
+              }
+            }
           },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Transaction"
+                  },
+                  "title": "Response Create Transactions Api Ledger V1 Books  Book Id  Transactions Batch Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Transactions"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/transactions/{directive_id}": {
+      "get": {
+        "operationId": "get_transaction_api_ledger_v1_books__book_id__transactions__directive_id__get",
+        "parameters": [
           {
             "in": "path",
             "name": "directive_id",
             "required": true,
             "schema": {
               "title": "Directive Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
               "type": "string"
             }
           }
@@ -1889,19 +2637,19 @@
         "parameters": [
           {
             "in": "path",
-            "name": "book_id",
+            "name": "directive_id",
             "required": true,
             "schema": {
-              "title": "Book Id",
+              "title": "Directive Id",
               "type": "string"
             }
           },
           {
             "in": "path",
-            "name": "directive_id",
+            "name": "book_id",
             "required": true,
             "schema": {
-              "title": "Directive Id",
+              "title": "Book Id",
               "type": "string"
             }
           }
@@ -1948,19 +2696,19 @@
         "parameters": [
           {
             "in": "path",
-            "name": "book_id",
+            "name": "directive_id",
             "required": true,
             "schema": {
-              "title": "Book Id",
+              "title": "Directive Id",
               "type": "string"
             }
           },
           {
             "in": "path",
-            "name": "directive_id",
+            "name": "book_id",
             "required": true,
             "schema": {
-              "title": "Directive Id",
+              "title": "Book Id",
               "type": "string"
             }
           }

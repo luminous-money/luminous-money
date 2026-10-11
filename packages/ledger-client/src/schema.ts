@@ -11,7 +11,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Backup */
+    /**
+     * Backup
+     * @description The caller's books, changed since `since`.
+     */
     get: operations["backup_api_ledger_v1_backup_get"];
     put?: never;
     post?: never;
@@ -31,7 +34,8 @@ export interface paths {
     /** Books */
     get: operations["books_api_ledger_v1_books_get"];
     put?: never;
-    post?: never;
+    /** Create Named Book */
+    post: operations["create_named_book_api_ledger_v1_books_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -45,14 +49,16 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    /** Get Book */
+    get: operations["get_book_api_ledger_v1_books__book_id__get"];
     /** Create Book */
     put: operations["create_book_api_ledger_v1_books__book_id__put"];
     post?: never;
     delete?: never;
     options?: never;
     head?: never;
-    patch?: never;
+    /** Rename Book */
+    patch: operations["rename_book_api_ledger_v1_books__book_id__patch"];
     trace?: never;
   };
   "/api/ledger/v1/books/{book_id}/accounts": {
@@ -67,6 +73,23 @@ export interface paths {
     put?: never;
     /** Create Account */
     post: operations["create_account_api_ledger_v1_books__book_id__accounts_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/ledger": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Account Ledger */
+    get: operations["account_ledger_api_ledger_v1_books__book_id__accounts__account__ledger_get"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -136,8 +159,29 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Import Text */
+    /**
+     * Import Text
+     * @description Apply Beancount text. Creates the book, owned by the caller, if it doesn't exist.
+     */
     post: operations["import_text_api_ledger_v1_books__book_id__import_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/money-accounts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Money Accounts */
+    get: operations["money_accounts_api_ledger_v1_books__book_id__money_accounts_get"];
+    put?: never;
+    /** Create Money Account */
+    post: operations["create_money_account_api_ledger_v1_books__book_id__money_accounts_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -196,6 +240,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/transactions/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Create Transactions
+     * @description Create many transactions in one atomic write: all of them, or none.
+     */
+    post: operations["create_transactions_api_ledger_v1_books__book_id__transactions_batch_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/transactions/{directive_id}": {
     parameters: {
       query?: never;
@@ -228,18 +292,27 @@ export interface components {
        * @description Constraint from the open directive; empty means any.
        */
       currencies?: string[];
+      /** Display Name */
+      display_name?: string | null;
       /**
        * Implicit
        * @description Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.
        * @default false
        */
       implicit: boolean;
+      /** Institution */
+      institution?: string | null;
       /**
        * Kind
        * @description Leaf accounts hold transactions; node accounts hold sub-accounts.
        * @enum {string}
        */
       kind: "leaf" | "node";
+      /**
+       * Money
+       * @description Held at a real institution: the kind of account (`bank`, ...).
+       */
+      money?: string | null;
       /** Name */
       name: string;
       /** Open */
@@ -299,8 +372,32 @@ export interface components {
     };
     /** Book */
     Book: {
+      /** Created At */
+      created_at: string;
       /** Id */
       id: string;
+      /**
+       * Name
+       * @description The book's `option "title"`, or its ID if it has none.
+       */
+      name: string;
+      /** Updated At */
+      updated_at: string;
+    };
+    /** BookIn */
+    BookIn: {
+      /** Name */
+      name: string;
+    };
+    /** BookPatch */
+    BookPatch: {
+      /** Name */
+      name: string;
+      /**
+       * Updated At
+       * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       */
+      updated_at: string;
     };
     /**
      * Cost
@@ -355,6 +452,51 @@ export interface components {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
     };
+    /** LedgerPage */
+    LedgerPage: {
+      /**
+       * Next Cursor
+       * @description Pass as `cursor` for the next (older) page; None at the end.
+       */
+      next_cursor: string | null;
+      /**
+       * Rows
+       * @description Newest first.
+       */
+      rows: components["schemas"]["LedgerRow"][];
+    };
+    /**
+     * LedgerRow
+     * @description One transaction, as one account's ledger shows it.
+     */
+    LedgerRow: {
+      /** @description The account's change in this transaction; None if only booking could say. */
+      amount: components["schemas"]["Amount"] | null;
+      /** @description The account's running balance after this transaction, pending included. */
+      balance: components["schemas"]["Amount"] | null;
+      /**
+       * Counterpart
+       * @description The other split's account, for a two-split transaction; None for more.
+       */
+      counterpart: string | null;
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Flag */
+      flag: string;
+      /** Id */
+      id: string;
+      /** Narration */
+      narration: string | null;
+      /** Payee */
+      payee: string | null;
+      /** Splits */
+      splits: number;
+      /** Updated At */
+      updated_at: string;
+    };
     /** MetaDate */
     MetaDate: {
       /**
@@ -367,6 +509,87 @@ export interface components {
     MetaNumber: {
       /** Number */
       number: string;
+    };
+    /** MoneyAccount */
+    MoneyAccount: {
+      /**
+       * Balance
+       * @description The current balance, pending transactions included: one amount per currency held.
+       */
+      balance: components["schemas"]["Amount"][];
+      /** Close */
+      close?: string | null;
+      /**
+       * Currencies
+       * @description Constraint from the open directive; empty means any.
+       */
+      currencies?: string[];
+      /** Display Name */
+      display_name?: string | null;
+      /**
+       * Implicit
+       * @description Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.
+       * @default false
+       */
+      implicit: boolean;
+      /** Institution */
+      institution?: string | null;
+      /**
+       * Kind
+       * @description Leaf accounts hold transactions; node accounts hold sub-accounts.
+       * @enum {string}
+       */
+      kind: "leaf" | "node";
+      /**
+       * Money
+       * @description Held at a real institution: the kind of account (`bank`, ...).
+       */
+      money?: string | null;
+      /** Name */
+      name: string;
+      /** Open */
+      open?: string | null;
+      /**
+       * Type
+       * @description From the top-level account; None for an unrecognized root.
+       */
+      type: ("asset" | "liability" | "equity" | "income" | "expense") | null;
+    };
+    /**
+     * MoneyAccountIn
+     * @description A money account to add: a bank account, for now.
+     */
+    MoneyAccountIn: {
+      /**
+       * As Of
+       * Format: date
+       * @description The date `balance` was the balance; the account opens then.
+       */
+      as_of: string;
+      /**
+       * Balance
+       * @description The balance on `as_of`, recorded as an opening balance.
+       * @default 0
+       */
+      balance: string;
+      /**
+       * Currency
+       * @default USD
+       */
+      currency: string;
+      /**
+       * Display Name
+       * @description A human name, e.g. "PNC Checking".
+       */
+      display_name: string;
+      /** Institution */
+      institution?: string | null;
+      /**
+       * Money
+       * @default bank
+       * @constant
+       */
+      money: "bank";
     };
     /** Posting */
     Posting: {
@@ -630,7 +853,80 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": string[];
+          "application/json": components["schemas"]["Book"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_named_book_api_ledger_v1_books_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BookIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Book"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_book_api_ledger_v1_books__book_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Book"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -654,6 +950,48 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["Book"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  rename_book_api_ledger_v1_books__book_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BookPatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Book"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {
@@ -719,6 +1057,41 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Account"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  account_ledger_api_ledger_v1_books__book_id__accounts__account__ledger_get: {
+    parameters: {
+      query?: {
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LedgerPage"];
         };
       };
       /** @description Validation Error */
@@ -810,8 +1183,8 @@ export interface operations {
       query?: never;
       header?: never;
       path: {
-        book_id: string;
         directive_id: string;
+        book_id: string;
       };
       cookie?: never;
     };
@@ -845,8 +1218,8 @@ export interface operations {
       };
       header?: never;
       path: {
-        book_id: string;
         directive_id: string;
+        book_id: string;
       };
       cookie?: never;
     };
@@ -891,8 +1264,8 @@ export interface operations {
       };
       header?: never;
       path: {
-        book_id: string;
         directive_id: string;
+        book_id: string;
       };
       cookie?: never;
     };
@@ -976,6 +1349,72 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Applied"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  money_accounts_api_ledger_v1_books__book_id__money_accounts_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MoneyAccount"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_money_account_api_ledger_v1_books__book_id__money_accounts_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MoneyAccountIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MoneyAccount"];
         };
       };
       /** @description Validation Error */
@@ -1128,13 +1567,48 @@ export interface operations {
       };
     };
   };
-  get_transaction_api_ledger_v1_books__book_id__transactions__directive_id__get: {
+  create_transactions_api_ledger_v1_books__book_id__transactions_batch_post: {
     parameters: {
       query?: never;
       header?: never;
       path: {
         book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TransactionIn"][];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Transaction"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_transaction_api_ledger_v1_books__book_id__transactions__directive_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
         directive_id: string;
+        book_id: string;
       };
       cookie?: never;
     };
@@ -1165,8 +1639,8 @@ export interface operations {
       query?: never;
       header?: never;
       path: {
-        book_id: string;
         directive_id: string;
+        book_id: string;
       };
       cookie?: never;
     };
@@ -1208,8 +1682,8 @@ export interface operations {
       query?: never;
       header?: never;
       path: {
-        book_id: string;
         directive_id: string;
+        book_id: string;
       };
       cookie?: never;
     };

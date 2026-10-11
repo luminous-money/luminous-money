@@ -5,10 +5,17 @@
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 
-export function createApp(webRoot: string) {
+import { createApi } from "./api.js";
+import type { AppDb } from "./db.js";
+import type { LedgerPort } from "./ledger.js";
+
+export function createApp(
+  webRoot: string,
+  services: { db: AppDb; ledgerFor: (userId: string) => LedgerPort }
+) {
   const app = new Hono();
 
-  app.get("/api/app/v1/health", (c) => c.json({ status: "ok" }));
+  app.route("/", createApi(services));
 
   app.get("/ui", (c) => c.redirect("/ui/"));
 

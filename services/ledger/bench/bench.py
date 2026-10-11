@@ -98,6 +98,17 @@ def main() -> None:
     with timed("SQL: one account subtree, 14 months"):
         ledger.store.find("bench", account="Assets:US", date_from=window, limit=1_000_000)
 
+    busiest = max(
+        {a.name for a in ledger.accounts("bench") if not a.implicit and a.kind == "leaf"},
+        key=lambda name: len(ledger.store.account_entries("bench", name)),
+    )
+    with timed(f"account ledger, first page of 200 ({busiest.split(':')[-1]})"):
+        page = ledger.account_ledger("bench", busiest)
+    with timed("account ledger, next page"):
+        ledger.account_ledger("bench", busiest, cursor=page.next_cursor)
+    with timed("balance from SQL (same account)"):
+        ledger.balance("bench", busiest)
+
     with timed("BQL: balances by account"):
         ledger.query("bench", "SELECT account, sum(position) GROUP BY account")
     with timed("BQL: monthly expenses, last year"):

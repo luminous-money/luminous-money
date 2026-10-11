@@ -1,107 +1,98 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-10._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-11._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
 
-The foundations and the review queue are done. See [docs/PLAN.md](docs/PLAN.md) for the milestones ahead.
+**M1 (one bank account, end to end) is built**, with a list of
+[decisions to review](docs/milestones/m1-one-account-e2e/PLAN.md#decisions-to-review). The
+milestones ahead are in [docs/PLAN.md](docs/PLAN.md).
 
-- **`services/ledger`** (Python) is the system of record.
-  - **Storage:** each Beancount directive is a database row holding its canonical text.
-  - **Engine:** Beancount's public loader runs over rows rendered back to text.
-  - **Writes:** transactions as JSON (`/transactions`, what the app uses) or any directive as
-    Beancount text (`/directives`, `/import`). Every endpoint has a typed response, so
-    `@fava-beans/ledger-client` exports real types (`Transaction`, `TransactionIn`, ...).
-  - **Versioned, partial edits:** every edit sends the `updated_at` it read, and a stale one gets
-    409. `PATCH /transactions/{id}` changes only the given fields. JSON is snake_case.
-  - **Accounts:** leaves hold transactions and nodes hold sub-accounts. Top-level accounts and
-    unopened parents are implicit nodes. `POST /accounts` takes a fully qualified name whose
-    nearest existing ancestor must be a node; levels on the way that don't exist are opened as
-    nodes in the same write. Postings to nodes are refused.
-  - **Migrations:** `migrations.py`, with every table created through `create_table` (non-null
-    `created_at`/`updated_at`), enforced by a lint test.
-  - **Proven:** round trips are exact, validation problems map to the directive that caused them,
-    BQL works, and incremental backups are made of Beancount chunks.
-  - **Concurrency:** one SQLite connection per thread (the end-to-end suite caught a shared-
-    connection bug).
-  - **Benchmarks** are recorded in [docs/design.md](docs/design.md#performance-over-decades-of-data).
-- **`services/app`** (TypeScript) serves the PWA at `/ui/`: React + Vite + `vite-plugin-pwa`,
-  served by Hono, which also serves `/api/app/v1`.
-  - **Home:** books with their queue sizes.
-  - **Review queue:** skip, categorize with a searchable picker, edit the description, confirm.
-    Swipe right to confirm and left to skip; cards that aren't ready spring back, and the
-    stack slides up after each one. "Create account" is the last option in every
-    posting-account picker; it takes a fully qualified name, prefilled from the search, with
-    Tab/tap autofill through node accounts. It always creates a leaf.
-  - **Data layer:** TanStack Query over the generated client. Edits to one transaction run in
-    order, each with the latest version.
-  - **Detail view:** a full split editor with a live, exact balance check.
-  - The rules are in [docs/design.md](docs/design.md#how-the-review-queue-works). The pure logic
-    (`src/web/lib`) has Vitest unit tests.
-- **`ledger`** also serves the chart of accounts (`/accounts`) for the picker.
-- **Stack:** Traefik routes by top-level prefix (`/api`, `/ui`) from its file provider. Fava was
-  dropped; reports will be our own (docs/PLAN.md, M10).
-  - `/api/ledger/v1` → `ledger`
-  - `/api/app/v1` and `/ui` → `app`
-  - `/` → redirects to `/ui/`
+What a user can do now:
+- **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M6.
+- **Set up:** name a book, then add a bank account with its balance as of a date.
+- **Home** shows the bank accounts as cards, with their balances and when each was last updated
+  by an import, plus a link to import transactions.
+- **Menu:** Home, Manage books (list and rename), Review, Log out.
+- **An account's ledger:**
+  - newest first, 200 a page, with infinite scroll
+  - running balances, and the other account or `<multiple>`
+  - tapping a transaction opens the editor; the bottom line adds one
+- **Import a CSV:**
+  - the first file is profiled (columns mapped, guessed and confirmed), and later files just
+    import
+  - rows are staged for review, uncategorized; duplicates, rows before the opening balance, and
+    unreadable rows are skipped
+  - possible matches are ranked and shown, and nothing acts on them yet
+- **The review queue,** from before: skip, categorize, confirm, swipe, create accounts.
+
+How it's put together:
+- **`services/auth`** (TypeScript): the stub user, JWT sessions in an HttpOnly cookie, and
+  `/verify` for Traefik's forwardAuth, which guards every other API and sets `X-User-Id`.
+- **`services/ledger`** (Python): the system of record.
+  - Books are owned by users and named by their `option "title"`.
+  - Money accounts, and balances and account ledgers computed with SQL.
+  - Versioned PATCH edits, batch writes, migrations, backups.
+- **`services/app`** (TypeScript): the PWA, plus CSV profiles, imports and the pipeline
+  (`src/server/pipeline`), in `app.sqlite`.
+- **`packages/db`** (TypeScript migrations and timestamps, with a lint check) and
+  **`packages/csv-import`** (parsing, guessing profiles, reading rows; shared by the browser and
+  the server).
 - **Tests, all passing:**
-  - `pnpm test`: 79 ledger tests (including the table lint), 36 app unit tests, the client
-    drift check, typechecks and Prettier
-  - `pnpm e2e`: 25 API tests and 27 browser tests (Playwright, phone-sized Chromium, including
-    real touch swipes via the DevTools protocol) through Traefik, against a throwaway stack
-- **Demo data:** `pnpm seed [book]` imports a 2-year `bean-example` history whose last 45 days of
-  card and checking purchases are staged for review: flagged `!`, with `source: "demo-import"`
-  metadata, and roughly half (chosen by a hash of the ID) moved to `Expenses:Uncategorized`.
-- **The local dev stack** (`docker compose up -d`) is running on `http://localhost:8080`
-  (listening on all interfaces), with a seeded `demo` book: 24 staged transactions, 8 of them
-  uncategorized. Its 2 validation problems are `bean-example`'s own 401(k) balance assertions,
-  which is handy for building the problems UI.
+  - `pnpm test`:
+    - ledger: 99 tests, including the table lint
+    - auth: 9; app: 50; db: 10; csv-import: 22
+    - plus the client drift check, typechecks and Prettier
+  - `pnpm e2e`: 32 API tests and 34 browser tests, two clean runs
+- **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, with the demo
+  seeded for the stub user: the "Demo" book with a BofA Checking card.
 
 ## Next steps
 
-M1 is being specified and planned: [SPEC.md](docs/milestones/m1-one-account-e2e/SPEC.md) and
-[PLAN.md](docs/milestones/m1-one-account-e2e/PLAN.md).
-
-1. Finish the M1 spec (it's marked "to be continued"). Acting on matches is deliberately deferred.
-2. The plan's [remaining questions](docs/milestones/m1-one-account-e2e/PLAN.md#questions) are
-   open, but their proposals stand as defaults, so they don't block starting.
-3. Start slice 1: `packages/db`, the TypeScript migration framework.
+1. **Review M1's [decisions](docs/milestones/m1-one-account-e2e/PLAN.md#decisions-to-review)**
+   and fold the answers in. The ones flagged "input wanted" matter most:
+   - opening-balance semantics
+   - editing a saved CSV profile
+   - whether new transactions start confirmed
+   - the JWT secret
+   - operator backups
+2. Then say `elaborate plan for M2` (credit card accounts).
 
 ## Gotchas
 
+- **The JWT secret:** Compose ships a development default for `AUTH_JWT_SECRET`, and auth warns
+  about it. Set a real one before the stack leaves your machine.
+- **`pnpm e2e:local` needs `AUTH_TEST_USERS=true`** on the running stack, so each test can log in
+  a user of its own: `AUTH_TEST_USERS=true docker compose up -d`. (`pnpm e2e` sets it for its
+  throwaway stack.) It also leaves test users and books behind; to clean up, run
+  `docker compose down -v && docker compose up -d && pnpm seed`.
 - **`pnpm seed` refuses to seed a book that already exists,** because the demo gets new IDs on
-  every run and importing twice would duplicate everything. To start over, run
-  `docker compose down -v && docker compose up -d && pnpm seed` (this wipes the dev stack's data).
-- **`pnpm e2e:local` leaves test books in the dev stack** (`ui-…`, `review-…` and so on). To
-  clean up, run `docker compose down -v && docker compose up -d && pnpm seed`.
-- **Playwright is pinned to 1.63.0** in `tests/ui/package.json` and in `node.Dockerfile`'s `ui`
-  stage. They must match, because the image's preinstalled browsers belong to that version. Bump
-  both together.
-- **The UI calls the ledger API directly** through Traefik. Nothing proxies through `app` yet;
-  that changes once auth exists.
-- **Databases from before the migration framework are refused** with a message to recreate them
+  every run and importing twice would duplicate everything.
+- **Databases from before a service's migrations are refused** with a message to recreate them
   (`docker compose down -v`). No real data exists yet, so there's no backfill.
+- **All services share the data volume as UID 1000.** A volume created by an older, root-owned
+  image needs `docker compose down -v` once.
+- **Playwright is pinned to 1.63.0** in `tests/ui/package.json` and in `node.Dockerfile`'s `ui`
+  stage. They must match, because the image's preinstalled browsers belong to that version.
 - **Beancount 3.2's `extra_validations` leaks:** each load appends them to a global list. Run
   extra checks after loading instead (see `engine.load`).
 - **`openapi-typescript` treats fields with defaults as required,** so the generated request
   types ask for `flag` and `narration` even though the API defaults them.
-- **TypeScript is pinned to 5.x.** `openapi-typescript` needs the TypeScript 5 compiler API, and
-  pnpm will offer TypeScript 7, which breaks generation.
+- **TypeScript is pinned to 5.x.** `openapi-typescript` needs the TypeScript 5 compiler API.
+- **`node:sqlite` is experimental in Node 22;** its warning is silenced in the service images.
 - **pnpm 11 checks the lockfile against a supply-chain policy, which needs registry access.**
   That's why `node.Dockerfile` installs with `--prefer-offline`, not `--offline`.
 - **Swarm hasn't been exercised for real.** `docker stack config -c compose.yaml` accepts the
-  file, but `docker swarm init` wasn't run on the dev machine.
-- **Text endpoints need `beancount()` with openapi-fetch.** It assumes JSON bodies; the helper in
-  `tests/e2e/src/support.ts` sends text unchanged. The app should prefer the JSON endpoints.
-- **Exports use Beancount's printer alignment,** which pads some `open` and `price` lines widely.
-  It's cosmetic.
+  file.
+- **Text endpoints need `beancount()` with openapi-fetch.** The app should prefer the JSON
+  endpoints.
 
 ## Verify
 
 ```sh
-pnpm test                 # unit tests, contract drift, typechecks, formatting
-pnpm e2e                  # whole stack, end to end
-docker compose up -d      # then open http://localhost:8080/
+pnpm test                 # unit tests, contract drift, typechecks, formatting, lint
+pnpm e2e                  # whole stack, end to end (API and browser)
+docker compose up -d      # then open http://localhost:8080/ and log in
 ```

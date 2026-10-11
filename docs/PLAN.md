@@ -44,8 +44,9 @@ Each milestone's detailed plan lives in `milestones/<milestone>/PLAN.md` next to
 [milestones/m1-one-account-e2e](milestones/m1-one-account-e2e/PLAN.md)), written when the
 milestone starts.
 
-- [ ] **M1: One bank account end-to-end.** _In progress:_
-      [spec](milestones/m1-one-account-e2e/SPEC.md), [plan](milestones/m1-one-account-e2e/PLAN.md).
+- [x] **M1: One bank account end-to-end.** Built 2026-10-11, with
+      [decisions to review](milestones/m1-one-account-e2e/PLAN.md#decisions-to-review)
+      ([spec](milestones/m1-one-account-e2e/SPEC.md), [plan](milestones/m1-one-account-e2e/PLAN.md)).
   - the "brand new empty user" homepage
   - the add-an-account flow
   - the homepage with accounts
@@ -151,10 +152,6 @@ elaborated.
 
 ## Open questions
 
-- **Marking money accounts:** is it an explicit property of the account (metadata on its `open`
-  directive, such as the institution's name), or derived from where it sits (leaves under
-  `Assets` and `Liabilities`)? Derived is simpler, but not every asset leaf is held at an
-  institution, and some may never be (a car, say).
 - **Resolver contract:**
   - What does confidence mean, and is it comparable across resolvers?
   - Can a resolver return a partial answer (e.g. a match with a suggested split)?

@@ -3,18 +3,16 @@
 import datetime
 
 import pytest
-from conftest import FEATURES, STAGED
-from fastapi.testclient import TestClient
+from conftest import FEATURES, STAGED, USER, http
 
 from ledger import engine, models
-from ledger.api import create_app
 
 ROOTS = {"Assets": "asset", "Liabilities": "liability", "Equity": "equity", "Income": "income", "Expenses": "expense"}
 
 
 @pytest.fixture
 def book(ledger):
-    ledger.apply_file("book", FEATURES)
+    ledger.apply_file("book", FEATURES, owner_id=USER)
     return ledger
 
 
@@ -46,6 +44,9 @@ def test_opened_accounts_are_leaves_with_their_open_close_and_constraints(book):
         "open": datetime.date(2020, 1, 1),
         "close": None,
         "currencies": ["USD"],
+        "money": None,
+        "display_name": None,
+        "institution": "First Bank",  # the fixture's own metadata
     }
     assert accounts["Assets:Brokerage"].currencies == ["VTI", "USD"]
     assert accounts["Assets:Cash"].close == datetime.date(2020, 12, 31)
@@ -163,7 +164,7 @@ def test_imported_postings_to_a_node_are_flagged_as_problems(book):
 
 
 def test_accounts_over_http(book):
-    client = TestClient(create_app(book))
+    client = http(book)
 
     created = client.post("/api/ledger/v1/books/book/accounts", json={"name": "Expenses:Travel:Hotels"})
     assert created.status_code == 422  # Expenses:Travel is a leaf

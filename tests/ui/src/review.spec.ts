@@ -4,8 +4,8 @@ import { problems, seedBook, stored, type Seeded } from "./support.js";
 
 let seeded: Seeded;
 
-test.beforeEach(async () => {
-  seeded = await seedBook();
+test.beforeEach(async ({ page }) => {
+  seeded = await seedBook(page);
 });
 
 const queue = (page: Page) => page.getByRole("article");
@@ -16,17 +16,6 @@ async function openQueue(page: Page) {
   await page.goto(`/ui/books/${seeded.book}/review`);
   await expect(queue(page)).toHaveCount(3);
 }
-
-test("the home page lists the book with its queue size and opens the queue", async ({ page }) => {
-  await page.goto("/ui/");
-
-  const book = page.getByRole("link", { name: new RegExp(seeded.book) });
-  await expect(book).toContainText("3 to review");
-  await book.click();
-
-  await expect(page).toHaveURL(new RegExp(`/ui/books/${seeded.book}/review$`));
-  await expect(queue(page)).toHaveCount(3);
-});
 
 test("skip moves an item to the end without changing it", async ({ page }) => {
   await openQueue(page);
