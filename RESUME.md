@@ -6,7 +6,7 @@ _Updated 2026-10-10._ Keep this current: every finalized change set updates it (
 
 ## State
 
-The foundations and the review queue are done. See [PLAN.md](PLAN.md) for the milestones ahead.
+The foundations and the review queue are done. See [docs/PLAN.md](docs/PLAN.md) for the milestones ahead.
 
 - **`services/ledger`** (Python) is the system of record.
   - **Storage:** each Beancount directive is a database row holding its canonical text.
@@ -42,7 +42,7 @@ The foundations and the review queue are done. See [PLAN.md](PLAN.md) for the mi
     (`src/web/lib`) has Vitest unit tests.
 - **`ledger`** also serves the chart of accounts (`/accounts`) for the picker.
 - **Stack:** Traefik routes by top-level prefix (`/api`, `/ui`) from its file provider. Fava was
-  dropped; reports will be our own (PLAN.md, M10).
+  dropped; reports will be our own (docs/PLAN.md, M10).
   - `/api/ledger/v1` → `ledger`
   - `/api/app/v1` and `/ui` → `app`
   - `/` → redirects to `/ui/`

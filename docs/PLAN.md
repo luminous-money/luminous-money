@@ -2,7 +2,7 @@ Plan
 ==================================================================================================
 
 The roadmap, as milestones. The reasoning behind each piece lives in
-[docs/design.md](docs/design.md); where work stands right now lives in [RESUME.md](RESUME.md).
+[design.md](design.md); where work stands right now lives in [RESUME.md](../RESUME.md).
 
 Two principles set the order:
 
@@ -40,8 +40,8 @@ Two principles set the order:
 
 ## Milestones
 
-Each milestone's detailed plan lives in `docs/milestones/<milestone>/PLAN.md` (e.g.
-[docs/milestones/m1-one-account-e2e](docs/milestones/m1-one-account-e2e/PLAN.md)), written when the
+Each milestone's detailed plan lives in `milestones/<milestone>/PLAN.md` next to this file (e.g.
+[milestones/m1-one-account-e2e](milestones/m1-one-account-e2e/PLAN.md)), written when the
 milestone starts.
 
 - [ ] **M1: One bank account end-to-end.**

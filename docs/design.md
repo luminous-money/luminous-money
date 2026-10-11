@@ -1,7 +1,7 @@
 # Design
 
 The durable decisions behind fava-beans and the architecture they add up to. What's being built
-next lives in [PLAN.md](../PLAN.md); where work stands right now lives in
+next lives in [PLAN.md](PLAN.md); where work stands right now lives in
 [RESUME.md](../RESUME.md).
 
 ## Why this exists

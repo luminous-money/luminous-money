@@ -11,7 +11,7 @@ books and handles transactions that span several of them.
 > data first, and only then hydrate with real finances.
 
 - **[RESUME.md](RESUME.md):** where work stands and what to do next. Start here.
-- **[PLAN.md](PLAN.md):** the roadmap, deferred items and open questions.
+- **[docs/PLAN.md](docs/PLAN.md):** the roadmap, deferred items and open questions.
 - **[docs/design.md](docs/design.md):** the decisions behind the system and its architecture.
 
 ## Quick start
