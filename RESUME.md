@@ -57,8 +57,9 @@ How it's put together:
 
 ## Next steps
 
-1. Say `elaborate plan for M2` (credit card accounts). M1's decisions are answered, except the
-   JWT secret (skipped for now).
+1. **Answer M2's [questions](docs/milestones/m2-credit-card/PLAN.md#questions):** the name,
+   signs on cards, when a match is made without asking, and merged transfers' flags.
+2. Then build M2.
 
 ## Gotchas
 
