@@ -748,6 +748,18 @@
             "default": "bank",
             "title": "Money",
             "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The account's fully qualified name: anything the account rules allow. Defaults to `Assets:Bank:<display name>`, with dashes for spaces.",
+            "title": "Name"
           }
         },
         "required": [
@@ -2095,6 +2107,7 @@
     },
     "/api/ledger/v1/books/{book_id}/export": {
       "get": {
+        "description": "The whole book as one Beancount file, named for downloading: the user's own copy of their\ndata, which `/import` can restore. (`/backup` gives every book of the caller's, changed\nsince a cursor, for scheduled backups.)",
         "operationId": "export_api_ledger_v1_books__book_id__export_get",
         "parameters": [
           {

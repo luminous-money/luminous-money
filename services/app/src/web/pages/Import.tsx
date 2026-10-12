@@ -4,24 +4,30 @@ import { Link } from "wouter";
 
 import { ImportResults } from "../components/ImportResults.js";
 import { ProfileEditor } from "../components/ProfileEditor.js";
-import type { ImportResult } from "../lib/appApi.js";
+import { ImportError, type ImportResult } from "../lib/appApi.js";
 import { useBack, useParam } from "../lib/navigation.js";
 import {
   explain,
   useImport,
   useMoneyAccounts,
-  useProfile,
+  useProfiles,
   useSaveProfile,
 } from "../lib/queries.js";
 
+/** A new profile replaces the account's saved ones, or is added alongside them. */
+type Mode = "replace" | "add";
+
 type Stage =
   | { kind: "choose" }
-  | { kind: "profile"; file: File; text: string; guess: CsvProfile }
+  | { kind: "mismatch"; file: File }
+  | { kind: "profile"; file: File; text: string; guess: CsvProfile; mode: Mode }
   | { kind: "done"; result: ImportResult };
 
 /**
  * The CSV import console: pick an account, drop in its bank's CSV. The first file for an account
- * is profiled first (how its columns map to ours), and the profile is saved for next time.
+ * is profiled first (how its columns map to ours), and the profile is saved for next time. A
+ * file that fits none of the account's saved profiles asks whether it's really for this account,
+ * and if so, profiles it to replace the saved ones or to add to them.
  * `?account=` picks the account to start with; `?back=` is where "‹ Back" goes.
  */
 export function Import({ book }: { book: string }) {
@@ -30,29 +36,38 @@ export function Import({ book }: { book: string }) {
   const preset = useParam("account");
   const [account, setAccount] = useState(preset ?? "");
   const chosen = account || accounts.data?.[0]?.name || "";
-  const profile = useProfile(book, chosen || undefined);
+  const profiles = useProfiles(book, chosen || undefined);
+  const saved = profiles.data?.length ?? 0;
   const save = useSaveProfile(book);
   const run = useImport(book);
   const [stage, setStage] = useState<Stage>({ kind: "choose" });
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const currency = accounts.data?.find((a) => a.name === chosen)?.currencies?.[0] ?? "USD";
+  const target = accounts.data?.find((a) => a.name === chosen);
+  const currency = target?.currencies?.[0] ?? "USD";
 
   const start = async (file: File) => {
     setError(null);
-    if (profile.data) return importNow(file);
+    return saved ? importNow(file) : profileFile(file, "replace");
+  };
+  const profileFile = async (file: File, mode: Mode) => {
     const text = await file.text();
     const guess = guessProfile(text);
-    if (!guess)
+    if (!guess) {
+      setStage({ kind: "choose" });
       return setError(
         "That doesn't look like a bank CSV: no column of dates and amounts was found."
       );
-    setStage({ kind: "profile", file, text, guess });
+    }
+    setStage({ kind: "profile", file, text, guess, mode });
   };
   const importNow = async (file: File) => {
     try {
       setStage({ kind: "done", result: await run.mutateAsync({ account: chosen, file }) });
     } catch (e) {
+      if (e instanceof ImportError && e.code === "wrong-layout") {
+        return setStage({ kind: "mismatch", file });
+      }
       setError(explain(e));
       setStage({ kind: "choose" });
     }
@@ -82,6 +97,25 @@ export function Import({ book }: { book: string }) {
             </button>
           </p>
         </>
+      ) : stage.kind === "mismatch" ? (
+        <section className="card stack" aria-label="File format mismatch">
+          <p>
+            The uploaded file doesn't match{" "}
+            {saved > 1 ? "any of the saved formats" : "the saved format"} for this account. Are you
+            sure this file is for the account '{target?.display_name ?? chosen}'?
+          </p>
+          <div className="choices">
+            <button type="button" onClick={() => void profileFile(stage.file, "replace")}>
+              Yes, replace saved format{saved > 1 ? "s" : ""}
+            </button>
+            <button type="button" onClick={() => void profileFile(stage.file, "add")}>
+              Yes, this is an additional format for this account
+            </button>
+            <button type="button" onClick={() => setStage({ kind: "choose" })}>
+              Cancel
+            </button>
+          </div>
+        </section>
       ) : stage.kind === "profile" ? (
         <ProfileEditor
           text={stage.text}
@@ -90,7 +124,7 @@ export function Import({ book }: { book: string }) {
           busy={save.isPending || run.isPending}
           onCancel={() => setStage({ kind: "choose" })}
           onSave={async (p) => {
-            await save.mutateAsync({ account: chosen, profile: p });
+            await save.mutateAsync({ account: chosen, profile: p, mode: stage.mode });
             await importNow(stage.file);
           }}
         />
@@ -110,11 +144,13 @@ export function Import({ book }: { book: string }) {
               ))}
             </select>
           </label>
-          {chosen && !profile.isPending && (
+          {chosen && !profiles.isPending && (
             <p className="muted small">
-              {profile.data
-                ? "This account's CSV layout is known: files import straight away."
-                : "First import for this account: you'll confirm how its CSV is laid out."}
+              {saved === 0
+                ? "First import for this account: you'll confirm how its CSV is laid out."
+                : saved === 1
+                  ? "This account's CSV layout is known: files import straight away."
+                  : `This account has ${saved} known CSV layouts: files in any of them import straight away.`}
             </p>
           )}
           <label

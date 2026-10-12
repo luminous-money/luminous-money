@@ -3,7 +3,8 @@ import { useState } from "react";
 
 import { explain, useBooks, useRenameBook } from "../lib/queries.js";
 
-/** Manage books: for M1, see them and rename them. More books come with M7. */
+/** Manage books: for M1, see them, rename them and export them (the whole book as one Beancount
+ * file, the user's own copy of their data). More books come with M7. */
 export function Books() {
   const books = useBooks();
   return (
@@ -30,9 +31,18 @@ function BookCard({ book }: { book: Book }) {
     return (
       <div className="card book">
         <h3>{book.name}</h3>
-        <button type="button" onClick={() => (setName(book.name), setEditing(true))}>
-          Rename
-        </button>
+        <div className="actions">
+          <a
+            className="button"
+            href={`/api/ledger/v1/books/${encodeURIComponent(book.id)}/export`}
+            download
+          >
+            Export
+          </a>
+          <button type="button" onClick={() => (setName(book.name), setEditing(true))}>
+            Rename
+          </button>
+        </div>
       </div>
     );
   }

@@ -1,7 +1,7 @@
 /**
  * Importing a CSV file into a money account.
  *
- * 1. The file is read with the account's CSV profile (it must fit the profile's layout).
+ * 1. The file is read with the first of the account's CSV profiles whose layout it fits.
  * 2. Each readable row gets a fingerprint. A row whose fingerprint an earlier import already
  *    staged is a duplicate, and is skipped.
  * 3. Rows dated on or before the account's `as_of` (its opening balance's date) are skipped: the
@@ -82,12 +82,13 @@ export async function importFile({
   const [accounts, money] = await Promise.all([ledger.accounts(book), ledger.moneyAccounts(book)]);
   const target = money.find((a) => a.name === account);
   if (!target) throw new ImportProblem("not-a-money-account", `${account} isn't a money account`);
-  const profile: CsvProfile | undefined = db.profile(book, account);
-  if (!profile) throw new ImportProblem("no-profile", `${account} has no CSV profile yet`);
-  if (!fits(profile, text)) {
+  const profiles = db.profiles(book, account);
+  if (!profiles.length) throw new ImportProblem("no-profile", `${account} has no CSV profile yet`);
+  const profile: CsvProfile | undefined = profiles.find((p) => fits(p, text));
+  if (!profile) {
     throw new ImportProblem(
       "wrong-layout",
-      `this file's columns don't match ${account}'s CSV profile`
+      `this file's columns don't match any of ${account}'s saved file formats`
     );
   }
 

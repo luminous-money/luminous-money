@@ -140,7 +140,12 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Export */
+    /**
+     * Export
+     * @description The whole book as one Beancount file, named for downloading: the user's own copy of their
+     *     data, which `/import` can restore. (`/backup` gives every book of the caller's, changed
+     *     since a cursor, for scheduled backups.)
+     */
     get: operations["export_api_ledger_v1_books__book_id__export_get"];
     put?: never;
     post?: never;
@@ -596,6 +601,11 @@ export interface components {
        * @constant
        */
       money: "bank";
+      /**
+       * Name
+       * @description The account's fully qualified name: anything the account rules allow. Defaults to `Assets:Bank:<display name>`, with dashes for spaces.
+       */
+      name?: string | null;
     };
     /** Posting */
     Posting: {

@@ -3,9 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { guessProfile } from "@fava-beans/csv-import";
+import { migrate, open } from "@fava-beans/db";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { AppDb } from "./db.js";
+import { AppDb, MIGRATIONS } from "./db.js";
 import { fingerprints, ImportProblem, importFile, UNCATEGORIZED } from "./imports.js";
 import { FakeLedger } from "./testing.js";
 
@@ -28,7 +29,7 @@ beforeEach(() => {
   ledger = new FakeLedger();
   ledger.addBook("b");
   ledger.addAccount(ACCOUNT, { money: "bank", open: "2024-03-01", currencies: ["USD"] } as never);
-  db.saveProfile("b", ACCOUNT, guessProfile(FILE)!);
+  db.replaceProfiles("b", ACCOUNT, [guessProfile(FILE)!]);
 });
 
 describe("importing a file", () => {
@@ -116,6 +117,48 @@ describe("importing a file", () => {
     expect(db.batch("b", result.batch.id)).toMatchObject({ staged: 3, filename: "march.csv" });
     expect(db.rows(result.batch.id)).toEqual(result.rows);
     expect(db.lastImports("b")).toEqual({ [ACCOUNT]: result.batch.created_at });
+  });
+});
+
+describe("several file formats for one account", () => {
+  const OTHER = `Posted,Payee,Debit,Credit
+2024-03-10,BAKERY,6.00,
+2024-03-11,REFUND,,2.00
+`;
+
+  it("reads a file with whichever of the account's profiles it fits", async () => {
+    db.addProfile("b", ACCOUNT, guessProfile(OTHER)!);
+
+    const first = await run();
+    const second = await run(OTHER);
+
+    expect(first.batch.staged).toBe(3);
+    expect(second.rows.map((r) => [r.description, r.amount, r.outcome])).toEqual([
+      ["BAKERY", "-6.00", "staged"],
+      ["REFUND", "2.00", "staged"],
+    ]);
+  });
+
+  it("replacing the profiles leaves only the new ones", async () => {
+    db.replaceProfiles("b", ACCOUNT, [guessProfile(OTHER)!]);
+
+    expect(db.profiles("b", ACCOUNT)).toHaveLength(1);
+    await expect(run()).rejects.toMatchObject({ code: "wrong-layout" });
+    expect((await run(OTHER)).batch.staged).toBe(2);
+  });
+
+  it("keeps a profile saved before profiles became a list (migration 2)", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "app-")), "app.sqlite");
+    const old = open(path);
+    migrate(old, MIGRATIONS.slice(0, 1));
+    old
+      .prepare(
+        "INSERT INTO csv_profile (book_id, account, profile, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+      )
+      .run("b", ACCOUNT, JSON.stringify(guessProfile(FILE)), "t", "t");
+    old.close();
+
+    expect(new AppDb(path).profiles("b", ACCOUNT)).toEqual([guessProfile(FILE)]);
   });
 });
 

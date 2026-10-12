@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import datetime
 import os
+import re
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, FastAPI, Header, HTTPException, Query, Request
@@ -126,8 +127,15 @@ def create_app(ledger: Ledger) -> FastAPI:
         return models.Applied(put=applied.put, deleted=applied.deleted)
 
     @api.get("/books/{book_id}/export", response_class=PlainTextResponse)
-    def export(book_id: OwnedBook) -> str:
-        return ledger.export(book_id)
+    def export(book_id: OwnedBook) -> PlainTextResponse:
+        """The whole book as one Beancount file, named for downloading: the user's own copy of their
+        data, which `/import` can restore. (`/backup` gives every book of the caller's, changed
+        since a cursor, for scheduled backups.)"""
+        filename = re.sub(r"[^A-Za-z0-9_-]+", "-", ledger.book(book_id).name).strip("-") or book_id
+        return PlainTextResponse(
+            ledger.export(book_id),
+            headers={"Content-Disposition": f'attachment; filename="{filename}.beancount"'},
+        )
 
     @api.get("/books/{book_id}/accounts")
     def accounts(book_id: OwnedBook) -> list[models.Account]:

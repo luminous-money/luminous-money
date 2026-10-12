@@ -310,14 +310,15 @@ class Ledger:
     def create_money_account(self, book_id: str, m: models.MoneyAccountIn) -> models.MoneyAccount:
         """Add a bank account by its human name, with its balance on a date.
 
-        It's opened as `Assets:Bank:<Name>` (dashes for spaces), with the nodes on the way if
-        they're missing, on the `as_of` date. The balance is recorded as an opening-balance
+        It's opened as `name`, by default `Assets:Bank:<Name>` (dashes for spaces), with the nodes
+        on the way if they're missing, on the `as_of` date. Any name the account rules allow will
+        do (see `create_account`). The balance is recorded as an opening-balance
         transaction against `Equity:Opening-Balances` on that date, so the account's balance is
         right from the start. It's written even when it's zero: its date is the account's `as_of`,
         which says where imports start, and it can be moved like any transaction. All of it is one
         write.
         """
-        name = f"Assets:Bank:{engine.segment(m.display_name)}"
+        name = m.name or f"Assets:Bank:{engine.segment(m.display_name)}"
         meta = {engine.MONEY_KEY: m.money, engine.DISPLAY_NAME_KEY: m.display_name}
         if m.institution:
             meta[engine.INSTITUTION_KEY] = m.institution

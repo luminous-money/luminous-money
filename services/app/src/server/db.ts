@@ -1,6 +1,7 @@
 /** The app's own database: CSV profiles and import history. */
+import { randomUUID } from "node:crypto";
+
 import {
-  after,
   createTable,
   migrate,
   now,
@@ -50,6 +51,21 @@ export const MIGRATIONS: Migration[] = [
     ),
     "CREATE INDEX import_row_fingerprint ON import_row(fingerprint)",
   ],
+  // 2: several CSV profiles per account, since a bank can export more than one layout.
+  [
+    "ALTER TABLE csv_profile RENAME TO csv_profile_1",
+    createTable("csv_profile", [
+      "id TEXT PRIMARY KEY",
+      "book_id TEXT NOT NULL",
+      "account TEXT NOT NULL",
+      "profile TEXT NOT NULL",
+    ]),
+    "CREATE INDEX csv_profile_account ON csv_profile(book_id, account, created_at)",
+    `INSERT INTO csv_profile (id, book_id, account, profile, created_at, updated_at)
+     SELECT lower(hex(randomblob(16))), book_id, account, profile, created_at, updated_at
+     FROM csv_profile_1`,
+    "DROP TABLE csv_profile_1",
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -62,24 +78,35 @@ export class AppDb {
     migrate(this.db, MIGRATIONS);
   }
 
-  profile(book: string, account: string): CsvProfile | undefined {
-    const row = this.db
-      .prepare("SELECT profile FROM csv_profile WHERE book_id = ? AND account = ?")
-      .get(book, account) as { profile: string } | undefined;
-    return row && (JSON.parse(row.profile) as CsvProfile);
+  /** The account's CSV profiles, oldest first. A file is read with the first one it fits. */
+  profiles(book: string, account: string): CsvProfile[] {
+    const rows = this.db
+      .prepare(
+        "SELECT profile FROM csv_profile WHERE book_id = ? AND account = ? ORDER BY created_at, rowid"
+      )
+      .all(book, account) as { profile: string }[];
+    return rows.map((r) => JSON.parse(r.profile) as CsvProfile);
   }
 
-  saveProfile(book: string, account: string, profile: CsvProfile): void {
-    const previous = this.db
-      .prepare("SELECT updated_at FROM csv_profile WHERE book_id = ? AND account = ?")
-      .get(book, account) as { updated_at: string } | undefined;
-    const stamp = after(previous?.updated_at);
+  /** Replace all of the account's CSV profiles. */
+  replaceProfiles(book: string, account: string, profiles: CsvProfile[]): void {
+    transaction(this.db, () => {
+      this.db
+        .prepare("DELETE FROM csv_profile WHERE book_id = ? AND account = ?")
+        .run(book, account);
+      for (const profile of profiles) this.addProfile(book, account, profile);
+    });
+  }
+
+  /** Add another CSV profile for the account. */
+  addProfile(book: string, account: string, profile: CsvProfile): void {
+    const stamp = now();
     this.db
       .prepare(
-        `INSERT INTO csv_profile (book_id, account, profile, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT (book_id, account) DO UPDATE SET profile = excluded.profile, updated_at = excluded.updated_at`
+        `INSERT INTO csv_profile (id, book_id, account, profile, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
       )
-      .run(book, account, JSON.stringify(profile), stamp, stamp);
+      .run(randomUUID().replace(/-/g, ""), book, account, JSON.stringify(profile), stamp, stamp);
   }
 
   /** Which of `fingerprints` were already staged by an earlier import into the account. */

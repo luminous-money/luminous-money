@@ -145,6 +145,11 @@ class MoneyAccountIn(Strict):
     """A money account to add: a bank account, for now."""
 
     display_name: str = Field(min_length=1, description='A human name, e.g. "PNC Checking".')
+    name: str | None = Field(
+        None,
+        description="The account's fully qualified name: anything the account rules allow. Defaults to "
+        "`Assets:Bank:<display name>`, with dashes for spaces.",
+    )
     money: Literal["bank"] = "bank"
     institution: str | None = None
     currency: str = "USD"

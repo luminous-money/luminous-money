@@ -54,7 +54,7 @@ export const keys = {
   money: (book: string) => ["book", book, "money"] as const,
   lastImports: (book: string) => ["book", book, "last-imports"] as const,
   ledger: (book: string, account: string) => ["book", book, "ledger", account] as const,
-  profile: (book: string, account: string) => ["book", book, "profile", account] as const,
+  profiles: (book: string, account: string) => ["book", book, "profiles", account] as const,
   queue: (book: string) => ["book", book, "queue"] as const,
   transaction: (book: string, id: string) => ["book", book, "transaction", id] as const,
 };
@@ -170,10 +170,10 @@ export function useCreateTransaction(book: string) {
   });
 }
 
-export function useProfile(book: string, account: string | undefined) {
+export function useProfiles(book: string, account: string | undefined) {
   return useQuery({
-    queryKey: keys.profile(book, account ?? ""),
-    queryFn: () => appApi.profile(book, account!),
+    queryKey: keys.profiles(book, account ?? ""),
+    queryFn: () => appApi.profiles(book, account!),
     enabled: !!account,
   });
 }
@@ -181,9 +181,17 @@ export function useProfile(book: string, account: string | undefined) {
 export function useSaveProfile(book: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ account, profile }: { account: string; profile: CsvProfile }) =>
-      appApi.saveProfile(book, account, profile),
-    onSuccess: (profile, { account }) => client.setQueryData(keys.profile(book, account), profile),
+    mutationFn: ({
+      account,
+      profile,
+      mode,
+    }: {
+      account: string;
+      profile: CsvProfile;
+      mode: "replace" | "add";
+    }) => appApi.saveProfile(book, account, profile, mode),
+    onSuccess: (profiles, { account }) =>
+      client.setQueryData(keys.profiles(book, account), profiles),
   });
 }
 

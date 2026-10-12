@@ -375,8 +375,10 @@ shape):
   - `money: "bank"` (later `credit-card`, `brokerage`)
   - `display-name`, a human name, spaces allowed
   - `institution`
-- **Adding a bank account** opens `Assets:Bank:<Name>` on an as-of date, with an opening-balance
-  transaction against `Equity:Opening-Balances` (written even for a zero balance).
+- **Adding a bank account** opens it on an as-of date, with an opening-balance transaction
+  against `Equity:Opening-Balances` (written even for a zero balance).
+  - **Where it's kept** defaults to `Assets:Bank:<Name>`, and can be any name the account rules
+    allow: users structure their accounts as they like, short of adding top-level accounts.
   - The balance means "at the end of that day", so imported rows from that day or earlier are
     skipped as already counted.
   - **The opening balance's date is the account's `as_of`,** wherever it's moved. Moving it back
@@ -395,13 +397,16 @@ shape):
 
 ### Importing CSVs (M1)
 
-- **A CSV profile per account** says how its bank's export is laid out: the preamble, header,
-  date column and format, signed or debit/credit amounts, description, and optionally payee,
-  bank ID and running balance.
-  - It's guessed from the first file (`packages/csv-import`, shared by the browser and the
+- **CSV profiles** say how a bank's export is laid out: the preamble, header, date column and
+  format, signed or debit/credit amounts, description, and optionally payee, bank ID and running
+  balance.
+  - One is guessed from the first file (`packages/csv-import`, shared by the browser and the
     server), confirmed by the user, and stored in `app`'s database.
-  - Later files must have the same columns.
-- **An import** reads every row with the profile and fingerprints it:
+  - **An account can have several,** since banks export more than one layout. A file is read
+    with the first that fits it.
+  - **A file that fits none asks** whether it's really for this account. If it is, it's profiled,
+    and the new profile either replaces the saved ones or is added to them.
+- **An import** reads every row with the fitting profile and fingerprints it:
   - **the fingerprint** is the bank's ID if mapped; otherwise the date, amount and description,
     plus the row's occurrence among identical ones in the file
   - **rows skipped:** duplicates of earlier imports, rows before the opening balance, and rows
@@ -410,6 +415,9 @@ shape):
     transactions against `Expenses:Uncategorized` or `Income:Uncategorized`
   - **recorded:** the batch and each row's outcome; the last batch's time is the account's
     "last updated"
+- **Exporting:** any user can download a book as one Beancount file (Manage books → Export),
+  which the ledger's `/import` restores. `/backup?since=` serves scheduled backups of all of the
+  caller's books. CSV profiles and import history aren't included.
 - **The pipeline, as built:** a chain of resolvers over a batch and its context (the account's
   transactions around the batch's dates). M1's only resolver is the matcher: the same amount,
   within ±5 days, ranked by closeness in date. It identifies and ranks; nothing acts on matches

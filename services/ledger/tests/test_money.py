@@ -128,6 +128,20 @@ def test_any_posting_before_its_account_opens_moves_the_open_back_to_meet_it(boo
     assert book.problems("book") == []
 
 
+def test_a_bank_account_can_be_kept_anywhere_the_account_rules_allow(book):
+    account = book.create_money_account(
+        "book",
+        models.MoneyAccountIn(display_name="Joint Checking", name="Assets:Shared:Checking", balance="5", as_of=datetime.date(2024, 1, 1)),
+    )
+
+    assert (account.name, account.display_name) == ("Assets:Shared:Checking", "Joint Checking")
+    assert {a.name: a.kind for a in book.accounts("book")}["Assets:Shared"] == "node"
+    with pytest.raises(engine.ParseFailure):
+        book.create_money_account(
+            "book", models.MoneyAccountIn(display_name="Bad", name="Checking", as_of=datetime.date(2024, 1, 1))
+        )
+
+
 def test_names_with_quotes_survive_and_duplicates_are_refused(book):
     account = bank(book, name='Joint "Rainy Day" fund')
 

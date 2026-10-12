@@ -265,14 +265,14 @@ input is wanted.
    transaction, so every account has one to move.
 2. **Money accounts are marked explicitly:** `money: "bank"`, `display-name` and `institution`
    metadata on the `open` directive.
-   - **The path is derived** from the name (`Assets:Bank:PNC-Checking`). It's shown, but can't be
-     edited in the form.
+   - **The path follows the name** (`Assets:Bank:PNC-Checking`) until it's edited.
 
-   _Input wanted:_ should the path be editable, or the parent (`Assets:Bank`) be choosable?
+   _Answered:_ don't constrain it. The path is editable, with the same autofill and checks as
+   creating any account, and can be anything the account rules allow: under a top-level account,
+   below a node, not already taken.
 3. **New transactions from the ledger's "Add transaction" line are saved confirmed (`*`),**
    since they're written by hand. They start with a split on the account and today's date.
-   _Input wanted:_ or start them pending, or offer the confirmed checkbox planned for the general
-   ledger?
+   _Answered:_ confirmed is fine.
 4. **Balances and ledgers come from SQL, recomputed per request** from the account's whole history.
    - That's about 90 ms a page on the laptop for the busiest account of a decades-scale book,
      which is likely around a second on a Pi 3.
@@ -280,12 +280,19 @@ input is wanted.
 
 ### Importing
 
-5. **There's no way to edit a saved CSV profile yet.** A later file with different columns is
-   refused ("this file's columns don't match"). _Input wanted:_ the next step would be an "edit
-   profile" action in the import console that re-profiles from a new file. Worth adding before M2?
+5. **A file that fits none of an account's saved formats asks first.** "The uploaded file doesn't
+   match the saved format for this account. Are you sure this file is for the account
+   '<account name>'?", with:
+   - **Yes, replace saved format:** profile the file, and keep only the new profile.
+   - **Yes, this is an additional format for this account:** profile the file, and keep it
+     alongside the others.
+   - **Cancel.**
+
+   An account can have several profiles; a file is read with the first one it fits. (Answered.
+   Managing saved formats directly is a Polish task in the [plan](../../PLAN.md#polish).)
 6. **Where CSV fields go:** the bank's description becomes the transaction's description
    (narration), editable in the review queue. A payee column, if mapped, becomes the payee.
-   _Input wanted:_ would you rather the bank's description be the payee?
+   _Answered:_ fine as it is.
 7. **Duplicates are skipped and counted, not shown for confirmation.**
    - A row is recognized by the bank's transaction ID if the profile maps one. Otherwise it's
      the date, amount and description, plus which occurrence of those it is in the file, so two
@@ -313,19 +320,23 @@ input is wanted.
     - Bearer tokens also accepted, for scripts and tests
     - logging out clears the cookie, but a stolen token stays valid until it expires (M6)
 13. **The JWT secret:** Compose ships a development default, and the auth service warns when it's
-    in use. _Input wanted:_ before the stack leaves your laptop, set `AUTH_JWT_SECRET`, and
-    decide whether a missing secret should refuse to start instead.
+    in use. Set `AUTH_JWT_SECRET` before the stack leaves your laptop. _Skipped for now:_ whether
+    a missing secret should refuse to start.
 14. **Test users (`AUTH_TEST_USERS`):** an opt-in auth mode, only for test stacks, where `login`
     takes an email and logs in a separate user for it. Each browser and API test gets a user of
-    its own, so tests never share books. It's off unless set; `pnpm e2e` turns it on. _Input
-    wanted:_ an acceptable stand-in until M6's real accounts?
+    its own, so tests never share books. It's off unless set; `pnpm e2e` turns it on. Kept as is
+    (no objection).
 15. **Book names are the book's Beancount `option "title"`,** so exports and backups carry them.
     Book IDs are generated. Books from before ownership existed have no owner and are invisible.
 16. **Setup appears only for a user with no books,** and stays up until the first account is
     added. A user with several books (only possible through the API in M1) sees the oldest.
-17. **Backups now cover only the caller's books.** A system-wide backup for the operator isn't
-    exposed through the API any more. _Input wanted:_ where should operator backups live? A CLI
-    in the ledger container, or an admin route behind its own auth?
+17. **Backups are per user, through the API.** _Answered:_ any user can export their own data.
+    - **Manage books → Export** downloads a book as one Beancount file (`<Book-Name>.beancount`,
+      from `/books/{id}/export`), which `/books/{id}/import` restores.
+    - **`/backup?since=`** gives each of the caller's books changed since a cursor, for scheduled
+      backups.
+    - There's no operator-wide backup; backing up the data volume covers everything.
+    - CSV profiles and import history (in `app`) aren't part of the export.
 
 ### Infrastructure
 

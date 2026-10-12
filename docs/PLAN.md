@@ -57,6 +57,8 @@ milestone starts.
   - CSV profiling (storing the structure of each account's CSV file)
   - first-use fixes (2026-10-11): the import cutoff follows the opening balance, importing from an
     account's ledger, the add line at the top, the editor's actions pinned
+  - decisions answered (2026-10-12): several file formats per account (asked about on a
+    mismatch), any ledger path for a bank account, and exporting a book
 - [ ] **M2: Credit card account.** Much of the same as M1, plus some minor display decisions,
       and testing matching with two accounts that reflect two sides of the same transaction.
 - [ ] **M3: Scheduled transactions.** The editor, storage, generator logic (when and how real
@@ -76,6 +78,7 @@ milestone starts.
 - [ ] **M10: Reports.** From basic to more complex.
 - [ ] **M11: Budgets.**
 - [ ] **M12: SimpleFIN.** Bank feeds.
+- [ ] **M13: Reconciliation.**
 
 ## Notes collected so far
 
@@ -102,7 +105,7 @@ elaborated.
   money, such as bank accounts, credit cards, brokerage accounts, other asset accounts and
   loans. The home screen lists them with their balances. Other places likely to treat them
   specially: the anchor side of imports, CSV and bank-feed imports, reconciliation and balance
-  assertions, and net worth.
+  assertions (M13), and net worth.
 - **Chart of accounts:**
   - view the tree
   - create, edit, rename and close accounts
@@ -161,3 +164,10 @@ elaborated.
 - **Budget display across periods** (to revisit): budgets can have any period. How does a view
   show accounts whose budgets have different periods side by side?
 - **Cutover:** deferred until hydration.
+
+## Polish
+
+Smaller improvements to pick up between milestones or at the end.
+
+- [ ] **Import file format management:** see, edit, rename and delete an account's saved CSV
+      formats directly, rather than only replacing or adding to them when a file doesn't match.

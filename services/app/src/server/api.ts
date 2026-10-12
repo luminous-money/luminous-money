@@ -35,26 +35,42 @@ export function createApi({
   const owned = async (user: string, book: string) =>
     (await ledgerFor(user).book(book)) !== undefined;
 
+  const isProfile = (p: unknown): p is CsvProfile => {
+    const profile = p as CsvProfile | undefined;
+    return (
+      Array.isArray(profile?.columns) &&
+      typeof profile.date?.column === "number" &&
+      !!profile.amount
+    );
+  };
+
+  /** An account's CSV profiles (its bank's file formats), oldest first; empty if none yet. */
   api.get("/books/:book/profiles/:account", async (c) => {
     const { book, account } = c.req.param();
     if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
-    const profile = db.profile(book, account);
-    return profile ? c.json(profile) : c.json({ detail: "no profile yet" }, 404);
+    return c.json(db.profiles(book, account));
   });
 
+  /** Replace all of an account's CSV profiles with the ones given. */
   api.put("/books/:book/profiles/:account", async (c) => {
     const { book, account } = c.req.param();
     if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
-    const profile = (await c.req.json()) as CsvProfile;
-    if (
-      !Array.isArray(profile?.columns) ||
-      typeof profile.date?.column !== "number" ||
-      !profile.amount
-    ) {
-      return c.json({ detail: "that isn't a CSV profile" }, 422);
+    const profiles = (await c.req.json()) as unknown;
+    if (!Array.isArray(profiles) || !profiles.every(isProfile)) {
+      return c.json({ detail: "send a list of CSV profiles" }, 422);
     }
-    db.saveProfile(book, account, profile);
-    return c.json(profile);
+    db.replaceProfiles(book, account, profiles);
+    return c.json(db.profiles(book, account));
+  });
+
+  /** Add a CSV profile to an account's. */
+  api.post("/books/:book/profiles/:account", async (c) => {
+    const { book, account } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    const profile = (await c.req.json()) as unknown;
+    if (!isProfile(profile)) return c.json({ detail: "that isn't a CSV profile" }, 422);
+    db.addProfile(book, account, profile);
+    return c.json(db.profiles(book, account), 201);
   });
 
   /** Import a file: multipart form data with `account` and `file`. */

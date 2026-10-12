@@ -1,4 +1,6 @@
 /** M1: one bank account, end to end. */
+import { readFileSync } from "node:fs";
+
 import { expect, test, type Page } from "@playwright/test";
 
 import { addTransactions, logIn, setUpUser } from "./support.js";
@@ -35,7 +37,9 @@ test("a new user sets up their books and first account, and lands home", async (
 
   await expect(page.getByText("Add an account to Kael and Jess")).toBeVisible();
   await page.getByRole("textbox", { name: "Account name" }).fill("Green Fi Joint");
-  await expect(page.getByText("Kept in the ledger as Assets:Bank:Green-Fi-Joint")).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Kept in the ledger as" })).toHaveValue(
+    "Assets:Bank:Green-Fi-Joint"
+  );
   await page.getByRole("textbox", { name: "Current balance" }).fill("2,500.00");
   await page.getByLabel("Balance as of").fill("2024-01-01");
   await page.getByRole("button", { name: "Finish setup" }).click();
@@ -44,6 +48,23 @@ test("a new user sets up their books and first account, and lands home", async (
   const card = page.getByRole("link", { name: /Green Fi Joint/ });
   await expect(card).toContainText("$2,500.00");
   await expect(card).toContainText("No imports yet");
+});
+
+test("a bank account can be kept anywhere in the ledger", async ({ page }) => {
+  await setUpUser(page);
+  await page.goto("/ui/accounts/new");
+
+  await page.getByRole("textbox", { name: "Account name" }).fill("Joint Checking");
+  const path = page.getByRole("combobox", { name: "Kept in the ledger as" });
+  await expect(path).toHaveValue("Assets:Bank:Joint-Checking");
+  await path.fill("Assets:Shared:Joint");
+  await expect(page.getByText("also creates Assets:Shared")).toBeVisible();
+  await page.getByRole("textbox", { name: "Account name" }).fill("Joint checking");
+  await expect(path).toHaveValue("Assets:Shared:Joint"); // edited, so it no longer follows the name
+  await page.getByRole("button", { name: "Add account" }).click();
+
+  await page.getByRole("link", { name: /Joint checking/ }).click();
+  await expect(page).toHaveURL(/accounts\/Assets%3AShared%3AJoint$/);
 });
 
 test("the menu has home, manage books, review and log out", async ({ page }) => {
@@ -58,6 +79,21 @@ test("the menu has home, manage books, review and log out", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "Kael Personal" })).toBeVisible();
   await menu(page, "Log out");
   await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
+});
+
+test("a book exports as a Beancount file", async ({ page }) => {
+  await setUpUser(page);
+  await page.goto("/ui/books");
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("link", { name: "Export" }).click(),
+  ]);
+
+  expect(download.suggestedFilename()).toBe("Kael-Personal.beancount");
+  const text = readFileSync(await download.path(), "utf8");
+  expect(text).toContain('option "title" "Kael Personal"');
+  expect(text).toContain("Opening balance");
 });
 
 test("a book can be renamed", async ({ page }) => {
@@ -279,4 +315,53 @@ test("importing a CSV: profile it once, import, see the results, and re-import w
   await expect(page.getByRole("button", { name: /CORNER CAFE/ })).toContainText("Uncategorized");
   await page.goto(`/ui/books/${book.id}/review`);
   await expect(page.getByRole("article")).toHaveCount(3);
+});
+
+test("a file in another layout asks first, then replaces the saved format or adds to it", async ({
+  page,
+}) => {
+  const { book } = await setUpUser(page);
+  const OTHER = `Posted,Payee,Debit,Credit\n2024-03-10,BAKERY,6.00,\n2024-03-11,REFUND,,2.00\n`;
+  const APRIL = `Date,Description,Amount,Balance\n04/01/2024,APRIL RENT,-900.00,2013.40\n`;
+  const THIRD = `Transaction Date,Details,Value\n2024-03-12,KIOSK,-1.00\n`;
+  const upload = (name: string, text: string) =>
+    page
+      .getByLabel("CSV file")
+      .setInputFiles({ name, mimeType: "text/csv", buffer: Buffer.from(text) });
+  const mismatch = page.getByRole("region", { name: "File format mismatch" });
+  const profile = page.getByRole("region", { name: "CSV profile" });
+  const results = page.getByRole("region", { name: "Import results" });
+  await page.goto(`/ui/books/${book.id}/import`);
+  await upload("march.csv", CSV);
+  await profile.getByRole("button", { name: "Save and import" }).click();
+  await expect(results).toContainText("3 new transactions to review");
+  await page.getByRole("button", { name: "Import another file" }).click();
+
+  await upload("other.csv", OTHER);
+  await expect(mismatch).toContainText(
+    "The uploaded file doesn't match the saved format for this account. Are you sure this file is for the account 'PNC Checking'?"
+  );
+  await mismatch.getByRole("button", { name: "Cancel" }).click();
+  await expect(mismatch).toBeHidden();
+
+  await upload("other.csv", OTHER);
+  await mismatch
+    .getByRole("button", { name: "Yes, this is an additional format for this account" })
+    .click();
+  await profile.getByRole("button", { name: "Save and import" }).click();
+  await expect(results).toContainText("2 new transactions to review");
+  await page.getByRole("button", { name: "Import another file" }).click();
+  await expect(page.getByText("This account has 2 known CSV layouts")).toBeVisible();
+
+  await upload("april.csv", APRIL); // the first format still imports straight away
+  await expect(results).toContainText("1 new transaction to review");
+  await page.getByRole("button", { name: "Import another file" }).click();
+
+  await upload("third.csv", THIRD);
+  await expect(mismatch).toContainText("doesn't match any of the saved formats");
+  await mismatch.getByRole("button", { name: "Yes, replace saved formats" }).click();
+  await profile.getByRole("button", { name: "Save and import" }).click();
+  await expect(results).toContainText("1 new transaction to review");
+  await page.getByRole("button", { name: "Import another file" }).click();
+  await expect(page.getByText("This account's CSV layout is known")).toBeVisible();
 });

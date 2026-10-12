@@ -1,15 +1,19 @@
 import type { MoneyAccount } from "@fava-beans/ledger-client";
 import { useState } from "react";
 
-import { toSegment } from "../lib/accounts.js";
+import { checkNewAccount, toSegment } from "../lib/accounts.js";
 import { isDecimal } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
-import { explain, useCreateMoneyAccount } from "../lib/queries.js";
+import { explain, useAccounts, useCreateMoneyAccount } from "../lib/queries.js";
+import { NewAccountField } from "./NewAccountField.js";
 
 /**
  * Add a bank account: its name, the institution (optional), and its current balance with the
  * date it was that balance. The balance becomes an opening balance on that date, so the account
  * is right from the start; imported rows on or before that date are skipped as already counted.
+ *
+ * Where it's kept in the ledger follows the name (`Assets:Bank:<Name>`) until it's edited; then
+ * it's any account the ledger's rules allow.
  */
 export function AddAccountForm({
   book,
@@ -21,7 +25,9 @@ export function AddAccountForm({
   submitLabel?: string;
 }) {
   const create = useCreateMoneyAccount(book);
+  const accounts = useAccounts(book);
   const [name, setName] = useState("");
+  const [edited, setEdited] = useState<string | null>(null);
   const [institution, setInstitution] = useState("");
   const [balance, setBalance] = useState("");
   const [asOf, setAsOf] = useState(today());
@@ -29,12 +35,13 @@ export function AddAccountForm({
   const [error, setError] = useState<string | null>(null);
 
   const amount = balance.trim().replace(/,/g, "") || "0";
+  const path = edited ?? `Assets:Bank:${toSegment(name.trim())}`;
   const valid =
     name.trim() !== "" &&
+    checkNewAccount(path, accounts.data ?? []).ok &&
     isDecimal(amount) &&
     /^[A-Z][A-Z0-9'._-]{1,22}$/.test(currency) &&
     asOf !== "";
-  const path = name.trim() ? `Assets:Bank:${toSegment(name.trim())}` : "";
 
   const submit = async () => {
     setError(null);
@@ -42,6 +49,7 @@ export function AddAccountForm({
       onAdded(
         await create.mutateAsync({
           display_name: name.trim(),
+          name: path,
           money: "bank",
           institution: institution.trim() || null,
           balance: amount,
@@ -72,7 +80,14 @@ export function AddAccountForm({
           required
         />
       </label>
-      {path && <p className="muted small">Kept in the ledger as {path}</p>}
+      {name.trim() && (
+        <NewAccountField
+          label="Kept in the ledger as"
+          name={path}
+          onName={setEdited}
+          accounts={accounts.data ?? []}
+        />
+      )}
       <label>
         Bank <span className="muted">(optional)</span>
         <input

@@ -35,19 +35,22 @@ async function json<T>(response: Response): Promise<T> {
 const base = (book: string) => `/api/app/v1/books/${encodeURIComponent(book)}`;
 
 export const appApi = {
-  /** The account's CSV profile, or null if it doesn't have one yet. */
-  async profile(book: string, account: string): Promise<CsvProfile | null> {
-    const response = await fetch(`${base(book)}/profiles/${encodeURIComponent(account)}`);
-    if (response.status === 404) return null;
-    return json<CsvProfile>(response);
-  },
+  /** The account's CSV profiles (its bank's file formats), oldest first. */
+  profiles: async (book: string, account: string): Promise<CsvProfile[]> =>
+    json(await fetch(`${base(book)}/profiles/${encodeURIComponent(account)}`)),
 
-  saveProfile: async (book: string, account: string, profile: CsvProfile): Promise<CsvProfile> =>
+  /** Save a profile: in place of the account's others (`replace`), or alongside them (`add`). */
+  saveProfile: async (
+    book: string,
+    account: string,
+    profile: CsvProfile,
+    mode: "replace" | "add"
+  ): Promise<CsvProfile[]> =>
     json(
       await fetch(`${base(book)}/profiles/${encodeURIComponent(account)}`, {
-        method: "PUT",
+        method: mode === "replace" ? "PUT" : "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(profile),
+        body: JSON.stringify(mode === "replace" ? [profile] : profile),
       })
     ),
 

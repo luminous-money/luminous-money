@@ -19,6 +19,20 @@ def test_a_named_book_gets_a_generated_id_and_its_name_as_its_title(ledger):
     assert 'option "title" "Kael & Jess \\"Shared\\""' in client.get(f"/api/ledger/v1/books/{book['id']}/export").text
 
 
+def test_a_book_exports_as_a_beancount_file_named_for_it_that_restores_it(ledger):
+    client = http(ledger)
+    book = client.post("/api/ledger/v1/books", json={"name": 'Kael & Jess "Shared"'}).json()
+
+    exported = client.get(f"/api/ledger/v1/books/{book['id']}/export")
+    restored = client.post(
+        "/api/ledger/v1/books/copy/import", content=exported.text, headers={"content-type": "text/plain"}
+    )
+
+    assert exported.headers["content-disposition"] == 'attachment; filename="Kael-Jess-Shared.beancount"'
+    assert restored.status_code == 200
+    assert client.get("/api/ledger/v1/books/copy").json()["name"] == 'Kael & Jess "Shared"'
+
+
 def test_users_see_only_their_own_books(ledger):
     mine = http(ledger).post("/api/ledger/v1/books", json={"name": "Mine"}).json()
     theirs = http(ledger, OTHER).post("/api/ledger/v1/books", json={"name": "Theirs"}).json()

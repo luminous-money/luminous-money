@@ -149,18 +149,20 @@ describe("importing CSVs", () => {
     user.app(`/books/${book}/profiles/${encodeURIComponent(account)}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        delimiter: ",",
-        skip: 0,
-        header: true,
-        columns: ["Date", "Description", "Amount"],
-        date: { column: 0, format: "MM/DD/YYYY" },
-        amount: { kind: "signed", column: 2, negate: false },
-        description: 1,
-        payee: null,
-        id: null,
-        balance: null,
-      }),
+      body: JSON.stringify([
+        {
+          delimiter: ",",
+          skip: 0,
+          header: true,
+          columns: ["Date", "Description", "Amount"],
+          date: { column: 0, format: "MM/DD/YYYY" },
+          amount: { kind: "signed", column: 2, negate: false },
+          description: 1,
+          payee: null,
+          id: null,
+          balance: null,
+        },
+      ]),
     });
 
   it("needs a profile first, then stages rows, ranks matches, and skips duplicates", async () => {

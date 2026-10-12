@@ -1,21 +1,23 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-11._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-12._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
 
-**M1 (one bank account, end to end) is built**, with a list of
-[decisions to review](docs/milestones/m1-one-account-e2e/PLAN.md#decisions-to-review). The
-milestones ahead are in [docs/PLAN.md](docs/PLAN.md).
+**M1 (one bank account, end to end) is built,** and its
+[decisions](docs/milestones/m1-one-account-e2e/PLAN.md#decisions-to-review) are answered. The
+milestones ahead (M2–M13, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
 - **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M6.
 - **Set up:** name a book, then add a bank account with its balance as of a date.
 - **Home** shows the bank accounts as cards, with their balances and when each was last updated
   by an import, plus a link to import transactions.
-- **Menu:** Home, Manage books (list and rename), Review, Log out.
+- **Menu:** Home, Manage books (list, rename, export as a Beancount file), Review, Log out.
+- **Adding a bank account:** where it's kept in the ledger follows its name
+  (`Assets:Bank:<Name>`) until edited, then anything the account rules allow.
 - **An account's ledger:**
   - newest first, 200 a page, with infinite scroll
   - running balances, and the other account or `<multiple>`
@@ -24,6 +26,8 @@ What a user can do now:
 - **Import a CSV:**
   - the first file is profiled (columns mapped, guessed and confirmed), and later files just
     import
+  - a file that fits none of the account's saved formats asks first, then replaces them or adds
+    another format
   - rows are staged for review, uncategorized; duplicates, rows up to the opening balance's date,
     and unreadable rows are skipped
   - moving the opening balance back moves that cutoff (and the account's `open`) with it
@@ -44,22 +48,17 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 103 tests, including the table lint
-    - auth: 9; app: 51; db: 10; csv-import: 22
+    - ledger: 105 tests, including the table lint
+    - auth: 9; app: 54; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 33 API tests and 36 browser tests
+  - `pnpm e2e`: 33 API tests and 39 browser tests
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, with the demo
   seeded for the stub user: the "Demo" book with a BofA Checking card.
 
 ## Next steps
 
-1. **Review M1's [decisions](docs/milestones/m1-one-account-e2e/PLAN.md#decisions-to-review)**
-   and fold the answers in. The ones flagged "input wanted" matter most:
-   - editing a saved CSV profile
-   - whether new transactions start confirmed
-   - the JWT secret
-   - operator backups
-2. Then say `elaborate plan for M2` (credit card accounts).
+1. Say `elaborate plan for M2` (credit card accounts). M1's decisions are answered, except the
+   JWT secret (skipped for now).
 
 ## Gotchas
 
