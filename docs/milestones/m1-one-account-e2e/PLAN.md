@@ -232,8 +232,14 @@ the docs, `docs/PLAN.md` and `RESUME.md` updated.
 - **Review:** yes, in the menu.
 - **Match candidates:** M1 builds only identifying and ranking. The notes for later are in the
   spec.
-- **Add transaction:** a persistent line at the bottom of the account ledger, opening an empty
-  transaction editor.
+- **Add transaction:** a persistent line at the top of the account ledger (first built at the
+  bottom), opening an empty transaction editor.
+- **After trying it (2026-10-11):**
+  - Skipping rows before the opening balance is right, and moving the opening balance back must
+    move the cutoff with it. Built: see decision 1.
+  - An account's ledger links to importing into that account, and back.
+  - The transaction editor's Back and Save stay pinned to the bottom of the screen until the page
+    is scrolled past where they belong.
 
 **Answered by best guess** (the proposals, as built): marking money accounts explicitly, a derived
 account path, list-and-rename for Manage books, a ±5-day matching window, profiles that capture
@@ -253,8 +259,10 @@ input is wanted.
    - The balance means "at the end of that day", so **imported rows dated on or before the as-of
      date are skipped** as already counted ("before the opening balance").
 
-   _Input wanted:_ is that the right reading? It also means history from before the as-of date
-   can't be imported; you'd add the account with an earlier date instead.
+   _Answered:_ yes. Older history imports by moving the opening balance back: the cutoff is the
+   opening-balance transaction's date (`as_of` on money accounts), not the account's `open`, and
+   the `open` moves back to meet any earlier posting. A zero balance still gets an opening-balance
+   transaction, so every account has one to move.
 2. **Money accounts are marked explicitly:** `money: "bank"`, `display-name` and `institution`
    metadata on the `open` directive.
    - **The path is derived** from the name (`Assets:Bank:PNC-Checking`). It's shown, but can't be

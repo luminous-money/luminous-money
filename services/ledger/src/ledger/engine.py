@@ -477,6 +477,18 @@ def _meta_out(meta: dict[str, Any] | None) -> models.Meta:
     return out
 
 
+def moved_opens(open_texts: list[str], earliest: dict[str, datetime.date]) -> list[Directive]:
+    """The `open` directives among `open_texts` dated after `earliest[account]`, moved back to it."""
+    entries, errors, _ = parser.parse_string("\n".join(open_texts))
+    if errors:
+        raise ParseFailure([_message(e) for e in errors])
+    return [
+        to_directive(e._replace(date=earliest[e.account]))
+        for e in entries
+        if isinstance(e, data.Open) and e.account in earliest and e.date > earliest[e.account]
+    ]
+
+
 def with_flag(text: str, flag: str) -> Directive:
     entries, errors, _ = parser.parse_string(text)
     if errors or len(entries) != 1 or not isinstance(entries[0], data.Transaction):

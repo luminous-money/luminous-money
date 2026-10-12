@@ -7,6 +7,7 @@ import {
   createLedgerClient,
   type Account,
   type components,
+  type MoneyAccount,
   type Transaction,
   type TransactionIn,
 } from "@fava-beans/ledger-client";
@@ -27,6 +28,7 @@ export interface LedgerPort {
   /** The book, if it exists and the user owns it. */
   book(book: string): Promise<Book | undefined>;
   accounts(book: string): Promise<Account[]>;
+  moneyAccounts(book: string): Promise<MoneyAccount[]>;
   createAccount(book: string, name: string): Promise<Account>;
   accountLedger(book: string, account: string, cursor?: string): Promise<LedgerPage>;
   /** All of them or none. */
@@ -59,6 +61,12 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
     accounts: (book) =>
       unwrap(
         client.GET("/api/ledger/v1/books/{book_id}/accounts", {
+          params: { path: { book_id: book } },
+        })
+      ),
+    moneyAccounts: (book) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/money-accounts", {
           params: { path: { book_id: book } },
         })
       ),

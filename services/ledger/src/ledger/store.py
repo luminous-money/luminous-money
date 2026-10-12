@@ -15,6 +15,7 @@ its version: edits name the version they read, and a write against any other ver
 from __future__ import annotations
 
 import datetime
+import json
 import sqlite3
 import threading
 from collections.abc import Iterator
@@ -251,6 +252,32 @@ class Store:
             """,
             {"book": book_id, "account": account},
         ).fetchall()
+
+    def first_postings(self, book_id: str, accounts: set[str]) -> dict[str, str]:
+        """For each of `accounts`, the date of its first live posting."""
+        rows = self._conn.execute(
+            """
+            SELECT p.account, MIN(d.date) FROM directive d JOIN posting p ON p.directive_id = d.id
+            WHERE d.book_id = ? AND d.deleted = 0 AND p.account IN (SELECT value FROM json_each(?))
+            GROUP BY p.account
+            """,
+            (book_id, json.dumps(sorted(accounts))),
+        ).fetchall()
+        return {account: date for account, date in rows}
+
+    def opening_dates(self, book_id: str, equity: str) -> dict[str, str]:
+        """For each account, the date of its first live transaction against `equity`: its opening
+        balance."""
+        rows = self._conn.execute(
+            """
+            SELECT p.account, MIN(d.date) FROM directive d JOIN posting p ON p.directive_id = d.id
+            WHERE d.book_id = :book AND d.deleted = 0 AND d.kind = 'transaction' AND p.account <> :equity
+              AND d.id IN (SELECT directive_id FROM posting WHERE account = :equity)
+            GROUP BY p.account
+            """,
+            {"book": book_id, "equity": equity},
+        ).fetchall()
+        return {account: date for account, date in rows}
 
     def find(
         self,

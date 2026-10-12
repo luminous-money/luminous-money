@@ -3,12 +3,14 @@ import { Link, useLocation } from "wouter";
 
 import { shortName } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";
+import { withBack } from "../lib/navigation.js";
 import { explain, useAccountLedger, useMoneyAccounts } from "../lib/queries.js";
 
 /**
  * One account's ledger: every transaction, newest first, 200 at a time, more loading as you
  * scroll. A simple transaction shows the account on its other side; one with more splits shows
- * <multiple>. Tapping one opens it; the line at the bottom adds a new one.
+ * <multiple>. Tapping one opens it; the line above them adds a new one. A money account's
+ * ledger links to importing into it.
  */
 export function AccountLedger({ book, account }: { book: string; account: string }) {
   const [, navigate] = useLocation();
@@ -30,23 +32,51 @@ export function AccountLedger({ book, account }: { book: string; account: string
   }, [ledger]);
 
   const rows = ledger.data?.pages.flatMap((page) => page.rows) ?? [];
-  const open = (id: string) =>
-    navigate(`/books/${book}/transactions/${id}?back=${encodeURIComponent(here)}`);
+  const open = (id: string) => navigate(withBack(`/books/${book}/transactions/${id}`, here));
 
   return (
-    <main className="ledger-page">
+    <main>
       <header className="page-head">
         <Link href="/" className="back">
           ‹ Home
         </Link>
-        <h1>{info?.display_name ?? shortName(account)}</h1>
-        {info && (
-          <p className="muted">
-            {info.balance.map((b) => formatMoney(b.number, b.currency)).join(" · ") ||
-              formatMoney("0.00", info.currencies?.[0] ?? "USD")}
-          </p>
-        )}
+        <div className="home-head">
+          <div>
+            <h1>{info?.display_name ?? shortName(account)}</h1>
+            {info && (
+              <p className="muted">
+                {info.balance.map((b) => formatMoney(b.number, b.currency)).join(" · ") ||
+                  formatMoney("0.00", info.currencies?.[0] ?? "USD")}
+              </p>
+            )}
+          </div>
+          {info && (
+            <Link
+              href={withBack(`/books/${book}/import?account=${encodeURIComponent(account)}`, here)}
+              className="button"
+            >
+              Import transactions
+            </Link>
+          )}
+        </div>
       </header>
+
+      <div className="ledger-add">
+        <button
+          type="button"
+          className="primary"
+          onClick={() =>
+            navigate(
+              withBack(
+                `/books/${book}/transactions/new?account=${encodeURIComponent(account)}`,
+                here
+              )
+            )
+          }
+        >
+          + Add transaction
+        </button>
+      </div>
 
       {ledger.isPending && <p className="muted">Loading…</p>}
       {ledger.error && <p className="card error">{explain(ledger.error)}</p>}
@@ -86,20 +116,6 @@ export function AccountLedger({ book, account }: { book: string; account: string
       </ol>
       <div ref={end} className="ledger-end">
         {ledger.isFetchingNextPage && <span className="muted">Loading more…</span>}
-      </div>
-
-      <div className="ledger-add">
-        <button
-          type="button"
-          className="primary"
-          onClick={() =>
-            navigate(
-              `/books/${book}/transactions/new?account=${encodeURIComponent(account)}&back=${encodeURIComponent(here)}`
-            )
-          }
-        >
-          + Add transaction
-        </button>
       </div>
     </main>
   );

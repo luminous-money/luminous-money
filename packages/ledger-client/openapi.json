@@ -575,6 +575,12 @@
       },
       "MoneyAccount": {
         "properties": {
+          "as_of": {
+            "description": "The date of its opening balance, which includes everything up to then. Imports skip rows up to it.",
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
           "balance": {
             "description": "The current balance, pending transactions included: one amount per currency held.",
             "items": {
@@ -692,7 +698,8 @@
           "name",
           "type",
           "kind",
-          "balance"
+          "balance",
+          "as_of"
         ],
         "title": "MoneyAccount",
         "type": "object"
@@ -709,7 +716,7 @@
           },
           "balance": {
             "default": "0",
-            "description": "The balance on `as_of`, recorded as an opening balance.",
+            "description": "The balance at the end of `as_of`, recorded as an opening balance.",
             "pattern": "^-?\\d+(\\.\\d+)?$",
             "title": "Balance",
             "type": "string"

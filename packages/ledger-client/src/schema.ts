@@ -513,6 +513,12 @@ export interface components {
     /** MoneyAccount */
     MoneyAccount: {
       /**
+       * As Of
+       * Format: date
+       * @description The date of its opening balance, which includes everything up to then. Imports skip rows up to it.
+       */
+      as_of: string;
+      /**
        * Balance
        * @description The current balance, pending transactions included: one amount per currency held.
        */
@@ -568,7 +574,7 @@ export interface components {
       as_of: string;
       /**
        * Balance
-       * @description The balance on `as_of`, recorded as an opening balance.
+       * @description The balance at the end of `as_of`, recorded as an opening balance.
        * @default 0
        */
       balance: string;

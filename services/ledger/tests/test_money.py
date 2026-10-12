@@ -49,11 +49,83 @@ def test_a_bank_account_opens_under_assets_bank_with_its_opening_balance(book):
     assert book.problems("book") == []
 
 
-def test_a_zero_balance_needs_no_opening_transaction(book):
+def test_a_zero_balance_still_gets_an_opening_transaction_to_date_it(book):
     account = bank(book, balance="0")
 
-    assert account.balance == []
-    assert book.transactions("book") == []
+    assert [t.narration for t in book.transactions("book")] == ["Opening balance"]
+    assert account.as_of == datetime.date(2024, 1, 1)
+    assert sum(Decimal(b.number) for b in account.balance) == 0
+    assert book.problems("book") == []
+
+
+def _opening(ledger):
+    return next(t for t in ledger.transactions("book") if t.narration == "Opening balance")
+
+
+def test_moving_the_opening_balance_back_moves_the_account_open_and_its_as_of(book):
+    bank(book)
+    opening = _opening(book)
+
+    book.patch_transaction("book", opening.id, models.TransactionPatch(date="2023-08-02", updated_at=opening.updated_at))
+
+    account = book.money_accounts("book")[0]
+    assert (account.open, account.as_of) == (datetime.date(2023, 8, 2), datetime.date(2023, 8, 2))
+    assert book.problems("book") == []
+
+
+def test_a_book_left_with_postings_before_an_open_is_put_right_by_the_next_write(ledger):
+    ledger.apply_text(
+        "book",
+        """2024-01-10 open Assets:Cash
+2024-01-01 open Expenses:Food
+2024-01-05 * "Too early"
+  Assets:Cash  -1.00 USD
+  Expenses:Food
+""",
+        owner_id=USER,
+    )
+    assert ledger.problems("book")
+
+    spend(ledger, "Assets:Cash", "-2.00", date="2024-01-20")
+
+    assert {a.name: a.open for a in ledger.accounts("book")}["Assets:Cash"] == datetime.date(2024, 1, 5)
+    assert ledger.problems("book") == []
+
+
+def test_moving_the_opening_balance_forward_moves_the_as_of_but_not_the_open(book):
+    bank(book)
+    opening = _opening(book)
+
+    book.patch_transaction("book", opening.id, models.TransactionPatch(date="2024-02-01", updated_at=opening.updated_at))
+
+    account = book.money_accounts("book")[0]
+    assert (account.open, account.as_of) == (datetime.date(2024, 1, 1), datetime.date(2024, 2, 1))
+
+
+def test_any_posting_before_its_account_opens_moves_the_open_back_to_meet_it(book):
+    account = bank(book).name
+    book.create_account("book", models.AccountIn(name="Expenses:Coffee", kind="leaf", open=datetime.date(2024, 6, 1)))
+
+    spend(book, account, "-3.00", date="2023-12-30", other="Expenses:Coffee")
+    book.create_transactions(
+        "book",
+        [
+            models.TransactionIn(
+                date="2023-11-15",
+                narration="Older",
+                postings=[
+                    models.Posting(account=account, units=models.Amount(number="-1.00", currency="USD")),
+                    models.Posting(account="Expenses:Coffee"),
+                ],
+            )
+        ],
+    )
+
+    opens = {a.name: a.open for a in book.accounts("book")}
+    assert opens[account] == opens["Expenses:Coffee"] == datetime.date(2023, 11, 15)
+    assert opens["Expenses:Food"] == datetime.date(2020, 1, 1)  # untouched: already open
+    assert book.money_accounts("book")[0].as_of == datetime.date(2024, 1, 1)  # still the opening balance
+    assert book.problems("book") == []
 
 
 def test_names_with_quotes_survive_and_duplicates_are_refused(book):

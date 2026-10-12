@@ -50,8 +50,9 @@ added by hand during setup, for the whole flow.
 - **Simple two-split transactions** show the account of the other split on the transaction line.
 - **Multi-split transactions** show `<multiple>` in the account cell.
 - Either kind opens the **transaction details editor** on click.
-- **Adding a transaction:** a persistent line at the bottom of the account ledger. Clicking it
-  brings up an empty transaction editor.
+- **Adding a transaction:** a persistent line at the top of the account ledger (moved from the
+  bottom after trying it). Clicking it brings up an empty transaction editor.
+- **Importing from the ledger:** an account's ledger links to importing into that account.
 
 ## Importing transactions (CSV)
 

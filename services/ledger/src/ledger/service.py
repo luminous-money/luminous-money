@@ -294,9 +294,15 @@ class Ledger:
     OPENING_BALANCES = "Equity:Opening-Balances"
 
     def money_accounts(self, book_id: str) -> list[models.MoneyAccount]:
-        """Accounts held at a real institution that aren't closed, with their balances."""
+        """Accounts held at a real institution that aren't closed, with their balances and the
+        dates of their opening balances (their open dates, for any without one)."""
+        openings = self.store.opening_dates(book_id, self.OPENING_BALANCES)
         return [
-            models.MoneyAccount(**a.model_dump(), balance=self.balance(book_id, a.name))
+            models.MoneyAccount(
+                **a.model_dump(),
+                balance=self.balance(book_id, a.name),
+                as_of=openings.get(a.name) or a.open,
+            )
             for a in self.accounts(book_id)
             if a.money and not a.close
         ]
@@ -305,9 +311,11 @@ class Ledger:
         """Add a bank account by its human name, with its balance on a date.
 
         It's opened as `Assets:Bank:<Name>` (dashes for spaces), with the nodes on the way if
-        they're missing, on the `as_of` date. A nonzero balance is recorded as an opening-balance
+        they're missing, on the `as_of` date. The balance is recorded as an opening-balance
         transaction against `Equity:Opening-Balances` on that date, so the account's balance is
-        right from the start. All of it is one write.
+        right from the start. It's written even when it's zero: its date is the account's `as_of`,
+        which says where imports start, and it can be moved like any transaction. All of it is one
+        write.
         """
         name = f"Assets:Bank:{engine.segment(m.display_name)}"
         meta = {engine.MONEY_KEY: m.money, engine.DISPLAY_NAME_KEY: m.display_name}
@@ -315,19 +323,18 @@ class Ledger:
             meta[engine.INSTITUTION_KEY] = m.institution
         directives = self._account_directives(book_id, name, "leaf", m.as_of, currencies=[m.currency], meta=meta)
 
-        if Decimal(m.balance) != 0:
-            if self.OPENING_BALANCES not in {a.name for a in self.accounts(book_id) if not a.implicit}:
-                directives += self._account_directives(book_id, self.OPENING_BALANCES, "leaf", m.as_of)
-            opening = models.TransactionIn(
-                date=m.as_of,
-                flag="*",
-                narration="Opening balance",
-                postings=[
-                    models.Posting(account=name, units=models.Amount(number=m.balance, currency=m.currency)),
-                    models.Posting(account=self.OPENING_BALANCES),
-                ],
-            )
-            directives.append(engine.transaction_directive(opening))
+        if self.OPENING_BALANCES not in {a.name for a in self.accounts(book_id) if not a.implicit}:
+            directives += self._account_directives(book_id, self.OPENING_BALANCES, "leaf", m.as_of)
+        opening = models.TransactionIn(
+            date=m.as_of,
+            flag="*",
+            narration="Opening balance",
+            postings=[
+                models.Posting(account=name, units=models.Amount(number=m.balance, currency=m.currency)),
+                models.Posting(account=self.OPENING_BALANCES),
+            ],
+        )
+        directives.append(engine.transaction_directive(opening))
         with self.store.transaction():
             self.store.put(book_id, directives)
         return next(a for a in self.money_accounts(book_id) if a.name == name)
@@ -414,7 +421,7 @@ class Ledger:
         kinds = self._kinds(book_id)
         directives = [self._postable(book_id, engine.transaction_directive(t), kinds) for t in batch]
         with self.store.transaction():
-            self.store.put(book_id, directives)
+            self._write(book_id, directives)
         return directives
 
     def _default_open(self, book_id: str, parent: models.Account, tree: dict[str, models.Account]) -> datetime.date:
@@ -432,15 +439,35 @@ class Ledger:
         with self.store.transaction():
             if self.store.get(book_id, directive.id) is not None:
                 raise ValueError(f"directive {directive.id} already exists")
-            self.store.put(book_id, [directive])
+            self._write(book_id, [directive])
         return directive
 
     def _put(self, book_id: str, directive: engine.Directive, expected: str | None = None) -> engine.Directive:
         with self.store.transaction():
             if expected is not None:
                 self.store.check_version(book_id, directive.id, expected)
-            self.store.put(book_id, [directive])
+            self._write(book_id, [directive])
         return directive
+
+    def _write(self, book_id: str, directives: list[engine.Directive]) -> None:
+        """Put directives, then make sure every account they post to opens by its first posting.
+
+        An account's open date is incidental here: it's whenever its history starts. So a posting
+        dated before it (an opening balance moved back, or an old import categorized into a new
+        account) moves the open back to meet it, rather than leaving the book invalid.
+        """
+        self.store.put(book_id, directives)
+        accounts = {p.account for d in directives for p in d.postings}
+        if not accounts:
+            return
+        earliest = {
+            account: datetime.date.fromisoformat(date)
+            for account, date in self.store.first_postings(book_id, accounts).items()
+        }
+        opens = [r.text for r in self.store.find(book_id, kind="open", limit=None)]
+        moved = engine.moved_opens(opens, earliest)
+        if moved:
+            self.store.put(book_id, moved)
 
     # The engine
 

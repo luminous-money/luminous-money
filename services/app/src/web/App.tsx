@@ -67,13 +67,14 @@ function Gate() {
           <AddAccount book={book} />
         </Route>
         <Route path="/import">
-          <Import book={book} />
+          <Import book={book.id} />
         </Route>
         <Route path="/books/:book/accounts/:account">
           {({ book: id, account }) => (
             <AccountLedger key={account} book={id} account={decodeURIComponent(account)} />
           )}
         </Route>
+        <Route path="/books/:book/import">{({ book: id }) => <Import key={id} book={id} />}</Route>
         <Route path="/books/:book/review">{({ book: id }) => <Review book={id} />}</Route>
         <Route path="/books/:book/transactions/new">
           {({ book: id }) => <NewTransactionPage book={id} />}

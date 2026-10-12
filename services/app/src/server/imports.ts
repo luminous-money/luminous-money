@@ -4,8 +4,8 @@
  * 1. The file is read with the account's CSV profile (it must fit the profile's layout).
  * 2. Each readable row gets a fingerprint. A row whose fingerprint an earlier import already
  *    staged is a duplicate, and is skipped.
- * 3. Rows dated on or before the account's opening date are skipped: the opening balance already
- *    includes them.
+ * 3. Rows dated on or before the account's `as_of` (its opening balance's date) are skipped: the
+ *    opening balance already includes them. Moving the opening balance moves the cutoff.
  * 4. The rest go through the pipeline (for now: the matcher, which ranks existing transactions
  *    that might be the same event, and acts on nothing).
  * 5. They're staged in one atomic ledger write as pending (`!`) transactions, uncategorized:
@@ -79,10 +79,9 @@ export async function importFile({
 }): Promise<ImportResult> {
   if (!(await ledger.book(book)))
     throw new ImportProblem("no-such-book", `there's no book ${book}`);
-  const accounts = await ledger.accounts(book);
-  const target = accounts.find((a) => a.name === account);
-  if (!target?.money)
-    throw new ImportProblem("not-a-money-account", `${account} isn't a money account`);
+  const [accounts, money] = await Promise.all([ledger.accounts(book), ledger.moneyAccounts(book)]);
+  const target = money.find((a) => a.name === account);
+  if (!target) throw new ImportProblem("not-a-money-account", `${account} isn't a money account`);
   const profile: CsvProfile | undefined = db.profile(book, account);
   if (!profile) throw new ImportProblem("no-profile", `${account} has no CSV profile yet`);
   if (!fits(profile, text)) {
@@ -104,7 +103,7 @@ export async function importFile({
   const outcomes: Outcome[] = rows.map((row, i) => {
     if (row.error) return "unreadable";
     if (before.has(prints[i]!)) return "duplicate";
-    if (target.open && row.date! <= target.open) return "before-opening";
+    if (row.date! <= target.as_of) return "before-opening";
     return "staged";
   });
   const stage = rows.filter((_, i) => outcomes[i] === "staged");

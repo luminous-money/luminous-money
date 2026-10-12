@@ -67,6 +67,15 @@ describe("importing a file", () => {
     expect(ledger.created.sort()).toEqual([UNCATEGORIZED.in, UNCATEGORIZED.out].sort());
   });
 
+  it("skips rows up to the opening balance's date, wherever it's been moved", async () => {
+    ledger.accountList[0]!.as_of = "2024-02-29"; // the opening balance, moved back a day
+
+    const result = await run();
+
+    expect(result.rows[0]).toMatchObject({ description: "OPENING DAY COFFEE", outcome: "staged" });
+    expect(result.batch).toMatchObject({ staged: 4, skipped: 0 });
+  });
+
   it("skips rows an earlier import already staged, even identical ones, but not new ones", async () => {
     await run();
     const again = await run(`${FILE}03/09/2024,BAKERY,-6.00,2982.00\n`);

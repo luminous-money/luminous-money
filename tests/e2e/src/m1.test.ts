@@ -145,6 +145,24 @@ describe("importing CSVs", () => {
     return user.app(`/books/${book}/imports`, { method: "POST", body: form });
   };
 
+  const saveProfile = (user: Awaited<ReturnType<typeof newUser>>, book: string, account: string) =>
+    user.app(`/books/${book}/profiles/${encodeURIComponent(account)}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        delimiter: ",",
+        skip: 0,
+        header: true,
+        columns: ["Date", "Description", "Amount"],
+        date: { column: 0, format: "MM/DD/YYYY" },
+        amount: { kind: "signed", column: 2, negate: false },
+        description: 1,
+        payee: null,
+        id: null,
+        balance: null,
+      }),
+    });
+
   it("needs a profile first, then stages rows, ranks matches, and skips duplicates", async () => {
     const { user, book, account } = await withAccount();
     const { data: manual } = await user.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
@@ -164,24 +182,7 @@ describe("importing CSVs", () => {
     assert.equal(first.status, 409);
     assert.equal(((await first.json()) as { code: string }).code, "no-profile");
 
-    const profile = {
-      delimiter: ",",
-      skip: 0,
-      header: true,
-      columns: ["Date", "Description", "Amount"],
-      date: { column: 0, format: "MM/DD/YYYY" },
-      amount: { kind: "signed", column: 2, negate: false },
-      description: 1,
-      payee: null,
-      id: null,
-      balance: null,
-    };
-    const saved = await user.app(`/books/${book.id}/profiles/${encodeURIComponent(account.name)}`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(profile),
-    });
-    assert.equal(saved.status, 200);
+    assert.equal((await saveProfile(user, book.id, account.name)).status, 200);
 
     const imported = (await (await upload(user, book.id, account.name)).json()) as {
       batch: { staged: number };
@@ -215,6 +216,44 @@ describe("importing CSVs", () => {
       "Expenses:Uncategorized",
       "Income:Uncategorized",
     ]);
+  });
+
+  it("skips rows up to the opening balance, and starts earlier once it's moved back", async () => {
+    const { user, book, account } = await withAccount();
+    await saveProfile(user, book.id, account.name);
+    const older = `Date,Description,Amount\n12/30/2023,OLD COFFEE,-3.00\n01/01/2024,NEW YEAR,-1.00\n`;
+    const outcomes = async () =>
+      (
+        (await (await upload(user, book.id, account.name, older)).json()) as {
+          rows: { outcome: string }[];
+        }
+      ).rows.map((r) => r.outcome);
+
+    assert.deepEqual(await outcomes(), ["before-opening", "before-opening"]);
+
+    const { data: transactions } = await user.ledger.GET(
+      "/api/ledger/v1/books/{book_id}/transactions",
+      { params: { path: { book_id: book.id } } }
+    );
+    const opening = transactions!.find((t) => t.narration === "Opening balance")!;
+    const moved = await user.ledger.PATCH(
+      "/api/ledger/v1/books/{book_id}/transactions/{directive_id}",
+      {
+        params: { path: { book_id: book.id, directive_id: opening.id } },
+        body: { date: "2023-12-01", updated_at: opening.updated_at },
+      }
+    );
+    assert.equal(moved.response.status, 200);
+    const { data: money } = await user.ledger.GET("/api/ledger/v1/books/{book_id}/money-accounts", {
+      params: { path: { book_id: book.id } },
+    });
+    assert.deepEqual([money![0]!.open, money![0]!.as_of], ["2023-12-01", "2023-12-01"]);
+
+    assert.deepEqual(await outcomes(), ["staged", "staged"]);
+    const { data: problems } = await user.ledger.GET("/api/ledger/v1/books/{book_id}/problems", {
+      params: { path: { book_id: book.id } },
+    });
+    assert.deepEqual(problems, []);
   });
 
   it("answers 404 for someone else's book", async () => {

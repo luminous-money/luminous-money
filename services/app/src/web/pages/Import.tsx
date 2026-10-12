@@ -1,4 +1,3 @@
-import type { Book } from "@fava-beans/ledger-client";
 import { guessProfile, type CsvProfile } from "@fava-beans/csv-import";
 import { useState, type DragEvent } from "react";
 import { Link } from "wouter";
@@ -6,6 +5,7 @@ import { Link } from "wouter";
 import { ImportResults } from "../components/ImportResults.js";
 import { ProfileEditor } from "../components/ProfileEditor.js";
 import type { ImportResult } from "../lib/appApi.js";
+import { useBack, useParam } from "../lib/navigation.js";
 import {
   explain,
   useImport,
@@ -22,14 +22,17 @@ type Stage =
 /**
  * The CSV import console: pick an account, drop in its bank's CSV. The first file for an account
  * is profiled first (how its columns map to ours), and the profile is saved for next time.
+ * `?account=` picks the account to start with; `?back=` is where "‹ Back" goes.
  */
-export function Import({ book }: { book: Book }) {
-  const accounts = useMoneyAccounts(book.id);
-  const [account, setAccount] = useState("");
+export function Import({ book }: { book: string }) {
+  const accounts = useMoneyAccounts(book);
+  const back = useBack("/");
+  const preset = useParam("account");
+  const [account, setAccount] = useState(preset ?? "");
   const chosen = account || accounts.data?.[0]?.name || "";
-  const profile = useProfile(book.id, chosen || undefined);
-  const save = useSaveProfile(book.id);
-  const run = useImport(book.id);
+  const profile = useProfile(book, chosen || undefined);
+  const save = useSaveProfile(book);
+  const run = useImport(book);
   const [stage, setStage] = useState<Stage>({ kind: "choose" });
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -64,15 +67,15 @@ export function Import({ book }: { book: Book }) {
   return (
     <main>
       <header className="page-head">
-        <Link href="/" className="back">
-          ‹ Home
+        <Link href={back} className="back">
+          {back === "/" ? "‹ Home" : "‹ Back"}
         </Link>
         <h1>Import transactions</h1>
       </header>
 
       {stage.kind === "done" ? (
         <>
-          <ImportResults result={stage.result} book={book.id} currency={currency} />
+          <ImportResults result={stage.result} book={book} currency={currency} />
           <p className="center">
             <button type="button" onClick={() => setStage({ kind: "choose" })}>
               Import another file

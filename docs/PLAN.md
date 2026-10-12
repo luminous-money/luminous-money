@@ -55,6 +55,8 @@ milestone starts.
   - the import CSV flow (with transaction matching but not categorization yet, so an abridged
     version of the processing pipeline)
   - CSV profiling (storing the structure of each account's CSV file)
+  - first-use fixes (2026-10-11): the import cutoff follows the opening balance, importing from an
+    account's ledger, the add line at the top, the editor's actions pinned
 - [ ] **M2: Credit card account.** Much of the same as M1, plus some minor display decisions,
       and testing matching with two accounts that reflect two sides of the same transaction.
 - [ ] **M3: Scheduled transactions.** The editor, storage, generator logic (when and how real

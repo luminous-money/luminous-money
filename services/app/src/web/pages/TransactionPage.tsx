@@ -1,11 +1,12 @@
 import type { Posting, Transaction } from "@fava-beans/ledger-client";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useSearch } from "wouter";
+import { Link, useLocation } from "wouter";
 
 import { AccountPicker } from "../components/AccountPicker.js";
 import { postable } from "../lib/accounts.js";
 import { formatMoney, isDecimal } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
+import { useBack, useParam } from "../lib/navigation.js";
 import {
   explain,
   useAccountCreation,
@@ -51,15 +52,9 @@ function toPostings(rows: Row[]): Posting[] {
   }));
 }
 
-/** Where to go back to: the page that opened this one (`?back=`), else the review queue. */
-function useBack(book: string): string {
-  const back = new URLSearchParams(useSearch()).get("back");
-  return back && back.startsWith("/") ? back : `/books/${book}/review`;
-}
-
 export function TransactionPage({ book, id }: { book: string; id: string }) {
   const loaded = useTransaction(book, id);
-  const back = useBack(book);
+  const back = useBack(`/books/${book}/review`);
 
   return (
     <main>
@@ -79,8 +74,8 @@ export function TransactionPage({ book, id }: { book: string; id: string }) {
 /** A new transaction, started from an account's ledger: empty but for a split on that account
  * and today's date. It's saved confirmed, since it's written by hand. */
 export function NewTransactionPage({ book }: { book: string }) {
-  const account = new URLSearchParams(useSearch()).get("account") ?? "";
-  const back = useBack(book);
+  const account = useParam("account") ?? "";
+  const back = useBack(`/books/${book}/review`);
   const draft: Transaction = {
     id: "",
     created_at: "",
@@ -255,7 +250,7 @@ function Editor({
 
       {message && <p className={message.kind === "error" ? "error" : "ok"}>{message.text}</p>}
 
-      <div className="actions">
+      <div className="actions pinned">
         <Link href={back} className="button">
           Back
         </Link>

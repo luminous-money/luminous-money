@@ -1,11 +1,11 @@
 /** An in-memory stand-in for the ledger, for unit tests of the import logic. */
-import type { Account, Transaction, TransactionIn } from "@fava-beans/ledger-client";
+import type { Account, MoneyAccount, Transaction, TransactionIn } from "@fava-beans/ledger-client";
 
 import type { Book, LedgerPage, LedgerPort } from "./ledger.js";
 
 export class FakeLedger implements LedgerPort {
   books = new Map<string, Book>();
-  accountList: Account[] = [];
+  accountList: (Account & { as_of?: string })[] = [];
   transactions: Transaction[] = [];
   created: string[] = [];
   private next = 1;
@@ -14,7 +14,7 @@ export class FakeLedger implements LedgerPort {
     this.books.set(id, { id, name: id, created_at: "", updated_at: "" });
   }
 
-  addAccount(name: string, extra: Partial<Account> = {}) {
+  addAccount(name: string, extra: Partial<MoneyAccount> = {}) {
     this.accountList.push({
       name,
       type: "asset",
@@ -37,6 +37,12 @@ export class FakeLedger implements LedgerPort {
 
   async accounts() {
     return this.accountList;
+  }
+
+  async moneyAccounts(): Promise<MoneyAccount[]> {
+    return this.accountList
+      .filter((a) => a.money)
+      .map((a) => ({ balance: [], ...a, as_of: a.as_of ?? a.open! }));
   }
 
   async createAccount(_book: string, name: string) {

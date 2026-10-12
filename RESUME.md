@@ -19,12 +19,14 @@ What a user can do now:
 - **An account's ledger:**
   - newest first, 200 a page, with infinite scroll
   - running balances, and the other account or `<multiple>`
-  - tapping a transaction opens the editor; the bottom line adds one
+  - tapping a transaction opens the editor, whose Back and Save stay pinned on screen
+  - the line above the transactions adds one; "Import transactions" imports into this account
 - **Import a CSV:**
   - the first file is profiled (columns mapped, guessed and confirmed), and later files just
     import
-  - rows are staged for review, uncategorized; duplicates, rows before the opening balance, and
-    unreadable rows are skipped
+  - rows are staged for review, uncategorized; duplicates, rows up to the opening balance's date,
+    and unreadable rows are skipped
+  - moving the opening balance back moves that cutoff (and the account's `open`) with it
   - possible matches are ranked and shown, and nothing acts on them yet
 - **The review queue,** from before: skip, categorize, confirm, swipe, create accounts.
 
@@ -42,10 +44,10 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 99 tests, including the table lint
-    - auth: 9; app: 50; db: 10; csv-import: 22
+    - ledger: 103 tests, including the table lint
+    - auth: 9; app: 51; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 32 API tests and 34 browser tests, two clean runs
+  - `pnpm e2e`: 33 API tests and 36 browser tests
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, with the demo
   seeded for the stub user: the "Demo" book with a BofA Checking card.
 
@@ -53,7 +55,6 @@ How it's put together:
 
 1. **Review M1's [decisions](docs/milestones/m1-one-account-e2e/PLAN.md#decisions-to-review)**
    and fold the answers in. The ones flagged "input wanted" matter most:
-   - opening-balance semantics
    - editing a saved CSV profile
    - whether new transactions start confirmed
    - the JWT secret
@@ -62,6 +63,8 @@ How it's put together:
 
 ## Gotchas
 
+- **`pnpm up` is pnpm's own `update` command,** not the `up` script: it bumps dependencies. Use
+  `pnpm run up` (foreground), or `docker buildx bake && docker compose up -d`.
 - **The JWT secret:** Compose ships a development default for `AUTH_JWT_SECRET`, and auth warns
   about it. Set a real one before the stack leaves your machine.
 - **`pnpm e2e:local` needs `AUTH_TEST_USERS=true`** on the running stack, so each test can log in

@@ -132,7 +132,7 @@ test.describe("an account's ledger", () => {
     await expect(page.getByRole("heading", { name: "PNC Checking" })).toBeVisible();
   });
 
-  test("the line at the bottom adds a transaction", async ({ page }) => {
+  test("the line above the transactions adds one", async ({ page }) => {
     const { session, book, account } = await setUpUser(page);
     await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
       params: { path: { book_id: book.id } },
@@ -140,7 +140,11 @@ test.describe("an account's ledger", () => {
     });
     await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
 
-    await page.getByRole("button", { name: "+ Add transaction" }).click();
+    const add = page.getByRole("button", { name: "+ Add transaction" });
+    const list = page.getByRole("list", { name: "Transactions" });
+    await expect(list.getByRole("listitem")).toHaveCount(1);
+    expect((await add.boundingBox())!.y).toBeLessThan((await list.boundingBox())!.y);
+    await add.click();
     await expect(page.getByRole("heading", { name: "New transaction" })).toBeVisible();
     await page.getByRole("textbox", { name: "Payee" }).fill("Corner Cafe");
     const amounts = page.getByRole("textbox", { name: "Amount" });
@@ -160,6 +164,71 @@ test.describe("an account's ledger", () => {
     );
     await expect(page.getByRole("button", { name: /Corner Cafe/ })).toContainText("$995.50");
   });
+
+  test("imports into the account it's showing, and comes back", async ({ page }) => {
+    const { session, book } = await setUpUser(page);
+    const { data: savings } = await session.ledger.POST(
+      "/api/ledger/v1/books/{book_id}/money-accounts",
+      {
+        params: { path: { book_id: book.id } },
+        body: {
+          display_name: "PNC Savings",
+          money: "bank",
+          currency: "USD",
+          balance: "0",
+          as_of: "2024-01-01",
+        },
+      }
+    );
+    await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(savings!.name)}`);
+
+    await page.getByRole("link", { name: "Import transactions" }).click();
+    await expect(page.getByRole("heading", { name: "Import transactions" })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Account" })).toHaveValue(savings!.name);
+
+    await page.getByRole("link", { name: "‹ Back" }).click();
+    await expect(page.getByRole("heading", { name: "PNC Savings" })).toBeVisible();
+  });
+});
+
+test("a transaction's Back and Save stay on screen, and settle into place at the end", async ({
+  page,
+}) => {
+  const { session, book, account } = await setUpUser(page);
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+    params: { path: { book_id: book.id } },
+    body: { name: "Expenses:Food", kind: "leaf" },
+  });
+  const { data: big } = await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+    params: { path: { book_id: book.id } },
+    body: {
+      date: "2024-03-01",
+      flag: "*",
+      payee: "Costco",
+      narration: "",
+      postings: [
+        { account, units: { number: "-12.00", currency: "USD" } },
+        ...Array.from({ length: 12 }, () => ({
+          account: "Expenses:Food",
+          units: { number: "1.00", currency: "USD" },
+        })),
+      ],
+    },
+  });
+  await page.setViewportSize({ width: 390, height: 640 });
+  await page.goto(`/ui/books/${book.id}/transactions/${big!.id}`);
+
+  const save = page.getByRole("button", { name: "Save" });
+  const gapBelow = async () =>
+    640 - (await save.boundingBox())!.y - (await save.boundingBox())!.height;
+  await expect(page.getByRole("textbox", { name: "Amount" })).toHaveCount(13);
+  await expect(save).toBeInViewport();
+  await expect(page.getByRole("link", { name: "Back", exact: true })).toBeInViewport();
+  expect(await gapBelow()).toBeLessThan(30); // pinned to the bottom of the screen
+
+  await page.getByText("Early build").scrollIntoViewIfNeeded();
+  await expect(save).toBeInViewport();
+  expect(await gapBelow()).toBeGreaterThan(30); // back in place, with the page's end below it
 });
 
 const CSV = `Date,Description,Amount,Balance

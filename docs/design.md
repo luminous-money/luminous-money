@@ -376,8 +376,15 @@ shape):
   - `display-name`, a human name, spaces allowed
   - `institution`
 - **Adding a bank account** opens `Assets:Bank:<Name>` on an as-of date, with an opening-balance
-  transaction against `Equity:Opening-Balances`. The balance means "at the end of that day", so
-  imported rows from that day or earlier are skipped as already counted.
+  transaction against `Equity:Opening-Balances` (written even for a zero balance).
+  - The balance means "at the end of that day", so imported rows from that day or earlier are
+    skipped as already counted.
+  - **The opening balance's date is the account's `as_of`,** wherever it's moved. Moving it back
+    (with the balance as of the earlier date) lets older history import.
+- **Accounts open by their first posting.** Open dates are incidental here, so a write that
+  posts to an account before its `open` moves the `open` back to meet the account's earliest
+  posting, instead of leaving the book invalid. That covers moving an opening balance back, and
+  categorizing old imports into new accounts.
 - **Balances and account ledgers come from plain SQL, not a Beancount load.**
   - Each posting stores its change to its account, with an elided amount filled in when that's
     unambiguous (one currency, no lots or prices).

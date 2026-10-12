@@ -270,6 +270,16 @@ button:focus-visible,
   margin-left: auto;
 }
 
+/* Actions that stay on screen while the page runs on below them, and settle back into place
+   once it's scrolled past where they belong. */
+.actions.pinned {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding: 0.75rem 0 max(0.75rem, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--paper) 75%, transparent);
+}
+
 .error {
   color: var(--bad);
 }
@@ -808,10 +818,6 @@ a.primary-link {
 
 /* Account ledger */
 
-.ledger-page {
-  padding-bottom: 5rem;
-}
-
 .ledger {
   list-style: none;
   margin: 0;
@@ -889,9 +895,10 @@ a.primary-link {
 
 .ledger-add {
   position: sticky;
-  bottom: 0;
-  padding: 0.75rem 0 max(0.75rem, env(safe-area-inset-bottom));
-  background: linear-gradient(to top, var(--paper) 70%, transparent);
+  top: 0;
+  z-index: 1;
+  padding: 0.5rem 0 0.75rem;
+  background: linear-gradient(to bottom, var(--paper) 75%, transparent);
 }
 
 .ledger-add button {

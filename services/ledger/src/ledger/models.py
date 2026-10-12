@@ -136,6 +136,9 @@ class MoneyAccount(Account):
     balance: list[Amount] = Field(
         description="The current balance, pending transactions included: one amount per currency held."
     )
+    as_of: datetime.date = Field(
+        description="The date of its opening balance, which includes everything up to then. Imports skip rows up to it."
+    )
 
 
 class MoneyAccountIn(Strict):
@@ -145,7 +148,7 @@ class MoneyAccountIn(Strict):
     money: Literal["bank"] = "bank"
     institution: str | None = None
     currency: str = "USD"
-    balance: DecimalStr = Field("0", description="The balance on `as_of`, recorded as an opening balance.")
+    balance: DecimalStr = Field("0", description="The balance at the end of `as_of`, recorded as an opening balance.")
     as_of: datetime.date = Field(description="The date `balance` was the balance; the account opens then.")
 
 
