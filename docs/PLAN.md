@@ -61,8 +61,9 @@ milestone starts.
     mismatch), any ledger path for a bank account, and exporting a book
 - [ ] **M2: Credit card account.** Much of the same as M1, plus some minor display decisions,
       and testing matching with two accounts that reflect two sides of the same transaction.
-      Planned 2026-10-12 ([plan](milestones/m2-credit-card/PLAN.md)): mostly matches that act,
-      so transfers between your own accounts aren't counted twice.
+      Planned 2026-10-12 ([plan](milestones/m2-credit-card/PLAN.md)): starred accounts replace
+      "money accounts" (no account kinds), liabilities and income display inverted, and matches
+      that act, so transfers between your own accounts aren't counted twice.
 - [ ] **M3: Scheduled transactions.** The editor, storage, generator logic (when and how real
       transactions are created from a schedule template), and display considerations.
 - [ ] **M4: Categorization.** The categorization engine.
@@ -105,7 +106,8 @@ elaborated.
     it for editing, including complex splits.
 - **Money accounts** (M1, M2, M5): accounts linked to a real institution that actually hold
   money, such as bank accounts, credit cards, brokerage accounts, other asset accounts and
-  loans. The home screen lists them with their balances. Other places likely to treat them
+  loans. The home screen lists them with their balances. (M2 replaces the explicit kind with
+  per-user **starred accounts**; there are no account kinds.) Other places likely to treat them
   specially: the anchor side of imports, CSV and bank-feed imports, reconciliation and balance
   assertions (M13), and net worth.
 - **Chart of accounts:**
@@ -171,5 +173,6 @@ elaborated.
 
 Smaller improvements to pick up between milestones or at the end.
 
+- [ ] **Type-aware wording when creating accounts** (e.g. "amount owed" for a liability).
 - [ ] **Import file format management:** see, edit, rename and delete an account's saved CSV
       formats directly, rather than only replacing or adding to them when a file doesn't match.

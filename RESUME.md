@@ -57,9 +57,10 @@ How it's put together:
 
 ## Next steps
 
-1. **Answer M2's [questions](docs/milestones/m2-credit-card/PLAN.md#questions):** the name,
-   signs on cards, when a match is made without asking, and merged transfers' flags.
-2. Then build M2.
+1. **Build M2** ([plan](docs/milestones/m2-credit-card/PLAN.md)): starred accounts in place of
+   money accounts, inverted display signs for liabilities and income, and matches that act.
+   Its questions are answered; two **Proposed** calls are left to glance at (stars per user in
+   `app`; importing into any leaf, starred first).
 
 ## Gotchas
 
