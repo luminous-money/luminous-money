@@ -129,24 +129,111 @@ So M2 is four things:
 - **The demo book gains a credit card** with monthly payments from checking, both starred, and
   the e2e tests import both sides in either order.
 
-## Work, in order
+## How it gets built
 
-1. **Starred accounts:**
-   - stars in `app` (migration, API), the accounts summary in the ledger
-   - the home page from stars; star/unstar in the ledger header
-   - adding an account by full name with an optional opening balance (setup and home)
-   - the import drop-down (starred first), the cutoff without kinds, and retiring `money`
-2. **Display signs:** the shared helper, home cards, account ledgers, the profile preview.
-3. **Matching context:** the uncategorized legs of other accounts' transactions, and the
-   transfer candidate rule.
-4. **Acting on matches:**
-   - the ledger batch with updates
-   - merging transfers, claiming same-account events, and the `matched` outcome in results
-   - clear winners and stored alternatives
-5. **Reviewing matches:** the review card's matched line, switching to an alternative, and "Not
-   a match".
-6. **Wrap-up:** demo data, a browser test importing a checking file and a card file that share
-   a payment (both orders), and the docs.
+Five slices, in order. Each ends with `pnpm test` and `pnpm e2e` green and the docs updated, and
+is committed on its own.
+
+### 1. Starred accounts (replacing money accounts)
+
+- **Ledger:**
+  - `POST /accounts` takes an optional **opening balance**: `{amount, currency, date}`. When
+    given, the account opens on that date (unless `open` says otherwise), and the
+    opening-balance transaction is written in the same write, as money accounts do today.
+  - **`GET /accounts/summary?account=…&account=…`** returns, for the accounts asked for, each
+    one's type, display name, balance (from SQL, as now) and `as_of` (its opening balance's
+    date, or null without one).
+  - **Removed:** `/money-accounts` (both routes), `MoneyAccount`, `MoneyAccountIn`, and the
+    `money`/`institution` fields on `Account`. `display-name` metadata is still read if present.
+- **App:**
+  - migration 3: a **`star`** table (user, book, account)
+  - `GET /books/:book/stars` (the caller's starred accounts), `PUT` and `DELETE
+    /books/:book/stars/:account`
+  - the importer takes its cutoff from the summary's `as_of` (none without one) and accepts any
+    open leaf account
+- **PWA:**
+  - **Home:** the starred accounts' cards (stars from `app`, balances from the summary). With
+    nothing starred: "Star accounts to see them here", plus "Add account".
+  - **Add account** (setup and home): the shared `NewAccountField` for the full name, then an
+    optional opening balance and its date. Accounts added here are starred.
+  - **An account's ledger:** a star toggle in its header. "Import transactions" shows for any
+    leaf account.
+  - **Import:** the drop-down lists every open leaf account, starred first.
+  - **Display names:** one helper: `display-name` metadata if set, else the last segment with
+    dashes as spaces.
+- **Seed:** the demo stars its checking account and its credit card (`bean-example` already
+  generates a Chase card paid from checking).
+- **Tests:** ledger (opening balance on create, summary), app (stars, import into any leaf, no
+  cutoff without an opening balance), e2e and browser (setup with an arbitrary path; star and
+  unstar changes the home page; import picks starred first).
+
+### 2. Display signs
+
+- **A shared helper** says whether an account's amounts display inverted: liabilities and
+  income.
+- **Applied to** home cards, account ledgers (amounts and running balances) and the profile
+  editor's preview. The transaction editor and review cards keep stored signs.
+- **Colors** follow the stored sign, i.e. the effect on net worth (**Proposed**): a card charge
+  shows as `$50.00` more owed, in red; a payment shows as `−$500.00` owed, in green.
+- **Tests:** unit tests for the helper; a browser test of a card's ledger.
+
+### 3. Matching context and candidates
+
+- **The context** is read with the transaction list (`/transactions?account=&from=&to=`), which
+  carries postings and metadata, instead of paging the account's ledger:
+  - this account's transactions in the window
+  - and those with a leg in `Expenses:Uncategorized` or `Income:Uncategorized`
+- **Candidates,** same amount within ±5 days, scored by days apart as now:
+  - **transfer:** a transaction that doesn't post to this account, hasn't been matched before,
+    and has an uncategorized leg whose amount (worked out if elided) is exactly this row's
+    change
+  - **same event:** a transaction in this account that no import has touched (no `import-id`
+    or `matched-import-id`): one entered by hand
+- **Within a batch,** a transaction is matched at most once: rows claim candidates best score
+  first.
+- **Tests:** unit tests for each rule, elided legs, the exclusions, and claiming within a batch.
+
+### 4. Acting on matches
+
+- **Ledger:** **`POST /transactions/changes`** takes `{create: [...], update: [{id, updated_at,
+  transaction}]}` and applies all of it in one write, or none (409 if any version is stale).
+- **The import:**
+  - **a clear winner** (the only candidate, or 2+ days closer than the next) is matched
+  - **otherwise the best is matched anyway,** the others stored as alternatives, and the
+    transaction made pending
+  - **a transfer** replaces the uncategorized leg with this account and the row's amount; **a
+    same-event match** changes no postings
+  - both record the row on the transaction as metadata: `matched-import-id` (its fingerprint),
+    `matched-import-batch`, `matched-account`, `matched-date`, `matched-description`, and
+    `match-alternatives` (transaction IDs) when there are any
+  - the row's outcome is **`matched`**, with the transaction it joined. Matched rows count as
+    already imported on later imports, just like staged ones.
+  - new rows and merges go to the ledger as one `changes` write
+- **Import results** list matched rows ("matched with <payee> · <date>").
+- **Tests:** app unit tests for both kinds of match and for alternatives; e2e importing
+  checking-then-card and card-then-checking, ending with one transaction either way, and
+  re-importing either file changes nothing.
+
+### 5. Reviewing matches
+
+- **App:** two actions, each one ledger `changes` write:
+  - **`POST /books/:book/matches/:transaction/undo`** ("Not a match"): puts the uncategorized
+    leg back (for a transfer), removes the `matched-*` metadata, and stages the absorbed row as
+    its own pending transaction from what was recorded
+  - **`POST /books/:book/matches/:transaction/move`** `{to}` ("Match with this instead"): undo,
+    then match the row to the alternative
+- **The review card** of a matched transaction: "Matched with <account> · <date>", each
+  alternative as "Match with this instead", and "Not a match".
+- **Confirming** (button, swipe or editor) clears `match-alternatives` in the same write.
+- **Tests:** browser tests for an ambiguous match (move it, then undo it) and for a clear
+  transfer, which shows no alternatives.
+
+### Wrap-up
+
+- **Docs:** design.md (stars, display signs, matching that acts), M2's status, `docs/PLAN.md`
+  and RESUME.md.
+- **The dev stack:** your PNC account loses its card until you star it. Its data is disposable,
+  so there's no migration for `money` metadata.
 
 ## Out of scope for M2
 
@@ -158,5 +245,10 @@ So M2 is four things:
 
 ## Questions
 
-None blocking. The two **Proposed** calls worth a glance: stars per user in `app` (rather than
-in the book), and importing into any leaf account with starred ones listed first.
+Before building, the **Proposed** calls worth a glance:
+1. Stars per user in `app`, rather than in the book.
+2. Importing into any open leaf account, starred ones listed first.
+3. Colors follow the stored sign (effect on net worth), even where the displayed number is
+   inverted.
+4. An ambiguous match is still made (best candidate), and sent to review with its alternatives,
+   rather than left unmatched until you choose.
