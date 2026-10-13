@@ -28,6 +28,9 @@ export type Existing = {
   payee: string | null;
   narration: string | null;
   amount: { number: string; currency: string } | null;
+  /** How far an incoming amount may be from this one and still match (a scheduled split's
+   * tolerance); absent for exact. */
+  tolerance?: string;
 };
 
 export type Context = {

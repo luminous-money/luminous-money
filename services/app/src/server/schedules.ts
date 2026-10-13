@@ -1,13 +1,20 @@
 /**
  * Scheduled transactions: checking schedules, the generator, and what's coming.
  *
- * The generator stages each due occurrence of every schedule that isn't paused as a pending (`!`)
- * transaction, acting as the schedule's owner toward the ledger. It runs at startup, every hour,
- * and after a schedule is saved. An occurrence is due on its (weekend-adjusted) date. Each is
- * staged once: only nominal dates after the schedule's generated-through date are considered,
- * and that date moves past every occurrence staged, so editing a rule never backfills, and a
- * deleted occurrence doesn't come back. A schedule whose transactions the ledger refuses keeps
- * the error, and is retried on the next run; the others carry on.
+ * The generator stages each due occurrence of every schedule that isn't paused, acting as the
+ * schedule's owner toward the ledger: pending (`!`) for review, or confirmed if the schedule
+ * confirms automatically. It runs at startup, after a schedule is saved, and once a day just
+ * after midnight in each book's time zone. An occurrence is due on its (weekend-adjusted) date,
+ * in the book's time zone.
+ *
+ * A schedule's `last_applied` date is the last nominal date it ran for. The generator stages
+ * the occurrences after it (or from the start, if it has never run) through today, then moves
+ * it past them. So each occurrence is staged once: one deleted with "Not this time" doesn't
+ * come back. Editing a schedule resets it to now: its unconfirmed occurrences from today on are
+ * deleted (except ones an import already matched), and staged again as edited.
+ *
+ * A schedule whose transactions the ledger refuses keeps the error, and is retried on the next
+ * run; the others carry on.
  */
 import type { Account, TransactionIn } from "@fava-beans/ledger-client";
 
@@ -18,25 +25,27 @@ import {
   problem,
   upcoming,
   type Occurrence,
-  type Rule,
   type Schedule,
   type ScheduleIn,
-  type TransactionTemplate,
+  type SchedulePatch,
   type UpcomingOccurrence,
 } from "../shared/schedule.js";
-import type { AppDb, StoredSchedule } from "./db.js";
-import type { SchedulePatch } from "../shared/schedule.js";
+import { StaleVersion, type AppDb, type StoredSchedule } from "./db.js";
 import type { LedgerPort } from "./ledger.js";
 
 export const SCHEDULE_KEY = "schedule";
 export const SCHEDULE_DATE_KEY = "schedule-date";
 
-/** Today's date where the app runs (set `TZ` for the household's time zone). */
-export function today(): string {
-  return new Date().toLocaleDateString("en-CA");
+/** Today's date in `timeZone` (IANA), or where the app runs if none is given. */
+export function todayIn(timeZone?: string): string {
+  return new Date().toLocaleDateString("en-CA", timeZone ? { timeZone } : undefined);
 }
 
+/** Today in the book's time zone. */
+export const bookToday = (db: AppDb, book: string) => todayIn(db.timeZone(book));
+
 const DECIMAL = /^-?\d+(\.\d+)?$/;
+const AMOUNT = /^\d+(\.\d+)?$/;
 
 /** Why a schedule can't be saved, or null if it can. The ledger checks the transaction again
  * when an occurrence is staged. */
@@ -49,6 +58,11 @@ export function scheduleProblem(s: ScheduleIn, accounts: Account[]): string | nu
   if (postings.filter((p) => !p.units).length > 1) return "Leave at most one amount blank";
   if (postings.some((p) => p.units && (!DECIMAL.test(p.units.number) || !p.units.currency)))
     return "Amounts must be numbers like 12.50, with a currency";
+  if (postings.some((p) => p.tolerance && !AMOUNT.test(p.tolerance)))
+    return "A match tolerance is an amount, like 25.00";
+  const tolerant = postings.filter((p) => p.tolerance && Number(p.tolerance) > 0);
+  if (tolerant.length && (tolerant.some((p) => !p.units) || postings.every((p) => p.units)))
+    return "A split with a match tolerance needs an amount, and another split left blank to absorb the difference";
   const byName = new Map(accounts.map((a) => [a.name, a]));
   for (const p of postings) {
     const account = byName.get(p.account);
@@ -75,15 +89,15 @@ type Services = {
   book: string;
 };
 
-/** Create a schedule owned by `user`, and stage any occurrences already due (from its start:
- * a start in the past backfills). */
+/** Create a schedule owned by `user`, and stage every occurrence from its start through today
+ * (`on`, by default today in the book's time zone). */
 export async function createSchedule({
   db,
   ledgerFor,
   user,
   book,
   input,
-  on = today(),
+  on,
 }: Services & { input: ScheduleIn | null; on?: string }): Promise<Schedule> {
   const ledger = ledgerFor(user);
   if (!(await ledger.book(book))) throw new ScheduleProblem(404, "not found");
@@ -96,15 +110,17 @@ export async function createSchedule({
     rule: input.rule,
     template: input.template,
     paused: input.paused ?? false,
+    auto_confirm: input.auto_confirm ?? false,
   });
   await runSchedules({ db, ledgerFor, on, id });
   return view(db.schedule(book, id)!);
 }
 
 /**
- * Change a schedule (only the fields given), against the version read. Changes apply to
- * occurrences still to come: a changed rule applies from `on` (today), never staging dates
- * already past. Then stages anything now due.
+ * Change a schedule (only the fields given), against the version read, and reset it to now:
+ * its unconfirmed occurrences dated today (`on`) or later are deleted, except ones an import
+ * matched, and `last_applied` becomes yesterday (or the last occurrence kept), so today's
+ * occurrence on is staged as edited. Dates before today are never staged by an edit.
  */
 export async function editSchedule({
   db,
@@ -113,7 +129,7 @@ export async function editSchedule({
   book,
   id,
   patch,
-  on = today(),
+  on = bookToday(db, book),
 }: Services & { id: string; patch: SchedulePatch | null; on?: string }): Promise<Schedule> {
   const ledger = ledgerFor(user);
   if (!(await ledger.book(book))) throw new ScheduleProblem(404, "not found");
@@ -124,45 +140,64 @@ export async function editSchedule({
   const merged = { ...current, ...changes };
   const problem = scheduleProblem(merged, await ledger.accounts(book));
   if (problem) throw new ScheduleProblem(422, problem);
-  const yesterday = addDays(on, -1);
-  const ruleChanged = JSON.stringify(merged.rule) !== JSON.stringify(current.rule);
+  if (current.updated_at !== updated_at)
+    throw new StaleVersion("the schedule changed since it was read");
+
+  const from = db.occurrencesFrom(id, on);
+  const held = db.heldByImports(from.map((o) => o.transaction_id));
+  const remove: { id: string; updated_at: string }[] = [];
+  const forget: string[] = [];
+  let kept = addDays(on, -1);
+  for (const o of from) {
+    const staged = held.has(o.transaction_id)
+      ? undefined
+      : await ledger.transaction(book, o.transaction_id).catch(() => null);
+    if (staged === null)
+      forget.push(o.nominal); // already deleted
+    else if (staged?.flag === "!") {
+      remove.push({ id: staged.id, updated_at: staged.updated_at });
+      forget.push(o.nominal);
+    } else if (o.nominal > kept) kept = o.nominal; // confirmed or matched: it stays
+  }
+  if (remove.length) await ledger.applyChanges(book, { create: [], delete: remove });
+  db.forgetOccurrences(id, forget);
   db.updateSchedule(book, id, updated_at, {
     name: merged.name.trim(),
     rule: merged.rule,
     template: merged.template,
     paused: merged.paused,
-    generated_through:
-      ruleChanged && (current.generated_through ?? "") < yesterday
-        ? yesterday
-        : current.generated_through,
+    auto_confirm: merged.auto_confirm,
+    last_applied: kept,
   });
   await runSchedules({ db, ledgerFor, on, id });
   return view(db.schedule(book, id)!);
 }
 
-/** The transaction an occurrence stages. */
+/** The transaction an occurrence stages. Tolerances stay with the schedule. */
 export function occurrenceTransaction(
-  id: string,
-  template: TransactionTemplate,
+  s: Pick<StoredSchedule, "id" | "template" | "auto_confirm">,
   occurrence: Occurrence
 ): TransactionIn {
+  const { template } = s;
   return {
     date: occurrence.date,
-    flag: "!",
+    flag: s.auto_confirm ? "*" : "!",
     payee: template.payee,
     narration: template.narration,
     tags: template.tags,
     links: template.links,
-    meta: { ...template.meta, [SCHEDULE_KEY]: id, [SCHEDULE_DATE_KEY]: occurrence.nominal },
-    postings: template.postings as TransactionIn["postings"],
+    meta: { ...template.meta, [SCHEDULE_KEY]: s.id, [SCHEDULE_DATE_KEY]: occurrence.nominal },
+    postings: template.postings.map(
+      ({ tolerance: _tolerance, ...p }) => p
+    ) as TransactionIn["postings"],
   };
 }
 
 /** The next occurrence a schedule will stage, if any (none while paused or ended). */
 function next(s: StoredSchedule): Occurrence | null {
   if (s.paused) return null;
-  const from = s.generated_through ?? s.rule.start;
-  return occurrences(s.rule, s.generated_through, addDays(from, 800))[0] ?? null;
+  const from = s.last_applied ?? s.rule.start;
+  return occurrences(s.rule, s.last_applied, addDays(from, 800))[0] ?? null;
 }
 
 /** A schedule as the API shows it. */
@@ -174,7 +209,8 @@ export function view(s: StoredSchedule): Schedule {
     rule: s.rule,
     template: s.template,
     paused: s.paused,
-    generated_through: s.generated_through,
+    auto_confirm: s.auto_confirm,
+    last_applied: s.last_applied,
     last_error: s.last_error,
     next: next(s),
     created_at: s.created_at,
@@ -196,7 +232,7 @@ export function upcomingOccurrences(
     .filter((s) => !s.paused)
     .flatMap((s) =>
       upcoming(s.rule, from, 1000, days + 3)
-        .filter((o) => o.date <= to && (!s.generated_through || o.nominal > s.generated_through))
+        .filter((o) => o.date <= to && (!s.last_applied || o.nominal > s.last_applied))
         .map((o) => ({ ...o, schedule_id: s.id, name: s.name, template: s.template }))
     )
     .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
@@ -204,13 +240,13 @@ export function upcomingOccurrences(
 
 /**
  * Stage every due occurrence of the active schedules (all of them, or one book's, or one
- * schedule). Each schedule's occurrences are one atomic ledger write. Returns how many were
- * staged.
+ * schedule), each due by today in its book's time zone (or `on`). Each schedule's occurrences
+ * are one atomic ledger write. Returns how many were staged.
  */
 export async function runSchedules({
   db,
   ledgerFor,
-  on = today(),
+  on,
   book,
   id,
 }: {
@@ -223,12 +259,12 @@ export async function runSchedules({
   let staged = 0;
   for (const s of db.activeSchedules()) {
     if ((book && s.book_id !== book) || (id && s.id !== id)) continue;
-    const occurrences = due(s.rule as Rule, s.generated_through, on);
+    const occurrences = due(s.rule, s.last_applied, on ?? bookToday(db, s.book_id));
     if (!occurrences.length) continue;
     try {
       const created = await ledgerFor(s.user_id).createTransactions(
         s.book_id,
-        occurrences.map((o) => occurrenceTransaction(s.id, s.template, o))
+        occurrences.map((o) => occurrenceTransaction(s, o))
       );
       db.recordOccurrences(
         s.id,
@@ -242,18 +278,41 @@ export async function runSchedules({
   return staged;
 }
 
-/** Run the generator now and then every hour, logging what it does. Returns a stop function. */
-export function startScheduler(
-  db: AppDb,
-  ledgerFor: (userId: string) => LedgerPort,
-  everyMs = 60 * 60 * 1000
-): () => void {
-  const tick = () =>
-    runSchedules({ db, ledgerFor }).then(
-      (n) => n && console.log(`scheduler: staged ${n} occurrence${n === 1 ? "" : "s"}`),
-      (error: unknown) => console.error("scheduler:", error)
-    );
+/** Milliseconds from `now` until just after the next midnight in `timeZone` (or locally). */
+export function untilMidnight(now: Date, timeZone?: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+    })
+      .formatToParts(now)
+      .map((p) => [p.type, Number(p.value)])
+  );
+  const elapsed = (parts.hour! * 3600 + parts.minute! * 60 + parts.second!) * 1000;
+  return 24 * 3600 * 1000 - elapsed - now.getMilliseconds() + 60_000; // a minute past
+}
+
+/**
+ * Run the generator now, then once a day: just after the next midnight in any book's time zone
+ * (or the app's own), so each book's occurrences are staged on their day. Logs what it does.
+ * Returns a stop function.
+ */
+export function startScheduler(db: AppDb, ledgerFor: (userId: string) => LedgerPort): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const tick = async () => {
+    try {
+      const n = await runSchedules({ db, ledgerFor });
+      if (n) console.log(`scheduler: staged ${n} occurrence${n === 1 ? "" : "s"}`);
+    } catch (error) {
+      console.error("scheduler:", error);
+    }
+    const now = new Date();
+    const zones = [undefined, ...new Set(db.activeSchedules().map((s) => db.timeZone(s.book_id)))];
+    timer = setTimeout(() => void tick(), Math.min(...zones.map((z) => untilMidnight(now, z))));
+  };
   void tick();
-  const timer = setInterval(() => void tick(), everyMs);
-  return () => clearInterval(timer);
+  return () => clearTimeout(timer);
 }

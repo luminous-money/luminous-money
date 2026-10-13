@@ -35,6 +35,13 @@ export interface LedgerPort {
   /** All of them or none. */
   createTransactions(book: string, transactions: TransactionIn[]): Promise<Transaction[]>;
   transaction(book: string, id: string): Promise<Transaction>;
+  /** Change a transaction's postings, against the version read. */
+  setPostings(
+    book: string,
+    id: string,
+    postings: TransactionIn["postings"],
+    updated_at: string
+  ): Promise<Transaction>;
   /** Create and delete (with the versions read) in one write, or not at all. Returns the
    * created transactions. */
   applyChanges(
@@ -95,6 +102,13 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
       unwrap(
         client.GET("/api/ledger/v1/books/{book_id}/transactions/{directive_id}", {
           params: { path: { book_id: book, directive_id: id } },
+        })
+      ),
+    setPostings: (book, id, postings, updated_at) =>
+      unwrap(
+        client.PATCH("/api/ledger/v1/books/{book_id}/transactions/{directive_id}", {
+          params: { path: { book_id: book, directive_id: id } },
+          body: { postings, updated_at },
         })
       ),
     applyChanges: (book, changes) =>

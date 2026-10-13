@@ -2,15 +2,19 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { guessProfile } from "@fava-beans/csv-import";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ScheduleIn } from "../shared/schedule.js";
 import { AppDb, StaleVersion } from "./db.js";
+import { importFile } from "./imports.js";
+import { confirmRow } from "./matches.js";
 import {
   createSchedule,
   editSchedule,
   runSchedules,
   ScheduleProblem,
+  untilMidnight,
   upcomingOccurrences,
 } from "./schedules.js";
 import { FakeLedger } from "./testing.js";
@@ -67,19 +71,10 @@ describe("the generator", () => {
       ["2024-03-01", "!", "Landlord"],
     ]);
     expect(ledger.transactions[0]!.meta).toEqual({ schedule: s.id, "schedule-date": "2024-01-01" });
-    expect(s).toMatchObject({ generated_through: "2024-03-01", next: { date: "2024-04-01" } });
+    expect(s).toMatchObject({ last_applied: "2024-03-01", next: { date: "2024-04-01" } });
     expect(await runSchedules({ db, ledgerFor, on: "2024-03-31" })).toBe(0);
     expect(await runSchedules({ db, ledgerFor, on: "2024-04-01" })).toBe(1);
     expect(Object.keys(db.scheduledTransactions("b"))).toHaveLength(4);
-  });
-
-  it("doesn't bring back an occurrence that was deleted (skipped)", async () => {
-    await create(rent(), "2024-02-15");
-    ledger.transactions.pop();
-
-    await runSchedules({ db, ledgerFor, on: "2024-02-20" });
-
-    expect(ledger.transactions.map((t) => t.date)).toEqual(["2024-01-01"]);
   });
 
   it("skips paused schedules, and keeps a failing schedule's error without stopping others", async () => {
@@ -102,7 +97,7 @@ describe("the generator", () => {
     await runSchedules({ db, ledgerFor, on: "2024-04-01" });
 
     expect(db.schedule("b", failing.id)!.last_error).toBe("account closed");
-    expect(db.schedule("b", ok.id)!.generated_through).toBe("2024-04-01");
+    expect(db.schedule("b", ok.id)!.last_applied).toBe("2024-04-01");
     expect(ledger.transactions).toHaveLength(1);
   });
 });
@@ -124,23 +119,6 @@ describe("saving schedules", () => {
         postings: [{ account: "Expenses:Nope", units: null }, ...rent().template.postings],
       },
     });
-  });
-
-  it("an edited rule applies from today, never staging dates already past", async () => {
-    const s = await create(rent({ start: "2024-04-01" }), "2024-03-10");
-
-    const edited = await editSchedule({
-      db,
-      ledgerFor,
-      user: "u",
-      book: "b",
-      id: s.id,
-      on: "2024-04-20",
-      patch: { updated_at: s.updated_at, rule: rent({ start: "2024-01-01", days: [15] }).rule },
-    });
-
-    expect(ledger.transactions).toHaveLength(0); // not Jan 15 to Apr 15
-    expect(edited.next).toMatchObject({ date: "2024-05-15" });
   });
 
   it("edits are versioned", async () => {
@@ -174,4 +152,88 @@ it("lists what's coming across schedules, not what's staged", async () => {
     ["2024-04-01", "Rent"],
     ["2024-04-05", "Allowance"],
   ]);
+});
+
+describe("answers to M3's questions", () => {
+  const edit = (id: string, updated_at: string, on: string, change: Partial<ScheduleIn>) =>
+    editSchedule({ db, ledgerFor, user: "u", book: "b", id, on, patch: { updated_at, ...change } });
+
+  it("editing resets to now: today's unconfirmed occurrence is staged again as edited", async () => {
+    const s = await create(rent(), "2024-03-01"); // Jan, Feb and Mar 1, pending
+    ledger.transactions[0]!.flag = "*"; // January's was confirmed
+
+    await edit(s.id, s.updated_at, "2024-03-01", {
+      template: { ...rent().template, payee: "New landlord" },
+    });
+
+    expect(ledger.transactions.map((t) => [t.date, t.flag, t.payee])).toEqual([
+      ["2024-01-01", "*", "Landlord"],
+      ["2024-02-01", "!", "Landlord"], // before today: kept as it was
+      ["2024-03-01", "!", "New landlord"],
+    ]);
+    expect(db.schedule("b", s.id)!.last_applied).toBe("2024-03-01");
+  });
+
+  it("an edited rule never stages dates already past", async () => {
+    const s = await create(rent({ start: "2024-04-01" }), "2024-03-10");
+
+    const edited = await edit(s.id, s.updated_at, "2024-04-20", {
+      rule: rent({ start: "2024-01-01", days: [15] }).rule,
+    });
+
+    expect(ledger.transactions).toHaveLength(0);
+    expect(edited.next).toMatchObject({ date: "2024-05-15" });
+  });
+
+  it("a deleted occurrence (not this time) doesn't come back", async () => {
+    await create(rent(), "2024-02-15");
+    ledger.transactions.pop();
+
+    await runSchedules({ db, ledgerFor, on: "2024-02-20" });
+
+    expect(ledger.transactions.map((t) => t.date)).toEqual(["2024-01-01"]);
+  });
+
+  it("schedules can confirm their occurrences automatically", async () => {
+    await create({ ...rent(), auto_confirm: true }, "2024-01-15");
+
+    expect(ledger.transactions.map((t) => t.flag)).toEqual(["*"]);
+  });
+
+  it("a split's tolerance lets the bank's amount match, and the bank's amount wins on confirm", async () => {
+    const tolerant = rent({ start: "2024-03-01" });
+    tolerant.template.postings[0]!.tolerance = "25.00";
+    await create(tolerant, "2024-03-01");
+    const header = "Date,Description,Amount,Balance\n";
+    db.replaceProfiles("b", CHECKING, [guessProfile(`${header}03/02/2024,X,-1.00,1\n`)!]);
+
+    const imported = await importFile({
+      db,
+      ledger,
+      book: "b",
+      account: CHECKING,
+      filename: "f.csv",
+      text: `${header}03/02/2024,RENT,-1510.00,1\n03/03/2024,OTHER,-1530.00,1\n`,
+      userId: "u",
+    });
+
+    expect(imported.rows.map((r) => r.outcome)).toEqual(["matched", "staged"]); // 1530 is too far
+    await confirmRow(db, ledger, "b", { batch: imported.batch.id, line: 2 });
+    const rentPaid = ledger.transactions.find((t) => t.payee === "Landlord")!;
+    expect(rentPaid.postings.map((p) => p.units?.number ?? null)).toEqual(["-1510.00", null]);
+  });
+
+  it("refuses a tolerance with nowhere for the difference to go", async () => {
+    const both = rent();
+    both.template.postings[0]!.tolerance = "5";
+    both.template.postings[1]!.units = { number: "1500.00", currency: "USD" };
+
+    await expect(create(both, "2024-01-01")).rejects.toThrow(/absorb/);
+  });
+
+  it("runs just after the next midnight in a time zone", () => {
+    const now = new Date("2024-03-10T05:00:00.000Z");
+    expect(untilMidnight(now, "UTC")).toBe((19 * 3600 + 60) * 1000);
+    expect(untilMidnight(now, "Asia/Tokyo")).toBe((10 * 3600 + 60) * 1000); // 14:00 there
+  });
 });

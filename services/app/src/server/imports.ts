@@ -188,6 +188,12 @@ export async function importFile({
       shift(dates.at(-1)!, windowDays),
       (ids) => db.claimed(book, account, ids)
     );
+    // Scheduled transactions may match within their split's tolerance.
+    const schedules = db.schedulesOf(context.existing.map((t) => t.id));
+    for (const t of context.existing) {
+      const split = schedules.get(t.id)?.template.postings.find((p) => p.account === account);
+      if (split?.tolerance) t.tolerance = split.tolerance;
+    }
     for (const [line, found] of await runChain([matcher(windowDays)], incoming, context)) {
       resolutions.set(
         line,

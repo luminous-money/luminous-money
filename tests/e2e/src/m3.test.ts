@@ -11,7 +11,7 @@ const mdy = (iso: string) => `${iso.slice(5, 7)}/${iso.slice(8, 10)}/${iso.slice
 type Schedule = {
   id: string;
   updated_at: string;
-  generated_through: string | null;
+  last_applied: string | null;
   next: { date: string } | null;
 };
 

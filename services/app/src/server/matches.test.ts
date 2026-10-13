@@ -96,7 +96,7 @@ describe("the coffee example", () => {
   });
 
   it("confirming leaves review; a confirmed row can't be reassigned", async () => {
-    confirmRow(db, "b", { batch, line: 2 });
+    await confirmRow(db, ledger, "b", { batch, line: 2 });
 
     expect(Object.keys(holding())).toEqual(["3"]);
     await expect(

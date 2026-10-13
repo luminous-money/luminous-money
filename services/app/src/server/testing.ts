@@ -88,6 +88,17 @@ export class FakeLedger implements LedgerPort {
     return found;
   }
 
+  async setPostings(
+    book: string,
+    id: string,
+    postings: TransactionIn["postings"],
+    _updated_at: string
+  ) {
+    const found = await this.transaction(book, id);
+    found.postings = postings;
+    return found;
+  }
+
   async applyChanges(
     _book: string,
     changes: { create: TransactionIn[]; delete: { id: string; updated_at: string }[] }

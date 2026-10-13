@@ -192,6 +192,9 @@ export type TransactionTemplate = {
   postings: {
     account: string;
     units: { number: string; currency: string } | null;
+    /** How far an imported amount may be from this split's, either way, and still match it
+     * (a decimal string; absent or "0" for exact). Kept in the schedule, not the books. */
+    tolerance?: string | null;
     [more: string]: unknown;
   }[];
 };
@@ -203,9 +206,11 @@ export type Schedule = {
   rule: Rule;
   template: TransactionTemplate;
   paused: boolean;
-  /** The last nominal date considered: occurrences after it are still to come. Null before the
-   * first. */
-  generated_through: string | null;
+  /** Stage occurrences confirmed, rather than pending for review. */
+  auto_confirm: boolean;
+  /** The last nominal date the schedule ran for: occurrences after it are still to come. Null
+   * before the first. */
+  last_applied: string | null;
   /** Why the last attempt to stage an occurrence failed, until one succeeds. */
   last_error: string | null;
   /** The next occurrence still to stage, if any. */
@@ -219,6 +224,7 @@ export type ScheduleIn = {
   rule: Rule;
   template: TransactionTemplate;
   paused?: boolean;
+  auto_confirm?: boolean;
 };
 
 export type SchedulePatch = Partial<ScheduleIn> & { updated_at: string };

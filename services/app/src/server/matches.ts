@@ -20,6 +20,7 @@ import type { ProposedMatch } from "../shared/imports.js";
 import type { AppDb, HeldRow } from "./db.js";
 import { ensureUncategorized, stagedTransaction, type Stageable } from "./imports.js";
 import type { LedgerPort } from "./ledger.js";
+import { sameNumber } from "./pipeline/matcher.js";
 
 export type RowRef = { batch: string; line: number };
 
@@ -148,12 +149,35 @@ export async function assignRow({
   db.setRows(changes);
 }
 
-/** Confirm a row's match: its transaction is final, and it leaves review. */
-export function confirmRow(db: AppDb, book: string, at: RowRef): void {
+/**
+ * Confirm a row's match: its transaction is final, and it leaves review. A transaction matched
+ * within a scheduled split's tolerance takes the bank's amount for that split (the blank split
+ * absorbs the difference).
+ */
+export async function confirmRow(
+  db: AppDb,
+  ledger: LedgerPort,
+  book: string,
+  at: RowRef
+): Promise<void> {
   const row = db.row(book, at.batch, at.line);
   if (!row) throw new MatchProblem("not-found", "there's no such import row");
   if (row.match !== "proposed")
     throw new MatchProblem("not-proposed", "this row's match isn't up for review");
+  if (row.outcome === "matched" && row.amount) {
+    const t = await ledger.transaction(book, row.transaction_id!);
+    const split = t.postings.find((p) => p.account === row.account);
+    if (split?.units && !sameNumber(split.units.number, row.amount)) {
+      await ledger.setPostings(
+        book,
+        t.id,
+        t.postings.map((p) =>
+          p === split ? { ...p, units: { ...split.units!, number: row.amount! } } : p
+        ),
+        t.updated_at
+      );
+    }
+  }
   db.setRows([
     {
       ...at,

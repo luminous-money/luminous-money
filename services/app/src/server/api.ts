@@ -17,13 +17,23 @@ import {
   editSchedule,
   runSchedules,
   ScheduleProblem,
-  today,
+  bookToday,
   upcomingOccurrences,
   view,
 } from "./schedules.js";
 import type { LedgerPort } from "./ledger.js";
 
 type Env = { Variables: { user: string } };
+
+/** Whether `zone` is an IANA time zone this runtime knows. */
+function isTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function createApi({
   db,
@@ -177,11 +187,31 @@ export function createApi({
     const { book, batch, line } = c.req.param();
     if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
     try {
-      confirmRow(db, book, { batch, line: Number(line) });
+      await confirmRow(db, ledgerFor(c.get("user")), book, { batch, line: Number(line) });
       return c.json(proposedMatches(db, book));
     } catch (error) {
       return c.json(...matchError(error));
     }
+  });
+
+  // Book settings (kept in `app`): for now, the book's time zone, which decides "today" for
+  // its schedules.
+
+  api.get("/books/:book/settings", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    return c.json({ time_zone: db.timeZone(book) ?? null });
+  });
+
+  api.put("/books/:book/settings", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as { time_zone?: unknown };
+    const zone = body.time_zone;
+    if (typeof zone !== "string" || !isTimeZone(zone))
+      return c.json({ detail: "send a time zone, like America/Chicago" }, 422);
+    db.setTimeZone(book, zone);
+    return c.json({ time_zone: zone });
   });
 
   // Schedules
@@ -215,7 +245,7 @@ export function createApi({
     const { book } = c.req.param();
     if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
     const days = Math.min(Number(c.req.query("days") ?? 30) || 30, 366);
-    return c.json(upcomingOccurrences(db, book, today(), days));
+    return c.json(upcomingOccurrences(db, book, bookToday(db, book), days));
   });
 
   /** Which transactions schedules staged: transaction ID to schedule ID. */

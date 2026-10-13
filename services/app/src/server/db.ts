@@ -112,6 +112,13 @@ export const MIGRATIONS: Migration[] = [
       ["PRIMARY KEY (schedule_id, nominal)"]
     ),
   ],
+  // 7: M3's answers. `last_applied` is the last nominal date a schedule ran for; schedules can
+  // confirm their occurrences automatically; books have a time zone for "today".
+  [
+    "ALTER TABLE schedule RENAME COLUMN generated_through TO last_applied",
+    "ALTER TABLE schedule ADD COLUMN auto_confirm INTEGER NOT NULL DEFAULT 0",
+    createTable("book_setting", ["book_id TEXT PRIMARY KEY", "time_zone TEXT NOT NULL"]),
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -125,7 +132,8 @@ export type StoredSchedule = {
   rule: Rule;
   template: TransactionTemplate;
   paused: boolean;
-  generated_through: string | null;
+  auto_confirm: boolean;
+  last_applied: string | null;
   last_error: string | null;
   created_at: string;
   updated_at: string;
@@ -134,10 +142,11 @@ export type StoredSchedule = {
 /** An edit based on a version that has moved on. */
 export class StaleVersion extends Error {}
 
-type ScheduleRecord = Omit<StoredSchedule, "rule" | "template" | "paused"> & {
+type ScheduleRecord = Omit<StoredSchedule, "rule" | "template" | "paused" | "auto_confirm"> & {
   rule: string;
   template: string;
   paused: number;
+  auto_confirm: number;
 };
 
 const toSchedule = (r: ScheduleRecord): StoredSchedule => ({
@@ -145,6 +154,7 @@ const toSchedule = (r: ScheduleRecord): StoredSchedule => ({
   rule: JSON.parse(r.rule) as Rule,
   template: JSON.parse(r.template) as TransactionTemplate,
   paused: r.paused === 1,
+  auto_confirm: r.auto_confirm === 1,
 });
 
 /** An `import_row` as stored: candidates as JSON. */
@@ -437,14 +447,17 @@ export class AppDb {
   }
 
   addSchedule(
-    s: Pick<StoredSchedule, "user_id" | "book_id" | "name" | "rule" | "template" | "paused">
+    s: Pick<
+      StoredSchedule,
+      "user_id" | "book_id" | "name" | "rule" | "template" | "paused" | "auto_confirm"
+    >
   ): string {
     const id = randomUUID().replace(/-/g, "");
     const stamp = now();
     this.db
       .prepare(
-        `INSERT INTO schedule (id, user_id, book_id, name, rule, template, paused, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO schedule (id, user_id, book_id, name, rule, template, paused, auto_confirm, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -454,6 +467,7 @@ export class AppDb {
         JSON.stringify(s.rule),
         JSON.stringify(s.template),
         s.paused ? 1 : 0,
+        s.auto_confirm ? 1 : 0,
         stamp,
         stamp
       );
@@ -466,7 +480,10 @@ export class AppDb {
     id: string,
     expected: string,
     changes: Partial<
-      Pick<StoredSchedule, "name" | "rule" | "template" | "paused" | "generated_through">
+      Pick<
+        StoredSchedule,
+        "name" | "rule" | "template" | "paused" | "auto_confirm" | "last_applied"
+      >
     >
   ): void {
     transaction(this.db, () => {
@@ -477,7 +494,7 @@ export class AppDb {
       const next = { ...current, ...changes };
       this.db
         .prepare(
-          `UPDATE schedule SET name = ?, rule = ?, template = ?, paused = ?, generated_through = ?,
+          `UPDATE schedule SET name = ?, rule = ?, template = ?, paused = ?, auto_confirm = ?, last_applied = ?,
              last_error = NULL, updated_at = ? WHERE id = ?`
         )
         .run(
@@ -485,7 +502,8 @@ export class AppDb {
           JSON.stringify(next.rule),
           JSON.stringify(next.template),
           next.paused ? 1 : 0,
-          next.generated_through,
+          next.auto_confirm ? 1 : 0,
+          next.last_applied,
           after(current.updated_at),
           id
         );
@@ -502,7 +520,7 @@ export class AppDb {
     });
   }
 
-  /** Record the occurrences a schedule just staged, and move its generated-through date to the
+  /** Record the occurrences a schedule just staged, and move its last-applied date to the
    * last of them. Generator bookkeeping, not an edit: the version doesn't change. */
   recordOccurrences(id: string, staged: (Occurrence & { transaction_id: string })[]): void {
     const stamp = now();
@@ -513,7 +531,7 @@ export class AppDb {
       );
       for (const o of staged) insert.run(id, o.nominal, o.date, o.transaction_id, stamp, stamp);
       this.db
-        .prepare("UPDATE schedule SET generated_through = ?, last_error = NULL WHERE id = ?")
+        .prepare("UPDATE schedule SET last_applied = ?, last_error = NULL WHERE id = ?")
         .run(staged.at(-1)!.nominal, id);
     });
   }
@@ -521,6 +539,65 @@ export class AppDb {
   /** Remember why a schedule couldn't stage its occurrences (null clears it). */
   setScheduleError(id: string, error: string | null): void {
     this.db.prepare("UPDATE schedule SET last_error = ? WHERE id = ?").run(error, id);
+  }
+
+  /** A schedule's occurrences dated `from` or later, with their transactions. */
+  occurrencesFrom(id: string, from: string): (Occurrence & { transaction_id: string })[] {
+    return this.db
+      .prepare(
+        "SELECT nominal, date, transaction_id FROM schedule_occurrence WHERE schedule_id = ? AND date >= ? ORDER BY nominal"
+      )
+      .all(id, from) as (Occurrence & { transaction_id: string })[];
+  }
+
+  forgetOccurrences(id: string, nominals: string[]): void {
+    const remove = this.db.prepare(
+      "DELETE FROM schedule_occurrence WHERE schedule_id = ? AND nominal = ?"
+    );
+    transaction(this.db, () => nominals.forEach((n) => remove.run(id, n)));
+  }
+
+  /** Which of `transactions` some import row holds (staged or matched). */
+  heldByImports(transactions: string[]): Set<string> {
+    if (!transactions.length) return new Set();
+    const found = this.db
+      .prepare(
+        `SELECT transaction_id FROM import_row WHERE outcome IN ('staged', 'matched')
+           AND transaction_id IN (SELECT value FROM json_each(?))`
+      )
+      .all(JSON.stringify(transactions)) as { transaction_id: string }[];
+    return new Set(found.map((r) => r.transaction_id));
+  }
+
+  /** For each of `transactions` a schedule staged, the schedule. */
+  schedulesOf(transactions: string[]): Map<string, StoredSchedule> {
+    if (!transactions.length) return new Map();
+    const rows = this.db
+      .prepare(
+        `SELECT o.transaction_id, s.* FROM schedule_occurrence o JOIN schedule s ON s.id = o.schedule_id
+         WHERE o.transaction_id IN (SELECT value FROM json_each(?))`
+      )
+      .all(JSON.stringify(transactions)) as (ScheduleRecord & { transaction_id: string })[];
+    return new Map(rows.map(({ transaction_id, ...r }) => [transaction_id, toSchedule(r)]));
+  }
+
+  // Book settings
+
+  /** The book's time zone (IANA, e.g. "America/Chicago"), if set. */
+  timeZone(book: string): string | undefined {
+    const r = this.db.prepare("SELECT time_zone FROM book_setting WHERE book_id = ?").get(book) as
+      { time_zone: string } | undefined;
+    return r?.time_zone;
+  }
+
+  setTimeZone(book: string, timeZone: string): void {
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO book_setting (book_id, time_zone, created_at, updated_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT (book_id) DO UPDATE SET time_zone = excluded.time_zone, updated_at = excluded.updated_at`
+      )
+      .run(book, timeZone, stamp, stamp);
   }
 
   /** Which transactions in the book schedules staged: transaction ID to schedule ID. */
