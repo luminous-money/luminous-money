@@ -4,7 +4,14 @@ import { Link, useLocation } from "wouter";
 import { displayName, shortName, shown } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";
 import { withBack } from "../lib/navigation.js";
-import { explain, useAccountLedger, useSetStar, useStars, useSummary } from "../lib/queries.js";
+import {
+  explain,
+  useAccountLedger,
+  useScheduled,
+  useSetStar,
+  useStars,
+  useSummary,
+} from "../lib/queries.js";
 
 /**
  * One account's ledger: every transaction, newest first, 200 at a time, more loading as you
@@ -12,7 +19,7 @@ import { explain, useAccountLedger, useSetStar, useStars, useSummary } from "../
  * <multiple>. Tapping one opens it; the line above them adds a new one. Its header stars the
  * account (putting it on the home page) and links to importing into it. Amounts and balances
  * are shown as the account reads (a card's balance is what's owed); colors follow the stored
- * sign, the effect on net worth.
+ * sign, the effect on net worth. Transactions a schedule staged are marked ↻.
  */
 export function AccountLedger({ book, account }: { book: string; account: string }) {
   const [, navigate] = useLocation();
@@ -21,6 +28,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
   const info = summary.data?.[0];
   const stars = useStars(book);
   const setStar = useSetStar(book);
+  const scheduled = useScheduled(book);
   const starred = stars.data?.includes(account) ?? false;
   const type = info?.type;
   const end = useRef<HTMLDivElement>(null);
@@ -113,6 +121,16 @@ export function AccountLedger({ book, account }: { book: string; account: string
               <span className="ledger-date">{row.date}</span>
               <span className="ledger-what">
                 <span className="ledger-payee">
+                  {scheduled.data?.[row.id] && (
+                    <span
+                      className="scheduled"
+                      role="img"
+                      aria-label="Scheduled"
+                      title="From a schedule"
+                    >
+                      ↻{" "}
+                    </span>
+                  )}
                   {row.payee ?? row.narration ?? "(no description)"}
                 </span>
                 <span className="ledger-account muted">

@@ -1,12 +1,11 @@
-import type { Posting, Transaction } from "@fava-beans/ledger-client";
-import { useEffect, useMemo, useState } from "react";
+import type { Transaction } from "@fava-beans/ledger-client";
+import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 
-import { AccountPicker } from "../components/AccountPicker.js";
+import { SplitsFieldset, useSplits } from "../components/Splits.js";
 import { postable } from "../lib/accounts.js";
-import { formatMoney, isDecimal } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
-import { useBack, useParam } from "../lib/navigation.js";
+import { useBack, useParam, withBack } from "../lib/navigation.js";
 import {
   explain,
   useAccountCreation,
@@ -15,41 +14,10 @@ import {
   useEditTransaction,
   useTransaction,
 } from "../lib/queries.js";
-import { checkBalance, simple, UNCATEGORIZED } from "../lib/split.js";
-
-/** A posting being edited. The amount stays a raw string until it's valid; anything the form
- * doesn't edit (cost, price, flag, metadata) rides along untouched in `original`. */
-type Row = {
-  key: number;
-  account: string;
-  number: string;
-  currency: string;
-  original: Partial<Posting>;
-};
-
-let nextKey = 0;
-
-/** Blank amounts get the transaction's currency, so typing a number into one just works. */
-function toRows(postings: Posting[], currency: string): Row[] {
-  return postings.map((p) => ({
-    key: nextKey++,
-    account: p.account,
-    number: p.units?.number ?? "",
-    currency: p.units?.currency ?? currency,
-    original: p,
-  }));
-}
+import { simple } from "../lib/split.js";
 
 function currencyOf(t: Transaction): string {
   return simple(t)?.currency ?? t.postings.find((p) => p.units)?.units?.currency ?? "USD";
-}
-
-function toPostings(rows: Row[]): Posting[] {
-  return rows.map((r) => ({
-    ...r.original,
-    account: r.account,
-    units: r.number.trim() ? { number: r.number.trim(), currency: r.currency.trim() } : null,
-  }));
 }
 
 export function TransactionPage({ book, id }: { book: string; id: string }) {
@@ -123,26 +91,12 @@ function Editor({
   const [payee, setPayee] = useState(t.payee ?? "");
   const [narration, setNarration] = useState(t.narration);
   const fallbackCurrency = useMemo(() => currencyOf(t), [t]);
-  const [rows, setRows] = useState(() => toRows(t.postings, fallbackCurrency));
+  const splits = useSplits(t.postings, fallbackCurrency);
+  const { postings, balance, uncategorized } = splits;
   const busy = edit.isPending || add.isPending;
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
-  useEffect(() => setRows(toRows(t.postings, fallbackCurrency)), [t, fallbackCurrency]);
   const names = accounts.data ? postable(accounts.data, date) : [];
-  const badAmount = rows.some(
-    (r) => r.number.trim() && (!isDecimal(r.number.trim()) || !r.currency.trim())
-  );
-  const postings = toPostings(rows);
-  const balance = badAmount
-    ? ({
-        state: "invalid",
-        message: "Amounts must be numbers like 12.50, with a currency",
-      } as const)
-    : checkBalance(postings);
-  const uncategorized = rows.some((r) => r.account === UNCATEGORIZED);
   const staged = t.flag === "!";
-
-  const update = (key: number, change: Partial<Row>) =>
-    setRows((all) => all.map((r) => (r.key === key ? { ...r, ...change } : r)));
 
   const submit = async (flag: string, then?: string) => {
     setMessage(null);
@@ -163,10 +117,18 @@ function Editor({
   return (
     <form className="editor" onSubmit={(e) => (e.preventDefault(), void submit(t.flag))}>
       {!isNew && (
-        <p>
+        <p className="status-line">
           <span className={`pill ${staged ? "staged" : "confirmed"}`}>
             {staged ? "Staged" : "Confirmed"}
           </span>
+          <Link
+            href={withBack(
+              `/books/${book}/schedules/new?from=${t.id}`,
+              `/books/${book}/transactions/${t.id}`
+            )}
+          >
+            Repeat…
+          </Link>
         </p>
       )}
 
@@ -183,70 +145,7 @@ function Editor({
         <input value={narration} onChange={(e) => setNarration(e.target.value)} />
       </label>
 
-      <fieldset className="postings">
-        <legend>Splits</legend>
-        {rows.map((r) => (
-          <div className="posting" key={r.key}>
-            <AccountPicker
-              label="Account"
-              accounts={names}
-              value={r.account === UNCATEGORIZED ? "" : r.account}
-              create={create}
-              onChange={(account) => update(r.key, { account })}
-            />
-            <div className="posting-amount">
-              <input
-                aria-label="Amount"
-                inputMode="decimal"
-                placeholder="auto"
-                value={r.number}
-                onChange={(e) => update(r.key, { number: e.target.value })}
-              />
-              <input
-                aria-label="Currency"
-                className="currency"
-                value={r.currency}
-                placeholder={fallbackCurrency}
-                onChange={(e) => update(r.key, { currency: e.target.value.toUpperCase() })}
-              />
-              <button
-                type="button"
-                aria-label="Remove split"
-                className="icon"
-                disabled={rows.length <= 1}
-                onClick={() => setRows((all) => all.filter((x) => x.key !== r.key))}
-              >
-                ×
-              </button>
-            </div>
-            {(r.original.cost || r.original.price) && (
-              <p className="muted small">
-                Has a {r.original.cost ? "cost basis" : "price"}; kept as is.
-              </p>
-            )}
-          </div>
-        ))}
-        <button
-          type="button"
-          onClick={() =>
-            setRows((all) => [
-              ...all,
-              { key: nextKey++, account: "", number: "", currency: fallbackCurrency, original: {} },
-            ])
-          }
-        >
-          + Add split
-        </button>
-        <p className={`balance ${balance.state}`} aria-live="polite">
-          {balance.state === "invalid" && balance.message}
-          {balance.state === "deferred" && "Lots and prices are checked by the ledger on save."}
-          {balance.state === "balanced" &&
-            (balance.auto.length
-              ? `Balanced. The blank amount will be ${balance.auto.map((a) => formatMoney(a.number, a.currency)).join(", ")}.`
-              : "Balanced.")}
-        </p>
-        <p className="muted small">Leave one amount blank to balance automatically.</p>
-      </fieldset>
+      <SplitsFieldset splits={splits} accounts={names} create={create} />
 
       {message && <p className={message.kind === "error" ? "error" : "ok"}>{message.text}</p>}
 

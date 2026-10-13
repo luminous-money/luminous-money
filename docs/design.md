@@ -476,9 +476,26 @@ entries.
     the transfer to shared
   - shared book: the matching contribution arriving in joint checking
 - **Amounts can vary from one occurrence to the next,** so a template can mark amounts as
-  estimates.
+  estimates. (Not built yet; see M3's questions.)
 - **When the real deposit arrives through the bank feed, it gets matched, not duplicated.** See
   the resolver pipeline below.
+
+As built in M3 (single-book; legs across books are M9):
+
+- **Schedules live in `app`:** a rule plus a transaction template (no date or flag), owned by a
+  user, versioned like every edit.
+- **The rule is small, not RRULE:** every N days, weeks, months or years from a start, until an
+  optional end; months on the start's day or listed days (or the last day), clamped to short
+  months; weekends kept or moved to the Friday before or Monday after. One shared module
+  (`src/shared/schedule.ts`) computes and describes it for both the server and the PWA.
+- **The generator** runs in `app` at startup, hourly and after saves, acting as the owner. An
+  occurrence is staged on its (weekend-adjusted) date as a `!` transaction marked
+  `schedule`/`schedule-date`, so the bank's row matches it on import (M2).
+- **Each occurrence is staged once.** A generated-through date moves past every occurrence
+  staged; a changed rule applies from today. So edits never backfill, and a deleted occurrence
+  (a skipped one) doesn't come back. A new schedule starting in the past does backfill from its
+  start, with a warning in the editor.
+- **Failures are per schedule:** the error is kept and shown, and retried on the next run.
 
 ### The resolver pipeline: matching and categorization
 

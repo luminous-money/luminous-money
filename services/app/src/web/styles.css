@@ -1069,3 +1069,42 @@ main a:not(.button):not(.card):not(.back):not(.menu-item) {
   justify-content: space-between;
   gap: 0.5rem;
 }
+
+/* Schedules */
+
+.upcoming {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.upcoming li {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr auto;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.upcoming li:first-child {
+  border-top: 0;
+}
+
+.rule input.every {
+  max-width: 5rem;
+}
+
+.warning {
+  color: #9a6b00;
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scheduled {
+  color: var(--green);
+  font-style: normal;
+}

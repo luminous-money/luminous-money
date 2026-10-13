@@ -1,7 +1,8 @@
 M3: Scheduled transactions: plan
 ==================================================================================================
 
-> **Status: built (first pass, 2026-10-13); [questions](#questions) open.** There's no separate
+> **Status: built (first pass, 2026-10-13); [questions](#questions) open.** Every slice below is
+> done, with unit, API and browser tests. There's no separate
 > spec: the milestone's line in [the plan](../../PLAN.md) ("the editor, storage, generator
 > logic, and display considerations") and the design's
 > [scheduled transactions](../../design.md#scheduled-transactions) section are the brief. Calls
@@ -121,4 +122,27 @@ import the bank's rent row, and it matches.
 
 ## Questions
 
-Filled in when the first pass is done.
+Decided by best guess in the first pass, or left out. Most consequential first.
+
+1. **Estimated amounts.** Salary, utilities and card payments vary. The design calls for marking
+   template amounts as estimates, matching an import within a tolerance, and taking the bank's
+   amount. _Not built:_ want it, and with what tolerance (±10%? a fixed amount?), and which split
+   absorbs the difference when the bank's amount wins (for salary: the net deposit, against
+   gross pay)?
+2. **When an occurrence is staged.** It's staged on its date, so it doesn't count in balances
+   before it happens. _Alternatives:_ stage it a few days ahead (future-dated, so the ledger
+   shows what's coming, but balances include it early); or show upcoming occurrences in ledgers
+   as virtual rows, with a projected balance.
+3. **Confirming occurrences without a bank feed** (rent by check): they wait in review like any
+   staged transaction. Want a per-schedule "confirm automatically" for trusted ones?
+4. **The generator's "today"** is the server's date: UTC in the containers, so an occurrence due
+   on the 1st is staged at 7 p.m. Central on the 31st. _Proposed:_ a `TZ` setting for the
+   household's time zone in Compose (defaulting to the host's).
+5. **Backfill:** a new schedule starting in the past stages everything since its start (with a
+   warning in the editor). Right, or should it start from today unless asked?
+6. **Rules not covered:** "the second Tuesday", "the last Friday", business days with holidays.
+   Wanted?
+7. **Skipping an occurrence** is deleting its staged transaction (it won't come back). Worth a
+   "Skip" button in review for scheduled transactions?
+8. **Deleting a schedule** keeps what it staged, but drops their ↻ marks (the transactions keep
+   `schedule` metadata). Fine?

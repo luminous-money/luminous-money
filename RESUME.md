@@ -6,9 +6,10 @@ _Updated 2026-10-13._ Keep this current: every finalized change set updates it (
 
 ## State
 
-**M1 and M2 are built.** M2 (credit cards, really "any account, and matching") is described in
-its [plan](docs/milestones/m2-credit-card/PLAN.md). The milestones ahead (M3–M13, then Polish)
-are in [docs/PLAN.md](docs/PLAN.md).
+**M1, M2 and M3 are built.** M2 (credit cards, really "any account, and matching") and M3
+(scheduled transactions, with [questions](docs/milestones/m3-scheduled-transactions/PLAN.md#questions)
+open) are described in their plans. The milestones ahead (M4–M13, then Polish) are in
+[docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
 - **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M6.
@@ -17,7 +18,13 @@ What a user can do now:
 - **Home** shows the user's **starred** accounts as cards: balance (a card's shown as what's
   owed) and when each was last updated by an import, plus "Import transactions" and "Add an
   account" (added accounts are starred).
-- **Menu:** Home, Manage books (list, rename, export as a Beancount file), Review, Log out.
+- **Menu:** Home, Manage books (list, rename, export as a Beancount file), Review, Schedules,
+  Log out.
+- **Schedules:** a transaction plus a rule (every N days/weeks/months/years, days of the month,
+  weekends moved or kept, an optional end), made new or with "Repeat…" on any transaction. Due
+  occurrences are staged as pending transactions (at startup, hourly, after saves), marked ↻ in
+  ledgers, and matched by imports like any transaction. The Schedules page lists them and what's
+  coming in the next 30 days; edit, pause and delete there.
 - **An account's ledger:**
   - newest first, 200 a page, with infinite scroll; running balances, and the other account or
     `<multiple>`; liabilities and income shown inverted, colored by their effect on net worth
@@ -46,23 +53,27 @@ How it's put together:
   - Versioned PATCH edits, batch writes, atomic create-and-delete (`/transactions/changes`),
     migrations, backups and export.
 - **`services/app`** (TypeScript): the PWA, plus stars, CSV profiles, imports, the pipeline
-  (`src/server/pipeline`: matcher, then assignment) and match review (`src/server/matches.ts`),
-  in `app.sqlite`.
+  (`src/server/pipeline`: matcher, then assignment), match review (`src/server/matches.ts`) and
+  schedules (`src/shared/schedule.ts` for rules, `src/server/schedules.ts` for the generator), in
+  `app.sqlite`.
 - **`packages/db`** (TypeScript migrations and timestamps, with a lint check) and
   **`packages/csv-import`** (parsing, guessing profiles, reading rows; shared by the browser and
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 106 tests, including the table lint
-    - auth: 9; app: 69; db: 10; csv-import: 22
+    - auth: 9; app: 88; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 36 API tests and 41 browser tests
+  - `pnpm e2e`: 40 API tests and 43 browser tests
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, with the demo
   seeded for the stub user: the "Demo" book, its checking account and card starred.
 
 ## Next steps
 
-1. Say `elaborate plan for M3` (scheduled transactions).
+1. **Answer M3's [questions](docs/milestones/m3-scheduled-transactions/PLAN.md#questions)**
+   (estimated amounts, when occurrences are staged, auto-confirm, time zone, backfill, rules not
+   covered, skipping, deleted schedules' marks).
+2. Then say `elaborate plan for M4` (categorization).
 
 ## Gotchas
 

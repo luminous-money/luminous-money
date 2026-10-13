@@ -1,7 +1,19 @@
 /** The app API (imports and CSV profiles), at /api/app/v1 on the same origin. */
 import type { CsvProfile, ImportBatch, ImportResult, ProposedMatch } from "../../shared/imports.js";
+import type {
+  Schedule,
+  ScheduleIn,
+  SchedulePatch,
+  UpcomingOccurrence,
+} from "../../shared/schedule.js";
 import { ApiError } from "./ledger.js";
 
+export type {
+  Schedule,
+  ScheduleIn,
+  SchedulePatch,
+  UpcomingOccurrence,
+} from "../../shared/schedule.js";
 export type {
   CsvProfile,
   ImportBatch,
@@ -93,6 +105,45 @@ export const appApi = {
         method: "POST",
       })
     ),
+
+  schedules: async (book: string): Promise<Schedule[]> =>
+    json(await fetch(`${base(book)}/schedules`)),
+
+  schedule: async (book: string, id: string): Promise<Schedule> =>
+    json(await fetch(`${base(book)}/schedules/${id}`)),
+
+  createSchedule: async (book: string, schedule: ScheduleIn): Promise<Schedule> =>
+    json(
+      await fetch(`${base(book)}/schedules`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(schedule),
+      })
+    ),
+
+  editSchedule: async (book: string, id: string, patch: SchedulePatch): Promise<Schedule> =>
+    json(
+      await fetch(`${base(book)}/schedules/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(patch),
+      })
+    ),
+
+  async deleteSchedule(book: string, schedule: Schedule): Promise<void> {
+    const response = await fetch(
+      `${base(book)}/schedules/${schedule.id}?updated_at=${encodeURIComponent(schedule.updated_at)}`,
+      { method: "DELETE" }
+    );
+    if (!response.ok) await json(response);
+  },
+
+  upcoming: async (book: string, days = 30): Promise<UpcomingOccurrence[]> =>
+    json(await fetch(`${base(book)}/schedules/upcoming?days=${days}`)),
+
+  /** Transaction ID to schedule ID, for every transaction a schedule staged. */
+  scheduled: async (book: string): Promise<Record<string, string>> =>
+    json(await fetch(`${base(book)}/schedules/occurrences`)),
 
   lastImports: async (book: string): Promise<Record<string, string>> =>
     json(await fetch(`${base(book)}/imports/latest`)),

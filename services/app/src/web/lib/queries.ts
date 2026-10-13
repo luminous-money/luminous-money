@@ -27,7 +27,14 @@ import {
 } from "@tanstack/react-query";
 
 import type { AccountCreation } from "../components/AccountPicker.js";
-import { appApi, type CsvProfile, type ProposedMatch } from "./appApi.js";
+import {
+  appApi,
+  type CsvProfile,
+  type ProposedMatch,
+  type Schedule,
+  type ScheduleIn,
+  type SchedulePatch,
+} from "./appApi.js";
 import { api, ApiError, type TransactionChanges } from "./ledger.js";
 import { logIn, logOut, me, type User } from "./session.js";
 
@@ -59,6 +66,8 @@ export const keys = {
   profiles: (book: string, account: string) => ["book", book, "profiles", account] as const,
   queue: (book: string) => ["book", book, "queue"] as const,
   matches: (book: string) => ["book", book, "matches"] as const,
+  schedules: (book: string) => ["book", book, "schedules"] as const,
+  schedule: (book: string, id: string) => ["book", book, "schedules", id] as const,
   transaction: (book: string, id: string) => ["book", book, "transaction", id] as const,
 };
 
@@ -305,10 +314,61 @@ export function useConfirmMatch(book: string) {
   });
 }
 
+// Schedules
+
+export function useSchedules(book: string) {
+  return useQuery({ queryKey: keys.schedules(book), queryFn: () => appApi.schedules(book) });
+}
+
+export function useSchedule(book: string, id: string | undefined) {
+  return useQuery({
+    queryKey: keys.schedule(book, id ?? ""),
+    queryFn: () => appApi.schedule(book, id!),
+    enabled: !!id,
+  });
+}
+
+export function useUpcoming(book: string) {
+  return useQuery({
+    queryKey: [...keys.schedules(book), "upcoming"],
+    queryFn: () => appApi.upcoming(book),
+  });
+}
+
+/** Transaction ID to schedule ID, for marking scheduled transactions. */
+export function useScheduled(book: string) {
+  return useQuery({
+    queryKey: [...keys.schedules(book), "occurrences"],
+    queryFn: () => appApi.scheduled(book),
+  });
+}
+
+/** Saving or deleting a schedule may stage transactions: refresh everything in the book. */
+const schedulesChanged = (book: string) =>
+  queryClient.invalidateQueries({ queryKey: keys.book(book) });
+
+export function useSaveSchedule(book: string) {
+  return useMutation({
+    mutationFn: ({ id, schedule }: { id?: string; schedule: ScheduleIn | SchedulePatch }) =>
+      id
+        ? appApi.editSchedule(book, id, schedule as SchedulePatch)
+        : appApi.createSchedule(book, schedule as ScheduleIn),
+    onSuccess: () => schedulesChanged(book),
+  });
+}
+
+export function useDeleteSchedule(book: string) {
+  return useMutation({
+    mutationFn: (schedule: Schedule) => appApi.deleteSchedule(book, schedule),
+    onSuccess: () => schedulesChanged(book),
+  });
+}
+
 export function useTransaction(book: string, id: string) {
   return useQuery({
     queryKey: keys.transaction(book, id),
     queryFn: () => api.transaction(book, id),
+    enabled: !!id,
   });
 }
 

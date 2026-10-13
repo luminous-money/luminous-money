@@ -10,6 +10,8 @@ import { Home } from "./pages/Home.js";
 import { Import } from "./pages/Import.js";
 import { Login } from "./pages/Login.js";
 import { Review } from "./pages/Review.js";
+import { ScheduleEditor } from "./pages/ScheduleEditor.js";
+import { Schedules } from "./pages/Schedules.js";
 import { Setup } from "./pages/Setup.js";
 import { NewTransactionPage, TransactionPage } from "./pages/TransactionPage.js";
 
@@ -75,6 +77,15 @@ function Gate() {
           )}
         </Route>
         <Route path="/books/:book/import">{({ book: id }) => <Import key={id} book={id} />}</Route>
+        <Route path="/books/:book/schedules">{({ book: id }) => <Schedules book={id} />}</Route>
+        <Route path="/books/:book/schedules/new">
+          {({ book: id }) => <ScheduleEditor key="new" book={id} />}
+        </Route>
+        <Route path="/books/:book/schedules/:id">
+          {({ book: id, id: schedule }) => (
+            <ScheduleEditor key={schedule} book={id} id={schedule} />
+          )}
+        </Route>
         <Route path="/books/:book/review">{({ book: id }) => <Review book={id} />}</Route>
         <Route path="/books/:book/transactions/new">
           {({ book: id }) => <NewTransactionPage book={id} />}
