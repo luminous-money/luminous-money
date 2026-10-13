@@ -95,6 +95,8 @@ def main() -> None:
     window = today - datetime.timedelta(days=14 * 31)
     with timed("SQL: 14-month resolver context (all accounts)"):
         context = ledger.store.find("bench", date_from=window, limit=1_000_000)
+    with timed("compact 14-month context (categorizers)"):
+        compact = ledger.compact("bench", window)
     with timed("SQL: one account subtree, 14 months"):
         ledger.store.find("bench", account="Assets:US", date_from=window, limit=1_000_000)
 
@@ -133,7 +135,7 @@ def main() -> None:
 
     print(f"\nSynthetic book: {opts.years} years x {opts.copies} histories")
     print("  " + ", ".join(f"{n} {k}" for k, n in sorted(counts.items(), key=lambda kv: -kv[1])))
-    print(f"  {len(loaded.entries)} booked entries, {len(problems)} problems, {len(context)} directives in the 14-month context")
+    print(f"  {len(loaded.entries)} booked entries, {len(problems)} problems, {len(context)} directives in the 14-month context ({len(compact)} transactions)")
     print(f"  database {db_bytes / 1e6:.1f} MB, export {len(exported) / 1e6:.1f} MB, peak RSS {peak_mb:.0f} MB\n")
     width = max(len(label) for label, _ in results)
     for label, seconds in results:

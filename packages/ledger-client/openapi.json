@@ -389,6 +389,88 @@
         "title": "BookPatch",
         "type": "object"
       },
+      "CompactPosting": {
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The posting's change to its account; None if only booking could say."
+          }
+        },
+        "required": [
+          "account",
+          "amount"
+        ],
+        "title": "CompactPosting",
+        "type": "object"
+      },
+      "CompactTransaction": {
+        "description": "A transaction with only what categorizers use: who, when, and where the money went.",
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "flag": {
+            "title": "Flag",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "narration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narration"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "postings": {
+            "items": {
+              "$ref": "#/components/schemas/CompactPosting"
+            },
+            "title": "Postings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "flag",
+          "payee",
+          "narration",
+          "postings"
+        ],
+        "title": "CompactTransaction",
+        "type": "object"
+      },
       "Cost": {
         "additionalProperties": false,
         "description": "A cost basis, as written in `{...}`. All fields empty is `{}`: let booking pick the lot.",
@@ -2609,6 +2691,62 @@
           }
         },
         "summary": "Apply Changes"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/transactions/compact": {
+      "get": {
+        "description": "Every transaction from a date on, oldest first, with only payee, narration and each\nposting's account and amount: the context categorizers work from. Not paged.",
+        "operationId": "compact_transactions_api_ledger_v1_books__book_id__transactions_compact_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The first date included.",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "description": "The first date included.",
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CompactTransaction"
+                  },
+                  "title": "Response Compact Transactions Api Ledger V1 Books  Book Id  Transactions Compact Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compact Transactions"
       }
     },
     "/api/ledger/v1/books/{book_id}/transactions/{directive_id}": {

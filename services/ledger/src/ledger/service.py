@@ -318,6 +318,29 @@ class Ledger:
 
     OPENING_BALANCES = "Equity:Opening-Balances"
 
+    def compact(self, book_id: str, date_from: datetime.date) -> list[models.CompactTransaction]:
+        """Every transaction dated `date_from` or later, oldest first, in compact form: the
+        context categorizers work from, read with plain SQL so a long window stays fast."""
+        self._header(book_id)
+        out: list[models.CompactTransaction] = []
+        for r in self.store.compact(book_id, date_from.isoformat()):
+            if not out or out[-1].id != r["id"]:
+                out.append(
+                    models.CompactTransaction(
+                        id=r["id"],
+                        date=datetime.date.fromisoformat(r["date"]),
+                        flag=r["flag"],
+                        payee=r["payee"],
+                        narration=r["narration"],
+                        postings=[],
+                    )
+                )
+            amount = (
+                models.Amount(number=r["amount"], currency=r["amount_currency"]) if r["amount"] is not None else None
+            )
+            out[-1].postings.append(models.CompactPosting(account=r["account"], amount=amount))
+        return out
+
     def summary(self, book_id: str, names: list[str]) -> list[models.AccountSummary]:
         """The named accounts (those that exist, in the order asked), with their balances and the
         dates of their opening balances."""

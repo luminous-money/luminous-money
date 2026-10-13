@@ -180,6 +180,15 @@ def create_app(ledger: Ledger) -> FastAPI:
         created = ledger.apply_changes(book_id, changes)
         return [ledger.transaction(book_id, d.id) for d in created]
 
+    @api.get("/books/{book_id}/transactions/compact")
+    def compact_transactions(
+        book_id: OwnedBook,
+        date_from: Annotated[datetime.date, Query(alias="from", description="The first date included.")],
+    ) -> list[models.CompactTransaction]:
+        """Every transaction from a date on, oldest first, with only payee, narration and each
+        posting's account and amount: the context categorizers work from. Not paged."""
+        return ledger.compact(book_id, date_from)
+
     @api.get("/books/{book_id}/transactions")
     def list_transactions(book_id: OwnedBook, filters: Annotated[Filters, Depends()]) -> list[models.Transaction]:
         return ledger.transactions(book_id, **filters.values)

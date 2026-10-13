@@ -289,6 +289,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/transactions/compact": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Compact Transactions
+     * @description Every transaction from a date on, oldest first, with only payee, narration and each
+     *     posting's account and amount: the context categorizers work from. Not paged.
+     */
+    get: operations["compact_transactions_api_ledger_v1_books__book_id__transactions_compact_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/transactions/{directive_id}": {
     parameters: {
       query?: never;
@@ -474,6 +495,34 @@ export interface components {
        * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
        */
       updated_at: string;
+    };
+    /** CompactPosting */
+    CompactPosting: {
+      /** Account */
+      account: string;
+      /** @description The posting's change to its account; None if only booking could say. */
+      amount: components["schemas"]["Amount"] | null;
+    };
+    /**
+     * CompactTransaction
+     * @description A transaction with only what categorizers use: who, when, and where the money went.
+     */
+    CompactTransaction: {
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Flag */
+      flag: string;
+      /** Id */
+      id: string;
+      /** Narration */
+      narration: string | null;
+      /** Payee */
+      payee: string | null;
+      /** Postings */
+      postings: components["schemas"]["CompactPosting"][];
     };
     /**
      * Cost
@@ -1639,6 +1688,40 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  compact_transactions_api_ledger_v1_books__book_id__transactions_compact_get: {
+    parameters: {
+      query: {
+        /** @description The first date included. */
+        from: string;
+      };
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CompactTransaction"][];
+        };
       };
       /** @description Validation Error */
       422: {

@@ -25,6 +25,7 @@ export type OpeningBalance = Schemas["OpeningBalance"];
 export type AccountIn = Schemas["AccountIn"];
 export type LedgerPage = Schemas["LedgerPage"];
 export type LedgerRow = Schemas["LedgerRow"];
+export type CompactTransaction = Schemas["CompactTransaction"];
 export type Backup = Schemas["Backup"];
 
 export function createLedgerClient(options: ClientOptions) {

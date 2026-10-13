@@ -162,6 +162,22 @@ class OpeningBalance(Strict):
     date: datetime.date
 
 
+class CompactPosting(Api):
+    account: str
+    amount: Amount | None = Field(description="The posting's change to its account; None if only booking could say.")
+
+
+class CompactTransaction(Api):
+    """A transaction with only what categorizers use: who, when, and where the money went."""
+
+    id: str
+    date: datetime.date
+    flag: str
+    payee: str | None
+    narration: str | None
+    postings: list[CompactPosting]
+
+
 class LedgerRow(Api):
     """One transaction, as one account's ledger shows it."""
 

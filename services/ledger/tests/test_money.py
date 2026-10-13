@@ -290,3 +290,18 @@ def test_segments_from_human_names():
     with pytest.raises(engine.ParseFailure):
         engine.segment("!!!")
     assert Decimal("1") == Decimal(engine.decimal_text(Decimal("1")))
+
+
+def test_compact_transactions_are_the_window_oldest_first_with_amounts(book):
+    account = bank(book).name
+    spend(book, account, "-25.50", date="2024-02-01", narration="Groceries")
+    spend(book, account, "-4.50", date="2024-03-01", flag="!", narration="Coffee")
+
+    found = book.compact("book", datetime.date(2024, 2, 1))
+
+    assert [(t.narration, t.flag) for t in found] == [("Groceries", "*"), ("Coffee", "!")]
+    assert [(p.account, p.amount.number if p.amount else None) for p in found[1].postings] == [
+        (account, "-4.50"),
+        ("Expenses:Food", "4.50"),  # the elided side, filled in
+    ]
+    assert http(book).get("/api/ledger/v1/books/book/transactions/compact", params={"from": "2024-03-01"}).json()[0]["narration"] == "Coffee"

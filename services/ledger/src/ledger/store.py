@@ -265,6 +265,20 @@ class Store:
         ).fetchall()
         return {account: date for account, date in rows}
 
+    def compact(self, book_id: str, date_from: str) -> list[sqlite3.Row]:
+        """Every live transaction dated `date_from` or later, oldest first, one row per posting:
+        the directive's id, date, flag, payee, narration, and the posting's account and amount
+        (NULL where only booking could say). For resolvers' context: plain SQL, no parsing."""
+        return self._conn.execute(
+            """
+            SELECT d.id, d.date, d.flag, d.payee, d.narration, p.idx, p.account, p.amount, p.amount_currency
+            FROM directive d JOIN posting p ON p.directive_id = d.id
+            WHERE d.book_id = ? AND d.deleted = 0 AND d.kind = 'transaction' AND d.date >= ?
+            ORDER BY d.date, d.ordinal, p.idx
+            """,
+            (book_id, date_from),
+        ).fetchall()
+
     def opening_dates(self, book_id: str, equity: str) -> dict[str, str]:
         """For each account, the date of its first live transaction against `equity`: its opening
         balance."""
