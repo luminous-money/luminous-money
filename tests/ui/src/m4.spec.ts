@@ -56,9 +56,7 @@ test("picking a category offers it to similar pending transactions in the accoun
   await first.getByRole("button", { name: "Yes", exact: true }).click();
 
   await expect(page.getByRole("article").filter({ hasText: "Food:Tea" })).toHaveCount(3);
-  await expect(page.getByRole("article", { name: /SOMEWHERE ELSE/ })).not.toContainText(
-    "Food:Tea"
-  );
+  await expect(page.getByRole("article", { name: /SOMEWHERE ELSE/ })).not.toContainText("Food:Tea");
 });
 
 test("Remember as a rule makes a rule from a card, and offers to apply it", async ({ page }) => {
