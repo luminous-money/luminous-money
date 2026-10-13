@@ -38,13 +38,15 @@ export interface LedgerPort {
   transaction(book: string, id: string): Promise<Transaction>;
   /** Every transaction from `from` on, oldest first, compactly: categorizers' context. */
   compact(book: string, from: string): Promise<CompactTransaction[]>;
-  /** Change a transaction's postings, against the version read. */
-  setPostings(
+  /** Change a transaction's fields (only those given), against the version read. */
+  patch(
     book: string,
     id: string,
-    postings: TransactionIn["postings"],
+    changes: Partial<Pick<TransactionIn, "postings" | "payee" | "flag">>,
     updated_at: string
   ): Promise<Transaction>;
+  /** The book's pending (`!`) transactions. */
+  pending(book: string): Promise<Transaction[]>;
   /** Create and delete (with the versions read) in one write, or not at all. Returns the
    * created transactions. */
   applyChanges(
@@ -113,11 +115,17 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
           params: { path: { book_id: book }, query: { from } },
         })
       ),
-    setPostings: (book, id, postings, updated_at) =>
+    patch: (book, id, changes, updated_at) =>
       unwrap(
         client.PATCH("/api/ledger/v1/books/{book_id}/transactions/{directive_id}", {
           params: { path: { book_id: book, directive_id: id } },
-          body: { postings, updated_at },
+          body: { ...changes, updated_at },
+        })
+      ),
+    pending: (book) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/transactions", {
+          params: { path: { book_id: book }, query: { flag: "!", limit: 5000 } },
         })
       ),
     applyChanges: (book, changes) =>

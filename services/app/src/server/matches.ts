@@ -168,12 +168,14 @@ export async function confirmRow(
     const t = await ledger.transaction(book, row.transaction_id!);
     const split = t.postings.find((p) => p.account === row.account);
     if (split?.units && !sameNumber(split.units.number, row.amount)) {
-      await ledger.setPostings(
+      await ledger.patch(
         book,
         t.id,
-        t.postings.map((p) =>
-          p === split ? { ...p, units: { ...split.units!, number: row.amount! } } : p
-        ),
+        {
+          postings: t.postings.map((p) =>
+            p === split ? { ...p, units: { ...split.units!, number: row.amount! } } : p
+          ),
+        },
         t.updated_at
       );
     }

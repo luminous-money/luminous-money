@@ -19,6 +19,7 @@ import { categorize, SETTLE } from "./chain.js";
 import { external, providersFrom } from "./external.js";
 import { history } from "./history.js";
 import { rules } from "./rules.js";
+import { applyRule, coveredBy, settle, suggestPending } from "./service.js";
 import type { Categorizer } from "./types.js";
 
 const CHECKING = "Assets:Bank:Checking";
@@ -413,5 +414,99 @@ describe("importing with categorization", () => {
     const staged = ledger.transactions.find((t) => t.id === result.rows[1]!.transaction_id)!;
     expect([staged.flag, staged.payee]).toEqual(["*", "Mystery Shop"]);
     expect(db.rule("b", id)!.applied).toBe(1);
+  });
+});
+
+describe("pending transactions", () => {
+  let db: AppDb;
+  let ledger: FakeLedger;
+  const book = { id: "b", name: "Book" };
+  const pending = (narration: string, other = "Expenses:Uncategorized") =>
+    ledger.addTransaction({
+      date: "2024-03-05",
+      flag: "!",
+      narration,
+      postings: [{ account: CHECKING, units: usd("-4.50") }, { account: other }],
+    });
+
+  beforeEach(() => {
+    db = new AppDb(join(mkdtempSync(join(tmpdir(), "app-")), "app.sqlite"));
+    ledger = new FakeLedger();
+    ledger.addBook("b");
+    for (const a of [CHECKING, "Expenses:Food:Coffee", "Expenses:Food:Groceries"])
+      ledger.addAccount(a);
+    ledger.addTransaction({
+      date: "2024-02-01",
+      flag: "*",
+      payee: "Corner Cafe",
+      narration: "CORNER CAFE",
+      postings: [
+        { account: CHECKING, units: usd("-3.00") },
+        { account: "Expenses:Food:Coffee", units: usd("3.00") },
+      ],
+    });
+  });
+
+  it("Suggest categories fills in the ones not yet categorized, leaving decided ones", async () => {
+    const open = pending("CORNER CAFE");
+    const decided = pending("CORNER CAFE", "Expenses:Food:Groceries"); // the user chose this
+
+    const n = await suggestPending({ db, ledger, book, categorizers: [history] });
+
+    expect(n).toBe(1);
+    expect([open.payee, open.postings[1]!.account]).toEqual([
+      "Corner Cafe",
+      "Expenses:Food:Coffee",
+    ]);
+    expect(decided.postings[1]!.account).toBe("Expenses:Food:Groceries");
+  });
+
+  it("a rule re-applies to what it covers that hasn't been touched, and counts", async () => {
+    const open = pending("TEA HOUSE");
+    const id = db.addRule("b", {
+      name: "Tea",
+      conditions: { account: null, key: null, contains: "tea", min: null, max: null },
+      account: "Expenses:Food:Coffee",
+      payee: "Tea House",
+      auto_confirm: true,
+    });
+
+    expect(await coveredBy({ db, ledger, book }, db.rule("b", id)!)).toHaveLength(1);
+    expect(await applyRule({ db, ledger, book }, db.rule("b", id)!)).toBe(1);
+    expect([open.flag, open.payee, open.postings[1]!.account]).toEqual([
+      "*",
+      "Tea House",
+      "Expenses:Food:Coffee",
+    ]);
+    expect(db.rule("b", id)!.applied).toBe(1);
+  });
+
+  it("settling records whether the proposal was kept, and gives feedback", async () => {
+    const kept = pending("CORNER CAFE");
+    const changed = pending("CORNER CAFE");
+    const told: unknown[] = [];
+    const provider: Categorizer = {
+      name: "history",
+      categorize: history.categorize,
+      feedback: async (r) => void told.push(...r.outcomes),
+    };
+    await suggestPending({ db, ledger, book, categorizers: [provider] });
+    kept.flag = "*";
+    changed.flag = "*";
+    changed.postings[1]!.account = "Expenses:Food:Groceries";
+
+    await settle({ db, ledger, book, categorizers: [provider], transaction: kept.id });
+    await settle({ db, ledger, book, categorizers: [provider], transaction: changed.id });
+
+    expect(db.acceptance("b")).toEqual([{ categorizer: "history", settled: 2, accepted: 1 }]);
+    expect(told).toEqual([
+      expect.objectContaining({ accepted: true, id: kept.id }),
+      expect.objectContaining({
+        accepted: false,
+        final: expect.objectContaining({
+          postings: [{ account: "Expenses:Food:Groceries", amount: null }],
+        }),
+      }),
+    ]);
   });
 });

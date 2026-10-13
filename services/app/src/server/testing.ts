@@ -103,15 +103,19 @@ export class FakeLedger implements LedgerPort {
       }));
   }
 
-  async setPostings(
+  async patch(
     book: string,
     id: string,
-    postings: TransactionIn["postings"],
+    changes: Partial<Pick<TransactionIn, "postings" | "payee" | "flag">>,
     _updated_at: string
   ) {
     const found = await this.transaction(book, id);
-    found.postings = postings;
+    Object.assign(found, changes);
     return found;
+  }
+
+  async pending() {
+    return this.transactions.filter((t) => t.flag === "!");
   }
 
   async applyChanges(

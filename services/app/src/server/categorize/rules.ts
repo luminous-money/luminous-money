@@ -6,7 +6,8 @@
 import type { CategorizeRequest, IncomingTransaction } from "../../shared/categorizer-api.js";
 import { add, isNegative, negate } from "../../shared/decimal.js";
 import { payeeKey } from "../../shared/payees.js";
-import { specificity, type CategoryRule } from "../../shared/rules.js";
+import { specificity, type CategoryRule, type CategoryRuleIn } from "../../shared/rules.js";
+import type { Account } from "@fava-beans/ledger-client";
 import type { Categorizer } from "./types.js";
 
 /** a ≤ b, for decimal strings. */
@@ -58,4 +59,21 @@ export function rules(load: (book: string) => CategoryRule[]): Categorizer {
       };
     },
   };
+}
+
+const DECIMAL = /^-?\d+(\.\d+)?$/;
+
+/** Why a rule can't be saved, or null if it can. */
+export function ruleProblem(rule: CategoryRuleIn | null, accounts: Account[]): string | null {
+  if (!rule?.name?.trim()) return "Name the rule";
+  const c = rule.conditions;
+  if (!c || specificity(c) === 0) return "Give the rule at least one condition";
+  for (const bound of [c.min, c.max])
+    if (bound && !DECIMAL.test(bound)) return "Amounts are numbers, like -25.00";
+  const leaves = new Set(
+    accounts.filter((a) => a.kind === "leaf" && !a.implicit && !a.close).map((a) => a.name)
+  );
+  if (!leaves.has(rule.account)) return `${rule.account || "The category"} isn't an open account`;
+  if (c.account && !leaves.has(c.account)) return `${c.account} isn't an open account`;
+  return null;
 }

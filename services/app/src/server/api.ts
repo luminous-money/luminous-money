@@ -22,6 +22,9 @@ import {
   view,
 } from "./schedules.js";
 import type { Categorizer } from "./categorize/types.js";
+import { ruleProblem } from "./categorize/rules.js";
+import { applyRule, coveredBy, settle, suggestPending } from "./categorize/service.js";
+import type { CategoryRuleIn, CategoryRulePatch } from "../shared/rules.js";
 import type { LedgerPort } from "./ledger.js";
 
 type Env = { Variables: { user: string } };
@@ -197,6 +200,157 @@ export function createApi({
     } catch (error) {
       return c.json(...matchError(error));
     }
+  });
+
+  // Categorization: rules, proposals, suggesting, acceptance
+
+  /** The book, for categorizer requests (404 unless the caller owns it). */
+  const bookOf = async (user: string, book: string) => {
+    const found = await ledgerFor(user).book(book);
+    return found && { id: found.id, name: found.name };
+  };
+
+  api.get("/books/:book/rules", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    return c.json(db.rules(book));
+  });
+
+  /** Create a rule. Says how many pending transactions it covers, to offer re-applying. */
+  api.post("/books/:book/rules", async (c) => {
+    const { book } = c.req.param();
+    const info = await bookOf(c.get("user"), book);
+    if (!info) return c.json({ detail: "not found" }, 404);
+    const ledger = ledgerFor(c.get("user"));
+    const input = (await c.req.json().catch(() => null)) as CategoryRuleIn | null;
+    const problem = ruleProblem(input, await ledger.accounts(book));
+    if (problem) return c.json({ detail: problem }, 422);
+    const id = db.addRule(book, {
+      ...input!,
+      name: input!.name.trim(),
+      payee: input!.payee || null,
+    });
+    const rule = db.rule(book, id)!;
+    const covers = (await coveredBy({ db, ledger, book: info }, rule)).length;
+    return c.json({ ...rule, covers }, 201);
+  });
+
+  api.get("/books/:book/rules/:id", async (c) => {
+    const { book, id } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    const rule = db.rule(book, id);
+    return rule ? c.json(rule) : c.json({ detail: "not found" }, 404);
+  });
+
+  /** Change a rule (only the fields sent), against `updated_at`. Says how many pending
+   * transactions it now covers, to offer re-applying. */
+  api.patch("/books/:book/rules/:id", async (c) => {
+    const { book, id } = c.req.param();
+    const info = await bookOf(c.get("user"), book);
+    if (!info) return c.json({ detail: "not found" }, 404);
+    const current = db.rule(book, id);
+    if (!current) return c.json({ detail: "not found" }, 404);
+    const ledger = ledgerFor(c.get("user"));
+    const patch = (await c.req.json().catch(() => null)) as CategoryRulePatch | null;
+    if (!patch?.updated_at) return c.json({ detail: "send the updated_at you read" }, 422);
+    const { updated_at, ...changes } = patch;
+    const merged = { ...current, ...changes };
+    const problem = ruleProblem(merged, await ledger.accounts(book));
+    if (problem) return c.json({ detail: problem }, 422);
+    try {
+      db.updateRule(book, id, updated_at, {
+        name: merged.name.trim(),
+        conditions: merged.conditions,
+        account: merged.account,
+        payee: merged.payee || null,
+        auto_confirm: merged.auto_confirm,
+      });
+    } catch (error) {
+      if (error instanceof StaleVersion) return c.json({ detail: error.message }, 409);
+      throw error;
+    }
+    const rule = db.rule(book, id)!;
+    const covers = (await coveredBy({ db, ledger, book: info }, rule)).length;
+    return c.json({ ...rule, covers });
+  });
+
+  api.delete("/books/:book/rules/:id", async (c) => {
+    const { book, id } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    if (!db.rule(book, id)) return c.json({ detail: "not found" }, 404);
+    try {
+      db.deleteRule(book, id, c.req.query("updated_at") ?? "");
+    } catch (error) {
+      if (error instanceof StaleVersion) return c.json({ detail: error.message }, 409);
+      throw error;
+    }
+    return c.body(null, 204);
+  });
+
+  /** Re-apply a rule to the pending transactions it covers that haven't been touched. */
+  api.post("/books/:book/rules/:id/apply", async (c) => {
+    const { book, id } = c.req.param();
+    const info = await bookOf(c.get("user"), book);
+    const rule = info && db.rule(book, id);
+    if (!info || !rule) return c.json({ detail: "not found" }, 404);
+    const applied = await applyRule({ db, ledger: ledgerFor(c.get("user")), book: info }, rule);
+    return c.json({ applied });
+  });
+
+  /** Proposals for transactions still waiting: transaction ID to what was proposed. */
+  api.get("/books/:book/proposals", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    return c.json(
+      Object.fromEntries(
+        db.openProposals(book).map((p) => [p.transaction_id, db.proposalOf(p.transaction_id)])
+      )
+    );
+  });
+
+  /** Record whether a confirmed transaction kept its proposal (the PWA calls this on confirm). */
+  api.post("/books/:book/proposals/:transaction/settle", async (c) => {
+    const { book, transaction } = c.req.param();
+    const info = await bookOf(c.get("user"), book);
+    if (!info) return c.json({ detail: "not found" }, 404);
+    const settled = await settle({
+      db,
+      ledger: ledgerFor(c.get("user")),
+      book: info,
+      categorizers,
+      transaction,
+    });
+    return settled
+      ? c.json({ accepted: settled.accepted, payee_accepted: settled.payee_accepted })
+      : c.json({ detail: "no proposal" }, 404);
+  });
+
+  /** "Suggest categories" for pending transactions not yet categorized. */
+  api.post("/books/:book/suggest", async (c) => {
+    const { book } = c.req.param();
+    const info = await bookOf(c.get("user"), book);
+    if (!info) return c.json({ detail: "not found" }, 404);
+    const suggested = await suggestPending({
+      db,
+      ledger: ledgerFor(c.get("user")),
+      book: info,
+      categorizers,
+    });
+    return c.json({ suggested });
+  });
+
+  /** The categorizers, in chain order, with how often their proposals were accepted. */
+  api.get("/books/:book/categorizers", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    const stats = new Map(db.acceptance(book).map((s) => [s.categorizer, s]));
+    return c.json(
+      categorizers.map((cat) => ({
+        name: cat.name,
+        settled: stats.get(cat.name)?.settled ?? 0,
+        accepted: stats.get(cat.name)?.accepted ?? 0,
+      }))
+    );
   });
 
   // Book settings (kept in `app`): for now, the book's time zone, which decides "today" for
