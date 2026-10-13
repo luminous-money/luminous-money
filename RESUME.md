@@ -59,8 +59,9 @@ How it's put together:
 
 1. **Finish M2** ([plan](docs/milestones/m2-credit-card/PLAN.md)). Done: slice 1 (starred
    accounts replace money accounts; accounts added by full name with an optional opening
-   balance; import into any open leaf) and slice 2 (liabilities and income shown inverted). Next:
-   slice 3 (matching and assignment), 4 (`assign` and the ledger's `changes`), 5 (reviewing
+   balance; import into any open leaf), slice 2 (liabilities and income shown inverted) and
+   slice 3 (imports match transactions already in the account, one row per transaction,
+   proposed for review). Next: slice 4 (`assign` and the ledger's `changes`) and 5 (reviewing
    matches).
 
 ## Gotchas

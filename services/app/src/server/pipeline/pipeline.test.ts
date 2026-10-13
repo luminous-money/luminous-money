@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { assign } from "./assign.js";
 import { runChain } from "./chain.js";
 import { matcher, sameNumber } from "./matcher.js";
-import type { Context, Existing, Incoming, Resolver } from "./types.js";
+import type { Candidate, Context, Existing, Incoming, Resolver } from "./types.js";
 
 const usd = (number: string) => ({ number, currency: "USD" });
 const row = (line: number, date: string, amount: string): Incoming => ({
@@ -103,4 +104,35 @@ it("later resolvers see only what earlier ones didn't settle", async () => {
 
   expect(seen).toEqual([[2]]);
   expect(results.get(1)!.map((r) => r.resolver)).toEqual(["settler"]);
+});
+
+describe("assignment", () => {
+  const c = (transaction_id: string, score: number) =>
+    ({ transaction_id, score }) as unknown as Candidate;
+
+  it("gives each row the best candidate no better pair took; each transaction goes once", () => {
+    const assigned = assign(
+      new Map([
+        [1, [c("a", 1), c("b", 0.5)]],
+        [2, [c("a", 0.9), c("b", 0.8)]],
+        [3, [c("a", 0.7)]],
+      ])
+    );
+
+    expect([...assigned]).toEqual([
+      [1, "a"],
+      [2, "b"],
+    ]); // row 3's only candidate was taken
+  });
+
+  it("breaks ties by row, then transaction", () => {
+    const assigned = assign(
+      new Map([
+        [2, [c("b", 1), c("a", 1)]],
+        [1, [c("b", 1)]],
+      ])
+    );
+
+    expect(Object.fromEntries(assigned)).toEqual({ 1: "b", 2: "a" });
+  });
 });

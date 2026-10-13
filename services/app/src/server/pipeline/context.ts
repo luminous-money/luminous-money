@@ -1,7 +1,8 @@
 /**
- * The context a batch is resolved in: the account's existing transactions from `from` to `to`.
- * Read from the account's ledger, newest first, until it's older than `from`. (M4's categorizer
- * will want a longer window, about 14 months: a parameter, not a new builder.)
+ * The context a batch is resolved in: the account's existing transactions from `from` to `to`,
+ * less any `claimed` ones (held by a row of the account's earlier imports, so they can't be
+ * matched again). Read from the account's ledger, newest first, until it's older than `from`.
+ * (M4's categorizer will want a longer window, about 14 months: a parameter, not a new builder.)
  */
 import type { LedgerPort } from "../ledger.js";
 import type { Context, Existing } from "./types.js";
@@ -11,7 +12,8 @@ export async function buildContext(
   book: string,
   account: string,
   from: string,
-  to: string
+  to: string,
+  claimed: (ids: string[]) => Set<string> = () => new Set()
 ): Promise<Context> {
   const existing: Existing[] = [];
   let cursor: string | undefined;
@@ -33,5 +35,6 @@ export async function buildContext(
     if (!page.next_cursor || !oldest || oldest.date < from) break;
     cursor = page.next_cursor;
   }
-  return { account, existing };
+  const held = claimed(existing.map((t) => t.id));
+  return { account, existing: existing.filter((t) => !held.has(t.id)) };
 }

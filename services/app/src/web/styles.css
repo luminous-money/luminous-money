@@ -998,6 +998,10 @@ a.primary-link {
   color: var(--green);
 }
 
+.pill.outcome-matched {
+  background: color-mix(in srgb, #d9a400 22%, transparent);
+}
+
 .pill.outcome-duplicate,
 .pill.outcome-before-opening {
   background: var(--line);

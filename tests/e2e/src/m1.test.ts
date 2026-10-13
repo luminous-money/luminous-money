@@ -175,7 +175,7 @@ describe("importing CSVs", () => {
       ]),
     });
 
-  it("needs a profile first, then stages rows, ranks matches, and skips duplicates", async () => {
+  it("needs a profile first, then matches what's already there, stages the rest, and skips duplicates", async () => {
     const { user, book, account } = await withAccount();
     const { data: manual } = await user.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
       params: { path: { book_id: book.id } },
@@ -197,15 +197,21 @@ describe("importing CSVs", () => {
     assert.equal((await saveProfile(user, book.id, account.name)).status, 200);
 
     const imported = (await (await upload(user, book.id, account.name)).json()) as {
-      batch: { staged: number };
+      batch: { staged: number; matched: number };
       rows: {
         description: string;
         outcome: string;
+        transaction_id: string;
+        match: string | null;
         candidates: { transaction_id: string; days: number }[];
       }[];
     };
-    assert.equal(imported.batch.staged, 2);
+    assert.deepEqual([imported.batch.staged, imported.batch.matched], [1, 1]);
     const cafe = imported.rows.find((r) => r.description === "CORNER CAFE")!;
+    assert.deepEqual(
+      [cafe.outcome, cafe.transaction_id, cafe.match],
+      ["matched", manual!.id, "proposed"]
+    );
     assert.deepEqual(
       cafe.candidates.map((c) => [c.transaction_id, c.days]),
       [[manual!.id, 1]]
@@ -224,10 +230,10 @@ describe("importing CSVs", () => {
     const { data: staged } = await user.ledger.GET("/api/ledger/v1/books/{book_id}/transactions", {
       params: { path: { book_id: book.id }, query: { flag: "!" } },
     });
-    assert.deepEqual(staged?.map((t) => t.postings[1]?.account).sort(), [
-      "Expenses:Uncategorized",
-      "Income:Uncategorized",
-    ]);
+    assert.deepEqual(
+      staged?.map((t) => t.postings[1]?.account),
+      ["Income:Uncategorized"] // the coffee matched the one entered by hand: nothing added
+    );
   });
 
   it("skips rows up to the opening balance, and starts earlier once it's moved back", async () => {

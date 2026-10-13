@@ -74,9 +74,33 @@ export const MIGRATIONS: Migration[] = [
       ["PRIMARY KEY (user_id, book_id, account)"]
     ),
   ],
+  // 4: matches that act (M2). A row's transaction can be one it matched; with candidates, its
+  // match is proposed until confirmed in review.
+  [
+    "ALTER TABLE import_row ADD COLUMN match TEXT", // 'proposed' | 'confirmed' | NULL
+    "ALTER TABLE import_batch ADD COLUMN matched INTEGER NOT NULL DEFAULT 0",
+    "CREATE INDEX import_row_transaction ON import_row(transaction_id)",
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
+
+/** An `import_row` as stored: candidates as JSON. */
+type RowRecord = Omit<StoredRow, "candidates"> & { batch_id: string; candidates: string };
+
+function toImportRow(r: RowRecord): ImportRow {
+  return {
+    line: r.line,
+    date: r.date,
+    amount: r.amount,
+    description: r.description,
+    outcome: r.outcome,
+    error: r.error,
+    transaction_id: r.transaction_id,
+    candidates: JSON.parse(r.candidates),
+    match: r.match,
+  };
+}
 
 export class AppDb {
   readonly db: DatabaseSync;
@@ -143,17 +167,32 @@ export class AppDb {
       .run(user, book, account);
   }
 
-  /** Which of `fingerprints` were already staged by an earlier import into the account. */
-  stagedBefore(book: string, account: string, fingerprints: string[]): Set<string> {
+  /** Which of `fingerprints` an earlier import into the account already brought in (staged or
+   * matched). */
+  importedBefore(book: string, account: string, fingerprints: string[]): Set<string> {
     if (!fingerprints.length) return new Set();
     const found = this.db
       .prepare(
         `SELECT r.fingerprint FROM import_row r JOIN import_batch b ON b.id = r.batch_id
-         WHERE b.book_id = ? AND b.account = ? AND r.outcome = 'staged'
+         WHERE b.book_id = ? AND b.account = ? AND r.outcome IN ('staged', 'matched')
            AND r.fingerprint IN (SELECT value FROM json_each(?))`
       )
       .all(book, account, JSON.stringify(fingerprints)) as { fingerprint: string }[];
     return new Set(found.map((r) => r.fingerprint));
+  }
+
+  /** Which of `transactions` a row of the account's imports already holds (staged or matched):
+   * they can't be matched again from this account. */
+  claimed(book: string, account: string, transactions: string[]): Set<string> {
+    if (!transactions.length) return new Set();
+    const found = this.db
+      .prepare(
+        `SELECT r.transaction_id FROM import_row r JOIN import_batch b ON b.id = r.batch_id
+         WHERE b.book_id = ? AND b.account = ? AND r.outcome IN ('staged', 'matched')
+           AND r.transaction_id IN (SELECT value FROM json_each(?))`
+      )
+      .all(book, account, JSON.stringify(transactions)) as { transaction_id: string }[];
+    return new Set(found.map((r) => r.transaction_id));
   }
 
   saveImport(batch: ImportBatch & { book_id: string; user_id: string }, rows: StoredRow[]): void {
@@ -161,8 +200,8 @@ export class AppDb {
     transaction(this.db, () => {
       this.db
         .prepare(
-          `INSERT INTO import_batch (id, book_id, account, user_id, filename, rows, staged, duplicates, skipped, unreadable, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO import_batch (id, book_id, account, user_id, filename, rows, staged, matched, duplicates, skipped, unreadable, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           batch.id,
@@ -172,6 +211,7 @@ export class AppDb {
           batch.filename,
           batch.rows,
           batch.staged,
+          batch.matched,
           batch.duplicates,
           batch.skipped,
           batch.unreadable,
@@ -179,8 +219,8 @@ export class AppDb {
           stamp
         );
       const insert = this.db.prepare(
-        `INSERT INTO import_row (batch_id, line, date, amount, description, fingerprint, outcome, error, transaction_id, candidates, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO import_row (batch_id, line, date, amount, description, fingerprint, outcome, error, transaction_id, candidates, match, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
       for (const r of rows) {
         insert.run(
@@ -194,6 +234,7 @@ export class AppDb {
           r.error,
           r.transaction_id,
           JSON.stringify(r.candidates),
+          r.match,
           stamp,
           stamp
         );
@@ -210,21 +251,8 @@ export class AppDb {
   rows(batchId: string): ImportRow[] {
     const rows = this.db
       .prepare("SELECT * FROM import_row WHERE batch_id = ? ORDER BY line")
-      .all(batchId) as (ImportRow & {
-      candidates: string;
-    })[];
-    return rows.map(
-      ({ line, date, amount, description, outcome, error, transaction_id, candidates }) => ({
-        line,
-        date,
-        amount,
-        description,
-        outcome,
-        error,
-        transaction_id,
-        candidates: JSON.parse(candidates),
-      })
-    );
+      .all(batchId) as RowRecord[];
+    return rows.map(toImportRow);
   }
 
   batches(book: string, account?: string): ImportBatch[] {

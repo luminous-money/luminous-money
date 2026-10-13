@@ -3,15 +3,18 @@
  *
  * 1. The file is read with the first of the account's CSV profiles whose layout it fits.
  * 2. Each readable row gets a fingerprint. A row whose fingerprint an earlier import already
- *    staged is a duplicate, and is skipped.
+ *    brought in (staged or matched) is a duplicate, and is skipped.
  * 3. Rows dated on or before the account's `as_of` (its opening balance's date, if it has one)
  *    are skipped: the opening balance already includes them. Moving the opening balance moves the
  *    cutoff.
- * 4. The rest go through the pipeline (for now: the matcher, which ranks existing transactions
- *    that might be the same event, and acts on nothing).
- * 5. They're staged in one atomic ledger write as pending (`!`) transactions, uncategorized:
+ * 4. The rest go through the pipeline: the matcher ranks the account's transactions that might
+ *    be the same event (any not already held by a row of this account's imports), and
+ *    assignment gives each row the best one no other row took.
+ * 5. A row that got one is `matched`: it claims that transaction, and nothing is added. The rest
+ *    are staged in one atomic ledger write as pending (`!`) transactions, uncategorized:
  *    `Expenses:Uncategorized` for money out, `Income:Uncategorized` for money in, until M4.
- * 6. The batch, each row's outcome and its candidates are recorded.
+ * 6. The batch, each row's outcome, transaction and candidates are recorded. A row with
+ *    candidates has its match proposed until it's confirmed in review.
  */
 import { createHash, randomUUID } from "node:crypto";
 
@@ -22,6 +25,7 @@ import type { TransactionIn } from "@fava-beans/ledger-client";
 import type { ImportResult, ImportRow, Outcome } from "../shared/imports.js";
 import type { AppDb } from "./db.js";
 import type { LedgerPort } from "./ledger.js";
+import { assign } from "./pipeline/assign.js";
 import { buildContext } from "./pipeline/context.js";
 import { runChain } from "./pipeline/chain.js";
 import { DEFAULT_WINDOW_DAYS, matcher } from "./pipeline/matcher.js";
@@ -102,7 +106,7 @@ export async function importFile({
   const currency = target.currencies?.[0] ?? "USD";
   const rows = applyProfile(text, profile);
   const prints = fingerprints(rows);
-  const before = db.stagedBefore(
+  const before = db.importedBefore(
     book,
     account,
     prints.filter((p): p is string => p !== null)
@@ -114,10 +118,10 @@ export async function importFile({
     if (target.as_of && row.date! <= target.as_of) return "before-opening";
     return "staged";
   });
-  const stage = rows.filter((_, i) => outcomes[i] === "staged");
+  const fresh = rows.filter((_, i) => outcomes[i] === "staged");
 
   // Match first, so the rows being staged can't match themselves.
-  const incoming: Incoming[] = stage.map((row) => ({
+  const incoming: Incoming[] = fresh.map((row) => ({
     line: row.line,
     date: row.date!,
     amount: { number: row.amount!, currency },
@@ -134,7 +138,8 @@ export async function importFile({
       book,
       account,
       shift(dates[0]!, -windowDays),
-      shift(dates.at(-1)!, windowDays)
+      shift(dates.at(-1)!, windowDays),
+      (ids) => db.claimed(book, account, ids)
     );
     for (const [line, found] of await runChain([matcher(windowDays)], incoming, context)) {
       resolutions.set(
@@ -144,8 +149,14 @@ export async function importFile({
     }
   }
 
+  const assigned = assign(resolutions);
+  fresh.forEach((row) => {
+    if (assigned.has(row.line)) outcomes[rows.indexOf(row)] = "matched";
+  });
+  const stage = fresh.filter((row) => !assigned.has(row.line));
+
   const batchId = randomUUID().replace(/-/g, "");
-  const ids = new Map<number, string>();
+  const ids = new Map<number, string>(assigned);
   if (stage.length) {
     const needed = new Set(
       stage.map((row) => (row.amount!.startsWith("-") ? UNCATEGORIZED.out : UNCATEGORIZED.in))
@@ -179,6 +190,7 @@ export async function importFile({
     error: row.error,
     transaction_id: ids.get(row.line) ?? null,
     candidates: resolutions.get(row.line) ?? [],
+    match: resolutions.get(row.line)?.length ? "proposed" : null,
   }));
   const count = (outcome: Outcome) => outcomes.filter((o) => o === outcome).length;
   const batch = {
@@ -188,6 +200,7 @@ export async function importFile({
     created_at: now(),
     rows: rows.length,
     staged: count("staged"),
+    matched: count("matched"),
     duplicates: count("duplicate"),
     skipped: count("before-opening"),
     unreadable: count("unreadable"),

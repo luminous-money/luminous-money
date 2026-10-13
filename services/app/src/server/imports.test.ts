@@ -86,7 +86,7 @@ describe("importing a file", () => {
     expect(ledger.created).toHaveLength(2); // the uncategorized accounts, once
   });
 
-  it("ranks existing transactions that might be the same event, acting on none", async () => {
+  it("a row that's the same as a transaction in the account claims it, proposed for review", async () => {
     const manual = ledger.addTransaction({
       date: "2024-03-06",
       flag: "*",
@@ -99,16 +99,105 @@ describe("importing a file", () => {
 
     const result = await run();
 
-    const coffee = result.rows.find((r) => r.line === 3)!;
-    expect(coffee.candidates).toEqual([
+    const [first, second] = result.rows.filter((r) => r.description === "CORNER CAFE");
+    expect(first).toMatchObject({
+      outcome: "matched",
+      transaction_id: manual.id,
+      match: "proposed",
+    });
+    expect(first!.candidates).toEqual([
       expect.objectContaining({
         transaction_id: manual.id,
         days: 1,
         narration: "Coffee (entered by hand)",
       }),
     ]);
-    expect(coffee.outcome).toBe("staged");
-    expect(result.rows.find((r) => r.description === "ACME PAYROLL")!.candidates).toEqual([]);
+    // The second identical coffee can't have it too: staged, with the candidate still linked.
+    expect(second).toMatchObject({ outcome: "staged", match: "proposed" });
+    expect(second!.candidates.map((c) => c.transaction_id)).toEqual([manual.id]);
+    expect(result.rows.find((r) => r.description === "ACME PAYROLL")).toMatchObject({
+      candidates: [],
+      match: null,
+    });
+    expect(result.batch).toMatchObject({ staged: 2, matched: 1 });
+    expect(ledger.transactions).toHaveLength(3); // the manual one, and two staged
+    expect(manual.flag).toBe("*"); // a match changes nothing in the books
+  });
+
+  it("pairs by proximity: the coffee example (an accepted miss, fixed by swapping in review)", async () => {
+    const coffee = (date: string) =>
+      ledger.addTransaction({
+        date,
+        flag: "*",
+        narration: "Coffee",
+        postings: [
+          { account: ACCOUNT, units: { number: "-5.00", currency: "USD" } },
+          { account: "Expenses:Food" },
+        ],
+      });
+    const fifth = coffee("2024-03-05");
+    const seventh = coffee("2024-03-07");
+
+    const result = await run(
+      "Date,Description,Amount,Balance\n03/07/2024,CAFE,-5.00,1\n03/08/2024,CAFE,-5.00,1\n"
+    );
+
+    const [r7, r8] = result.rows;
+    expect([r7!.transaction_id, r8!.transaction_id]).toEqual([seventh.id, fifth.id]);
+    expect(r7!.candidates.map((c) => c.transaction_id)).toEqual([seventh.id, fifth.id]);
+    expect(r8!.candidates.map((c) => c.transaction_id)).toEqual([seventh.id, fifth.id]);
+    expect(result.batch).toMatchObject({ matched: 2, staged: 0 });
+  });
+
+  it("never matches what this account's imports hold, but does match what another account's do", async () => {
+    await run(); // stages the coffees and the payroll
+    const card = ledger.addTransaction({
+      date: "2024-03-08",
+      flag: "!",
+      narration: "PAYMENT TO CARD",
+      postings: [
+        { account: "Assets:Bank:Checking", units: { number: "-6.00", currency: "USD" } },
+        { account: ACCOUNT, units: { number: "6.00", currency: "USD" } },
+      ],
+    });
+    ledger.accountList.push({ ...ledger.accountList[0]!, name: "Assets:Bank:Checking" });
+    db.replaceProfiles("b", "Assets:Bank:Checking", [guessProfile(FILE)!]);
+    await importFile({
+      db,
+      ledger,
+      book: "b",
+      account: "Assets:Bank:Checking",
+      filename: "checking.csv",
+      text: "Date,Description,Amount,Balance\n03/08/2024,PAYMENT TO CARD,-6.00,1\n",
+      userId: "u",
+    }); // checking's import holds the payment now (it matched it)
+
+    const later = await run(
+      "Date,Description,Amount,Balance\n03/06/2024,CORNER CAFE AGAIN,-4.50,1\n03/09/2024,PAYMENT THANK YOU,6.00,1\n"
+    );
+
+    expect(later.rows.map((r) => [r.description, r.outcome])).toEqual([
+      ["CORNER CAFE AGAIN", "staged"], // not one of the coffees this account's import staged
+      ["PAYMENT THANK YOU", "matched"],
+    ]);
+    expect(later.rows[1]!.transaction_id).toBe(card.id);
+  });
+
+  it("re-importing a file whose rows matched changes nothing", async () => {
+    ledger.addTransaction({
+      date: "2024-03-07",
+      flag: "*",
+      narration: "Payroll",
+      postings: [
+        { account: ACCOUNT, units: { number: "2000.00", currency: "USD" } },
+        { account: "Income:Salary" },
+      ],
+    });
+    await run();
+
+    const again = await run();
+
+    expect(again.batch).toMatchObject({ staged: 0, matched: 0, duplicates: 3 });
   });
 
   it("records the batch, its rows and the account's last import", async () => {

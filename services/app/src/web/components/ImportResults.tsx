@@ -1,14 +1,18 @@
 import { Link } from "wouter";
 
-import type { ImportResult, Outcome } from "../lib/appApi.js";
+import type { Candidate, ImportResult, Outcome } from "../lib/appApi.js";
 import { formatMoney } from "../lib/decimal.js";
 
 const OUTCOMES: Record<Outcome, string> = {
   staged: "Imported",
+  matched: "Matched",
   duplicate: "Already imported",
   "before-opening": "Before the opening balance",
   unreadable: "Couldn't read",
 };
+
+const describe = (c: Candidate | undefined) =>
+  c ? `${c.payee ?? c.narration ?? "(no description)"} · ${c.date}` : "a transaction";
 
 /** What an import did: counts, then every row with its outcome and any possible matches. */
 export function ImportResults({
@@ -28,6 +32,8 @@ export function ImportResults({
         <p>
           <strong>{batch.staged}</strong> new {batch.staged === 1 ? "transaction" : "transactions"}{" "}
           to review
+          {batch.matched > 0 &&
+            ` · ${batch.matched} matched ${batch.matched === 1 ? "a transaction" : "transactions"} already there`}
           {batch.duplicates > 0 && ` · ${batch.duplicates} already imported`}
           {batch.skipped > 0 && ` · ${batch.skipped} before the opening balance`}
           {batch.unreadable > 0 && ` · ${batch.unreadable} couldn't be read`}
@@ -39,7 +45,7 @@ export function ImportResults({
           >
             View the account
           </Link>
-          {batch.staged > 0 && (
+          {batch.staged + batch.matched > 0 && (
             <Link href={`/books/${book}/review`} className="button primary-link">
               Review them
             </Link>
@@ -61,10 +67,17 @@ export function ImportResults({
             <p className="small">
               <span className={`pill outcome-${row.outcome}`}>{OUTCOMES[row.outcome]}</span>
               {row.error && <span className="error"> {row.error}</span>}
+              {row.outcome === "matched" && (
+                <span className="muted">
+                  {" "}
+                  with{" "}
+                  {describe(row.candidates.find((c) => c.transaction_id === row.transaction_id))}
+                </span>
+              )}
             </p>
             {row.candidates.length > 0 && (
               <div className="candidates">
-                <p className="muted small">Might be the same as:</p>
+                <p className="muted small">Possible matches:</p>
                 <ol>
                   {row.candidates.slice(0, 3).map((c) => (
                     <li key={c.transaction_id}>

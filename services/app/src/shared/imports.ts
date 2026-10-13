@@ -8,6 +8,9 @@ export type { CsvProfile } from "@fava-beans/csv-import";
 export type Outcome =
   /** Staged as a pending transaction in the account, for review. */
   | "staged"
+  /** The same event as a transaction already in the account: it claims that one instead of
+   * adding another (proposed until confirmed in review). */
+  | "matched"
   /** Already imported before (same fingerprint): skipped. */
   | "duplicate"
   /** Dated on or before the account's opening balance, which already includes it: skipped. */
@@ -37,9 +40,12 @@ export type ImportRow = {
   outcome: Outcome;
   error: string | null;
   transaction_id: string | null;
-  /** Existing transactions that might be the same event, best first. Identifying and ranking
-   * only, for now: nothing acts on them yet. */
+  /** Transactions already in the account that might be the same event, best first. The row's
+   * transaction is the best one no other row took (`matched`), else a new one (`staged`). */
   candidates: Candidate[];
+  /** For a row with candidates: whether its transaction is still `proposed`, or `confirmed` in
+   * review. Null for a row without candidates (nothing to review on the matching side). */
+  match: "proposed" | "confirmed" | null;
 };
 
 export type ImportBatch = {
@@ -49,6 +55,7 @@ export type ImportBatch = {
   created_at: string;
   rows: number;
   staged: number;
+  matched: number;
   duplicates: number;
   skipped: number;
   unreadable: number;
