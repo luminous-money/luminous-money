@@ -1,12 +1,49 @@
 M4: Categorization: plan
 ==================================================================================================
 
-> **Status: planned (2026-10-13), not started.** There's no separate spec: the milestone's line
+> **Status: in progress (2026-10-13); questions answered** (see [Answers](#answers-2026-10-13)). There's no separate spec: the milestone's line
 > in [the plan](../../PLAN.md) ("the categorization engine"), its notes there (bulk
 > categorization, the 14-month context, the resolver chain), and the design's
 > [resolver pipeline](../../design.md#the-resolver-pipeline-matching-and-categorization) are the
 > brief. Calls marked **Proposed** are open; the [questions](#questions) list the ones that
 > matter most.
+
+## Answers (2026-10-13)
+
+These override anything below that disagrees.
+
+- **Every proposal fills in a concrete category, at any confidence.** After all the
+  categorizers have proposed, the best proposal is applied: the review queue is where weak ones
+  get corrected. (No "Maybe…" chips.)
+- **The cascade stops at 0.9:** a row with a proposal at or above it isn't sent to later
+  categorizers.
+- **Auto-confirm is strict:** only an explicit rule with "confirm automatically" ticked.
+- **Clean payees:** yes, from rules and from history (the payee last given to the same payee
+  key).
+- **Rules and history,** both.
+- **"Similar" stays within the active account** (the account imported into).
+- **A changed rule offers** to re-apply to pending transactions it covers that the user hasn't
+  touched.
+- **External categorizers:** build the interface now. We're the system of record, so we define
+  the API (inspired by Cati, not tied to it), documented in
+  [docs/categorizer-api.md](../../categorizer-api.md). Several providers can be configured.
+- **Acceptance tracking:** yes, per categorizer.
+
+### The external API, in short
+
+- **A provider is an HTTP service** we call; it proposes and never writes. Configured per
+  installation (`CATEGORIZERS`, a JSON list of `{name, url, token?, timeout_ms?, feedback?}`),
+  run in order after the built-ins.
+- **`POST <url>/v1/categorize`:** the rows to categorize, plus the context (the book's chart of
+  accounts and its last 14 months of transactions). Answered with proposals: per row, the
+  postings for the other side (one account, or several with amounts: splits are allowed), an
+  optional payee, a confidence, and a reason.
+- **`POST <url>/v1/feedback`** (if the provider asks for it): what became of each of its
+  proposals once the transaction was confirmed, so it can learn.
+- **Confidence** is meant as the chance the user accepts the proposal unchanged. We don't trust
+  it blindly: acceptance is measured per provider and shown, so an uncalibrated provider is
+  visible as one.
+- **Failures and timeouts** skip the provider for that batch; the import goes on.
 
 ## What M4 is
 
