@@ -439,7 +439,8 @@ button:focus-visible,
   font-weight: 400;
 }
 
-.postings {
+.postings,
+.rule {
   border: 1px solid var(--line);
   border-radius: 1rem;
   padding: 0.75rem;
@@ -449,7 +450,8 @@ button:focus-visible,
   background: var(--card);
 }
 
-.postings legend {
+.postings legend,
+.rule legend {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--muted);
@@ -1090,8 +1092,19 @@ main a:not(.button):not(.card):not(.back):not(.menu-item) {
   border-top: 0;
 }
 
-.rule input.every {
-  max-width: 5rem;
+/* Two equal fields side by side; inputs shrink to fit (date inputs won't on their own). */
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  align-items: end;
+}
+
+.pair input,
+.pair select {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .warning {

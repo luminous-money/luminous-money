@@ -205,15 +205,10 @@ function Form({
 
       <fieldset className="rule">
         <legend>Repeats</legend>
-        <div className="row-fields">
+        <div className="pair">
           <label>
             Every
-            <input
-              inputMode="numeric"
-              value={every}
-              onChange={(e) => setEvery(e.target.value)}
-              className="every"
-            />
+            <input inputMode="numeric" value={every} onChange={(e) => setEvery(e.target.value)} />
           </label>
           <label>
             Unit
@@ -235,7 +230,7 @@ function Form({
             />
           </label>
         )}
-        <div className="row-fields">
+        <div className="pair">
           <label>
             Starts
             <input type="date" value={start} onChange={(e) => setStart(e.target.value)} required />
