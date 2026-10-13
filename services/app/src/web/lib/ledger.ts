@@ -2,11 +2,11 @@
 import {
   createLedgerClient,
   type Account,
+  type AccountIn,
+  type AccountSummary,
   type Book,
   type components,
   type LedgerPage,
-  type MoneyAccount,
-  type MoneyAccountIn,
   type Transaction,
   type TransactionIn,
 } from "@fava-beans/ledger-client";
@@ -67,16 +67,11 @@ export const api = {
       })
     ),
 
-  moneyAccounts: (book_id: string): Promise<MoneyAccount[]> =>
+  /** The accounts asked for that exist, with balances and opening-balance dates. */
+  summary: (book_id: string, accounts: string[]): Promise<AccountSummary[]> =>
     unwrap(
-      ledger.GET("/api/ledger/v1/books/{book_id}/money-accounts", { params: { path: { book_id } } })
-    ),
-
-  createMoneyAccount: (book_id: string, body: MoneyAccountIn): Promise<MoneyAccount> =>
-    unwrap(
-      ledger.POST("/api/ledger/v1/books/{book_id}/money-accounts", {
-        params: { path: { book_id } },
-        body,
+      ledger.GET("/api/ledger/v1/books/{book_id}/accounts/summary", {
+        params: { path: { book_id }, query: { account: accounts } },
       })
     ),
 
@@ -100,11 +95,11 @@ export const api = {
       ledger.GET("/api/ledger/v1/books/{book_id}/accounts", { params: { path: { book_id } } })
     ),
 
-  createAccount: (book_id: string, name: string, kind: AccountKind): Promise<Account> =>
+  createAccount: (book_id: string, body: AccountIn): Promise<Account> =>
     unwrap(
       ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
         params: { path: { book_id } },
-        body: { name, kind },
+        body,
       })
     ),
 

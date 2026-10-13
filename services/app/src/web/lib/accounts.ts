@@ -1,5 +1,7 @@
 import type { Account } from "@fava-beans/ledger-client";
 
+import { negate } from "./decimal.js";
+
 /** Accounts a transaction dated `date` (ISO) can post to: leaves, open on that date. */
 export function postable(accounts: Account[], date: string): string[] {
   return accounts
@@ -203,4 +205,24 @@ export function checkNewAccount(name: string, accounts: Account[]): NewAccountCh
     break;
   }
   return { ok: true, type: root.type, creates };
+}
+
+/** An account's human name: its `display-name` if set, else its last segment with dashes as
+ * spaces ("PNC-Shared-Checking" → "PNC Shared Checking"). */
+export function displayName(account: { name: string; display_name?: string | null }): string {
+  return account.display_name ?? account.name.split(":").at(-1)!.replace(/-/g, " ");
+}
+
+/**
+ * Whether an account's amounts are shown with their signs flipped: liabilities and income, so a
+ * card shows what's owed and income shows as positive. Only for reading (balances, ledgers,
+ * previews); editors show stored signs, since splits sum to zero.
+ */
+export function shownInverted(type: Account["type"] | undefined): boolean {
+  return type === "liability" || type === "income";
+}
+
+/** A stored amount as it's shown for an account of `type`, and back (the same flip). */
+export function shown(number: string, type: Account["type"] | undefined): string {
+  return shownInverted(type) ? negate(number) : number;
 }

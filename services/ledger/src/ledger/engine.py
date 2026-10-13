@@ -34,11 +34,9 @@ from . import models
 
 ID_KEY = "id"
 KIND_KEY = "kind"
-# Money accounts: accounts held at a real institution. `money` says what kind (bank,
-# credit-card, ...); the display name is a human one, since account names can't have spaces.
-MONEY_KEY = "money"
+# An account's human name, since account names can't have spaces. Optional: the app falls back
+# to the name's last segment.
 DISPLAY_NAME_KEY = "display-name"
-INSTITUTION_KEY = "institution"
 NODE = "node"
 ROOT_OPTIONS = (
     ("name_assets", "asset"),
@@ -295,9 +293,7 @@ def accounts(header: list[str], texts: list[str]) -> list[models.Account]:
                 kind="node" if entry.meta.get(KIND_KEY) == NODE else "leaf",
                 open=entry.date,
                 currencies=list(entry.currencies or []),
-                money=entry.meta.get(MONEY_KEY),
                 display_name=entry.meta.get(DISPLAY_NAME_KEY),
-                institution=entry.meta.get(INSTITUTION_KEY),
             )
     for entry in entries:
         if isinstance(entry, data.Close) and entry.account in found:

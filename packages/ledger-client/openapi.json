@@ -32,6 +32,7 @@
                 "type": "null"
               }
             ],
+            "description": "A human name, from `display-name` metadata if set.",
             "title": "Display Name"
           },
           "implicit": {
@@ -39,17 +40,6 @@
             "description": "Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.",
             "title": "Implicit",
             "type": "boolean"
-          },
-          "institution": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Institution"
           },
           "kind": {
             "description": "Leaf accounts hold transactions; node accounts hold sub-accounts.",
@@ -59,18 +49,6 @@
             ],
             "title": "Kind",
             "type": "string"
-          },
-          "money": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Held at a real institution: the kind of account (`bank`, ...).",
-            "title": "Money"
           },
           "name": {
             "title": "Name",
@@ -143,14 +121,142 @@
                 "type": "null"
               }
             ],
-            "description": "Defaults to when the nearest opened ancestor opened, else the earliest account under it, else the book's first entry.",
+            "description": "Defaults to the opening balance's date if there is one, else when the nearest opened ancestor opened, else the earliest account under it, else the book's first entry.",
             "title": "Open"
+          },
+          "opening_balance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpeningBalance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A leaf's balance on a date, recorded as an opening-balance transaction."
           }
         },
         "required": [
           "name"
         ],
         "title": "AccountIn",
+        "type": "object"
+      },
+      "AccountSummary": {
+        "description": "An account with what a card or a ledger's header shows.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The date of its opening balance, which includes everything up to then (imports skip rows up to it); None without one.",
+            "title": "As Of"
+          },
+          "balance": {
+            "description": "The current balance, pending transactions included: one amount per currency held.",
+            "items": {
+              "$ref": "#/components/schemas/Amount"
+            },
+            "title": "Balance",
+            "type": "array"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "currencies": {
+            "description": "Constraint from the open directive; empty means any.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Currencies",
+            "type": "array"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A human name, from `display-name` metadata if set.",
+            "title": "Display Name"
+          },
+          "implicit": {
+            "default": false,
+            "description": "Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.",
+            "title": "Implicit",
+            "type": "boolean"
+          },
+          "kind": {
+            "description": "Leaf accounts hold transactions; node accounts hold sub-accounts.",
+            "enum": [
+              "leaf",
+              "node"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "asset",
+                  "liability",
+                  "equity",
+                  "income",
+                  "expense"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "From the top-level account; None for an unrecognized root.",
+            "title": "Type"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "kind",
+          "balance",
+          "as_of"
+        ],
+        "title": "AccountSummary",
         "type": "object"
       },
       "Amount": {
@@ -573,152 +679,14 @@
         "title": "MetaNumber",
         "type": "object"
       },
-      "MoneyAccount": {
-        "properties": {
-          "as_of": {
-            "description": "The date of its opening balance, which includes everything up to then. Imports skip rows up to it.",
-            "format": "date",
-            "title": "As Of",
-            "type": "string"
-          },
-          "balance": {
-            "description": "The current balance, pending transactions included: one amount per currency held.",
-            "items": {
-              "$ref": "#/components/schemas/Amount"
-            },
-            "title": "Balance",
-            "type": "array"
-          },
-          "close": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Close"
-          },
-          "currencies": {
-            "description": "Constraint from the open directive; empty means any.",
-            "items": {
-              "type": "string"
-            },
-            "title": "Currencies",
-            "type": "array"
-          },
-          "display_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Display Name"
-          },
-          "implicit": {
-            "default": false,
-            "description": "Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.",
-            "title": "Implicit",
-            "type": "boolean"
-          },
-          "institution": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Institution"
-          },
-          "kind": {
-            "description": "Leaf accounts hold transactions; node accounts hold sub-accounts.",
-            "enum": [
-              "leaf",
-              "node"
-            ],
-            "title": "Kind",
-            "type": "string"
-          },
-          "money": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Held at a real institution: the kind of account (`bank`, ...).",
-            "title": "Money"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "open": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Open"
-          },
-          "type": {
-            "anyOf": [
-              {
-                "enum": [
-                  "asset",
-                  "liability",
-                  "equity",
-                  "income",
-                  "expense"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "From the top-level account; None for an unrecognized root.",
-            "title": "Type"
-          }
-        },
-        "required": [
-          "name",
-          "type",
-          "kind",
-          "balance",
-          "as_of"
-        ],
-        "title": "MoneyAccount",
-        "type": "object"
-      },
-      "MoneyAccountIn": {
+      "OpeningBalance": {
         "additionalProperties": false,
-        "description": "A money account to add: a bank account, for now.",
+        "description": "An account's balance on a date, from a statement: recorded as an opening-balance transaction.",
         "properties": {
-          "as_of": {
-            "description": "The date `balance` was the balance; the account opens then.",
-            "format": "date",
-            "title": "As Of",
-            "type": "string"
-          },
-          "balance": {
-            "default": "0",
-            "description": "The balance at the end of `as_of`, recorded as an opening balance.",
+          "amount": {
+            "description": "The balance at the end of `date`, as stored (negative on a liability).",
             "pattern": "^-?\\d+(\\.\\d+)?$",
-            "title": "Balance",
+            "title": "Amount",
             "type": "string"
           },
           "currency": {
@@ -726,47 +694,17 @@
             "title": "Currency",
             "type": "string"
           },
-          "display_name": {
-            "description": "A human name, e.g. \"PNC Checking\".",
-            "minLength": 1,
-            "title": "Display Name",
+          "date": {
+            "format": "date",
+            "title": "Date",
             "type": "string"
-          },
-          "institution": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Institution"
-          },
-          "money": {
-            "const": "bank",
-            "default": "bank",
-            "title": "Money",
-            "type": "string"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The account's fully qualified name: anything the account rules allow. Defaults to `Assets:Bank:<display name>`, with dashes for spaces.",
-            "title": "Name"
           }
         },
         "required": [
-          "display_name",
-          "as_of"
+          "amount",
+          "date"
         ],
-        "title": "MoneyAccountIn",
+        "title": "OpeningBalance",
         "type": "object"
       },
       "Posting": {
@@ -1688,6 +1626,64 @@
         "summary": "Create Account"
       }
     },
+    "/api/ledger/v1/books/{book_id}/accounts/summary": {
+      "get": {
+        "description": "Accounts with their balances and opening-balance dates: what the home page's cards and a\nledger's header show.",
+        "operationId": "account_summary_api_ledger_v1_books__book_id__accounts_summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The accounts to summarize; repeat for more.",
+            "in": "query",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "description": "The accounts to summarize; repeat for more.",
+              "items": {
+                "type": "string"
+              },
+              "title": "Account",
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AccountSummary"
+                  },
+                  "title": "Response Account Summary Api Ledger V1 Books  Book Id  Accounts Summary Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Account Summary"
+      }
+    },
     "/api/ledger/v1/books/{book_id}/accounts/{account}/ledger": {
       "get": {
         "operationId": "account_ledger_api_ledger_v1_books__book_id__accounts__account__ledger_get",
@@ -2194,96 +2190,6 @@
           }
         },
         "summary": "Import Text"
-      }
-    },
-    "/api/ledger/v1/books/{book_id}/money-accounts": {
-      "get": {
-        "operationId": "money_accounts_api_ledger_v1_books__book_id__money_accounts_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "book_id",
-            "required": true,
-            "schema": {
-              "title": "Book Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/MoneyAccount"
-                  },
-                  "title": "Response Money Accounts Api Ledger V1 Books  Book Id  Money Accounts Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Money Accounts"
-      },
-      "post": {
-        "operationId": "create_money_account_api_ledger_v1_books__book_id__money_accounts_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "book_id",
-            "required": true,
-            "schema": {
-              "title": "Book Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MoneyAccountIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MoneyAccount"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Create Money Account"
       }
     },
     "/api/ledger/v1/books/{book_id}/problems": {

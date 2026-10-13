@@ -79,6 +79,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/accounts/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Account Summary
+     * @description Accounts with their balances and opening-balance dates: what the home page's cards and a
+     *     ledger's header show.
+     */
+    get: operations["account_summary_api_ledger_v1_books__book_id__accounts_summary_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/accounts/{account}/ledger": {
     parameters: {
       query?: never;
@@ -169,24 +190,6 @@ export interface paths {
      * @description Apply Beancount text. Creates the book, owned by the caller, if it doesn't exist.
      */
     post: operations["import_text_api_ledger_v1_books__book_id__import_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/ledger/v1/books/{book_id}/money-accounts": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Money Accounts */
-    get: operations["money_accounts_api_ledger_v1_books__book_id__money_accounts_get"];
-    put?: never;
-    /** Create Money Account */
-    post: operations["create_money_account_api_ledger_v1_books__book_id__money_accounts_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -297,7 +300,10 @@ export interface components {
        * @description Constraint from the open directive; empty means any.
        */
       currencies?: string[];
-      /** Display Name */
+      /**
+       * Display Name
+       * @description A human name, from `display-name` metadata if set.
+       */
       display_name?: string | null;
       /**
        * Implicit
@@ -305,19 +311,12 @@ export interface components {
        * @default false
        */
       implicit: boolean;
-      /** Institution */
-      institution?: string | null;
       /**
        * Kind
        * @description Leaf accounts hold transactions; node accounts hold sub-accounts.
        * @enum {string}
        */
       kind: "leaf" | "node";
-      /**
-       * Money
-       * @description Held at a real institution: the kind of account (`bank`, ...).
-       */
-      money?: string | null;
       /** Name */
       name: string;
       /** Open */
@@ -343,9 +342,60 @@ export interface components {
       name: string;
       /**
        * Open
-       * @description Defaults to when the nearest opened ancestor opened, else the earliest account under it, else the book's first entry.
+       * @description Defaults to the opening balance's date if there is one, else when the nearest opened ancestor opened, else the earliest account under it, else the book's first entry.
        */
       open?: string | null;
+      /** @description A leaf's balance on a date, recorded as an opening-balance transaction. */
+      opening_balance?: components["schemas"]["OpeningBalance"] | null;
+    };
+    /**
+     * AccountSummary
+     * @description An account with what a card or a ledger's header shows.
+     */
+    AccountSummary: {
+      /**
+       * As Of
+       * @description The date of its opening balance, which includes everything up to then (imports skip rows up to it); None without one.
+       */
+      as_of: string | null;
+      /**
+       * Balance
+       * @description The current balance, pending transactions included: one amount per currency held.
+       */
+      balance: components["schemas"]["Amount"][];
+      /** Close */
+      close?: string | null;
+      /**
+       * Currencies
+       * @description Constraint from the open directive; empty means any.
+       */
+      currencies?: string[];
+      /**
+       * Display Name
+       * @description A human name, from `display-name` metadata if set.
+       */
+      display_name?: string | null;
+      /**
+       * Implicit
+       * @description Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.
+       * @default false
+       */
+      implicit: boolean;
+      /**
+       * Kind
+       * @description Leaf accounts hold transactions; node accounts hold sub-accounts.
+       * @enum {string}
+       */
+      kind: "leaf" | "node";
+      /** Name */
+      name: string;
+      /** Open */
+      open?: string | null;
+      /**
+       * Type
+       * @description From the top-level account; None for an unrecognized root.
+       */
+      type: ("asset" | "liability" | "equity" | "income" | "expense") | null;
     };
     /** Amount */
     Amount: {
@@ -515,97 +565,26 @@ export interface components {
       /** Number */
       number: string;
     };
-    /** MoneyAccount */
-    MoneyAccount: {
-      /**
-       * As Of
-       * Format: date
-       * @description The date of its opening balance, which includes everything up to then. Imports skip rows up to it.
-       */
-      as_of: string;
-      /**
-       * Balance
-       * @description The current balance, pending transactions included: one amount per currency held.
-       */
-      balance: components["schemas"]["Amount"][];
-      /** Close */
-      close?: string | null;
-      /**
-       * Currencies
-       * @description Constraint from the open directive; empty means any.
-       */
-      currencies?: string[];
-      /** Display Name */
-      display_name?: string | null;
-      /**
-       * Implicit
-       * @description Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.
-       * @default false
-       */
-      implicit: boolean;
-      /** Institution */
-      institution?: string | null;
-      /**
-       * Kind
-       * @description Leaf accounts hold transactions; node accounts hold sub-accounts.
-       * @enum {string}
-       */
-      kind: "leaf" | "node";
-      /**
-       * Money
-       * @description Held at a real institution: the kind of account (`bank`, ...).
-       */
-      money?: string | null;
-      /** Name */
-      name: string;
-      /** Open */
-      open?: string | null;
-      /**
-       * Type
-       * @description From the top-level account; None for an unrecognized root.
-       */
-      type: ("asset" | "liability" | "equity" | "income" | "expense") | null;
-    };
     /**
-     * MoneyAccountIn
-     * @description A money account to add: a bank account, for now.
+     * OpeningBalance
+     * @description An account's balance on a date, from a statement: recorded as an opening-balance transaction.
      */
-    MoneyAccountIn: {
+    OpeningBalance: {
       /**
-       * As Of
-       * Format: date
-       * @description The date `balance` was the balance; the account opens then.
+       * Amount
+       * @description The balance at the end of `date`, as stored (negative on a liability).
        */
-      as_of: string;
-      /**
-       * Balance
-       * @description The balance at the end of `as_of`, recorded as an opening balance.
-       * @default 0
-       */
-      balance: string;
+      amount: string;
       /**
        * Currency
        * @default USD
        */
       currency: string;
       /**
-       * Display Name
-       * @description A human name, e.g. "PNC Checking".
+       * Date
+       * Format: date
        */
-      display_name: string;
-      /** Institution */
-      institution?: string | null;
-      /**
-       * Money
-       * @default bank
-       * @constant
-       */
-      money: "bank";
-      /**
-       * Name
-       * @description The account's fully qualified name: anything the account rules allow. Defaults to `Assets:Bank:<display name>`, with dashes for spaces.
-       */
-      name?: string | null;
+      date: string;
     };
     /** Posting */
     Posting: {
@@ -1086,6 +1065,40 @@ export interface operations {
       };
     };
   };
+  account_summary_api_ledger_v1_books__book_id__accounts_summary_get: {
+    parameters: {
+      query: {
+        /** @description The accounts to summarize; repeat for more. */
+        account: string[];
+      };
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AccountSummary"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   account_ledger_api_ledger_v1_books__book_id__accounts__account__ledger_get: {
     parameters: {
       query?: {
@@ -1365,72 +1378,6 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Applied"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  money_accounts_api_ledger_v1_books__book_id__money_accounts_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        book_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["MoneyAccount"][];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  create_money_account_api_ledger_v1_books__book_id__money_accounts_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        book_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["MoneyAccountIn"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["MoneyAccount"];
         };
       };
       /** @description Validation Error */

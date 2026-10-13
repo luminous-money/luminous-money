@@ -1019,3 +1019,21 @@ main a:not(.button):not(.card):not(.back):not(.menu-item) {
   color: var(--green);
   font-weight: 600;
 }
+
+/* Starring an account (its ledger's header) */
+
+.star {
+  font: inherit;
+  font-size: 1.3rem;
+  line-height: 1;
+  border: 0;
+  background: none;
+  padding: 0 0.25rem;
+  color: var(--muted, #888);
+  cursor: pointer;
+  vertical-align: 0.1em;
+}
+
+.star.on {
+  color: #d9a400;
+}

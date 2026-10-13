@@ -1,22 +1,28 @@
 import { useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 
-import { shortName } from "../lib/accounts.js";
+import { displayName, shortName, shown } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";
 import { withBack } from "../lib/navigation.js";
-import { explain, useAccountLedger, useMoneyAccounts } from "../lib/queries.js";
+import { explain, useAccountLedger, useSetStar, useStars, useSummary } from "../lib/queries.js";
 
 /**
  * One account's ledger: every transaction, newest first, 200 at a time, more loading as you
  * scroll. A simple transaction shows the account on its other side; one with more splits shows
- * <multiple>. Tapping one opens it; the line above them adds a new one. A money account's
- * ledger links to importing into it.
+ * <multiple>. Tapping one opens it; the line above them adds a new one. Its header stars the
+ * account (putting it on the home page) and links to importing into it. Amounts and balances
+ * are shown as the account reads (a card's balance is what's owed); colors follow the stored
+ * sign, the effect on net worth.
  */
 export function AccountLedger({ book, account }: { book: string; account: string }) {
   const [, navigate] = useLocation();
   const ledger = useAccountLedger(book, account);
-  const money = useMoneyAccounts(book);
-  const info = money.data?.find((a) => a.name === account);
+  const summary = useSummary(book, [account]);
+  const info = summary.data?.[0];
+  const stars = useStars(book);
+  const setStar = useSetStar(book);
+  const starred = stars.data?.includes(account) ?? false;
+  const type = info?.type;
   const end = useRef<HTMLDivElement>(null);
   const here = `/books/${book}/accounts/${encodeURIComponent(account)}`;
 
@@ -42,15 +48,29 @@ export function AccountLedger({ book, account }: { book: string; account: string
         </Link>
         <div className="home-head">
           <div>
-            <h1>{info?.display_name ?? shortName(account)}</h1>
+            <h1>
+              {displayName(info ?? { name: account })}{" "}
+              <button
+                type="button"
+                className={`star${starred ? " on" : ""}`}
+                aria-pressed={starred}
+                aria-label="Starred"
+                title={starred ? "Starred: on the home page" : "Star: show on the home page"}
+                disabled={!stars.data || setStar.isPending}
+                onClick={() => setStar.mutate({ account, starred: !starred })}
+              >
+                {starred ? "★" : "☆"}
+              </button>
+            </h1>
             {info && (
               <p className="muted">
-                {info.balance.map((b) => formatMoney(b.number, b.currency)).join(" · ") ||
-                  formatMoney("0.00", info.currencies?.[0] ?? "USD")}
+                {info.balance
+                  .map((b) => formatMoney(shown(b.number, type), b.currency))
+                  .join(" · ") || formatMoney("0.00", info.currencies?.[0] ?? "USD")}
               </p>
             )}
           </div>
-          {info && (
+          {info?.kind === "leaf" && !info.implicit && !info.close && (
             <Link
               href={withBack(`/books/${book}/import?account=${encodeURIComponent(account)}`, here)}
               className="button"
@@ -104,10 +124,14 @@ export function AccountLedger({ book, account }: { book: string; account: string
                 <span
                   className={`amount ${row.amount && !isNegative(row.amount.number) ? "in" : "out"}`}
                 >
-                  {row.amount ? formatMoney(row.amount.number, row.amount.currency) : "?"}
+                  {row.amount
+                    ? formatMoney(shown(row.amount.number, type), row.amount.currency)
+                    : "?"}
                 </span>
                 <span className="muted small">
-                  {row.balance ? formatMoney(row.balance.number, row.balance.currency) : ""}
+                  {row.balance
+                    ? formatMoney(shown(row.balance.number, type), row.balance.currency)
+                    : ""}
                 </span>
               </span>
             </button>

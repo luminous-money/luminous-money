@@ -1,13 +1,15 @@
 import type { Book } from "@fava-beans/ledger-client";
 import { Link } from "wouter";
 
+import { displayName, shown } from "../lib/accounts.js";
 import { formatMoney } from "../lib/decimal.js";
 import { formatWhen } from "../lib/format.js";
-import { explain, useLastImports, useMoneyAccounts } from "../lib/queries.js";
+import { explain, useLastImports, useStarredAccounts } from "../lib/queries.js";
 
-/** The user's money accounts, with their balances and when each was last updated by an import. */
+/** The user's starred accounts, with their balances (as shown: a card's is what's owed) and when
+ * each was last updated by an import. */
 export function Home({ book }: { book: Book }) {
-  const accounts = useMoneyAccounts(book.id);
+  const accounts = useStarredAccounts(book.id);
   const imports = useLastImports(book.id);
 
   return (
@@ -26,7 +28,8 @@ export function Home({ book }: { book: Book }) {
       {accounts.error && <p className="card error">{explain(accounts.error)}</p>}
       {accounts.data?.length === 0 && (
         <p className="card done">
-          No accounts yet. <Link href="/accounts/new">Add one</Link>
+          No starred accounts yet. Star one from its ledger, or{" "}
+          <Link href="/accounts/new">add an account</Link>.
         </p>
       )}
 
@@ -40,10 +43,12 @@ export function Home({ book }: { book: Book }) {
               className="card link account-card"
             >
               <div className="account-card-top">
-                <h2>{account.display_name ?? account.name}</h2>
+                <h2>{displayName(account)}</h2>
                 <span className="balance">
                   {account.balance.length
-                    ? account.balance.map((b) => formatMoney(b.number, b.currency)).join(" · ")
+                    ? account.balance
+                        .map((b) => formatMoney(shown(b.number, account.type), b.currency))
+                        .join(" · ")
                     : formatMoney("0.00", account.currencies?.[0] ?? "USD")}
                 </span>
               </div>

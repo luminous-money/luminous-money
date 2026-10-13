@@ -5,14 +5,18 @@ import {
   type CsvProfile,
   type DateFormat,
 } from "@fava-beans/csv-import";
+import type { Account } from "@fava-beans/ledger-client";
 import { useMemo, useState } from "react";
 
+import { shown, shownInverted } from "../lib/accounts.js";
 import { formatMoney } from "../lib/decimal.js";
 
 type Props = {
   text: string;
   initial: CsvProfile;
   currency: string;
+  /** The account's type, so the preview shows amounts as its ledger will (see `shown`). */
+  type?: Account["type"];
   busy?: boolean;
   onSave: (profile: CsvProfile) => void;
   onCancel: () => void;
@@ -26,7 +30,7 @@ const OPTIONAL = -1;
  * payee, the bank's transaction ID and a running balance. Starts from a guess; a live preview
  * shows how the first rows would be read.
  */
-export function ProfileEditor({ text, initial, currency, busy, onSave, onCancel }: Props) {
+export function ProfileEditor({ text, initial, currency, type, busy, onSave, onCancel }: Props) {
   const [profile, setProfile] = useState(initial);
   const rows = useMemo(() => applyProfile(text, profile).slice(0, 8), [text, profile]);
   const sample = useMemo(() => {
@@ -164,14 +168,18 @@ export function ProfileEditor({ text, initial, currency, busy, onSave, onCancel 
             <tr key={r.line} className={r.error ? "bad" : undefined}>
               <td>{r.date ?? "?"}</td>
               <td>{r.error ? <span className="error">{r.error}</span> : r.description}</td>
-              <td className="num">{r.amount ? formatMoney(r.amount, currency) : ""}</td>
+              <td className="num">
+                {r.amount ? formatMoney(shown(r.amount, type), currency) : ""}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
       <p className="muted small">
-        {readable} of the first {rows.length} rows read cleanly. Money into the account should be
-        positive, money out negative.
+        {readable} of the first {rows.length} rows read cleanly.{" "}
+        {shownInverted(type)
+          ? "Amounts are shown as the account reads: charges should increase what's owed (positive), payments decrease it."
+          : "Money into the account should be positive, money out negative."}
       </p>
 
       <div className="actions">

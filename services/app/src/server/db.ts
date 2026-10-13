@@ -66,6 +66,14 @@ export const MIGRATIONS: Migration[] = [
      FROM csv_profile_1`,
     "DROP TABLE csv_profile_1",
   ],
+  // 3: starred accounts, per user: what their home page shows (M2).
+  [
+    createTable(
+      "star",
+      ["user_id TEXT NOT NULL", "book_id TEXT NOT NULL", "account TEXT NOT NULL"],
+      ["PRIMARY KEY (user_id, book_id, account)"]
+    ),
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -107,6 +115,32 @@ export class AppDb {
          VALUES (?, ?, ?, ?, ?, ?)`
       )
       .run(randomUUID().replace(/-/g, ""), book, account, JSON.stringify(profile), stamp, stamp);
+  }
+
+  /** The user's starred accounts in the book, in the order they were starred. */
+  stars(user: string, book: string): string[] {
+    const rows = this.db
+      .prepare(
+        "SELECT account FROM star WHERE user_id = ? AND book_id = ? ORDER BY created_at, rowid"
+      )
+      .all(user, book) as { account: string }[];
+    return rows.map((r) => r.account);
+  }
+
+  star(user: string, book: string, account: string): void {
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO star (user_id, book_id, account, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT DO NOTHING`
+      )
+      .run(user, book, account, stamp, stamp);
+  }
+
+  unstar(user: string, book: string, account: string): void {
+    this.db
+      .prepare("DELETE FROM star WHERE user_id = ? AND book_id = ? AND account = ?")
+      .run(user, book, account);
   }
 
   /** Which of `fingerprints` were already staged by an earlier import into the account. */

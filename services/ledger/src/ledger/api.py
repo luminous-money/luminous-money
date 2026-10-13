@@ -145,15 +145,16 @@ def create_app(ledger: Ledger) -> FastAPI:
     def create_account(book_id: OwnedBook, account: models.AccountIn) -> models.Account:
         return ledger.create_account(book_id, account)
 
-    # Money accounts and account ledgers
+    # Account summaries and ledgers
 
-    @api.get("/books/{book_id}/money-accounts")
-    def money_accounts(book_id: OwnedBook) -> list[models.MoneyAccount]:
-        return ledger.money_accounts(book_id)
-
-    @api.post("/books/{book_id}/money-accounts", status_code=201)
-    def create_money_account(book_id: OwnedBook, account: models.MoneyAccountIn) -> models.MoneyAccount:
-        return ledger.create_money_account(book_id, account)
+    @api.get("/books/{book_id}/accounts/summary")
+    def account_summary(
+        book_id: OwnedBook,
+        account: Annotated[list[str], Query(description="The accounts to summarize; repeat for more.")],
+    ) -> list[models.AccountSummary]:
+        """Accounts with their balances and opening-balance dates: what the home page's cards and a
+        ledger's header show."""
+        return ledger.summary(book_id, account)
 
     @api.get("/books/{book_id}/accounts/{account}/ledger")
     def account_ledger(

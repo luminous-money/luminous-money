@@ -57,10 +57,11 @@ How it's put together:
 
 ## Next steps
 
-1. **Build M2** ([plan](docs/milestones/m2-credit-card/PLAN.md)): starred accounts in place of
-   money accounts, inverted display signs for liabilities and income, and matches that act.
-   Its questions are answered; two **Proposed** calls are left to glance at (stars per user in
-   `app`; importing into any leaf, starred first).
+1. **Finish M2** ([plan](docs/milestones/m2-credit-card/PLAN.md)). Done: slice 1 (starred
+   accounts replace money accounts; accounts added by full name with an optional opening
+   balance; import into any open leaf) and slice 2 (liabilities and income shown inverted). Next:
+   slice 3 (matching and assignment), 4 (`assign` and the ledger's `changes`), 5 (reviewing
+   matches).
 
 ## Gotchas
 

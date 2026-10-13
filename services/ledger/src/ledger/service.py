@@ -241,8 +241,33 @@ class Ledger:
         don't exist at all are opened as nodes along the way, in the same write. A name that's only
         implicit so far can be opened explicitly, but only as a node, since it already has
         accounts under it.
+
+        A leaf can come with an opening balance: its balance on a date, from a statement. It's
+        recorded as a transaction against `Equity:Opening-Balances` on that date (even when it's
+        zero: its date is the account's `as_of`, which says where imports start, and it can be
+        moved like any transaction), and the account opens then and holds that currency. All of
+        it is one write.
         """
-        directives = self._account_directives(book_id, a.name, a.kind, a.open)
+        opening = a.opening_balance
+        if opening and a.kind != "leaf":
+            raise engine.ParseFailure(["only a leaf account can have an opening balance"])
+        opened = a.open or (opening.date if opening else None)
+        directives = self._account_directives(
+            book_id, a.name, a.kind, opened, currencies=[opening.currency] if opening else None
+        )
+        if opening:
+            if self.OPENING_BALANCES not in {x.name for x in self.accounts(book_id) if not x.implicit}:
+                directives += self._account_directives(book_id, self.OPENING_BALANCES, "leaf", opening.date)
+            transaction = models.TransactionIn(
+                date=opening.date,
+                flag="*",
+                narration="Opening balance",
+                postings=[
+                    models.Posting(account=a.name, units=models.Amount(number=opening.amount, currency=opening.currency)),
+                    models.Posting(account=self.OPENING_BALANCES),
+                ],
+            )
+            directives.append(engine.transaction_directive(transaction))
         with self.store.transaction():
             self.store.put(book_id, directives)
         return self._account(book_id, a.name)
@@ -289,56 +314,24 @@ class Ledger:
         directives.append(engine.open_directive(name, opened, kind, currencies=currencies, meta=meta))
         return directives
 
-    # Money accounts
+    # Opening balances and summaries
 
     OPENING_BALANCES = "Equity:Opening-Balances"
 
-    def money_accounts(self, book_id: str) -> list[models.MoneyAccount]:
-        """Accounts held at a real institution that aren't closed, with their balances and the
-        dates of their opening balances (their open dates, for any without one)."""
+    def summary(self, book_id: str, names: list[str]) -> list[models.AccountSummary]:
+        """The named accounts (those that exist, in the order asked), with their balances and the
+        dates of their opening balances."""
         openings = self.store.opening_dates(book_id, self.OPENING_BALANCES)
+        by_name = {a.name: a for a in self.accounts(book_id)}
         return [
-            models.MoneyAccount(
-                **a.model_dump(),
-                balance=self.balance(book_id, a.name),
-                as_of=openings.get(a.name) or a.open,
+            models.AccountSummary(
+                **by_name[name].model_dump(),
+                balance=self.balance(book_id, name),
+                as_of=openings.get(name),
             )
-            for a in self.accounts(book_id)
-            if a.money and not a.close
+            for name in dict.fromkeys(names)
+            if name in by_name
         ]
-
-    def create_money_account(self, book_id: str, m: models.MoneyAccountIn) -> models.MoneyAccount:
-        """Add a bank account by its human name, with its balance on a date.
-
-        It's opened as `name`, by default `Assets:Bank:<Name>` (dashes for spaces), with the nodes
-        on the way if they're missing, on the `as_of` date. Any name the account rules allow will
-        do (see `create_account`). The balance is recorded as an opening-balance
-        transaction against `Equity:Opening-Balances` on that date, so the account's balance is
-        right from the start. It's written even when it's zero: its date is the account's `as_of`,
-        which says where imports start, and it can be moved like any transaction. All of it is one
-        write.
-        """
-        name = m.name or f"Assets:Bank:{engine.segment(m.display_name)}"
-        meta = {engine.MONEY_KEY: m.money, engine.DISPLAY_NAME_KEY: m.display_name}
-        if m.institution:
-            meta[engine.INSTITUTION_KEY] = m.institution
-        directives = self._account_directives(book_id, name, "leaf", m.as_of, currencies=[m.currency], meta=meta)
-
-        if self.OPENING_BALANCES not in {a.name for a in self.accounts(book_id) if not a.implicit}:
-            directives += self._account_directives(book_id, self.OPENING_BALANCES, "leaf", m.as_of)
-        opening = models.TransactionIn(
-            date=m.as_of,
-            flag="*",
-            narration="Opening balance",
-            postings=[
-                models.Posting(account=name, units=models.Amount(number=m.balance, currency=m.currency)),
-                models.Posting(account=self.OPENING_BALANCES),
-            ],
-        )
-        directives.append(engine.transaction_directive(opening))
-        with self.store.transaction():
-            self.store.put(book_id, directives)
-        return next(a for a in self.money_accounts(book_id) if a.name == name)
 
     def balance(self, book_id: str, account: str) -> list[models.Amount]:
         """The account's balance, pending transactions included, one amount per currency.

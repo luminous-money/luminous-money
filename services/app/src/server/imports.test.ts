@@ -28,7 +28,7 @@ beforeEach(() => {
   db = new AppDb(join(mkdtempSync(join(tmpdir(), "app-")), "app.sqlite"));
   ledger = new FakeLedger();
   ledger.addBook("b");
-  ledger.addAccount(ACCOUNT, { money: "bank", open: "2024-03-01", currencies: ["USD"] } as never);
+  ledger.addAccount(ACCOUNT, { open: "2024-03-01", as_of: "2024-03-01", currencies: ["USD"] });
   db.replaceProfiles("b", ACCOUNT, [guessProfile(FILE)!]);
 });
 
@@ -120,6 +120,27 @@ describe("importing a file", () => {
   });
 });
 
+it("imports into any leaf, with no cutoff when it has no opening balance", async () => {
+  ledger.accountList[0]!.as_of = undefined;
+  ledger.accountList[0]!.type = "liability";
+
+  const result = await run();
+
+  expect(result.batch).toMatchObject({ staged: 4, skipped: 0 });
+});
+
+it("keeps stars per user and book", () => {
+  db.star("u", "b", ACCOUNT);
+  db.star("u", "b", "Liabilities:Card");
+  db.star("u", "b", ACCOUNT); // again: no change
+  db.star("other", "b", "Assets:Cash");
+  db.unstar("u", "b", "Liabilities:Card");
+
+  expect(db.stars("u", "b")).toEqual([ACCOUNT]);
+  expect(db.stars("other", "b")).toEqual(["Assets:Cash"]);
+  expect(db.stars("u", "elsewhere")).toEqual([]);
+});
+
 describe("several file formats for one account", () => {
   const OTHER = `Posted,Payee,Debit,Credit
 2024-03-10,BAKERY,6.00,
@@ -178,7 +199,7 @@ describe("what has to be fixed first", () => {
         }),
     ],
     [
-      "not-a-money-account",
+      "not-importable",
       () =>
         importFile({
           db,
@@ -194,7 +215,7 @@ describe("what has to be fixed first", () => {
     [
       "no-profile",
       () => {
-        ledger.addAccount("Assets:Bank:Other", { money: "bank" } as never);
+        ledger.addAccount("Assets:Bank:Other");
         return importFile({
           db,
           ledger,

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { addTransactions, logIn, setUpUser } from "./support.js";
+import { addAccount, addTransactions, logIn, setUpUser } from "./support.js";
 
 const menu = async (page: Page, item: string) => {
   await page.getByRole("button", { name: "Menu" }).click();
@@ -36,11 +36,12 @@ test("a new user sets up their books and first account, and lands home", async (
   await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(page.getByText("Add an account to Kael and Jess")).toBeVisible();
-  await page.getByRole("textbox", { name: "Account name" }).fill("Green Fi Joint");
-  await expect(page.getByRole("combobox", { name: "Kept in the ledger as" })).toHaveValue(
-    "Assets:Bank:Green-Fi-Joint"
-  );
-  await page.getByRole("textbox", { name: "Current balance" }).fill("2,500.00");
+  const name = page.getByRole("combobox", { name: "Account" });
+  await expect(name).toHaveValue("Assets:");
+  await name.pressSequentially("Bank:Green Fi Joint");
+  await expect(name).toHaveValue("Assets:Bank:Green-Fi-Joint");
+  await expect(page.getByText("also creates Assets:Bank")).toBeVisible();
+  await page.getByRole("textbox", { name: "Balance" }).fill("2,500.00");
   await page.getByLabel("Balance as of").fill("2024-01-01");
   await page.getByRole("button", { name: "Finish setup" }).click();
 
@@ -50,21 +51,50 @@ test("a new user sets up their books and first account, and lands home", async (
   await expect(card).toContainText("No imports yet");
 });
 
-test("a bank account can be kept anywhere in the ledger", async ({ page }) => {
+test("an account is added by its full name, starred onto the home page, a card showing what's owed", async ({
+  page,
+}) => {
   await setUpUser(page);
   await page.goto("/ui/accounts/new");
 
-  await page.getByRole("textbox", { name: "Account name" }).fill("Joint Checking");
-  const path = page.getByRole("combobox", { name: "Kept in the ledger as" });
-  await expect(path).toHaveValue("Assets:Bank:Joint-Checking");
-  await path.fill("Assets:Shared:Joint");
-  await expect(page.getByText("also creates Assets:Shared")).toBeVisible();
-  await page.getByRole("textbox", { name: "Account name" }).fill("Joint checking");
-  await expect(path).toHaveValue("Assets:Shared:Joint"); // edited, so it no longer follows the name
+  const name = page.getByRole("combobox", { name: "Account" });
+  await name.fill("Liabilities:Cards:Chase-Sapphire");
+  await expect(page.getByText("Liability account · also creates Liabilities:Cards")).toBeVisible();
+  await page.getByRole("textbox", { name: "Balance" }).fill("250.00");
+  await page.getByLabel("Balance as of").fill("2024-01-01");
   await page.getByRole("button", { name: "Add account" }).click();
 
-  await page.getByRole("link", { name: /Joint checking/ }).click();
-  await expect(page).toHaveURL(/accounts\/Assets%3AShared%3AJoint$/);
+  const card = page.getByRole("link", { name: /Chase Sapphire/ });
+  await expect(card).toContainText("$250.00");
+  await card.click();
+  await expect(page.getByRole("heading", { name: /Chase Sapphire/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Opening balance/ })).toContainText("$250.00");
+});
+
+test("starring and unstarring an account changes the home page", async ({ page }) => {
+  const { book, session } = await setUpUser(page);
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+    params: { path: { book_id: book.id } },
+    body: { name: "Assets:Cash", kind: "leaf", opening_balance: null },
+  });
+  await page.goto(`/ui/books/${book.id}/accounts/Assets%3ACash`);
+
+  const star = page.getByRole("button", { name: "Starred" });
+  await expect(star).toHaveAttribute("aria-pressed", "false");
+  await star.click();
+  await expect(star).toHaveAttribute("aria-pressed", "true");
+  await page.goto("/ui/");
+  await expect(page.getByRole("link", { name: /^Cash/ })).toBeVisible();
+
+  await page.getByRole("link", { name: /PNC Checking/ }).click();
+  await page.getByRole("button", { name: "Starred" }).click();
+  await expect(page.getByRole("button", { name: "Starred" })).toHaveAttribute(
+    "aria-pressed",
+    "false"
+  );
+  await page.goto("/ui/");
+  await expect(page.getByRole("link", { name: /PNC Checking/ })).toBeHidden();
+  await expect(page.getByRole("link", { name: /^Cash/ })).toBeVisible();
 });
 
 test("the menu has home, manage books, review and log out", async ({ page }) => {
@@ -202,20 +232,8 @@ test.describe("an account's ledger", () => {
   });
 
   test("imports into the account it's showing, and comes back", async ({ page }) => {
-    const { session, book } = await setUpUser(page);
-    const { data: savings } = await session.ledger.POST(
-      "/api/ledger/v1/books/{book_id}/money-accounts",
-      {
-        params: { path: { book_id: book.id } },
-        body: {
-          display_name: "PNC Savings",
-          money: "bank",
-          currency: "USD",
-          balance: "0",
-          as_of: "2024-01-01",
-        },
-      }
-    );
+    const { book } = await setUpUser(page);
+    const savings = { name: await addAccount(book.id, "Assets:Bank:PNC-Savings", "0") };
     await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(savings!.name)}`);
 
     await page.getByRole("link", { name: "Import transactions" }).click();

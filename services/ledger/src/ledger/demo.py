@@ -36,15 +36,17 @@ def generate(years: int, seed: int, today: datetime.date) -> str:
     ).stdout
 
 
-#: The demo's money account, so the home page has something to show.
-MONEY_ACCOUNT = "Assets:US:BofA:Checking"
-MONEY_META = '  money: "bank"\n  display-name: "BofA Checking"\n  institution: "Bank of America"\n'
+#: The accounts `pnpm seed` stars, so the home page has something to show, with human names.
+#: (Keep in step with `scripts/seed-demo.sh`.)
+STARRED = {"Assets:US:BofA:Checking": "BofA Checking", "Liabilities:US:Chase:Slate": "Chase Slate"}
 
 
 def demo_ledger(history: str, staged_days: int, today: datetime.date) -> str:
     """Stage the recent purchases in `history` (a Beancount ledger) and return the new ledger,
-    titled "Demo", with its checking account marked as a money account."""
-    history = re.sub(rf"^(\d{{4}}-\d\d-\d\d open {re.escape(MONEY_ACCOUNT)}\b.*\n)", rf"\1{MONEY_META}", history, count=1, flags=re.M)
+    titled "Demo", with display names on the accounts it stars."""
+    for account, name in STARRED.items():
+        meta = f'  {engine.DISPLAY_NAME_KEY}: "{name}"\n'
+        history = re.sub(rf"^(\d{{4}}-\d\d-\d\d open {re.escape(account)}\b.*\n)", rf"\g<1>{meta}", history, count=1, flags=re.M)
     parsed = engine.parse_text(history)
     since = today - datetime.timedelta(days=staged_days)
     first = min(d.date for d in parsed.directives)

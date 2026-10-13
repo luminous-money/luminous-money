@@ -1,4 +1,5 @@
-/** M1 through the real stack: sessions, owned books, money accounts, ledgers and CSV imports. */
+/** M1 and M2 through the real stack: sessions, owned books, accounts with opening balances and
+ * stars, ledgers and CSV imports. */
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { before, describe, it } from "node:test";
@@ -33,19 +34,14 @@ async function newUser() {
 async function withAccount() {
   const user = await newUser();
   const { data: book } = await user.ledger.POST("/api/ledger/v1/books", { body: { name: "Mine" } });
-  const { data: account } = await user.ledger.POST(
-    "/api/ledger/v1/books/{book_id}/money-accounts",
-    {
-      params: { path: { book_id: book!.id } },
-      body: {
-        display_name: "PNC Checking",
-        money: "bank",
-        currency: "USD",
-        balance: "1000.00",
-        as_of: "2024-01-01",
-      },
-    }
-  );
+  const { data: account } = await user.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+    params: { path: { book_id: book!.id } },
+    body: {
+      name: "Assets:Bank:PNC-Checking",
+      kind: "leaf",
+      opening_balance: { amount: "1000.00", currency: "USD", date: "2024-01-01" },
+    },
+  });
   return { user, book: book!, account: account! };
 }
 
@@ -96,15 +92,15 @@ describe("books belong to their users", () => {
   });
 });
 
-describe("money accounts and their ledgers", () => {
+describe("accounts, stars and ledgers", () => {
   before(stackIsUp);
 
-  it("open with an opening balance, list with balances, and page their ledgers", async () => {
+  it("open with an opening balance, summarize with balances, and page their ledgers", async () => {
     const { user, book, account } = await withAccount();
 
     const { data: listed } = await user.ledger.GET(
-      "/api/ledger/v1/books/{book_id}/money-accounts",
-      { params: { path: { book_id: book.id } } }
+      "/api/ledger/v1/books/{book_id}/accounts/summary",
+      { params: { path: { book_id: book.id }, query: { account: [account.name] } } }
     );
     const { data: page } = await user.ledger.GET(
       "/api/ledger/v1/books/{book_id}/accounts/{account}/ledger",
@@ -115,13 +111,27 @@ describe("money accounts and their ledgers", () => {
 
     assert.equal(account.name, "Assets:Bank:PNC-Checking");
     assert.deepEqual(
-      listed?.map((a) => [a.display_name, a.balance]),
-      [["PNC Checking", [{ number: "1000.00", currency: "USD" }]]]
+      listed?.map((a) => [a.name, a.as_of, a.balance]),
+      [[account.name, "2024-01-01", [{ number: "1000.00", currency: "USD" }]]]
     );
     assert.deepEqual(
       page?.rows.map((r) => [r.narration, r.counterpart, r.balance?.number]),
       [["Opening balance", "Equity:Opening-Balances", "1000.00"]]
     );
+  });
+});
+
+describe("stars", () => {
+  before(stackIsUp);
+
+  it("are each user's own, and set and cleared by account", async () => {
+    const { user, book, account } = await withAccount();
+    const path = `/books/${book.id}/stars/${encodeURIComponent(account.name)}`;
+
+    assert.deepEqual(await (await user.app(path, { method: "PUT" })).json(), [account.name]);
+    assert.deepEqual(await (await user.app(`/books/${book.id}/stars`)).json(), [account.name]);
+    assert.equal((await (await newUser()).app(`/books/${book.id}/stars`)).status, 404);
+    assert.deepEqual(await (await user.app(path, { method: "DELETE" })).json(), []);
   });
 });
 
@@ -246,10 +256,11 @@ describe("importing CSVs", () => {
       }
     );
     assert.equal(moved.response.status, 200);
-    const { data: money } = await user.ledger.GET("/api/ledger/v1/books/{book_id}/money-accounts", {
-      params: { path: { book_id: book.id } },
-    });
-    assert.deepEqual([money![0]!.open, money![0]!.as_of], ["2023-12-01", "2023-12-01"]);
+    const { data: summary } = await user.ledger.GET(
+      "/api/ledger/v1/books/{book_id}/accounts/summary",
+      { params: { path: { book_id: book.id }, query: { account: [account.name] } } }
+    );
+    assert.deepEqual([summary![0]!.open, summary![0]!.as_of], ["2023-12-01", "2023-12-01"]);
 
     assert.deepEqual(await outcomes(), ["staged", "staged"]);
     const { data: problems } = await user.ledger.GET("/api/ledger/v1/books/{book_id}/problems", {

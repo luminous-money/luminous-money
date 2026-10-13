@@ -126,27 +126,41 @@ export async function problems(book: string) {
   return data!;
 }
 
-/** A new user with a book and one bank account (opened 2024-01-01 at 1,000.00), ready to use. */
+/** Call the app API as the current session's user. */
+export function app(path: string, init: RequestInit = {}) {
+  return fetch(`${BASE_URL}/api/app/v1${path}`, {
+    ...init,
+    headers: {
+      authorization: `Bearer ${current.token}`,
+      ...(init.headers as Record<string, string>),
+    },
+  });
+}
+
+/** Add a starred account to `book`, with an opening balance on 2024-01-01 if `balance` is given. */
+export async function addAccount(book: string, account: string, balance: string | null) {
+  await current.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+    params: { path: { book_id: book } },
+    body: {
+      name: account,
+      kind: "leaf",
+      opening_balance:
+        balance === null ? null : { amount: balance, currency: "USD", date: "2024-01-01" },
+    },
+  });
+  await app(`/books/${book}/stars/${encodeURIComponent(account)}`, { method: "PUT" });
+  return account;
+}
+
+/** A new user with a book and one starred bank account (opened 2024-01-01 at 1,000.00). */
 export async function setUpUser(
   page: Page,
-  { name = "Kael Personal", account = "PNC Checking" } = {}
+  { name = "Kael Personal", account = "Assets:Bank:PNC-Checking" } = {}
 ) {
   const session = await logIn(page);
   const { data: book } = await session.ledger.POST("/api/ledger/v1/books", { body: { name } });
-  const { data: money } = await session.ledger.POST(
-    "/api/ledger/v1/books/{book_id}/money-accounts",
-    {
-      params: { path: { book_id: book!.id } },
-      body: {
-        display_name: account,
-        money: "bank",
-        currency: "USD",
-        balance: "1000.00",
-        as_of: "2024-01-01",
-      },
-    }
-  );
-  return { session, book: book!, account: money!.name };
+  await addAccount(book!.id, account, "1000.00");
+  return { session, book: book!, account };
 }
 
 /** Add transactions to an account in one write, `count` of them, a day apart from 2024-02-01. */

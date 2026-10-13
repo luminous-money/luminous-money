@@ -11,7 +11,7 @@
 import type {
   Account,
   Book,
-  MoneyAccountIn,
+  AccountIn,
   Transaction,
   TransactionIn,
 } from "@fava-beans/ledger-client";
@@ -27,7 +27,7 @@ import {
 
 import type { AccountCreation } from "../components/AccountPicker.js";
 import { appApi, type CsvProfile } from "./appApi.js";
-import { api, ApiError, type AccountKind, type TransactionChanges } from "./ledger.js";
+import { api, ApiError, type TransactionChanges } from "./ledger.js";
 import { logIn, logOut, me, type User } from "./session.js";
 
 /** A 401 from anywhere means the session is over: forget the user, and the app shows login. */
@@ -51,7 +51,8 @@ export const keys = {
   books: ["books"] as const,
   book: (book: string) => ["book", book] as const,
   accounts: (book: string) => ["book", book, "accounts"] as const,
-  money: (book: string) => ["book", book, "money"] as const,
+  summary: (book: string, accounts: string[]) => ["book", book, "summary", ...accounts] as const,
+  stars: (book: string) => ["book", book, "stars"] as const,
   lastImports: (book: string) => ["book", book, "last-imports"] as const,
   ledger: (book: string, account: string) => ["book", book, "ledger", account] as const,
   profiles: (book: string, account: string) => ["book", book, "profiles", account] as const,
@@ -128,18 +129,50 @@ export function useRenameBook() {
 
 // Money accounts, ledgers and imports
 
-export function useMoneyAccounts(book: string | undefined) {
+/** Accounts with their balances and opening-balance dates, in the order asked. */
+export function useSummary(book: string, accounts: string[] | undefined) {
   return useQuery({
-    queryKey: keys.money(book ?? ""),
-    queryFn: () => api.moneyAccounts(book!),
-    enabled: !!book,
+    queryKey: keys.summary(book, accounts ?? []),
+    queryFn: () => (accounts!.length ? api.summary(book, accounts!) : []),
+    enabled: !!accounts,
   });
 }
 
-export function useCreateMoneyAccount(book: string) {
+export function useStars(book: string) {
+  return useQuery({ queryKey: keys.stars(book), queryFn: () => appApi.stars(book) });
+}
+
+export function useSetStar(book: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (account: MoneyAccountIn) => api.createMoneyAccount(book, account),
+    mutationFn: ({ account, starred }: { account: string; starred: boolean }) =>
+      appApi.setStar(book, account, starred),
+    onSuccess: (stars) => client.setQueryData(keys.stars(book), stars),
+  });
+}
+
+/** The user's starred accounts, summarized: the home page. */
+export function useStarredAccounts(book: string) {
+  const stars = useStars(book);
+  const summary = useSummary(book, stars.data);
+  return {
+    data: summary.data,
+    isPending: stars.isPending || summary.isPending,
+    error: stars.error ?? summary.error,
+  };
+}
+
+/** Add an account (with an optional opening balance), and star it. */
+export function useAddAccount(book: string) {
+  const create = useCreateAccount(book);
+  const star = useSetStar(book);
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (account: AccountIn) => {
+      const created = await create.mutateAsync(account);
+      await star.mutateAsync({ account: created.name, starred: true });
+      return created;
+    },
     onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
   });
 }
@@ -234,7 +267,7 @@ function remember(book: string, saved: Transaction) {
   queryClient.setQueryData<Transaction[]>(keys.queue(book), (queue) =>
     queue?.flatMap((t) => (t.id !== saved.id ? [t] : saved.flag === "!" ? [saved] : []))
   );
-  void queryClient.invalidateQueries({ queryKey: keys.money(book) });
+  void queryClient.invalidateQueries({ queryKey: ["book", book, "summary"] });
   void queryClient.invalidateQueries({ queryKey: ["book", book, "ledger"] });
 }
 
@@ -258,8 +291,7 @@ export function useEditTransaction(book: string, id: string) {
 export function useCreateAccount(book: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, kind }: { name: string; kind: AccountKind }) =>
-      api.createAccount(book, name, kind),
+    mutationFn: (account: AccountIn) => api.createAccount(book, account),
     onSuccess: (account) => {
       client.setQueryData<Account[]>(
         keys.accounts(book),

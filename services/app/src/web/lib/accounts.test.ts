@@ -2,6 +2,7 @@ import type { Account } from "@fava-beans/ledger-client";
 import { describe, expect, it } from "vitest";
 
 import {
+  displayName,
   checkNewAccount,
   completeWith,
   completions,
@@ -11,6 +12,7 @@ import {
   preferredRoots,
   search,
   shortName,
+  shown,
   suggestName,
   toSegment,
 } from "./accounts.js";
@@ -210,4 +212,19 @@ describe("typing a new account's name", () => {
 it("short names keep the last two segments", () => {
   expect(shortName("Expenses:Food:Restaurant")).toBe("Food:Restaurant");
   expect(shortName("Assets:Cash")).toBe("Assets:Cash");
+});
+
+it("display names: display-name metadata, else the last segment with dashes as spaces", () => {
+  expect(displayName({ name: "Assets:Bank:PNC-Shared-Checking" })).toBe("PNC Shared Checking");
+  expect(displayName({ name: "Assets:Bank:X", display_name: "BofA Checking" })).toBe(
+    "BofA Checking"
+  );
+});
+
+it("liabilities and income are shown with their signs flipped", () => {
+  expect(shown("-250.00", "liability")).toBe("250.00");
+  expect(shown("-3000.00", "income")).toBe("3000.00");
+  expect(shown("-4.50", "asset")).toBe("-4.50");
+  expect(shown("12.00", "expense")).toBe("12.00");
+  expect(shown("12.00", undefined)).toBe("12.00");
 });

@@ -73,6 +73,27 @@ export function createApi({
     return c.json(db.profiles(book, account), 201);
   });
 
+  /** The caller's starred accounts in the book: what their home page shows. */
+  api.get("/books/:book/stars", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    return c.json(db.stars(c.get("user"), book));
+  });
+
+  api.put("/books/:book/stars/:account", async (c) => {
+    const { book, account } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    db.star(c.get("user"), book, account);
+    return c.json(db.stars(c.get("user"), book));
+  });
+
+  api.delete("/books/:book/stars/:account", async (c) => {
+    const { book, account } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    db.unstar(c.get("user"), book, account);
+    return c.json(db.stars(c.get("user"), book));
+  });
+
   /** Import a file: multipart form data with `account` and `file`. */
   api.post("/books/:book/imports", async (c) => {
     const { book } = c.req.param();

@@ -4,12 +4,14 @@ import { Link } from "wouter";
 
 import { ImportResults } from "../components/ImportResults.js";
 import { ProfileEditor } from "../components/ProfileEditor.js";
+import { displayName } from "../lib/accounts.js";
 import { ImportError, type ImportResult } from "../lib/appApi.js";
 import { useBack, useParam } from "../lib/navigation.js";
 import {
   explain,
   useImport,
-  useMoneyAccounts,
+  useAccounts,
+  useStars,
   useProfiles,
   useSaveProfile,
 } from "../lib/queries.js";
@@ -28,14 +30,19 @@ type Stage =
  * is profiled first (how its columns map to ours), and the profile is saved for next time. A
  * file that fits none of the account's saved profiles asks whether it's really for this account,
  * and if so, profiles it to replace the saved ones or to add to them.
+ * Any open leaf account can be imported into; starred ones are listed first.
  * `?account=` picks the account to start with; `?back=` is where "‹ Back" goes.
  */
 export function Import({ book }: { book: string }) {
-  const accounts = useMoneyAccounts(book);
+  const all = useAccounts(book);
+  const stars = useStars(book);
+  const open = (all.data ?? []).filter((a) => a.kind === "leaf" && !a.implicit && !a.close);
+  const starred = (stars.data ?? []).flatMap((name) => open.filter((a) => a.name === name));
+  const others = open.filter((a) => !stars.data?.includes(a.name));
   const back = useBack("/");
   const preset = useParam("account");
   const [account, setAccount] = useState(preset ?? "");
-  const chosen = account || accounts.data?.[0]?.name || "";
+  const chosen = account || starred[0]?.name || others[0]?.name || "";
   const profiles = useProfiles(book, chosen || undefined);
   const saved = profiles.data?.length ?? 0;
   const save = useSaveProfile(book);
@@ -43,7 +50,7 @@ export function Import({ book }: { book: string }) {
   const [stage, setStage] = useState<Stage>({ kind: "choose" });
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const target = accounts.data?.find((a) => a.name === chosen);
+  const target = open.find((a) => a.name === chosen);
   const currency = target?.currencies?.[0] ?? "USD";
 
   const start = async (file: File) => {
@@ -102,7 +109,7 @@ export function Import({ book }: { book: string }) {
           <p>
             The uploaded file doesn't match{" "}
             {saved > 1 ? "any of the saved formats" : "the saved format"} for this account. Are you
-            sure this file is for the account '{target?.display_name ?? chosen}'?
+            sure this file is for the account '{displayName(target ?? { name: chosen })}'?
           </p>
           <div className="choices">
             <button type="button" onClick={() => void profileFile(stage.file, "replace")}>
@@ -121,6 +128,7 @@ export function Import({ book }: { book: string }) {
           text={stage.text}
           initial={stage.guess}
           currency={currency}
+          type={target?.type}
           busy={save.isPending || run.isPending}
           onCancel={() => setStage({ kind: "choose" })}
           onSave={async (p) => {
@@ -137,11 +145,22 @@ export function Import({ book }: { book: string }) {
               value={chosen}
               onChange={(e) => setAccount(e.target.value)}
             >
-              {accounts.data?.map((a) => (
-                <option key={a.name} value={a.name}>
-                  {a.display_name ?? a.name}
-                </option>
-              ))}
+              {starred.length > 0 && (
+                <optgroup label="Starred">
+                  {starred.map((a) => (
+                    <option key={a.name} value={a.name}>
+                      {displayName(a)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label={starred.length ? "Other accounts" : "Accounts"}>
+                {others.map((a) => (
+                  <option key={a.name} value={a.name}>
+                    {a.name}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </label>
           {chosen && !profiles.isPending && (
@@ -175,7 +194,7 @@ export function Import({ book }: { book: string }) {
             </span>
           </label>
           {error && <p className="error">{error}</p>}
-          {accounts.data?.length === 0 && (
+          {all.data && open.length === 0 && (
             <p className="muted">
               No accounts to import into yet. <Link href="/accounts/new">Add one</Link>
             </p>

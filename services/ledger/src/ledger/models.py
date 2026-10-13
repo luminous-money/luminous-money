@@ -127,34 +127,27 @@ class Account(Api):
     open: datetime.date | None = None
     close: datetime.date | None = None
     currencies: list[str] = Field(default_factory=list, description="Constraint from the open directive; empty means any.")
-    money: str | None = Field(None, description="Held at a real institution: the kind of account (`bank`, ...).")
-    display_name: str | None = None
-    institution: str | None = None
+    display_name: str | None = Field(None, description="A human name, from `display-name` metadata if set.")
 
 
-class MoneyAccount(Account):
+class AccountSummary(Account):
+    """An account with what a card or a ledger's header shows."""
+
     balance: list[Amount] = Field(
         description="The current balance, pending transactions included: one amount per currency held."
     )
-    as_of: datetime.date = Field(
-        description="The date of its opening balance, which includes everything up to then. Imports skip rows up to it."
+    as_of: datetime.date | None = Field(
+        description="The date of its opening balance, which includes everything up to then (imports skip rows up "
+        "to it); None without one."
     )
 
 
-class MoneyAccountIn(Strict):
-    """A money account to add: a bank account, for now."""
+class OpeningBalance(Strict):
+    """An account's balance on a date, from a statement: recorded as an opening-balance transaction."""
 
-    display_name: str = Field(min_length=1, description='A human name, e.g. "PNC Checking".')
-    name: str | None = Field(
-        None,
-        description="The account's fully qualified name: anything the account rules allow. Defaults to "
-        "`Assets:Bank:<display name>`, with dashes for spaces.",
-    )
-    money: Literal["bank"] = "bank"
-    institution: str | None = None
+    amount: DecimalStr = Field(description="The balance at the end of `date`, as stored (negative on a liability).")
     currency: str = "USD"
-    balance: DecimalStr = Field("0", description="The balance at the end of `as_of`, recorded as an opening balance.")
-    as_of: datetime.date = Field(description="The date `balance` was the balance; the account opens then.")
+    date: datetime.date
 
 
 class LedgerRow(Api):
@@ -185,8 +178,11 @@ class AccountIn(Strict):
     kind: AccountKind = "leaf"
     open: datetime.date | None = Field(
         None,
-        description="Defaults to when the nearest opened ancestor opened, else the earliest account under it, "
-        "else the book's first entry.",
+        description="Defaults to the opening balance's date if there is one, else when the nearest opened "
+        "ancestor opened, else the earliest account under it, else the book's first entry.",
+    )
+    opening_balance: OpeningBalance | None = Field(
+        None, description="A leaf's balance on a date, recorded as an opening-balance transaction."
     )
 
 

@@ -61,6 +61,16 @@ export const appApi = {
     return json(await fetch(`${base(book)}/imports`, { method: "POST", body: form }));
   },
 
+  /** The caller's starred accounts in the book, in the order they were starred. */
+  stars: async (book: string): Promise<string[]> => json(await fetch(`${base(book)}/stars`)),
+
+  setStar: async (book: string, account: string, starred: boolean): Promise<string[]> =>
+    json(
+      await fetch(`${base(book)}/stars/${encodeURIComponent(account)}`, {
+        method: starred ? "PUT" : "DELETE",
+      })
+    ),
+
   lastImports: async (book: string): Promise<Record<string, string>> =>
     json(await fetch(`${base(book)}/imports/latest`)),
 

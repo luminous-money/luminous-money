@@ -1,4 +1,4 @@
-"""Money accounts, balances from SQL, and account ledgers (M1)."""
+"""Opening balances, account summaries, balances from SQL, and account ledgers (M1, M2)."""
 
 import datetime
 from decimal import Decimal
@@ -17,8 +17,16 @@ def book(ledger):
     return ledger
 
 
-def bank(ledger, name="PNC Checking", balance="1000.00", as_of=datetime.date(2024, 1, 1), **extra):
-    return ledger.create_money_account("book", models.MoneyAccountIn(display_name=name, balance=balance, as_of=as_of, **extra))
+def bank(ledger, name="Assets:Bank:PNC-Checking", balance="1000.00", as_of=datetime.date(2024, 1, 1)):
+    """An account with an opening balance, summarized."""
+    opening = models.OpeningBalance(amount=balance, date=as_of)
+    ledger.create_account("book", models.AccountIn(name=name, opening_balance=opening))
+    return summary(ledger, name)
+
+
+def summary(ledger, name="Assets:Bank:PNC-Checking"):
+    [found] = ledger.summary("book", [name])
+    return found
 
 
 def spend(ledger, account, amount, date="2024-01-10", flag="*", narration="Groceries", other="Expenses:Food"):
@@ -36,18 +44,16 @@ def spend(ledger, account, amount, date="2024-01-10", flag="*", narration="Groce
     )
 
 
-def test_a_bank_account_opens_under_assets_bank_with_its_opening_balance(book):
-    account = bank(book, institution="PNC")
+def test_an_opening_balance_opens_the_account_on_its_date_with_that_balance(book):
+    account = bank(book)
 
     assert account.name == "Assets:Bank:PNC-Checking"
-    assert (account.money, account.display_name, account.institution) == ("bank", "PNC Checking", "PNC")
-    assert account.open == datetime.date(2024, 1, 1)
+    assert (account.open, account.as_of) == (datetime.date(2024, 1, 1), datetime.date(2024, 1, 1))
     assert account.currencies == ["USD"]
     assert account.balance == [models.Amount(number="1000.00", currency="USD")]
     assert {a.name: a.kind for a in book.accounts("book")}["Assets:Bank"] == "node"
     assert "Equity:Opening-Balances" in {a.name for a in book.accounts("book") if not a.implicit}
     assert book.problems("book") == []
-
 
 def test_a_zero_balance_still_gets_an_opening_transaction_to_date_it(book):
     account = bank(book, balance="0")
@@ -68,7 +74,7 @@ def test_moving_the_opening_balance_back_moves_the_account_open_and_its_as_of(bo
 
     book.patch_transaction("book", opening.id, models.TransactionPatch(date="2023-08-02", updated_at=opening.updated_at))
 
-    account = book.money_accounts("book")[0]
+    account = summary(book)
     assert (account.open, account.as_of) == (datetime.date(2023, 8, 2), datetime.date(2023, 8, 2))
     assert book.problems("book") == []
 
@@ -98,7 +104,7 @@ def test_moving_the_opening_balance_forward_moves_the_as_of_but_not_the_open(boo
 
     book.patch_transaction("book", opening.id, models.TransactionPatch(date="2024-02-01", updated_at=opening.updated_at))
 
-    account = book.money_accounts("book")[0]
+    account = summary(book)
     assert (account.open, account.as_of) == (datetime.date(2024, 1, 1), datetime.date(2024, 2, 1))
 
 
@@ -124,39 +130,36 @@ def test_any_posting_before_its_account_opens_moves_the_open_back_to_meet_it(boo
     opens = {a.name: a.open for a in book.accounts("book")}
     assert opens[account] == opens["Expenses:Coffee"] == datetime.date(2023, 11, 15)
     assert opens["Expenses:Food"] == datetime.date(2020, 1, 1)  # untouched: already open
-    assert book.money_accounts("book")[0].as_of == datetime.date(2024, 1, 1)  # still the opening balance
+    assert summary(book).as_of == datetime.date(2024, 1, 1)  # still the opening balance
     assert book.problems("book") == []
 
 
-def test_a_bank_account_can_be_kept_anywhere_the_account_rules_allow(book):
-    account = book.create_money_account(
-        "book",
-        models.MoneyAccountIn(display_name="Joint Checking", name="Assets:Shared:Checking", balance="5", as_of=datetime.date(2024, 1, 1)),
-    )
+def test_any_account_can_have_an_opening_balance_but_only_a_leaf(book):
+    card = bank(book, name="Liabilities:Cards:Chase", balance="-250.00")
 
-    assert (account.name, account.display_name) == ("Assets:Shared:Checking", "Joint Checking")
-    assert {a.name: a.kind for a in book.accounts("book")}["Assets:Shared"] == "node"
+    assert card.balance == [models.Amount(number="-250.00", currency="USD")]
+    assert card.type == "liability"
     with pytest.raises(engine.ParseFailure):
-        book.create_money_account(
-            "book", models.MoneyAccountIn(display_name="Bad", name="Checking", as_of=datetime.date(2024, 1, 1))
+        book.create_account(
+            "book",
+            models.AccountIn(
+                name="Assets:Shared", kind="node", opening_balance=models.OpeningBalance(amount="1", date="2024-01-01")
+            ),
         )
 
+def test_an_account_without_an_opening_balance_has_no_as_of(book):
+    book.create_account("book", models.AccountIn(name="Assets:Cash"))
 
-def test_names_with_quotes_survive_and_duplicates_are_refused(book):
-    account = bank(book, name='Joint "Rainy Day" fund')
+    assert summary(book, "Assets:Cash").as_of is None
+    assert summary(book, "Assets:Cash").balance == []
 
-    assert account.name == "Assets:Bank:Joint-Rainy-Day-fund"
-    assert account.display_name == 'Joint "Rainy Day" fund'
-    with pytest.raises(ValueError):
-        bank(book, name='Joint "Rainy Day" fund')
-
-
-def test_only_open_money_accounts_are_listed(book):
+def test_summaries_are_of_the_accounts_asked_for_in_order(book):
     bank(book)
     book.create_account("book", models.AccountIn(name="Assets:Cash"))
 
-    assert [a.name for a in book.money_accounts("book")] == ["Assets:Bank:PNC-Checking"]
+    found = book.summary("book", ["Assets:Cash", "Assets:Nope", "Assets:Bank:PNC-Checking", "Assets:Cash"])
 
+    assert [a.name for a in found] == ["Assets:Cash", "Assets:Bank:PNC-Checking"]
 
 def test_balances_include_pending_and_fill_in_elided_amounts(book):
     account = bank(book).name
@@ -262,22 +265,23 @@ def test_batches_are_all_or_nothing(book):
     assert len(book.account_ledger("book", account).rows) == 3
 
 
-def test_money_accounts_and_ledgers_over_http(book):
+def test_opening_balances_summaries_and_ledgers_over_http(book):
     client = http(book)
 
     created = client.post(
-        "/api/ledger/v1/books/book/money-accounts",
-        json={"display_name": "PNC Checking", "balance": "500.00", "as_of": "2024-01-01"},
+        "/api/ledger/v1/books/book/accounts",
+        json={"name": "Assets:Bank:PNC-Checking", "opening_balance": {"amount": "500.00", "date": "2024-01-01"}},
     )
-    listed = client.get("/api/ledger/v1/books/book/money-accounts").json()
+    listed = client.get(
+        "/api/ledger/v1/books/book/accounts/summary", params=[("account", "Assets:Bank:PNC-Checking")]
+    ).json()
     page = client.get("/api/ledger/v1/books/book/accounts/Assets:Bank:PNC-Checking/ledger", params={"limit": 10}).json()
 
     assert created.status_code == 201
-    assert [a["display_name"] for a in listed] == ["PNC Checking"]
+    assert [(a["name"], a["as_of"]) for a in listed] == [("Assets:Bank:PNC-Checking", "2024-01-01")]
     assert listed[0]["balance"] == [{"number": "500.00", "currency": "USD"}]
     assert page["rows"][0]["narration"] == "Opening balance"
     assert page["next_cursor"] is None
-
 
 def test_segments_from_human_names():
     assert engine.segment("PNC checking") == "PNC-checking"
