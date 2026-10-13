@@ -120,7 +120,35 @@ import the bank's rent row, and it matches.
 - **Projected balances** and future occurrences in ledgers: see the questions.
 - **Holiday calendars.**
 
-## Questions
+## Answers (2026-10-13), being built
+
+- **The generator runs daily** (not hourly): at startup, after edits, and once a day, just after
+  midnight in each book's time zone.
+- **Creating a schedule** stages every occurrence from its start through today (as built).
+- **Match tolerance per split** (question 1): each split of a template can carry a tolerance, an
+  amount either way, default 0, set in the schedule editor. An imported row matches a
+  scheduled transaction's split if it's within that tolerance. On confirming the match, the
+  bank's amount replaces the split's, and the blank split (if any) absorbs the difference.
+- **Upcoming occurrences show in ledgers** as grayed rows above the transactions, with a
+  projected running balance (question 2).
+- **Confirm automatically,** per schedule (question 3): its occurrences are staged confirmed.
+- **Time zone is a book setting,** in `app`, defaulting to the browser's when the book is
+  created (question 4); the generator and "upcoming" use it.
+- **No rules beyond the current ones** (question 6).
+- **"Not this time"** (question 7), distinct from review's "Skip" (which only puts a card off):
+  - the schedule's `last_applied` date (was `generated_through`) is the last nominal date it ran
+    for; the generator starts after it, or at the start date if it has never run
+  - "Not this time" deletes a pending occurrence; it doesn't come back, since the schedule
+    already ran for that date
+  - **editing a schedule** resets `last_applied` to now (yesterday, so today's occurrence is
+    staged by the edited schedule), and deletes its unconfirmed occurrences dated today or
+    later (except ones an import already matched), so they're staged again as edited
+- **Deleting a schedule** keeps what it staged, without ↻ marks (question 8: fine).
+
+## Questions (first pass)
+
+The questions as first asked, answered above.
+
 
 Decided by best guess in the first pass, or left out. Most consequential first.
 
