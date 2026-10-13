@@ -1,7 +1,7 @@
 /** M3: schedules made with "Repeat…", staging occurrences marked in the ledger. */
 import { expect, test } from "@playwright/test";
 
-import { setUpUser } from "./support.js";
+import { app, setUpUser } from "./support.js";
 
 const day = (offset: number) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);
 
@@ -77,4 +77,75 @@ test("a schedule can be edited from the list, paused, and deleted", async ({ pag
   page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText("No schedules yet")).toBeVisible();
+});
+
+/** A monthly rent schedule on `account` starting `start`, made through the API. */
+async function scheduleRent(book: string, account: string, start: string) {
+  await app(`/books/${book}/schedules`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Rent",
+      rule: { every: 1, unit: "month", days: [], start, until: null, weekend: "keep" },
+      template: {
+        payee: "Landlord",
+        narration: "Rent",
+        tags: [],
+        links: [],
+        meta: {},
+        postings: [
+          { account, units: { number: "-1500.00", currency: "USD" } },
+          { account: "Equity:Opening-Balances", units: null },
+        ],
+      },
+    }),
+  });
+}
+
+test("upcoming occurrences show grayed in the ledger, with the projected balance", async ({
+  page,
+}) => {
+  const { book, account } = await setUpUser(page);
+  await scheduleRent(book.id, account, day(5));
+
+  await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
+
+  const upcoming = page.getByRole("list", { name: "Upcoming" });
+  await expect(upcoming.getByRole("listitem")).toHaveCount(1);
+  await expect(upcoming).toContainText(day(5));
+  await expect(upcoming).toContainText("projected −$500.00");
+});
+
+test("Not this time drops a scheduled occurrence for good", async ({ page }) => {
+  const { book, account } = await setUpUser(page);
+  await scheduleRent(book.id, account, day(0));
+  await page.goto(`/ui/books/${book.id}/review`);
+
+  const card = page.getByRole("article").filter({ hasText: "From a schedule" });
+  await expect(card).toHaveCount(1);
+  await card.getByRole("button", { name: "Not this time" }).click();
+  await expect(card).toHaveCount(0);
+
+  await app(`/books/${book.id}/schedules/run`, { method: "POST" });
+  await page.reload();
+  await expect(page.getByText("All caught up")).toBeVisible();
+});
+
+test("a schedule's splits take a match tolerance; a book's time zone can be set", async ({
+  page,
+}) => {
+  const { book } = await setUpUser(page);
+  await page.goto(`/ui/books/${book.id}/schedules/new`);
+
+  await expect(page.getByRole("textbox", { name: "Match tolerance" })).toHaveCount(0);
+  await page.getByRole("textbox", { name: "Amount" }).first().fill("-20.00");
+  await expect(page.getByRole("textbox", { name: "Match tolerance" })).toHaveCount(1);
+  await page.getByRole("textbox", { name: "Match tolerance" }).fill("abc");
+  await expect(page.getByText("A match tolerance is an amount")).toBeVisible();
+
+  await page.goto("/ui/books");
+  const zone = page.getByRole("combobox", { name: "Time zone" });
+  await zone.selectOption("America/Chicago");
+  await page.reload();
+  await expect(zone).toHaveValue("America/Chicago");
 });

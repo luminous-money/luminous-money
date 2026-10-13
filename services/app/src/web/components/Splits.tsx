@@ -12,37 +12,47 @@ type Row = {
   account: string;
   number: string;
   currency: string;
+  /** A schedule's match tolerance for the split (see `SplitsFieldset`'s `tolerances`). */
+  tolerance: string;
   original: Partial<Posting>;
 };
+
+/** A posting, with a schedule's match tolerance if it has one. */
+type Split = Posting & { tolerance?: string | null };
 
 let nextKey = 0;
 
 /** Blank amounts get the transaction's currency, so typing a number into one just works. */
-function toRows(postings: Posting[], currency: string): Row[] {
-  return postings.map((p) => ({
+function toRows(postings: Split[], currency: string): Row[] {
+  return postings.map(({ tolerance, ...p }) => ({
     key: nextKey++,
     account: p.account,
     number: p.units?.number ?? "",
     currency: p.units?.currency ?? currency,
+    tolerance: tolerance ?? "",
     original: p,
   }));
 }
 
-function toPostings(rows: Row[]): Posting[] {
+function toPostings(rows: Row[]): Split[] {
   return rows.map((r) => ({
     ...r.original,
     account: r.account,
     units: r.number.trim() ? { number: r.number.trim(), currency: r.currency.trim() } : null,
+    ...(r.tolerance.trim() ? { tolerance: r.tolerance.trim() } : {}),
   }));
 }
 
 /** A transaction's splits being edited: the rows, the postings they make, and whether they
  * balance. Reset whenever `postings` changes (a saved or refreshed transaction). */
-export function useSplits(postings: Posting[], currency: string) {
+export function useSplits(postings: Split[], currency: string) {
   const [rows, setRows] = useState(() => toRows(postings, currency));
   useEffect(() => setRows(toRows(postings, currency)), [postings, currency]);
   const badAmount = rows.some(
     (r) => r.number.trim() && (!isDecimal(r.number.trim()) || !r.currency.trim())
+  );
+  const badTolerance = rows.some(
+    (r) => r.tolerance.trim() && !/^\d+(\.\d+)?$/.test(r.tolerance.trim())
   );
   const edited = toPostings(rows);
   const balance = badAmount
@@ -50,7 +60,9 @@ export function useSplits(postings: Posting[], currency: string) {
         state: "invalid",
         message: "Amounts must be numbers like 12.50, with a currency",
       } as const)
-    : checkBalance(edited);
+    : badTolerance
+      ? ({ state: "invalid", message: "A match tolerance is an amount, like 25.00" } as const)
+      : checkBalance(edited);
   return {
     rows,
     setRows,
@@ -68,11 +80,15 @@ export function SplitsFieldset({
   splits,
   accounts,
   create,
+  tolerances = false,
 }: {
   splits: Splits;
   /** Accounts the splits can use. */
   accounts: string[];
   create?: AccountCreation;
+  /** Edit each split's match tolerance (schedules): how far a bank's amount may be from it, either
+   * way, and still match. */
+  tolerances?: boolean;
 }) {
   const { rows, setRows, currency, balance } = splits;
   const update = (key: number, change: Partial<Row>) =>
@@ -115,6 +131,18 @@ export function SplitsFieldset({
               ×
             </button>
           </div>
+          {tolerances && r.number.trim() && (
+            <label className="tolerance small">
+              Match within ±
+              <input
+                aria-label="Match tolerance"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={r.tolerance}
+                onChange={(e) => update(r.key, { tolerance: e.target.value })}
+              />
+            </label>
+          )}
           {(r.original.cost || r.original.price) && (
             <p className="muted small">
               Has a {r.original.cost ? "cost basis" : "price"}; kept as is.
@@ -127,7 +155,7 @@ export function SplitsFieldset({
         onClick={() =>
           setRows((all) => [
             ...all,
-            { key: nextKey++, account: "", number: "", currency, original: {} },
+            { key: nextKey++, account: "", number: "", currency, tolerance: "", original: {} },
           ])
         }
       >

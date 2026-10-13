@@ -143,6 +143,7 @@ function Form({
   const [until, setUntil] = useState(initial.rule.until ?? "");
   const [weekend, setWeekend] = useState<Weekend>(initial.rule.weekend);
   const [paused, setPaused] = useState(schedule?.paused ?? false);
+  const [autoConfirm, setAutoConfirm] = useState(schedule?.auto_confirm ?? false);
   const [error, setError] = useState<string | null>(null);
   const postings = useMemo(
     () => initial.template.postings as Transaction["postings"],
@@ -186,9 +187,16 @@ function Form({
         schedule
           ? {
               id: schedule.id,
-              schedule: { updated_at: schedule.updated_at, name, rule, template, paused },
+              schedule: {
+                updated_at: schedule.updated_at,
+                name,
+                rule,
+                template,
+                paused,
+                auto_confirm: autoConfirm,
+              },
             }
-          : { schedule: { name, rule, template, paused } }
+          : { schedule: { name, rule, template, paused, auto_confirm: autoConfirm } }
       );
       navigate(`/books/${book}/schedules`);
     } catch (e) {
@@ -268,7 +276,21 @@ function Form({
         Description
         <input value={narration} onChange={(e) => setNarration(e.target.value)} />
       </label>
-      <SplitsFieldset splits={splits} accounts={names} create={create} />
+      <SplitsFieldset splits={splits} accounts={names} create={create} tolerances />
+      <p className="muted small">
+        A match tolerance lets a bank&apos;s amount within it match the split; on confirming the
+        match, the bank&apos;s amount replaces the split&apos;s, and the blank split absorbs the
+        difference.
+      </p>
+
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={autoConfirm}
+          onChange={(e) => setAutoConfirm(e.target.checked)}
+        />
+        Confirm automatically (no review needed)
+      </label>
 
       <label className="check">
         <input type="checkbox" checked={paused} onChange={(e) => setPaused(e.target.checked)} />

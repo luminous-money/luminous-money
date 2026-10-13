@@ -1121,3 +1121,47 @@ main a:not(.button):not(.card):not(.back):not(.menu-item) {
   color: var(--green);
   font-style: normal;
 }
+
+.scheduled-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0.5rem 0 0;
+}
+
+button.plain {
+  border: 0;
+  background: none;
+  padding: 0.25rem 0;
+  min-height: 0;
+  color: var(--green);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tolerance {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+}
+
+.tolerance input {
+  max-width: 7rem;
+}
+
+/* Upcoming occurrences in a ledger: grayed, above the transactions */
+
+.upcoming-rows {
+  margin-bottom: 0.75rem;
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.time-zone {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-basis: 100%;
+  color: var(--muted);
+}

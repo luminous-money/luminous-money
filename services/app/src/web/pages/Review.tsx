@@ -5,7 +5,7 @@ import { Link } from "wouter";
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
 import { Swipeable, type SwipeHandle } from "../components/Swipeable.js";
 import { postable, preferredRoots, shortName } from "../lib/accounts.js";
-import { formatMoney, isNegative } from "../lib/decimal.js";
+import { add, formatMoney, isNegative, isZero, negate } from "../lib/decimal.js";
 import type { ProposedMatch } from "../lib/appApi.js";
 import {
   explain,
@@ -14,7 +14,9 @@ import {
   useAccounts,
   useAssign,
   useConfirmMatch,
+  useDropOccurrence,
   useEditTransaction,
+  useScheduled,
   useReviewQueue,
   writeSkipped,
 } from "../lib/queries.js";
@@ -29,6 +31,7 @@ export function Review({ book }: { book: string }) {
   const queue = useReviewQueue(book);
   const accounts = useAccounts(book);
   const create = useAccountCreation(book);
+  const scheduled = useScheduled(book);
   const [skipped, setSkipped] = useState(() => readSkipped(book));
   useEffect(() => writeSkipped(book, skipped), [book, skipped]);
 
@@ -65,6 +68,7 @@ export function Review({ book }: { book: string }) {
               book={book}
               transaction={t}
               matches={matches}
+              scheduled={!!scheduled.data?.[t.id]}
               accounts={accounts.data ? postable(accounts.data, t.date) : []}
               create={create}
               onSkip={() => setSkipped((s) => [...s.filter((x) => x !== t.id), t.id])}
@@ -81,13 +85,24 @@ type ItemProps = {
   transaction: Transaction;
   /** Import rows proposed as this transaction, if any. */
   matches: ProposedMatch[];
+  /** Whether a schedule staged it (so it can be dropped: "Not this time"). */
+  scheduled: boolean;
   accounts: string[];
   create?: AccountCreation;
   onSkip: () => void;
 };
 
-function QueueItem({ book, transaction: t, matches, accounts, create, onSkip }: ItemProps) {
+function QueueItem({
+  book,
+  transaction: t,
+  matches,
+  scheduled,
+  accounts,
+  create,
+  onSkip,
+}: ItemProps) {
   const edit = useEditTransaction(book, t.id);
+  const drop = useDropOccurrence(book);
   const confirmMatch = useConfirmMatch(book);
   const swipe = useRef<SwipeHandle>(null);
   const [error, setError] = useState<string | null>(null);
@@ -187,6 +202,20 @@ function QueueItem({ book, transaction: t, matches, accounts, create, onSkip }: 
           </ul>
         )}
 
+        {scheduled && t.flag === "!" && (
+          <p className="small scheduled-line">
+            <span className="muted">↻ From a schedule</span>
+            <button
+              type="button"
+              className="plain"
+              disabled={drop.isPending}
+              onClick={() => drop.mutate(t, { onError: (e) => setError(explain(e)) })}
+            >
+              Not this time
+            </button>
+          </p>
+        )}
+
         {matches.map((m) => (
           <MatchPanel key={`${m.batch_id}:${m.line}`} book={book} row={m} />
         ))}
@@ -215,6 +244,8 @@ function QueueItem({ book, transaction: t, matches, accounts, create, onSkip }: 
   );
 }
 
+const sameAmount = (a: string, b: string) => isZero(add(a, negate(b)));
+
 const describe = (date: string | null, text: string | null) =>
   `${date ?? "?"} · ${text || "(no description)"}`;
 
@@ -226,6 +257,8 @@ function MatchPanel({ book, row }: { book: string; row: ProposedMatch }) {
   const assign = useAssign(book);
   const matched = row.outcome === "matched";
   const others = row.candidates.filter((c) => c.transaction_id !== row.transaction_id);
+  const held = row.candidates.find((c) => c.transaction_id === row.transaction_id);
+  const differs = matched && held && row.amount && !sameAmount(held.amount, row.amount);
 
   return (
     <section className="match" aria-label="Match">
@@ -233,6 +266,12 @@ function MatchPanel({ book, row }: { book: string; row: ProposedMatch }) {
         {matched ? "Matches" : "Imported as new"}: <strong>{row.description}</strong> · {row.date}{" "}
         <span className="muted">({row.filename})</span>
       </p>
+      {differs && (
+        <p className="small">
+          Within the schedule&apos;s tolerance: confirming takes the bank&apos;s amount,{" "}
+          {row.amount}, in place of {held.amount}.
+        </p>
+      )}
       {others.length > 0 && (
         <ul className="match-options">
           {others.map((c) => (

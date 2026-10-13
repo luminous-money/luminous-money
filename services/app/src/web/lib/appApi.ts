@@ -145,6 +145,21 @@ export const appApi = {
   scheduled: async (book: string): Promise<Record<string, string>> =>
     json(await fetch(`${base(book)}/schedules/occurrences`)),
 
+  /** The book's time zone (IANA), or null if it was never set. */
+  timeZone: async (book: string): Promise<string | null> =>
+    (await json<{ time_zone: string | null }>(await fetch(`${base(book)}/settings`))).time_zone,
+
+  setTimeZone: async (book: string, timeZone: string): Promise<string> =>
+    (
+      await json<{ time_zone: string }>(
+        await fetch(`${base(book)}/settings`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ time_zone: timeZone }),
+        })
+      )
+    ).time_zone,
+
   lastImports: async (book: string): Promise<Record<string, string>> =>
     json(await fetch(`${base(book)}/imports/latest`)),
 

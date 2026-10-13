@@ -1,10 +1,18 @@
 import type { Book } from "@fava-beans/ledger-client";
 import { useState } from "react";
 
-import { explain, useBooks, useRenameBook } from "../lib/queries.js";
+import {
+  browserTimeZone,
+  explain,
+  useBooks,
+  useRenameBook,
+  useSetTimeZone,
+  useTimeZone,
+} from "../lib/queries.js";
 
-/** Manage books: for M1, see them, rename them and export them (the whole book as one Beancount
- * file, the user's own copy of their data). More books come with M7. */
+/** Manage books: see them, rename them, set their time zone (which decides "today" for their
+ * schedules), and export them (the whole book as one Beancount file, the user's own copy of
+ * their data). More books come with M7. */
 export function Books() {
   const books = useBooks();
   return (
@@ -31,6 +39,7 @@ function BookCard({ book }: { book: Book }) {
     return (
       <div className="card book">
         <h3>{book.name}</h3>
+        <TimeZone book={book.id} />
         <div className="actions">
           <a
             className="button"
@@ -74,5 +83,32 @@ function BookCard({ book }: { book: Book }) {
         </button>
       </div>
     </form>
+  );
+}
+
+const ZONES = Intl.supportedValuesOf("timeZone");
+
+/** A book's time zone; books created here start in the browser's. */
+function TimeZone({ book }: { book: string }) {
+  const zone = useTimeZone(book);
+  const set = useSetTimeZone(book);
+  const value = zone.data ?? "";
+  return (
+    <label className="time-zone small">
+      Time zone
+      <select
+        aria-label="Time zone"
+        value={value}
+        disabled={zone.isPending || set.isPending}
+        onChange={(e) => set.mutate(e.target.value)}
+      >
+        {!value && <option value="">Not set (the server's)</option>}
+        {[...new Set([...(value ? [value] : []), browserTimeZone(), ...ZONES])].map((z) => (
+          <option key={z} value={z}>
+            {z.replace(/_/g, " ")}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

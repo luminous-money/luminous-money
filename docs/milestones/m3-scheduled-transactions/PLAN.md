@@ -1,8 +1,8 @@
 M3: Scheduled transactions: plan
 ==================================================================================================
 
-> **Status: built (first pass, 2026-10-13); [questions](#questions) open.** Every slice below is
-> done, with unit, API and browser tests. There's no separate
+> **Status: built (2026-10-13), with the [answers](#answers-2026-10-13-built) to its first
+> pass.** Every slice is done, with unit, API and browser tests. There's no separate
 > spec: the milestone's line in [the plan](../../PLAN.md) ("the editor, storage, generator
 > logic, and display considerations") and the design's
 > [scheduled transactions](../../design.md#scheduled-transactions) section are the brief. Calls
@@ -120,7 +120,7 @@ import the bank's rent row, and it matches.
 - **Projected balances** and future occurrences in ledgers: see the questions.
 - **Holiday calendars.**
 
-## Answers (2026-10-13), being built
+## Answers (2026-10-13), built
 
 - **The generator runs daily** (not hourly): at startup, after edits, and once a day, just after
   midnight in each book's time zone.

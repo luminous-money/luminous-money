@@ -8,8 +8,22 @@ import { newUser, stackIsUp } from "./support.ts";
 const day = (offset: number) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);
 const mdy = (iso: string) => `${iso.slice(5, 7)}/${iso.slice(8, 10)}/${iso.slice(0, 4)}`;
 
+const PROFILE = {
+  delimiter: ",",
+  skip: 0,
+  header: true,
+  columns: ["Date", "Description", "Amount"],
+  date: { column: 0, format: "MM/DD/YYYY" },
+  amount: { kind: "signed", column: 2, negate: false },
+  description: 1,
+  payee: null,
+  id: null,
+  balance: null,
+};
+
 type Schedule = {
   id: string;
+  auto_confirm: boolean;
   updated_at: string;
   last_applied: string | null;
   next: { date: string } | null;
@@ -147,5 +161,68 @@ describe("schedules", () => {
 
     assert.equal((await json("POST", "/schedules", bad)).status, 422);
     assert.equal((await (await newUser()).app(`/books/${book}/schedules`)).status, 404);
+  });
+
+  it("match within a split's tolerance, and the bank's amount wins on confirm", async () => {
+    const { user, book, json } = await setUp();
+    const tolerant = rent(day(-3));
+    (tolerant.template.postings[0] as Record<string, unknown>).tolerance = "25.00";
+    await json("POST", "/schedules", tolerant);
+    await json("PUT", `/profiles/${encodeURIComponent("Assets:Bank:Checking")}`, [PROFILE]);
+    const form = new FormData();
+    form.set("account", "Assets:Bank:Checking");
+    form.set(
+      "file",
+      new Blob([`Date,Description,Amount\n${mdy(day(-2))},RENT,-1512.50\n`]),
+      "f.csv"
+    );
+    const imported = (await (
+      await user.app(`/books/${book}/imports`, { method: "POST", body: form })
+    ).json()) as { batch: { id: string }; rows: { outcome: string; transaction_id: string }[] };
+    assert.equal(imported.rows[0]!.outcome, "matched");
+
+    await json("POST", `/imports/${imported.batch.id}/rows/2/confirm`);
+
+    const { data: paid } = await user.ledger.GET(
+      "/api/ledger/v1/books/{book_id}/transactions/{directive_id}",
+      { params: { path: { book_id: book, directive_id: imported.rows[0]!.transaction_id } } }
+    );
+    assert.equal(paid!.postings[0]!.units!.number, "-1512.50");
+  });
+
+  it("confirm automatically, and editing restages today's unconfirmed occurrence", async () => {
+    const { user, book, json } = await setUp();
+    const auto = (await (
+      await json("POST", "/schedules", { ...rent(day(0)), name: "Auto", auto_confirm: true })
+    ).json()) as Schedule;
+    const pending = (await (await json("POST", "/schedules", rent(day(0)))).json()) as Schedule;
+
+    await json("PATCH", `/schedules/${pending.id}`, {
+      updated_at: pending.updated_at,
+      template: { ...rent(day(0)).template, payee: "New landlord" },
+    });
+
+    const { data: all } = await user.ledger.GET("/api/ledger/v1/books/{book_id}/transactions", {
+      params: { path: { book_id: book } },
+    });
+    assert.deepEqual(all!.map((t) => [t.flag, t.payee]).sort(), [
+      ["!", "New landlord"],
+      ["*", "Landlord"],
+    ]);
+    assert.ok(auto.auto_confirm);
+  });
+
+  it("use the book's time zone, set and read in its settings", async () => {
+    const { json } = await setUp();
+
+    assert.equal(
+      ((await (await json("GET", "/settings")).json()) as { time_zone: null }).time_zone,
+      null
+    );
+    assert.equal((await json("PUT", "/settings", { time_zone: "America/Chicago" })).status, 200);
+    assert.equal((await json("PUT", "/settings", { time_zone: "Mars/Olympus" })).status, 422);
+    assert.deepEqual(await (await json("GET", "/settings")).json(), {
+      time_zone: "America/Chicago",
+    });
   });
 });

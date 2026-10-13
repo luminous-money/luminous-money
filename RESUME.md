@@ -7,9 +7,8 @@ _Updated 2026-10-13._ Keep this current: every finalized change set updates it (
 ## State
 
 **M1, M2 and M3 are built.** M2 (credit cards, really "any account, and matching") and M3
-(scheduled transactions, with [questions](docs/milestones/m3-scheduled-transactions/PLAN.md#questions)
-open) are described in their plans. The milestones ahead (M4–M13, then Polish) are in
-[docs/PLAN.md](docs/PLAN.md).
+(scheduled transactions) are described in their plans. The milestones ahead (M4–M14, then
+Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
 - **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M6.
@@ -21,10 +20,17 @@ What a user can do now:
 - **Menu:** Home, Manage books (list, rename, export as a Beancount file), Review, Schedules,
   Log out.
 - **Schedules:** a transaction plus a rule (every N days/weeks/months/years, days of the month,
-  weekends moved or kept, an optional end), made new or with "Repeat…" on any transaction. Due
-  occurrences are staged as pending transactions (at startup, hourly, after saves), marked ↻ in
-  ledgers, and matched by imports like any transaction. The Schedules page lists them and what's
-  coming in the next 30 days; edit, pause and delete there.
+  weekends moved or kept, an optional end), made new or with "Repeat…" on any transaction.
+  - Due occurrences are staged (at startup, after saves, and daily after midnight in the book's
+    time zone) as pending transactions, or confirmed if the schedule confirms automatically;
+    marked ↻ in ledgers, and matched by imports like any transaction.
+  - Each split can have a match tolerance: the bank's amount within it matches, and wins on
+    confirm.
+  - "Not this time" in review drops an occurrence for good; editing a schedule restages its
+    unconfirmed occurrences from today.
+  - The Schedules page lists them and what's coming in 30 days; ledgers show what's coming as
+    grayed rows with a projected balance.
+- **Manage books** also sets each book's time zone (new books take the browser's).
 - **An account's ledger:**
   - newest first, 200 a page, with infinite scroll; running balances, and the other account or
     `<multiple>`; liabilities and income shown inverted, colored by their effect on net worth
@@ -62,18 +68,15 @@ How it's put together:
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 106 tests, including the table lint
-    - auth: 9; app: 88; db: 10; csv-import: 22
+    - auth: 9; app: 95; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 40 API tests and 43 browser tests
+  - `pnpm e2e`: 43 API tests and 46 browser tests
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, with the demo
   seeded for the stub user: the "Demo" book, its checking account and card starred.
 
 ## Next steps
 
-1. **Answer M3's [questions](docs/milestones/m3-scheduled-transactions/PLAN.md#questions)**
-   (estimated amounts, when occurrences are staged, auto-confirm, time zone, backfill, rules not
-   covered, skipping, deleted schedules' marks).
-2. Then say `elaborate plan for M4` (categorization).
+1. Say `elaborate plan for M4` (categorization).
 
 ## Gotchas
 

@@ -66,9 +66,9 @@ milestone starts.
       that match transactions already in the account, every match reviewed (move, swap, undo).
 - [x] **M3: Scheduled transactions.** The editor, storage, generator logic (when and how real
       transactions are created from a schedule template), and display considerations. Built
-      2026-10-13 ([plan](milestones/m3-scheduled-transactions/PLAN.md)); the answers to its
-      questions (2026-10-13) are being built: daily runs, per-split match tolerances, upcoming
-      rows with projected balances, auto-confirm, book time zones, and "not this time".
+      2026-10-13 ([plan](milestones/m3-scheduled-transactions/PLAN.md)), with the answers to its
+      questions: daily runs, per-split match tolerances, upcoming rows with projected balances,
+      auto-confirm, book time zones, and "Not this time".
 - [ ] **M4: Categorization.** The categorization engine.
 - [ ] **M5: Investment accounts.** Lean on what Beancount already provides. The main
       deliverable: storing non-currency holdings, with a currency representation of their value.

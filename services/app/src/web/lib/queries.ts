@@ -113,12 +113,35 @@ export function useCurrentBook(): { book: Book | undefined; loading: boolean } {
   return { book: books.data?.[0], loading: books.isPending };
 }
 
+/** The browser's time zone: a new book's, to start with. */
+export const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+/** Create a book, in the browser's time zone. */
 export function useCreateBook() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => api.createBook(name),
+    mutationFn: async (name: string) => {
+      const book = await api.createBook(name);
+      await appApi.setTimeZone(book.id, browserTimeZone());
+      return book;
+    },
     onSuccess: (book) =>
       client.setQueryData<Book[]>(keys.books, (books) => [...(books ?? []), book]),
+  });
+}
+
+export function useTimeZone(book: string) {
+  return useQuery({
+    queryKey: [...keys.book(book), "time-zone"],
+    queryFn: () => appApi.timeZone(book),
+  });
+}
+
+export function useSetTimeZone(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (zone: string) => appApi.setTimeZone(book, zone),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
   });
 }
 
@@ -361,6 +384,21 @@ export function useDeleteSchedule(book: string) {
   return useMutation({
     mutationFn: (schedule: Schedule) => appApi.deleteSchedule(book, schedule),
     onSuccess: () => schedulesChanged(book),
+  });
+}
+
+/** "Not this time": delete a scheduled occurrence. It doesn't come back, since its schedule
+ * already ran for that date. */
+export function useDropOccurrence(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (t: Transaction) => api.deleteTransaction(book, t),
+    onSuccess: (_, t) => {
+      client.setQueryData<Transaction[]>(keys.queue(book), (queue) =>
+        queue?.filter((q) => q.id !== t.id)
+      );
+      void client.invalidateQueries({ queryKey: keys.book(book) });
+    },
   });
 }
 

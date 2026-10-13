@@ -117,6 +117,16 @@ export const api = {
       })
     ),
 
+  /** Delete a transaction, against the version read. */
+  deleteTransaction: async (book_id: string, t: Transaction): Promise<void> => {
+    await unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/transactions/changes", {
+        params: { path: { book_id } },
+        body: { create: [], delete: [{ id: t.id, updated_at: t.updated_at }] },
+      })
+    );
+  },
+
   /** Change only the given fields, against the version read. */
   patch: (
     book_id: string,

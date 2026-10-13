@@ -11,7 +11,9 @@ import {
   useSetStar,
   useStars,
   useSummary,
+  useUpcoming,
 } from "../lib/queries.js";
+import { upcomingFor } from "../lib/upcoming.js";
 
 /**
  * One account's ledger: every transaction, newest first, 200 at a time, more loading as you
@@ -19,7 +21,8 @@ import {
  * <multiple>. Tapping one opens it; the line above them adds a new one. Its header stars the
  * account (putting it on the home page) and links to importing into it. Amounts and balances
  * are shown as the account reads (a card's balance is what's owed); colors follow the stored
- * sign, the effect on net worth. Transactions a schedule staged are marked ↻.
+ * sign, the effect on net worth. Transactions a schedule staged are marked ↻, and its
+ * occurrences coming in the next 30 days show above, grayed, with the projected balance.
  */
 export function AccountLedger({ book, account }: { book: string; account: string }) {
   const [, navigate] = useLocation();
@@ -29,6 +32,8 @@ export function AccountLedger({ book, account }: { book: string; account: string
   const stars = useStars(book);
   const setStar = useSetStar(book);
   const scheduled = useScheduled(book);
+  const upcoming = useUpcoming(book);
+  const ahead = upcoming.data && info ? upcomingFor(upcoming.data, account, info.balance) : [];
   const starred = stars.data?.includes(account) ?? false;
   const type = info?.type;
   const end = useRef<HTMLDivElement>(null);
@@ -109,6 +114,40 @@ export function AccountLedger({ book, account }: { book: string; account: string
       {ledger.isPending && <p className="muted">Loading…</p>}
       {ledger.error && <p className="card error">{explain(ledger.error)}</p>}
       {ledger.data && rows.length === 0 && <p className="card muted">No transactions yet.</p>}
+
+      {ahead.length > 0 && (
+        <ol className="ledger upcoming-rows" aria-label="Upcoming">
+          {ahead.map((row) => (
+            <li key={row.key}>
+              <button
+                type="button"
+                className="ledger-row"
+                onClick={() =>
+                  navigate(withBack(`/books/${book}/schedules/${row.schedule_id}`, here))
+                }
+              >
+                <span className="ledger-date">{row.date}</span>
+                <span className="ledger-what">
+                  <span className="ledger-payee">{row.label}</span>
+                  <span className="ledger-account muted">↻ upcoming</span>
+                </span>
+                <span className="ledger-numbers">
+                  <span className="amount">
+                    {row.amount
+                      ? formatMoney(shown(row.amount.number, type), row.amount.currency)
+                      : "?"}
+                  </span>
+                  <span className="muted small">
+                    {row.balance
+                      ? `projected ${formatMoney(shown(row.balance.number, type), row.balance.currency)}`
+                      : ""}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
 
       <ol className="ledger" aria-label="Transactions">
         {rows.map((row) => (
