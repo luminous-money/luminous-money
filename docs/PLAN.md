@@ -62,8 +62,8 @@ milestone starts.
 - [ ] **M2: Credit card account.** Much of the same as M1, plus some minor display decisions,
       and testing matching with two accounts that reflect two sides of the same transaction.
       Planned 2026-10-12 ([plan](milestones/m2-credit-card/PLAN.md)): starred accounts replace
-      "money accounts" (no account kinds), liabilities and income display inverted, and matches
-      that act, so transfers between your own accounts aren't counted twice.
+      "money accounts" (no account kinds), liabilities and income display inverted, and imports
+      that match transactions already in the account, every match reviewed.
 - [ ] **M3: Scheduled transactions.** The editor, storage, generator logic (when and how real
       transactions are created from a schedule template), and display considerations.
 - [ ] **M4: Categorization.** The categorization engine.
@@ -174,5 +174,8 @@ elaborated.
 Smaller improvements to pick up between milestones or at the end.
 
 - [ ] **Type-aware wording when creating accounts** (e.g. "amount owed" for a liability).
+- [ ] **Order-aware match assignment:** assign an import's rows to candidates over the whole
+      network of matches, weighting order, so two identical coffees entered on the 5th and 7th
+      pair with CSV rows on the 7th and 8th in order (M2 pairs by proximity, and review swaps).
 - [ ] **Import file format management:** see, edit, rename and delete an account's saved CSV
       formats directly, rather than only replacing or adding to them when a file doesn't match.
