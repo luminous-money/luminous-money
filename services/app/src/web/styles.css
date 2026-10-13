@@ -1041,3 +1041,31 @@ main a:not(.button):not(.card):not(.back):not(.menu-item) {
 .star.on {
   color: #d9a400;
 }
+
+/* A review card's match: the imported row, and other candidates */
+
+.match {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, #d9a400 12%, transparent);
+}
+
+.match p {
+  margin: 0 0 0.4rem;
+}
+
+.match-options {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.match-options li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}

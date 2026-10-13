@@ -59,11 +59,11 @@ milestone starts.
     account's ledger, the add line at the top, the editor's actions pinned
   - decisions answered (2026-10-12): several file formats per account (asked about on a
     mismatch), any ledger path for a bank account, and exporting a book
-- [ ] **M2: Credit card account.** Much of the same as M1, plus some minor display decisions,
+- [x] **M2: Credit card account.** Much of the same as M1, plus some minor display decisions,
       and testing matching with two accounts that reflect two sides of the same transaction.
-      Planned 2026-10-12 ([plan](milestones/m2-credit-card/PLAN.md)): starred accounts replace
+      Built 2026-10-13 ([plan](milestones/m2-credit-card/PLAN.md)): starred accounts replace
       "money accounts" (no account kinds), liabilities and income display inverted, and imports
-      that match transactions already in the account, every match reviewed.
+      that match transactions already in the account, every match reviewed (move, swap, undo).
 - [ ] **M3: Scheduled transactions.** The editor, storage, generator logic (when and how real
       transactions are created from a schedule template), and display considerations.
 - [ ] **M4: Categorization.** The categorization engine.

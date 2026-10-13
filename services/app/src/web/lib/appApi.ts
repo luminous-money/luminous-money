@@ -1,5 +1,5 @@
 /** The app API (imports and CSV profiles), at /api/app/v1 on the same origin. */
-import type { CsvProfile, ImportBatch, ImportResult } from "../../shared/imports.js";
+import type { CsvProfile, ImportBatch, ImportResult, ProposedMatch } from "../../shared/imports.js";
 import { ApiError } from "./ledger.js";
 
 export type {
@@ -9,6 +9,7 @@ export type {
   ImportRow,
   Candidate,
   Outcome,
+  ProposedMatch,
 } from "../../shared/imports.js";
 
 /** An import the app couldn't run, with a code for the ones the user can fix. */
@@ -68,6 +69,28 @@ export const appApi = {
     json(
       await fetch(`${base(book)}/stars/${encodeURIComponent(account)}`, {
         method: starred ? "PUT" : "DELETE",
+      })
+    ),
+
+  /** Import rows whose match is up for review. */
+  matches: async (book: string): Promise<ProposedMatch[]> =>
+    json(await fetch(`${base(book)}/matches`)),
+
+  /** Set a row's transaction: a candidate (swapping if another row holds it), or null for a
+   * new one. */
+  assign: async (book: string, row: ProposedMatch, transaction: string | null) =>
+    json<ProposedMatch[]>(
+      await fetch(`${base(book)}/imports/${row.batch_id}/rows/${row.line}/assign`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ transaction }),
+      })
+    ),
+
+  confirmMatch: async (book: string, row: ProposedMatch) =>
+    json<ProposedMatch[]>(
+      await fetch(`${base(book)}/imports/${row.batch_id}/rows/${row.line}/confirm`, {
+        method: "POST",
       })
     ),
 

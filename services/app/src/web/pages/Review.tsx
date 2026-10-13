@@ -6,29 +6,37 @@ import { AccountName, AccountPicker, type AccountCreation } from "../components/
 import { Swipeable, type SwipeHandle } from "../components/Swipeable.js";
 import { postable, preferredRoots, shortName } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";
+import type { ProposedMatch } from "../lib/appApi.js";
 import {
   explain,
   readSkipped,
   useAccountCreation,
   useAccounts,
+  useAssign,
+  useConfirmMatch,
   useEditTransaction,
-  useQueue,
+  useReviewQueue,
   writeSkipped,
 } from "../lib/queries.js";
 import { simple, UNCATEGORIZED, withCounterpart } from "../lib/split.js";
 
+/**
+ * The review queue: pending transactions to categorize and confirm, and imported rows matched
+ * to transactions already in the account, whose matches are confirmed here too (or moved,
+ * swapped, or undone).
+ */
 export function Review({ book }: { book: string }) {
-  const queue = useQueue(book);
+  const queue = useReviewQueue(book);
   const accounts = useAccounts(book);
   const create = useAccountCreation(book);
   const [skipped, setSkipped] = useState(() => readSkipped(book));
   useEffect(() => writeSkipped(book, skipped), [book, skipped]);
 
   // Oldest first; skipped items go to the end, most recently skipped last.
-  const items = queue.data ?? [];
+  const items = queue.items ?? [];
   const ordered = [
-    ...items.filter((t) => !skipped.includes(t.id)),
-    ...skipped.flatMap((id) => items.filter((t) => t.id === id)),
+    ...items.filter((i) => !skipped.includes(i.transaction.id)),
+    ...skipped.flatMap((id) => items.filter((i) => i.transaction.id === id)),
   ];
 
   return (
@@ -40,22 +48,23 @@ export function Review({ book }: { book: string }) {
         <h1>Review</h1>
         <p className="muted">
           {book}
-          {queue.data && ` · ${ordered.length} left`}
+          {queue.items && ` · ${ordered.length} left`}
         </p>
       </header>
 
-      {queue.isPending && <p className="muted">Loading…</p>}
+      {!queue.items && !queue.error && <p className="muted">Loading…</p>}
       {queue.error && <p className="card error">{explain(queue.error)}</p>}
-      {queue.data && ordered.length === 0 && (
+      {queue.items && ordered.length === 0 && (
         <p className="card done">All caught up. Nothing is waiting for review.</p>
       )}
 
       <ol className="queue">
-        {ordered.map((t) => (
+        {ordered.map(({ transaction: t, matches }) => (
           <li key={t.id}>
             <QueueItem
               book={book}
               transaction={t}
+              matches={matches}
               accounts={accounts.data ? postable(accounts.data, t.date) : []}
               create={create}
               onSkip={() => setSkipped((s) => [...s.filter((x) => x !== t.id), t.id])}
@@ -70,13 +79,16 @@ export function Review({ book }: { book: string }) {
 type ItemProps = {
   book: string;
   transaction: Transaction;
+  /** Import rows proposed as this transaction, if any. */
+  matches: ProposedMatch[];
   accounts: string[];
   create?: AccountCreation;
   onSkip: () => void;
 };
 
-function QueueItem({ book, transaction: t, accounts, create, onSkip }: ItemProps) {
+function QueueItem({ book, transaction: t, matches, accounts, create, onSkip }: ItemProps) {
   const edit = useEditTransaction(book, t.id);
+  const confirmMatch = useConfirmMatch(book);
   const swipe = useRef<SwipeHandle>(null);
   const [error, setError] = useState<string | null>(null);
   const [narration, setNarration] = useState(t.narration);
@@ -85,7 +97,7 @@ function QueueItem({ book, transaction: t, accounts, create, onSkip }: ItemProps
 
   const view = useMemo(() => simple(t), [t]);
   const detail = `/books/${book}/transactions/${t.id}`;
-  const busy = edit.isPending;
+  const busy = edit.isPending || confirmMatch.isPending;
   const uncategorized = t.postings.some((p) => p.account === UNCATEGORIZED);
 
   // Edits to this transaction queue up in order (see lib/queries), so these can fire freely.
@@ -102,8 +114,18 @@ function QueueItem({ book, transaction: t, accounts, create, onSkip }: ItemProps
   const saveNarration = () => {
     if (narration !== t.narration) void save({ narration });
   };
-  // Confirming carries the description too, in case it was edited without leaving the field.
-  const confirm = () => save({ flag: "*", narration });
+  // Confirming carries the description too, in case it was edited without leaving the field;
+  // it confirms the transaction if it's pending, and any matches proposed with it.
+  const confirm = async () => {
+    if (t.flag === "!" && !(await save({ flag: "*", narration }))) return false;
+    try {
+      for (const m of matches) await confirmMatch.mutateAsync(m);
+      return true;
+    } catch (e) {
+      setError(explain(e));
+      return false;
+    }
+  };
 
   return (
     <Swipeable
@@ -165,6 +187,10 @@ function QueueItem({ book, transaction: t, accounts, create, onSkip }: ItemProps
           </ul>
         )}
 
+        {matches.map((m) => (
+          <MatchPanel key={`${m.batch_id}:${m.line}`} book={book} row={m} />
+        ))}
+
         {error && <p className="error">{error}</p>}
 
         <div className="actions">
@@ -186,5 +212,61 @@ function QueueItem({ book, transaction: t, accounts, create, onSkip }: ItemProps
         </div>
       </article>
     </Swipeable>
+  );
+}
+
+const describe = (date: string | null, text: string | null) =>
+  `${date ?? "?"} · ${text || "(no description)"}`;
+
+/**
+ * An imported row proposed as this transaction: the row, and its other candidates to move it to
+ * (or swap with the row holding one), or "Not a match" to stage it on its own.
+ */
+function MatchPanel({ book, row }: { book: string; row: ProposedMatch }) {
+  const assign = useAssign(book);
+  const matched = row.outcome === "matched";
+  const others = row.candidates.filter((c) => c.transaction_id !== row.transaction_id);
+
+  return (
+    <section className="match" aria-label="Match">
+      <p className="small">
+        {matched ? "Matches" : "Imported as new"}: <strong>{row.description}</strong> · {row.date}{" "}
+        <span className="muted">({row.filename})</span>
+      </p>
+      {others.length > 0 && (
+        <ul className="match-options">
+          {others.map((c) => (
+            <li key={c.transaction_id}>
+              <span className="small">
+                {describe(c.date, c.payee ?? c.narration)}
+                {c.holder && (
+                  <span className="muted">
+                    {" "}
+                    (matched to {describe(c.holder.date, c.holder.description)})
+                  </span>
+                )}
+              </span>
+              <button
+                type="button"
+                disabled={assign.isPending}
+                onClick={() => assign.mutate({ row, to: c.transaction_id })}
+              >
+                {c.holder ? "Swap" : matched ? "Match with this instead" : "Match with this"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {matched && (
+        <button
+          type="button"
+          disabled={assign.isPending}
+          onClick={() => assign.mutate({ row, to: null })}
+        >
+          Not a match
+        </button>
+      )}
+      {assign.error && <p className="error">{explain(assign.error)}</p>}
+    </section>
   );
 }

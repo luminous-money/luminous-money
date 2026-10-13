@@ -366,21 +366,28 @@ shape):
 - **Books belong to users.** Every book has an owner, and a book endpoint answers only its owner:
   anyone else gets 404, as if the book didn't exist. Sharing and permissions come in M8.
 
-### Books, money accounts and balances (M1)
+### Books, starred accounts and balances (M1, M2)
 
 - **A book's name is its Beancount `option "title"`,** so exports and backups carry it. Book IDs
   are generated, so books can be renamed (versioned, like any edit).
-- **Money accounts:** accounts held at a real institution, marked with metadata on their `open`
-  directive:
-  - `money: "bank"` (later `credit-card`, `brokerage`)
-  - `display-name`, a human name, spaces allowed
-  - `institution`
-- **Adding a bank account** opens it on an as-of date, with an opening-balance transaction
-  against `Equity:Opening-Balances` (written even for a zero balance).
-  - **Where it's kept** defaults to `Assets:Bank:<Name>`, and can be any name the account rules
-    allow: users structure their accounts as they like, short of adding top-level accounts.
+- **No account kinds** (M2 replaced M1's "money accounts"). Marking an account as a bank account
+  or a credit card bought nothing a name and a star don't. Users create any account by its full
+  name, anywhere the account rules allow; filing a card under assets is theirs to make.
+- **Starred accounts are the home page.** Stars are per user, kept in `app` (user, book,
+  account), since they're a preference rather than bookkeeping: shared books (M8) can show each
+  user their own, and exports stay free of them. Renaming accounts will have to carry them along,
+  as it will CSV profiles.
+- **Display names:** `display-name` metadata if set, else the name's last segment with dashes as
+  spaces.
+- **Display signs:** liabilities and income are shown inverted wherever amounts are read (home
+  cards, ledgers, previews; later reports), so a card shows what's owed and income is positive.
+  Editors show stored signs, since splits sum to zero. Colors follow the stored sign, the effect
+  on net worth. One helper (`shown`) decides, so every view agrees.
+- **An opening balance** is just a number from a statement, with its date, for any leaf: an
+  opening-balance transaction against `Equity:Opening-Balances` (written even for zero), and the
+  account opens then.
   - The balance means "at the end of that day", so imported rows from that day or earlier are
-    skipped as already counted.
+    skipped as already counted. An account without one has no cutoff.
   - **The opening balance's date is the account's `as_of`,** wherever it's moved. Moving it back
     (with the balance as of the earlier date) lets older history import.
 - **Accounts open by their first posting.** Open dates are incidental here, so a write that
@@ -503,15 +510,30 @@ The default chain:
    - date within a few days
    - exact amount, unless the existing entry's amount is marked as an estimate
 
-   If more than one entry matches, nothing merges automatically; the transaction is staged with
-   the candidates so the user can pick. When a match merges, the bank's amount and date win.
+   As built in M2:
+   - **Only transactions already in the imported account match.** Guessing transfers across
+     accounts would match far too much. A transfer is recognized because the first import's
+     side was categorized to this account; then it's simply a transaction here.
+   - **Not ones this account's imports already hold** (staged or matched), so two identical
+     coffees in two files stay two.
+   - **Every candidate is linked to the row,** best first. Each transaction goes to one row: the
+     best pairs are taken first, and a row whose candidates were all taken is staged, its
+     candidates still linked.
+   - **A matched row adds nothing:** it holds the existing transaction, and the books don't
+     change.
+   - **No match is final until it's confirmed in review,** where it can be moved to another
+     candidate, swapped with the row holding one (one operation, since a held transaction can't
+     be taken), or undone ("Not a match" stages the row on its own).
+   - **Known miss:** pairing is by proximity, not order (two coffees entered on the 5th and 7th,
+     imported on the 7th and 8th, pair crossed). Swapping fixes it; order-aware assignment is a
+     Polish to-do.
 2. **`rules` (built in):** proposes postings from payee and amount history.
 3. **`external` (optional):** sends the remainder to a configured HTTP endpoint that implements the
    same contract. That's how an LLM categorizer such as Cati (`~/Repos/cati`) plugs in later. The
    Cati integration itself is out of scope for now.
 
-Resolution only proposes. Everything still lands in the review queue as `!`, with the match or
-proposal shown and confirmable with one tap.
+Resolution only proposes. Everything lands in the review queue (new transactions as `!`, matches
+as proposed), with the match or proposal shown and confirmable with one tap.
 
 #### Context
 

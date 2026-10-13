@@ -21,12 +21,13 @@ import {
   QueryClient,
   useInfiniteQuery,
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 
 import type { AccountCreation } from "../components/AccountPicker.js";
-import { appApi, type CsvProfile } from "./appApi.js";
+import { appApi, type CsvProfile, type ProposedMatch } from "./appApi.js";
 import { api, ApiError, type TransactionChanges } from "./ledger.js";
 import { logIn, logOut, me, type User } from "./session.js";
 
@@ -57,6 +58,7 @@ export const keys = {
   ledger: (book: string, account: string) => ["book", book, "ledger", account] as const,
   profiles: (book: string, account: string) => ["book", book, "profiles", account] as const,
   queue: (book: string) => ["book", book, "queue"] as const,
+  matches: (book: string) => ["book", book, "matches"] as const,
   transaction: (book: string, id: string) => ["book", book, "transaction", id] as const,
 };
 
@@ -243,6 +245,64 @@ export function useAccounts(book: string) {
 
 export function useQueue(book: string) {
   return useQuery({ queryKey: keys.queue(book), queryFn: () => api.staged(book) });
+}
+
+/** Import rows whose match is up for review. */
+export function useMatches(book: string) {
+  return useQuery({ queryKey: keys.matches(book), queryFn: () => appApi.matches(book) });
+}
+
+/**
+ * What review shows: pending transactions, plus transactions with a proposed match (which may
+ * be confirmed already, like one entered by hand), oldest first, each with its matches.
+ */
+export function useReviewQueue(book: string) {
+  const queue = useQueue(book);
+  const matches = useMatches(book);
+  const pending = new Set(queue.data?.map((t) => t.id));
+  const extra = [...new Set(matches.data?.map((m) => m.transaction_id!) ?? [])].filter(
+    (id) => id && !pending.has(id)
+  );
+  const fetched = useQueries({
+    queries: extra.map((id) => ({
+      queryKey: keys.transaction(book, id),
+      queryFn: () => api.transaction(book, id),
+    })),
+  });
+  const loading = queue.isPending || matches.isPending || fetched.some((q) => q.isPending);
+  const items = loading
+    ? undefined
+    : [...(queue.data ?? []), ...fetched.flatMap((q) => (q.data ? [q.data] : []))]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((transaction) => ({
+          transaction,
+          matches: matches.data!.filter((m) => m.transaction_id === transaction.id),
+        }));
+  return { items, error: queue.error ?? matches.error };
+}
+
+/** After a match changes, everything showing transactions may have. */
+function matchesChanged(book: string, matches: ProposedMatch[]) {
+  queryClient.setQueryData(keys.matches(book), matches);
+  void queryClient.invalidateQueries({ queryKey: keys.queue(book) });
+  void queryClient.invalidateQueries({ queryKey: ["book", book, "ledger"] });
+  void queryClient.invalidateQueries({ queryKey: ["book", book, "summary"] });
+}
+
+/** Set a row's transaction: a candidate (swapping if another row holds it), or null for new. */
+export function useAssign(book: string) {
+  return useMutation({
+    mutationFn: ({ row, to }: { row: ProposedMatch; to: string | null }) =>
+      appApi.assign(book, row, to),
+    onSuccess: (matches) => matchesChanged(book, matches),
+  });
+}
+
+export function useConfirmMatch(book: string) {
+  return useMutation({
+    mutationFn: (row: ProposedMatch) => appApi.confirmMatch(book, row),
+    onSuccess: (matches) => matchesChanged(book, matches),
+  });
 }
 
 export function useTransaction(book: string, id: string) {

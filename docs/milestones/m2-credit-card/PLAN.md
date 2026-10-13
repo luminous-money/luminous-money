@@ -1,8 +1,9 @@
 M2: Credit card account: plan
 ==================================================================================================
 
-> **Status: in progress (2026-10-12).** There's no separate spec: the milestone's one line in
-> [the plan](../../PLAN.md), M1's notes on matching, and the user's answers below are the brief.
+> **Status: built (2026-10-13).** All five slices are done, with unit, API and browser tests.
+> There's no separate spec: the milestone's one line in [the plan](../../PLAN.md), M1's notes on
+> matching, and the user's answers below are the brief.
 
 ## What M2 is
 

@@ -1,66 +1,68 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-12._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-13._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
 
-**M1 (one bank account, end to end) is built,** and its
-[decisions](docs/milestones/m1-one-account-e2e/PLAN.md#decisions-to-review) are answered. The
-milestones ahead (M2–M13, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+**M1 and M2 are built.** M2 (credit cards, really "any account, and matching") is described in
+its [plan](docs/milestones/m2-credit-card/PLAN.md). The milestones ahead (M3–M13, then Polish)
+are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
 - **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M6.
-- **Set up:** name a book, then add a bank account with its balance as of a date.
-- **Home** shows the bank accounts as cards, with their balances and when each was last updated
-  by an import, plus a link to import transactions.
+- **Set up:** name a book, then add an account by its full name (autofill, Tab to complete),
+  optionally with its balance on a date from a statement.
+- **Home** shows the user's **starred** accounts as cards: balance (a card's shown as what's
+  owed) and when each was last updated by an import, plus "Import transactions" and "Add an
+  account" (added accounts are starred).
 - **Menu:** Home, Manage books (list, rename, export as a Beancount file), Review, Log out.
-- **Adding a bank account:** where it's kept in the ledger follows its name
-  (`Assets:Bank:<Name>`) until edited, then anything the account rules allow.
 - **An account's ledger:**
-  - newest first, 200 a page, with infinite scroll
-  - running balances, and the other account or `<multiple>`
+  - newest first, 200 a page, with infinite scroll; running balances, and the other account or
+    `<multiple>`; liabilities and income shown inverted, colored by their effect on net worth
+  - a star toggle (home page), "Import transactions", and the add line above the transactions
   - tapping a transaction opens the editor, whose Back and Save stay pinned on screen
-  - the line above the transactions adds one; "Import transactions" imports into this account
-- **Import a CSV:**
+- **Import a CSV** into any open leaf account (starred listed first):
   - the first file is profiled (columns mapped, guessed and confirmed), and later files just
-    import
-  - a file that fits none of the account's saved formats asks first, then replaces them or adds
-    another format
-  - rows are staged for review, uncategorized; duplicates, rows up to the opening balance's date,
-    and unreadable rows are skipped
-  - moving the opening balance back moves that cutoff (and the account's `open`) with it
-  - possible matches are ranked and shown, and nothing acts on them yet
-- **The review queue,** from before: skip, categorize, confirm, swipe, create accounts.
+    import; a file that fits none of the saved formats asks first, then replaces them or adds one
+  - duplicates, rows up to the opening balance's date, and unreadable rows are skipped
+  - **rows that are the same event as a transaction already in the account match it** (same
+    amount, ±5 days, not already held by this account's imports): nothing is added. So a
+    payment categorized to the card on checking's import is recognized by the card's import, and
+    hand-entered transactions are reconciled
+  - the rest are staged for review, uncategorized
+- **Review:** pending transactions (skip, categorize, confirm, swipe, create accounts) and
+  proposed matches: confirm, "Match with this instead", "Swap" (with the row holding a
+  candidate), or "Not a match" (stages the row on its own).
 
 How it's put together:
 - **`services/auth`** (TypeScript): the stub user, JWT sessions in an HttpOnly cookie, and
   `/verify` for Traefik's forwardAuth, which guards every other API and sets `X-User-Id`.
 - **`services/ledger`** (Python): the system of record.
   - Books are owned by users and named by their `option "title"`.
-  - Money accounts, and balances and account ledgers computed with SQL.
-  - Versioned PATCH edits, batch writes, migrations, backups.
-- **`services/app`** (TypeScript): the PWA, plus CSV profiles, imports and the pipeline
-  (`src/server/pipeline`), in `app.sqlite`.
+  - Accounts with optional opening balances; summaries (balances, `as_of`) and account ledgers
+    computed with SQL.
+  - Versioned PATCH edits, batch writes, atomic create-and-delete (`/transactions/changes`),
+    migrations, backups and export.
+- **`services/app`** (TypeScript): the PWA, plus stars, CSV profiles, imports, the pipeline
+  (`src/server/pipeline`: matcher, then assignment) and match review (`src/server/matches.ts`),
+  in `app.sqlite`.
 - **`packages/db`** (TypeScript migrations and timestamps, with a lint check) and
   **`packages/csv-import`** (parsing, guessing profiles, reading rows; shared by the browser and
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 105 tests, including the table lint
-    - auth: 9; app: 54; db: 10; csv-import: 22
+    - ledger: 106 tests, including the table lint
+    - auth: 9; app: 69; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 33 API tests and 39 browser tests
+  - `pnpm e2e`: 36 API tests and 41 browser tests
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, with the demo
-  seeded for the stub user: the "Demo" book with a BofA Checking card.
+  seeded for the stub user: the "Demo" book, its checking account and card starred.
 
 ## Next steps
 
-1. **Finish M2** ([plan](docs/milestones/m2-credit-card/PLAN.md)). Done: slices 1–4 (starred
-   accounts; display signs; imports match transactions already in the account; `assign`
-   (move, swap, not a match) and confirm in `app`, over the ledger's atomic
-   `/transactions/changes`). Next: slice 5, reviewing matches in the review queue.
+1. Say `elaborate plan for M3` (scheduled transactions).
 
 ## Gotchas
 
