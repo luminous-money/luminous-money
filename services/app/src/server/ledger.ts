@@ -34,6 +34,13 @@ export interface LedgerPort {
   accountLedger(book: string, account: string, cursor?: string): Promise<LedgerPage>;
   /** All of them or none. */
   createTransactions(book: string, transactions: TransactionIn[]): Promise<Transaction[]>;
+  transaction(book: string, id: string): Promise<Transaction>;
+  /** Create and delete (with the versions read) in one write, or not at all. Returns the
+   * created transactions. */
+  applyChanges(
+    book: string,
+    changes: { create: TransactionIn[]; delete: { id: string; updated_at: string }[] }
+  ): Promise<Transaction[]>;
 }
 
 export function httpLedger(baseUrl: string, userId: string): LedgerPort {
@@ -82,6 +89,19 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
       unwrap(
         client.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/ledger", {
           params: { path: { book_id: book, account }, query: { cursor, limit: 1000 } },
+        })
+      ),
+    transaction: (book, id) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/transactions/{directive_id}", {
+          params: { path: { book_id: book, directive_id: id } },
+        })
+      ),
+    applyChanges: (book, changes) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/transactions/changes", {
+          params: { path: { book_id: book } },
+          body: changes,
         })
       ),
     createTransactions: (book, transactions) =>

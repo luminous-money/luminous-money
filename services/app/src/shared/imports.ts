@@ -37,6 +37,7 @@ export type ImportRow = {
   date: string | null;
   amount: string | null;
   description: string;
+  payee: string | null;
   outcome: Outcome;
   error: string | null;
   transaction_id: string | null;
@@ -62,3 +63,15 @@ export type ImportBatch = {
 };
 
 export type ImportResult = { batch: ImportBatch; rows: ImportRow[] };
+
+/** Another row of the account's imports, holding a candidate (so taking it is a swap). */
+export type Holder = { batch_id: string; line: number; date: string | null; description: string };
+
+/** A row whose match is up for review: where it came from, its transaction, and its
+ * candidates, each with the row holding it, if another does. */
+export type ProposedMatch = Omit<ImportRow, "candidates" | "error" | "match"> & {
+  batch_id: string;
+  account: string;
+  filename: string;
+  candidates: (Candidate & { holder: Holder | null })[];
+};

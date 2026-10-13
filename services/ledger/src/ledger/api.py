@@ -173,6 +173,13 @@ def create_app(ledger: Ledger) -> FastAPI:
         created = ledger.create_transactions(book_id, batch)
         return [ledger.transaction(book_id, d.id) for d in created]
 
+    @api.post("/books/{book_id}/transactions/changes", responses={409: {"description": "Stale version"}})
+    def apply_changes(book_id: OwnedBook, changes: models.TransactionChanges) -> list[models.Transaction]:
+        """Create and delete transactions in one atomic write: all of it, or none. Returns the
+        created ones."""
+        created = ledger.apply_changes(book_id, changes)
+        return [ledger.transaction(book_id, d.id) for d in created]
+
     @api.get("/books/{book_id}/transactions")
     def list_transactions(book_id: OwnedBook, filters: Annotated[Filters, Depends()]) -> list[models.Transaction]:
         return ledger.transactions(book_id, **filters.values)

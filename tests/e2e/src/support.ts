@@ -133,3 +133,26 @@ export async function newBook(prefix: string): Promise<string> {
   assert.equal(response.status, 200);
   return book_id;
 }
+
+/** A user of the suite's own (the e2e stack runs auth with AUTH_TEST_USERS). */
+export async function newUser() {
+  const email = `e2e-${randomBytes(4).toString("hex")}@test.local`;
+  const response = await fetch(`${BASE_URL}/api/auth/v1/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const { token, user } = (await response.json()) as { token: string; user: { id: string } };
+  const headers = { authorization: `Bearer ${token}` };
+  return {
+    id: user.id,
+    token,
+    response,
+    ledger: createLedgerClient({ baseUrl: BASE_URL, headers }),
+    app: (path: string, init: RequestInit = {}) =>
+      fetch(`${BASE_URL}/api/app/v1${path}`, {
+        ...init,
+        headers: { ...headers, ...(init.headers as Record<string, string>) },
+      }),
+  };
+}

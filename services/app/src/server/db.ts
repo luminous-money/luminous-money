@@ -81,6 +81,8 @@ export const MIGRATIONS: Migration[] = [
     "ALTER TABLE import_batch ADD COLUMN matched INTEGER NOT NULL DEFAULT 0",
     "CREATE INDEX import_row_transaction ON import_row(transaction_id)",
   ],
+  // 5: a row's payee, so it can be staged again when a match is undone.
+  ["ALTER TABLE import_row ADD COLUMN payee TEXT"],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -88,12 +90,25 @@ type StoredRow = ImportRow & { fingerprint: string | null };
 /** An `import_row` as stored: candidates as JSON. */
 type RowRecord = Omit<StoredRow, "candidates"> & { batch_id: string; candidates: string };
 
+/** A row with where it came from: its batch, account and file. */
+export type HeldRow = StoredRow & { batch_id: string; account: string; filename: string };
+
+const HELD = `SELECT r.*, b.account, b.filename FROM import_row r JOIN import_batch b ON b.id = r.batch_id`;
+const toHeldRow = (r: RowRecord & { account: string; filename: string }): HeldRow => ({
+  ...toImportRow(r),
+  fingerprint: r.fingerprint,
+  batch_id: r.batch_id,
+  account: r.account,
+  filename: r.filename,
+});
+
 function toImportRow(r: RowRecord): ImportRow {
   return {
     line: r.line,
     date: r.date,
     amount: r.amount,
     description: r.description,
+    payee: r.payee,
     outcome: r.outcome,
     error: r.error,
     transaction_id: r.transaction_id,
@@ -219,8 +234,8 @@ export class AppDb {
           stamp
         );
       const insert = this.db.prepare(
-        `INSERT INTO import_row (batch_id, line, date, amount, description, fingerprint, outcome, error, transaction_id, candidates, match, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO import_row (batch_id, line, date, amount, description, payee, fingerprint, outcome, error, transaction_id, candidates, match, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
       for (const r of rows) {
         insert.run(
@@ -229,6 +244,7 @@ export class AppDb {
           r.date,
           r.amount,
           r.description,
+          r.payee,
           r.fingerprint,
           r.outcome,
           r.error,
@@ -238,6 +254,63 @@ export class AppDb {
           stamp,
           stamp
         );
+      }
+    });
+  }
+
+  /** One row of the book's imports. */
+  row(book: string, batch: string, line: number): HeldRow | undefined {
+    const r = this.db
+      .prepare(`${HELD} WHERE b.book_id = ? AND r.batch_id = ? AND r.line = ?`)
+      .get(book, batch, line) as (RowRecord & { account: string; filename: string }) | undefined;
+    return r && toHeldRow(r);
+  }
+
+  /** The row of the account's imports holding `transaction` (staged or matched), other than
+   * `except`. */
+  holder(
+    book: string,
+    account: string,
+    transaction: string,
+    except: { batch: string; line: number }
+  ): HeldRow | undefined {
+    const r = this.db
+      .prepare(
+        `${HELD} WHERE b.book_id = ? AND b.account = ? AND r.transaction_id = ?
+           AND r.outcome IN ('staged', 'matched') AND NOT (r.batch_id = ? AND r.line = ?)`
+      )
+      .get(book, account, transaction, except.batch, except.line) as
+      (RowRecord & { account: string; filename: string }) | undefined;
+    return r && toHeldRow(r);
+  }
+
+  /** Rows whose match is proposed, oldest first: what review shows. */
+  proposed(book: string): HeldRow[] {
+    const rows = this.db
+      .prepare(
+        `${HELD} WHERE b.book_id = ? AND r.match = 'proposed' ORDER BY r.date, b.created_at, r.line`
+      )
+      .all(book) as (RowRecord & { account: string; filename: string })[];
+    return rows.map(toHeldRow);
+  }
+
+  /** Set rows' transactions (and so outcomes), and their match states, in one write. */
+  setRows(
+    changes: {
+      batch: string;
+      line: number;
+      outcome: "staged" | "matched";
+      transaction_id: string;
+      match: "proposed" | "confirmed";
+    }[]
+  ): void {
+    const update = this.db.prepare(
+      `UPDATE import_row SET outcome = ?, transaction_id = ?, match = ?, updated_at = ?
+       WHERE batch_id = ? AND line = ?`
+    );
+    transaction(this.db, () => {
+      for (const c of changes) {
+        update.run(c.outcome, c.transaction_id, c.match, now(), c.batch, c.line);
       }
     });
   }

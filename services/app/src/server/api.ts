@@ -9,6 +9,7 @@ import type { CsvProfile } from "@fava-beans/csv-import";
 
 import type { AppDb } from "./db.js";
 import { ImportProblem, importFile } from "./imports.js";
+import { assignRow, confirmRow, MatchProblem, proposedMatches } from "./matches.js";
 import type { LedgerPort } from "./ledger.js";
 
 type Env = { Variables: { user: string } };
@@ -122,6 +123,53 @@ export function createApi({
         );
       }
       throw error;
+    }
+  });
+
+  /** Rows whose match is up for review, with their candidates and who holds them. */
+  api.get("/books/:book/matches", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    return c.json(proposedMatches(db, book));
+  });
+
+  const matchError = (error: unknown) => {
+    if (!(error instanceof MatchProblem)) throw error;
+    const status = { "not-found": 404, "not-proposed": 409, "not-a-candidate": 422 } as const;
+    return [{ detail: error.message, code: error.code }, status[error.code]] as const;
+  };
+
+  /** Set a row's transaction: `{transaction}`, one of its candidates (swapping if another row
+   * holds it), or null for a new one ("not a match"). */
+  api.post("/books/:book/imports/:batch/rows/:line/assign", async (c) => {
+    const { book, batch, line } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as { transaction?: unknown };
+    if (body.transaction !== null && typeof body.transaction !== "string")
+      return c.json({ detail: "send a transaction ID, or null for a new one" }, 422);
+    try {
+      await assignRow({
+        db,
+        ledger: ledgerFor(c.get("user")),
+        book,
+        row: { batch, line: Number(line) },
+        to: body.transaction,
+      });
+      return c.json(proposedMatches(db, book));
+    } catch (error) {
+      return c.json(...matchError(error));
+    }
+  });
+
+  /** Confirm a row's match: its transaction is final, and it leaves review. */
+  api.post("/books/:book/imports/:batch/rows/:line/confirm", async (c) => {
+    const { book, batch, line } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    try {
+      confirmRow(db, book, { batch, line: Number(line) });
+      return c.json(proposedMatches(db, book));
+    } catch (error) {
+      return c.json(...matchError(error));
     }
   });
 

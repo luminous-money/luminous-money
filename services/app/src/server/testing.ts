@@ -81,4 +81,20 @@ export class FakeLedger implements LedgerPort {
   async createTransactions(_book: string, transactions: TransactionIn[]) {
     return transactions.map((t) => this.addTransaction(t));
   }
+
+  async transaction(_book: string, id: string) {
+    const found = this.transactions.find((t) => t.id === id);
+    if (!found) throw new Error(`no transaction ${id}`);
+    return found;
+  }
+
+  async applyChanges(
+    _book: string,
+    changes: { create: TransactionIn[]; delete: { id: string; updated_at: string }[] }
+  ) {
+    for (const d of changes.delete) await this.transaction(_book, d.id); // must exist
+    const gone = new Set(changes.delete.map((d) => d.id));
+    this.transactions = this.transactions.filter((t) => !gone.has(t.id));
+    return changes.create.map((t) => this.addTransaction(t));
+  }
 }

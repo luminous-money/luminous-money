@@ -268,6 +268,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/transactions/changes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Apply Changes
+     * @description Create and delete transactions in one atomic write: all of it, or none. Returns the
+     *     created ones.
+     */
+    post: operations["apply_changes_api_ledger_v1_books__book_id__transactions_changes_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/transactions/{directive_id}": {
     parameters: {
       query?: never;
@@ -476,6 +497,16 @@ export interface components {
        */
       total?: string | null;
     };
+    /** Deletion */
+    Deletion: {
+      /** Id */
+      id: string;
+      /**
+       * Updated At
+       * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       */
+      updated_at: string;
+    };
     /**
      * Directive
      * @description Any directive, as its canonical Beancount text plus the columns derived from it.
@@ -665,6 +696,19 @@ export interface components {
        * @description Changes on every write; send it back with edits.
        */
       updated_at: string;
+    };
+    /**
+     * TransactionChanges
+     * @description Transactions to create and delete, in one write: all of it, or none.
+     */
+    TransactionChanges: {
+      /** Create */
+      create?: components["schemas"]["TransactionIn"][];
+      /**
+       * Delete
+       * @description Each with the version read.
+       */
+      delete?: components["schemas"]["Deletion"][];
     };
     /** TransactionIn */
     TransactionIn: {
@@ -1553,6 +1597,48 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["Transaction"][];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  apply_changes_api_ledger_v1_books__book_id__transactions_changes_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TransactionChanges"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Transaction"][];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {

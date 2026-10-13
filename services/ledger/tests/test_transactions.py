@@ -179,3 +179,27 @@ def test_json_api_over_http(book):
     assert client.post("/api/ledger/v1/books/book/transactions", json={**COFFEE, "postings": []}).status_code == 422
     assert client.post("/api/ledger/v1/books/book/transactions", json={**COFFEE, "flag": "x"}).status_code == 422
     assert client.get("/api/ledger/v1/books/book/transactions/missing").status_code == 404
+
+
+def test_changes_create_and_delete_in_one_write_or_not_at_all(book):
+    client = http(book)
+    url = "/api/ledger/v1/books/book/transactions"
+    old = client.post(url, json=COFFEE).json()
+    before = len(book.transactions("book", limit=None))
+
+    stale = client.post(
+        f"{url}/changes", json={"create": [COFFEE], "delete": [{"id": old["id"], "updated_at": "2000-01-01T00:00:00.000000Z"}]}
+    )
+    assert stale.status_code == 409
+    assert len(book.transactions("book", limit=None)) == before  # nothing created either
+
+    done = client.post(
+        f"{url}/changes", json={"create": [COFFEE, COFFEE], "delete": [{"id": old["id"], "updated_at": old["updated_at"]}]}
+    )
+    assert done.status_code == 200
+    assert len(done.json()) == 2
+    assert len(book.transactions("book", limit=None)) == before + 1
+    assert client.get(f"{url}/{old['id']}").status_code == 404
+    assert client.post(
+        f"{url}/changes", json={"delete": [{"id": old["id"], "updated_at": old["updated_at"]}]}
+    ).status_code == 404

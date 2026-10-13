@@ -1,35 +1,9 @@
 /** M1 and M2 through the real stack: sessions, owned books, accounts with opening balances and
  * stars, ledgers and CSV imports. */
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
 import { before, describe, it } from "node:test";
 
-import { createLedgerClient } from "@fava-beans/ledger-client";
-
-import { BASE_URL, stackIsUp } from "./support.ts";
-
-/** A user of the suite's own (the e2e stack runs auth with AUTH_TEST_USERS). */
-async function newUser() {
-  const email = `e2e-${randomBytes(4).toString("hex")}@test.local`;
-  const response = await fetch(`${BASE_URL}/api/auth/v1/login`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email }),
-  });
-  const { token, user } = (await response.json()) as { token: string; user: { id: string } };
-  const headers = { authorization: `Bearer ${token}` };
-  return {
-    id: user.id,
-    token,
-    response,
-    ledger: createLedgerClient({ baseUrl: BASE_URL, headers }),
-    app: (path: string, init: RequestInit = {}) =>
-      fetch(`${BASE_URL}/api/app/v1${path}`, {
-        ...init,
-        headers: { ...headers, ...(init.headers as Record<string, string>) },
-      }),
-  };
-}
+import { BASE_URL, newUser, stackIsUp } from "./support.ts";
 
 async function withAccount() {
   const user = await newUser();

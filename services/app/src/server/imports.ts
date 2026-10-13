@@ -20,7 +20,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { applyProfile, fits, type CsvProfile, type Row } from "@fava-beans/csv-import";
 import { now } from "@fava-beans/db";
-import type { TransactionIn } from "@fava-beans/ledger-client";
+import type { Account, TransactionIn } from "@fava-beans/ledger-client";
 
 import type { ImportResult, ImportRow, Outcome } from "../shared/imports.js";
 import type { AppDb } from "./db.js";
@@ -41,6 +41,53 @@ export class ImportProblem extends Error {
   ) {
     super(message);
   }
+}
+
+/** What staging a row needs, so it can be staged again later (when a match is undone). */
+export type Stageable = {
+  date: string;
+  amount: string;
+  description: string;
+  payee: string | null;
+  fingerprint: string;
+};
+
+/** A row as a pending transaction in `account`, uncategorized on the other side. */
+export function stagedTransaction(
+  account: string,
+  currency: string,
+  batchId: string,
+  row: Stageable
+): TransactionIn {
+  return {
+    date: row.date,
+    flag: "!",
+    payee: row.payee,
+    narration: row.description,
+    tags: [],
+    links: [],
+    meta: { source: "csv", "import-batch": batchId, "import-id": row.fingerprint },
+    postings: [
+      { account, units: { number: row.amount, currency } },
+      { account: row.amount.startsWith("-") ? UNCATEGORIZED.out : UNCATEGORIZED.in },
+    ],
+  };
+}
+
+/** Open the uncategorized accounts staging `rows` needs, if they aren't already. */
+export async function ensureUncategorized(
+  ledger: LedgerPort,
+  book: string,
+  rows: Stageable[],
+  accounts?: Account[]
+): Promise<void> {
+  const needed = new Set(
+    rows.map((row) => (row.amount.startsWith("-") ? UNCATEGORIZED.out : UNCATEGORIZED.in))
+  );
+  const existing = new Set(
+    (accounts ?? (await ledger.accounts(book))).filter((a) => !a.implicit).map((a) => a.name)
+  );
+  for (const name of needed) if (!existing.has(name)) await ledger.createAccount(book, name);
 }
 
 /**
@@ -158,31 +205,24 @@ export async function importFile({
   const batchId = randomUUID().replace(/-/g, "");
   const ids = new Map<number, string>(assigned);
   if (stage.length) {
-    const needed = new Set(
-      stage.map((row) => (row.amount!.startsWith("-") ? UNCATEGORIZED.out : UNCATEGORIZED.in))
-    );
-    const existing = new Set(accounts.filter((a) => !a.implicit).map((a) => a.name));
-    for (const name of needed) if (!existing.has(name)) await ledger.createAccount(book, name);
-
-    const transactions: TransactionIn[] = stage.map((row) => ({
+    const staging = stage.map((row) => ({
       date: row.date!,
-      flag: "!",
+      amount: row.amount!,
+      description: row.description,
       payee: row.payee,
-      narration: row.description,
-      tags: [],
-      links: [],
-      meta: { source: "csv", "import-batch": batchId, "import-id": prints[rows.indexOf(row)]! },
-      postings: [
-        { account, units: { number: row.amount!, currency } },
-        { account: row.amount!.startsWith("-") ? UNCATEGORIZED.out : UNCATEGORIZED.in },
-      ],
+      fingerprint: prints[rows.indexOf(row)]!,
     }));
-    const created = await ledger.createTransactions(book, transactions);
+    await ensureUncategorized(ledger, book, staging, accounts);
+    const created = await ledger.createTransactions(
+      book,
+      staging.map((row) => stagedTransaction(account, currency, batchId, row))
+    );
     stage.forEach((row, i) => ids.set(row.line, created[i]!.id));
   }
 
   const results: ImportRow[] = rows.map((row, i) => ({
     line: row.line,
+    payee: row.payee,
     date: row.date,
     amount: row.amount,
     description: row.description,

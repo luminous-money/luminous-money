@@ -57,12 +57,10 @@ How it's put together:
 
 ## Next steps
 
-1. **Finish M2** ([plan](docs/milestones/m2-credit-card/PLAN.md)). Done: slice 1 (starred
-   accounts replace money accounts; accounts added by full name with an optional opening
-   balance; import into any open leaf), slice 2 (liabilities and income shown inverted) and
-   slice 3 (imports match transactions already in the account, one row per transaction,
-   proposed for review). Next: slice 4 (`assign` and the ledger's `changes`) and 5 (reviewing
-   matches).
+1. **Finish M2** ([plan](docs/milestones/m2-credit-card/PLAN.md)). Done: slices 1–4 (starred
+   accounts; display signs; imports match transactions already in the account; `assign`
+   (move, swap, not a match) and confirm in `app`, over the ledger's atomic
+   `/transactions/changes`). Next: slice 5, reviewing matches in the review queue.
 
 ## Gotchas
 

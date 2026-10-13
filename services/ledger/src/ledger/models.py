@@ -98,6 +98,18 @@ class TransactionUpdate(TransactionIn):
     updated_at: Version
 
 
+class Deletion(Strict):
+    id: str
+    updated_at: Version
+
+
+class TransactionChanges(Strict):
+    """Transactions to create and delete, in one write: all of it, or none."""
+
+    create: list[TransactionIn] = Field(default_factory=list)
+    delete: list[Deletion] = Field(default_factory=list, description="Each with the version read.")
+
+
 class TransactionPatch(Strict):
     """Change only the fields given. `postings`, when given, replaces all of them."""
 

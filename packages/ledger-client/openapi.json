@@ -457,6 +457,26 @@
         "title": "Cost",
         "type": "object"
       },
+      "Deletion": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "updated_at"
+        ],
+        "title": "Deletion",
+        "type": "object"
+      },
       "Directive": {
         "description": "Any directive, as its canonical Beancount text plus the columns derived from it.",
         "properties": {
@@ -938,6 +958,29 @@
           "updated_at"
         ],
         "title": "Transaction",
+        "type": "object"
+      },
+      "TransactionChanges": {
+        "additionalProperties": false,
+        "description": "Transactions to create and delete, in one write: all of it, or none.",
+        "properties": {
+          "create": {
+            "items": {
+              "$ref": "#/components/schemas/TransactionIn"
+            },
+            "title": "Create",
+            "type": "array"
+          },
+          "delete": {
+            "description": "Each with the version read.",
+            "items": {
+              "$ref": "#/components/schemas/Deletion"
+            },
+            "title": "Delete",
+            "type": "array"
+          }
+        },
+        "title": "TransactionChanges",
         "type": "object"
       },
       "TransactionIn": {
@@ -2509,6 +2552,63 @@
           }
         },
         "summary": "Create Transactions"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/transactions/changes": {
+      "post": {
+        "description": "Create and delete transactions in one atomic write: all of it, or none. Returns the\ncreated ones.",
+        "operationId": "apply_changes_api_ledger_v1_books__book_id__transactions_changes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionChanges"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Transaction"
+                  },
+                  "title": "Response Apply Changes Api Ledger V1 Books  Book Id  Transactions Changes Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Changes"
       }
     },
     "/api/ledger/v1/books/{book_id}/transactions/{directive_id}": {

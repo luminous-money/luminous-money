@@ -418,6 +418,22 @@ class Ledger:
             self._write(book_id, directives)
         return directives
 
+    def apply_changes(self, book_id: str, changes: models.TransactionChanges) -> list[engine.Directive]:
+        """Create and delete transactions in one atomic write: all of it, or none. A deletion
+        whose version has moved on refuses the whole write (StaleVersion)."""
+        self._header(book_id)
+        kinds = self._kinds(book_id)
+        created = [self._postable(book_id, engine.transaction_directive(t), kinds) for t in changes.create]
+        with self.store.transaction():
+            for d in changes.delete:
+                row = self.store.get(book_id, d.id)
+                if row is None or row.deleted or row.kind != "transaction":
+                    raise NotFound(d.id)
+                self.store.check_version(book_id, d.id, d.updated_at)
+            self._write(book_id, created)
+            self.store.delete(book_id, [d.id for d in changes.delete])
+        return created
+
     def _default_open(self, book_id: str, parent: models.Account, tree: dict[str, models.Account]) -> datetime.date:
         """Early enough for the account to take any of the book's transactions."""
         if parent.open:
