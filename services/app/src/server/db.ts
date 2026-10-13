@@ -2,6 +2,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  after,
   createTable,
   migrate,
   now,
@@ -12,6 +13,7 @@ import {
 } from "@fava-beans/db";
 
 import type { CsvProfile, ImportBatch, ImportRow } from "../shared/imports.js";
+import type { Occurrence, Rule, TransactionTemplate } from "../shared/schedule.js";
 
 export const MIGRATIONS: Migration[] = [
   [
@@ -83,9 +85,67 @@ export const MIGRATIONS: Migration[] = [
   ],
   // 5: a row's payee, so it can be staged again when a match is undone.
   ["ALTER TABLE import_row ADD COLUMN payee TEXT"],
+  // 6: scheduled transactions (M3). A schedule is a rule plus a transaction template; each
+  // occurrence it stages is recorded, and `generated_through` is the last nominal date
+  // considered, so edits never backfill and deleted occurrences don't come back.
+  [
+    createTable("schedule", [
+      "id TEXT PRIMARY KEY",
+      "user_id TEXT NOT NULL", // the owner: the generator acts as them
+      "book_id TEXT NOT NULL",
+      "name TEXT NOT NULL",
+      "rule TEXT NOT NULL", // JSON: Rule
+      "template TEXT NOT NULL", // JSON: TransactionTemplate
+      "paused INTEGER NOT NULL DEFAULT 0",
+      "generated_through TEXT",
+      "last_error TEXT",
+    ]),
+    "CREATE INDEX schedule_book ON schedule(book_id)",
+    createTable(
+      "schedule_occurrence",
+      [
+        "schedule_id TEXT NOT NULL",
+        "nominal TEXT NOT NULL",
+        "date TEXT NOT NULL",
+        "transaction_id TEXT NOT NULL",
+      ],
+      ["PRIMARY KEY (schedule_id, nominal)"]
+    ),
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
+
+/** A schedule as stored, with its owner. */
+export type StoredSchedule = {
+  id: string;
+  user_id: string;
+  book_id: string;
+  name: string;
+  rule: Rule;
+  template: TransactionTemplate;
+  paused: boolean;
+  generated_through: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** An edit based on a version that has moved on. */
+export class StaleVersion extends Error {}
+
+type ScheduleRecord = Omit<StoredSchedule, "rule" | "template" | "paused"> & {
+  rule: string;
+  template: string;
+  paused: number;
+};
+
+const toSchedule = (r: ScheduleRecord): StoredSchedule => ({
+  ...r,
+  rule: JSON.parse(r.rule) as Rule,
+  template: JSON.parse(r.template) as TransactionTemplate,
+  paused: r.paused === 1,
+});
 
 /** An `import_row` as stored: candidates as JSON. */
 type RowRecord = Omit<StoredRow, "candidates"> & { batch_id: string; candidates: string };
@@ -350,5 +410,127 @@ export class AppDb {
       )
       .all(book) as { account: string; last: string }[];
     return Object.fromEntries(rows.map((r) => [r.account, r.last]));
+  }
+
+  // Schedules
+
+  schedules(book: string): StoredSchedule[] {
+    const rows = this.db
+      .prepare("SELECT * FROM schedule WHERE book_id = ? ORDER BY name, created_at")
+      .all(book) as ScheduleRecord[];
+    return rows.map(toSchedule);
+  }
+
+  /** Every schedule that isn't paused, in every book: what the generator runs over. */
+  activeSchedules(): StoredSchedule[] {
+    const rows = this.db
+      .prepare("SELECT * FROM schedule WHERE paused = 0 ORDER BY created_at")
+      .all() as ScheduleRecord[];
+    return rows.map(toSchedule);
+  }
+
+  schedule(book: string, id: string): StoredSchedule | undefined {
+    const r = this.db
+      .prepare("SELECT * FROM schedule WHERE book_id = ? AND id = ?")
+      .get(book, id) as ScheduleRecord | undefined;
+    return r && toSchedule(r);
+  }
+
+  addSchedule(
+    s: Pick<StoredSchedule, "user_id" | "book_id" | "name" | "rule" | "template" | "paused">
+  ): string {
+    const id = randomUUID().replace(/-/g, "");
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO schedule (id, user_id, book_id, name, rule, template, paused, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        id,
+        s.user_id,
+        s.book_id,
+        s.name,
+        JSON.stringify(s.rule),
+        JSON.stringify(s.template),
+        s.paused ? 1 : 0,
+        stamp,
+        stamp
+      );
+    return id;
+  }
+
+  /** Change a schedule's name, rule, template or pause, against the version read. */
+  updateSchedule(
+    book: string,
+    id: string,
+    expected: string,
+    changes: Partial<
+      Pick<StoredSchedule, "name" | "rule" | "template" | "paused" | "generated_through">
+    >
+  ): void {
+    transaction(this.db, () => {
+      const current = this.schedule(book, id);
+      if (!current) throw new Error(`no schedule ${id}`);
+      if (current.updated_at !== expected)
+        throw new StaleVersion("the schedule changed since it was read");
+      const next = { ...current, ...changes };
+      this.db
+        .prepare(
+          `UPDATE schedule SET name = ?, rule = ?, template = ?, paused = ?, generated_through = ?,
+             last_error = NULL, updated_at = ? WHERE id = ?`
+        )
+        .run(
+          next.name,
+          JSON.stringify(next.rule),
+          JSON.stringify(next.template),
+          next.paused ? 1 : 0,
+          next.generated_through,
+          after(current.updated_at),
+          id
+        );
+    });
+  }
+
+  deleteSchedule(book: string, id: string, expected: string): void {
+    transaction(this.db, () => {
+      const current = this.schedule(book, id);
+      if (!current) throw new Error(`no schedule ${id}`);
+      if (current.updated_at !== expected)
+        throw new StaleVersion("the schedule changed since it was read");
+      this.db.prepare("DELETE FROM schedule WHERE id = ?").run(id);
+    });
+  }
+
+  /** Record the occurrences a schedule just staged, and move its generated-through date to the
+   * last of them. Generator bookkeeping, not an edit: the version doesn't change. */
+  recordOccurrences(id: string, staged: (Occurrence & { transaction_id: string })[]): void {
+    const stamp = now();
+    transaction(this.db, () => {
+      const insert = this.db.prepare(
+        `INSERT INTO schedule_occurrence (schedule_id, nominal, date, transaction_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      );
+      for (const o of staged) insert.run(id, o.nominal, o.date, o.transaction_id, stamp, stamp);
+      this.db
+        .prepare("UPDATE schedule SET generated_through = ?, last_error = NULL WHERE id = ?")
+        .run(staged.at(-1)!.nominal, id);
+    });
+  }
+
+  /** Remember why a schedule couldn't stage its occurrences (null clears it). */
+  setScheduleError(id: string, error: string | null): void {
+    this.db.prepare("UPDATE schedule SET last_error = ? WHERE id = ?").run(error, id);
+  }
+
+  /** Which transactions in the book schedules staged: transaction ID to schedule ID. */
+  scheduledTransactions(book: string): Record<string, string> {
+    const rows = this.db
+      .prepare(
+        `SELECT o.transaction_id, o.schedule_id FROM schedule_occurrence o
+         JOIN schedule s ON s.id = o.schedule_id WHERE s.book_id = ?`
+      )
+      .all(book) as { transaction_id: string; schedule_id: string }[];
+    return Object.fromEntries(rows.map((r) => [r.transaction_id, r.schedule_id]));
   }
 }

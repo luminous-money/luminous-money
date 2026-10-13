@@ -10,6 +10,17 @@ import type { CsvProfile } from "@fava-beans/csv-import";
 import type { AppDb } from "./db.js";
 import { ImportProblem, importFile } from "./imports.js";
 import { assignRow, confirmRow, MatchProblem, proposedMatches } from "./matches.js";
+import type { ScheduleIn, SchedulePatch } from "../shared/schedule.js";
+import { StaleVersion } from "./db.js";
+import {
+  createSchedule,
+  editSchedule,
+  runSchedules,
+  ScheduleProblem,
+  today,
+  upcomingOccurrences,
+  view,
+} from "./schedules.js";
 import type { LedgerPort } from "./ledger.js";
 
 type Env = { Variables: { user: string } };
@@ -171,6 +182,88 @@ export function createApi({
     } catch (error) {
       return c.json(...matchError(error));
     }
+  });
+
+  // Schedules
+
+  const scheduleError = (error: unknown): readonly [{ detail: string }, 404 | 409 | 422] => {
+    if (error instanceof ScheduleProblem) return [{ detail: error.message }, error.status];
+    if (error instanceof StaleVersion) return [{ detail: error.message }, 409];
+    throw error;
+  };
+
+  api.get("/books/:book/schedules", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    return c.json(db.schedules(book).map(view));
+  });
+
+  /** Create a schedule, and stage any occurrences already due (from its start). */
+  api.post("/books/:book/schedules", async (c) => {
+    const { book } = c.req.param();
+    const input = (await c.req.json().catch(() => null)) as ScheduleIn | null;
+    try {
+      const made = await createSchedule({ db, ledgerFor, user: c.get("user"), book, input });
+      return c.json(made, 201);
+    } catch (error) {
+      return c.json(...scheduleError(error));
+    }
+  });
+
+  /** Occurrences still to come over the next `days` (30 by default). */
+  api.get("/books/:book/schedules/upcoming", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    const days = Math.min(Number(c.req.query("days") ?? 30) || 30, 366);
+    return c.json(upcomingOccurrences(db, book, today(), days));
+  });
+
+  /** Which transactions schedules staged: transaction ID to schedule ID. */
+  api.get("/books/:book/schedules/occurrences", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    return c.json(db.scheduledTransactions(book));
+  });
+
+  /** Stage the book's due occurrences now (the generator also runs hourly). */
+  api.post("/books/:book/schedules/run", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    const staged = await runSchedules({ db, ledgerFor, book });
+    return c.json({ staged, schedules: db.schedules(book).map(view) });
+  });
+
+  api.get("/books/:book/schedules/:id", async (c) => {
+    const { book, id } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    const found = db.schedule(book, id);
+    return found ? c.json(view(found)) : c.json({ detail: "not found" }, 404);
+  });
+
+  /** Change a schedule (only the fields sent), against `updated_at`. Applies to occurrences
+   * still to come. */
+  api.patch("/books/:book/schedules/:id", async (c) => {
+    const { book, id } = c.req.param();
+    const patch = (await c.req.json().catch(() => null)) as SchedulePatch | null;
+    try {
+      return c.json(await editSchedule({ db, ledgerFor, user: c.get("user"), book, id, patch }));
+    } catch (error) {
+      return c.json(...scheduleError(error));
+    }
+  });
+
+  /** Delete a schedule, against `?updated_at=`. What it staged stays in the books. */
+  api.delete("/books/:book/schedules/:id", async (c) => {
+    const { book, id } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    if (!db.schedule(book, id)) return c.json({ detail: "not found" }, 404);
+    try {
+      db.deleteSchedule(book, id, c.req.query("updated_at") ?? "");
+    } catch (error) {
+      if (error instanceof StaleVersion) return c.json({ detail: error.message }, 409);
+      throw error;
+    }
+    return c.body(null, 204);
   });
 
   api.get("/books/:book/imports", async (c) => {
