@@ -22,7 +22,7 @@ import { upcomingFor } from "../lib/upcoming.js";
  * account (putting it on the home page) and links to importing into it. Amounts and balances
  * are shown as the account reads (a card's balance is what's owed); colors follow the stored
  * sign, the effect on net worth. Transactions a schedule staged are marked ↻, and its
- * occurrences coming in the next 30 days show above, grayed, with the projected balance.
+ * occurrences coming in the next UPCOMING_DAYS (16) days show above, grayed, with the projected balance.
  */
 export function AccountLedger({ book, account }: { book: string; account: string }) {
   const [, navigate] = useLocation();

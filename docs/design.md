@@ -501,7 +501,7 @@ As built in M3 (single-book; legs across books are M9):
 - **Editing resets a schedule to now:** its unconfirmed occurrences from today on are deleted
   (not ones an import matched) and staged again as edited; dates already past are never staged
   by an edit.
-- **Upcoming occurrences** (30 days) show in account ledgers as grayed rows with a projected
+- **Upcoming occurrences** (16 days) show in account ledgers as grayed rows with a projected
   balance, and on the Schedules page.
 - **Failures are per schedule:** the error is kept and shown, and retried on the next run.
 

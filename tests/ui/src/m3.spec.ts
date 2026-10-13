@@ -16,7 +16,7 @@ test("Repeat… makes a monthly schedule that stages what's due, marked ↻ in t
   const { data: paid } = await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
     params: { path: { book_id: book.id } },
     body: {
-      date: day(-40),
+      date: day(-50), // repeats from about day -20, and again within the upcoming window
       flag: "*",
       payee: "Landlord",
       narration: "Rent",

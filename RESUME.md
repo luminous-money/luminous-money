@@ -28,7 +28,7 @@ What a user can do now:
     confirm.
   - "Not this time" in review drops an occurrence for good; editing a schedule restages its
     unconfirmed occurrences from today.
-  - The Schedules page lists them and what's coming in 30 days; ledgers show what's coming as
+  - The Schedules page lists them and what's coming in 16 days; ledgers show what's coming as
     grayed rows with a projected balance.
 - **Manage books** also sets each book's time zone (new books take the browser's).
 - **An account's ledger:**
@@ -76,7 +76,9 @@ How it's put together:
 
 ## Next steps
 
-1. Say `elaborate plan for M4` (categorization).
+1. **Answer M4's [questions](docs/milestones/m4-categorization/PLAN.md#questions)**
+   (thresholds, auto-confirm, payees, rules vs history, "similar", re-running rules, the
+   external slot, acceptance tracking), then build M4.
 
 ## Gotchas
 

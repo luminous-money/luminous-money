@@ -69,7 +69,9 @@ milestone starts.
       2026-10-13 ([plan](milestones/m3-scheduled-transactions/PLAN.md)), with the answers to its
       questions: daily runs, per-split match tolerances, upcoming rows with projected balances,
       auto-confirm, book time zones, and "Not this time".
-- [ ] **M4: Categorization.** The categorization engine.
+- [ ] **M4: Categorization.** The categorization engine. Planned 2026-10-13
+      ([plan](milestones/m4-categorization/PLAN.md)), with
+      [questions](milestones/m4-categorization/PLAN.md#questions) open.
 - [ ] **M5: Investment accounts.** Lean on what Beancount already provides. The main
       deliverable: storing non-currency holdings, with a currency representation of their value.
 - [ ] **M6: Auth.** Account creation, log in, log out, book ownership and permissions.

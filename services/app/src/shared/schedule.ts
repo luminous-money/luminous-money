@@ -14,6 +14,9 @@
  * Dates are ISO strings (YYYY-MM-DD), computed in UTC so no time zone shifts them.
  */
 
+/** How far ahead "upcoming" looks: the Schedules page, and the grayed rows in ledgers. */
+export const UPCOMING_DAYS = 16;
+
 export type Unit = "day" | "week" | "month" | "year";
 export type Weekend = "keep" | "before" | "after";
 

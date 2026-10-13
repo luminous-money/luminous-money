@@ -77,7 +77,8 @@ M3 is single-book. Schedules whose legs straddle books (the salary case in the d
 
 - **A Schedules page** (in the menu):
   - each schedule's name, rule in words, next date, and amount; paused and failing ones marked
-  - **Upcoming:** every occurrence in the next 30 days, across schedules
+  - **Upcoming:** every occurrence in the next 16 days, across schedules (first built with
+    30; changed 2026-10-13)
   - "New schedule"
 - **The schedule editor:**
   - name; the transaction (payee, description, and the same splits editor as the transaction

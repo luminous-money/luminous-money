@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 
-import { describe, type TransactionTemplate } from "../../shared/schedule.js";
+import { describe, UPCOMING_DAYS, type TransactionTemplate } from "../../shared/schedule.js";
 import { formatMoney } from "../lib/decimal.js";
 import { explain, useSchedules, useUpcoming } from "../lib/queries.js";
 
@@ -12,7 +12,7 @@ function amount(template: TransactionTemplate): string {
 
 /**
  * Schedules: each one's rule in words, what it stages next and for how much (paused and failing
- * ones marked), then everything coming up in the next 30 days.
+ * ones marked), then everything coming up in the next UPCOMING_DAYS days.
  */
 export function Schedules({ book }: { book: string }) {
   const schedules = useSchedules(book);
@@ -60,7 +60,7 @@ export function Schedules({ book }: { book: string }) {
 
       {upcoming.data && upcoming.data.length > 0 && (
         <section className="card" aria-label="Upcoming">
-          <h2 className="section-title">Coming up in the next 30 days</h2>
+          <h2 className="section-title">Coming up in the next {UPCOMING_DAYS} days</h2>
           <ol className="upcoming">
             {upcoming.data.map((o) => (
               <li key={`${o.schedule_id}:${o.nominal}`}>

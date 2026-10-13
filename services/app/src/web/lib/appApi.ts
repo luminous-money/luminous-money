@@ -1,10 +1,11 @@
 /** The app API (imports and CSV profiles), at /api/app/v1 on the same origin. */
 import type { CsvProfile, ImportBatch, ImportResult, ProposedMatch } from "../../shared/imports.js";
-import type {
-  Schedule,
-  ScheduleIn,
-  SchedulePatch,
-  UpcomingOccurrence,
+import {
+  UPCOMING_DAYS,
+  type Schedule,
+  type ScheduleIn,
+  type SchedulePatch,
+  type UpcomingOccurrence,
 } from "../../shared/schedule.js";
 import { ApiError } from "./ledger.js";
 
@@ -138,7 +139,7 @@ export const appApi = {
     if (!response.ok) await json(response);
   },
 
-  upcoming: async (book: string, days = 30): Promise<UpcomingOccurrence[]> =>
+  upcoming: async (book: string, days = UPCOMING_DAYS): Promise<UpcomingOccurrence[]> =>
     json(await fetch(`${base(book)}/schedules/upcoming?days=${days}`)),
 
   /** Transaction ID to schedule ID, for every transaction a schedule staged. */

@@ -10,7 +10,7 @@ import type { CsvProfile } from "@fava-beans/csv-import";
 import type { AppDb } from "./db.js";
 import { ImportProblem, importFile } from "./imports.js";
 import { assignRow, confirmRow, MatchProblem, proposedMatches } from "./matches.js";
-import type { ScheduleIn, SchedulePatch } from "../shared/schedule.js";
+import { UPCOMING_DAYS, type ScheduleIn, type SchedulePatch } from "../shared/schedule.js";
 import { StaleVersion } from "./db.js";
 import {
   createSchedule,
@@ -240,11 +240,11 @@ export function createApi({
     }
   });
 
-  /** Occurrences still to come over the next `days` (30 by default). */
+  /** Occurrences still to come over the next `days` (UPCOMING_DAYS by default). */
   api.get("/books/:book/schedules/upcoming", async (c) => {
     const { book } = c.req.param();
     if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
-    const days = Math.min(Number(c.req.query("days") ?? 30) || 30, 366);
+    const days = Math.min(Number(c.req.query("days") ?? UPCOMING_DAYS) || UPCOMING_DAYS, 366);
     return c.json(upcomingOccurrences(db, book, bookToday(db, book), days));
   });
 
