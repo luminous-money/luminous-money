@@ -1165,3 +1165,32 @@ button.plain {
   flex-basis: 100%;
   color: var(--muted);
 }
+
+/* Categorization in review */
+
+.proposal,
+.offer {
+  margin: 0.35rem 0 0;
+}
+
+.remember {
+  display: inline-block;
+  margin-top: 0.35rem;
+}
+
+.select-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--card);
+}
+
+.select-one {
+  margin-bottom: 0.4rem;
+}

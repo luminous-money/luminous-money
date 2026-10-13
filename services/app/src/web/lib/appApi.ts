@@ -7,6 +7,8 @@ import {
   type SchedulePatch,
   type UpcomingOccurrence,
 } from "../../shared/schedule.js";
+import type { CategoryRule, CategoryRuleIn, CategoryRulePatch } from "../../shared/rules.js";
+import type { ProposalSummary } from "../../shared/imports.js";
 import { ApiError } from "./ledger.js";
 
 export type {
@@ -15,7 +17,9 @@ export type {
   SchedulePatch,
   UpcomingOccurrence,
 } from "../../shared/schedule.js";
+export type { CategoryRule, CategoryRuleIn, RuleConditions } from "../../shared/rules.js";
 export type {
+  ProposalSummary,
   CsvProfile,
   ImportBatch,
   ImportResult,
@@ -160,6 +164,53 @@ export const appApi = {
         })
       )
     ).time_zone,
+
+  rules: async (book: string): Promise<CategoryRule[]> => json(await fetch(`${base(book)}/rules`)),
+
+  rule: async (book: string, id: string): Promise<CategoryRule> =>
+    json(await fetch(`${base(book)}/rules/${id}`)),
+
+  /** Create or change a rule; the answer says how many pending transactions it covers. */
+  saveRule: async (
+    book: string,
+    rule: CategoryRuleIn | CategoryRulePatch,
+    id?: string
+  ): Promise<CategoryRule & { covers: number }> =>
+    json(
+      await fetch(`${base(book)}/rules${id ? `/${id}` : ""}`, {
+        method: id ? "PATCH" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(rule),
+      })
+    ),
+
+  async deleteRule(book: string, rule: CategoryRule): Promise<void> {
+    const response = await fetch(
+      `${base(book)}/rules/${rule.id}?updated_at=${encodeURIComponent(rule.updated_at)}`,
+      { method: "DELETE" }
+    );
+    if (!response.ok) await json(response);
+  },
+
+  applyRule: async (book: string, id: string): Promise<{ applied: number }> =>
+    json(await fetch(`${base(book)}/rules/${id}/apply`, { method: "POST" })),
+
+  /** Transaction ID to what categorization proposed, for transactions still waiting. */
+  proposals: async (book: string): Promise<Record<string, ProposalSummary>> =>
+    json(await fetch(`${base(book)}/proposals`)),
+
+  /** Record whether a confirmed transaction kept its proposal (no proposal: nothing to do). */
+  settle: async (book: string, transaction: string): Promise<void> => {
+    await fetch(`${base(book)}/proposals/${transaction}/settle`, { method: "POST" });
+  },
+
+  suggest: async (book: string): Promise<{ suggested: number }> =>
+    json(await fetch(`${base(book)}/suggest`, { method: "POST" })),
+
+  categorizers: async (
+    book: string
+  ): Promise<{ name: string; settled: number; accepted: number }[]> =>
+    json(await fetch(`${base(book)}/categorizers`)),
 
   lastImports: async (book: string): Promise<Record<string, string>> =>
     json(await fetch(`${base(book)}/imports/latest`)),

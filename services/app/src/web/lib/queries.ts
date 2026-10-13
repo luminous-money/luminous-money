@@ -30,11 +30,14 @@ import type { AccountCreation } from "../components/AccountPicker.js";
 import {
   appApi,
   type CsvProfile,
+  type CategoryRule,
+  type CategoryRuleIn,
   type ProposedMatch,
   type Schedule,
   type ScheduleIn,
   type SchedulePatch,
 } from "./appApi.js";
+import type { CategoryRulePatch } from "../../shared/rules.js";
 import { api, ApiError, type TransactionChanges } from "./ledger.js";
 import { logIn, logOut, me, type User } from "./session.js";
 
@@ -66,6 +69,8 @@ export const keys = {
   profiles: (book: string, account: string) => ["book", book, "profiles", account] as const,
   queue: (book: string) => ["book", book, "queue"] as const,
   matches: (book: string) => ["book", book, "matches"] as const,
+  proposals: (book: string) => ["book", book, "proposals"] as const,
+  rules: (book: string) => ["book", book, "rules"] as const,
   schedules: (book: string) => ["book", book, "schedules"] as const,
   schedule: (book: string, id: string) => ["book", book, "schedules", id] as const,
   transaction: (book: string, id: string) => ["book", book, "transaction", id] as const,
@@ -337,6 +342,87 @@ export function useConfirmMatch(book: string) {
   });
 }
 
+// Categorization
+
+/** Transaction ID to what categorization proposed, for the review queue. */
+export function useProposals(book: string) {
+  return useQuery({ queryKey: keys.proposals(book), queryFn: () => appApi.proposals(book) });
+}
+
+/** Apply the same change to several transactions, each a versioned PATCH, in turn: "also
+ * categorize N similar", and Select mode. */
+export function useBulkEdit(book: string) {
+  return useMutation({
+    mutationFn: async ({
+      transactions,
+      change,
+    }: {
+      transactions: Transaction[];
+      change: (t: Transaction) => TransactionChanges;
+    }) => {
+      for (const t of transactions) {
+        const current = await latest(book, t.id);
+        remember(book, await api.patch(book, t.id, change(current), current.updated_at));
+      }
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+/** "Suggest categories" for pending transactions not yet categorized. */
+export function useSuggest(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => appApi.suggest(book),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+export function useRules(book: string) {
+  return useQuery({ queryKey: keys.rules(book), queryFn: () => appApi.rules(book) });
+}
+
+export function useRule(book: string, id: string | undefined) {
+  return useQuery({
+    queryKey: [...keys.rules(book), id ?? ""],
+    queryFn: () => appApi.rule(book, id!),
+    enabled: !!id,
+  });
+}
+
+export function useSaveRule(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, rule }: { id?: string; rule: CategoryRuleIn | CategoryRulePatch }) =>
+      appApi.saveRule(book, rule, id),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.rules(book) }),
+  });
+}
+
+export function useDeleteRule(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (rule: CategoryRule) => appApi.deleteRule(book, rule),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.rules(book) }),
+  });
+}
+
+/** Re-apply a rule to the pending transactions it covers. */
+export function useApplyRule(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => appApi.applyRule(book, id),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+export function useCategorizers(book: string) {
+  return useQuery({
+    queryKey: [...keys.rules(book), "categorizers"],
+    queryFn: () => appApi.categorizers(book),
+  });
+}
+
 // Schedules
 
 export function useSchedules(book: string) {
@@ -419,8 +505,13 @@ async function latest(book: string, id: string): Promise<Transaction> {
   );
 }
 
-/** Put a saved transaction everywhere it's cached. Confirmed ones leave the queue. */
+/** Put a saved transaction everywhere it's cached. Confirmed ones leave the queue; one that
+ * was pending has its proposal (if any) settled: was it kept? */
 function remember(book: string, saved: Transaction) {
+  const wasPending =
+    queryClient.getQueryData<Transaction[]>(keys.queue(book))?.some((t) => t.id === saved.id) ||
+    queryClient.getQueryData<Transaction>(keys.transaction(book, saved.id))?.flag === "!";
+  if (saved.flag === "*" && wasPending) void appApi.settle(book, saved.id);
   queryClient.setQueryData(keys.transaction(book, saved.id), saved);
   queryClient.setQueryData<Transaction[]>(keys.queue(book), (queue) =>
     queue?.flatMap((t) => (t.id !== saved.id ? [t] : saved.flag === "!" ? [saved] : []))

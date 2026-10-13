@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 
 import type { Candidate, ImportResult, Outcome } from "../lib/appApi.js";
+import { shortName } from "../lib/accounts.js";
 import { formatMoney } from "../lib/decimal.js";
 
 const OUTCOMES: Record<Outcome, string> = {
@@ -67,6 +68,15 @@ export function ImportResults({
             <p className="small">
               <span className={`pill outcome-${row.outcome}`}>{OUTCOMES[row.outcome]}</span>
               {row.error && <span className="error"> {row.error}</span>}
+              {row.outcome === "staged" && row.proposal?.categorizer && (
+                <span className="muted">
+                  {" "}
+                  as {row.proposal.accounts.map(shortName).join(", ")} ({row.proposal.categorizer}
+                  {row.proposal.confidence !== null &&
+                    `, ${Math.round(row.proposal.confidence * 100)}%`}
+                  )
+                </span>
+              )}
               {row.outcome === "matched" && (
                 <span className="muted">
                   {" "}

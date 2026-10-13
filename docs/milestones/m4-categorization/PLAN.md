@@ -1,7 +1,9 @@
 M4: Categorization: plan
 ==================================================================================================
 
-> **Status: in progress (2026-10-13); questions answered** (see [Answers](#answers-2026-10-13)). There's no separate spec: the milestone's line
+> **Status: built (2026-10-13),** with the [answers](#answers-2026-10-13) to its questions.
+> Every slice is done, with unit, API and browser tests. The external API is documented in
+> [docs/categorizer-api.md](../../categorizer-api.md). There's no separate spec: the milestone's line
 > in [the plan](../../PLAN.md) ("the categorization engine"), its notes there (bulk
 > categorization, the 14-month context, the resolver chain), and the design's
 > [resolver pipeline](../../design.md#the-resolver-pipeline-matching-and-categorization) are the

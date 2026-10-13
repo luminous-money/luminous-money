@@ -552,13 +552,28 @@ The default chain:
    - **Known miss:** pairing is by proximity, not order (two coffees entered on the 5th and 7th,
      imported on the 7th and 8th, pair crossed). Swapping fixes it; order-aware assignment is a
      Polish to-do.
-2. **`rules` (built in):** proposes postings from payee and amount history.
-3. **`external` (optional):** sends the remainder to a configured HTTP endpoint that implements the
-   same contract. That's how an LLM categorizer such as Cati (`~/Repos/cati`) plugs in later. The
-   Cati integration itself is out of scope for now.
+2. **Categorizers** (built in M4), after matching and assignment, for the rows to be staged:
+   - **`rules`:** the user's own rules (account, payee key, description text, amount range →
+     category, optional payee, optionally confirm automatically). The most specific match wins.
+   - **`history`:** what the same payee (by payee key, exact then similar; same account first)
+     was confirmed as in the last 14 months, with a confidence from agreement and volume, and
+     the payee the user last gave it.
+   - **External providers,** configured per installation (`CATEGORIZERS`), speaking the
+     [categorizer API](categorizer-api.md) we define as the system of record. Built-ins
+     implement the same contract, so a provider is a peer. That's how an LLM categorizer such
+     as Cati plugs in; the Cati integration itself is out of scope for now.
+
+   Each is asked only about rows not yet settled (a proposal at 0.9 or more settles one). Then
+   the most confident postings and payee are applied at **any** confidence: review is where
+   weak ones get corrected. Only a user's rule can confirm automatically. Proposals are kept in
+   `app`, shown in review with their source, and settled on confirm (accepted unchanged or
+   not), which gives an acceptance rate per categorizer; providers can get that as feedback.
 
 Resolution only proposes. Everything lands in the review queue (new transactions as `!`, matches
-as proposed), with the match or proposal shown and confirmable with one tap.
+as proposed), with the match or proposal shown and confirmable with one tap, except what a
+user's rule confirms automatically. Review also has "Suggest categories" (the chain over pending
+uncategorized transactions), "Also categorize N similar" (same payee key, same account), "Remember
+as a rule", and Select mode for categorizing or confirming many at once.
 
 #### Context
 

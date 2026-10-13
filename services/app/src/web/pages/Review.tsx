@@ -6,18 +6,24 @@ import { AccountName, AccountPicker, type AccountCreation } from "../components/
 import { Swipeable, type SwipeHandle } from "../components/Swipeable.js";
 import { postable, preferredRoots, shortName } from "../lib/accounts.js";
 import { add, formatMoney, isNegative, isZero, negate } from "../lib/decimal.js";
-import type { ProposedMatch } from "../lib/appApi.js";
+import { appApi, type ProposalSummary, type ProposedMatch } from "../lib/appApi.js";
+import { today } from "../lib/format.js";
+import { withBack } from "../lib/navigation.js";
+import { similarPending } from "../lib/similar.js";
 import {
   explain,
   readSkipped,
   useAccountCreation,
   useAccounts,
   useAssign,
+  useBulkEdit,
   useConfirmMatch,
   useDropOccurrence,
   useEditTransaction,
+  useProposals,
   useScheduled,
   useReviewQueue,
+  useSuggest,
   writeSkipped,
 } from "../lib/queries.js";
 import { simple, UNCATEGORIZED, withCounterpart } from "../lib/split.js";
@@ -25,13 +31,20 @@ import { simple, UNCATEGORIZED, withCounterpart } from "../lib/split.js";
 /**
  * The review queue: pending transactions to categorize and confirm, and imported rows matched
  * to transactions already in the account, whose matches are confirmed here too (or moved,
- * swapped, or undone).
+ * swapped, or undone). Categories proposed on import say where they came from. "Suggest
+ * categories" proposes for anything still uncategorized; Select mode categorizes or confirms
+ * many at once.
  */
 export function Review({ book }: { book: string }) {
   const queue = useReviewQueue(book);
   const accounts = useAccounts(book);
   const create = useAccountCreation(book);
   const scheduled = useScheduled(book);
+  const proposals = useProposals(book);
+  const suggest = useSuggest(book);
+  const bulk = useBulkEdit(book);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
   const [skipped, setSkipped] = useState(() => readSkipped(book));
   useEffect(() => writeSkipped(book, skipped), [book, skipped]);
 
@@ -41,6 +54,23 @@ export function Review({ book }: { book: string }) {
     ...items.filter((i) => !skipped.includes(i.transaction.id)),
     ...skipped.flatMap((id) => items.filter((i) => i.transaction.id === id)),
   ];
+  const queued = items.map((i) => i.transaction);
+  const chosen = ordered.filter((i) => selected.includes(i.transaction.id));
+  const toggle = (id: string) =>
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const categorizeChosen = (account: string) =>
+    bulk.mutate({
+      transactions: chosen.map((i) => i.transaction).filter((t) => simple(t)),
+      change: (t) => ({ postings: withCounterpart(t, account).postings }),
+    });
+  const confirmChosen = async () => {
+    await bulk.mutateAsync({
+      transactions: chosen.map((i) => i.transaction).filter((t) => t.flag === "!"),
+      change: () => ({ flag: "*" }),
+    });
+    for (const m of chosen.flatMap((i) => i.matches)) await appApi.confirmMatch(book, m);
+    setSelected([]);
+  };
 
   return (
     <main>
@@ -53,7 +83,52 @@ export function Review({ book }: { book: string }) {
           {book}
           {queue.items && ` · ${ordered.length} left`}
         </p>
+        <div className="actions">
+          <button type="button" disabled={suggest.isPending} onClick={() => suggest.mutate()}>
+            {suggest.isPending ? "Suggesting…" : "Suggest categories"}
+          </button>
+          <button
+            type="button"
+            aria-pressed={selecting}
+            onClick={() => (setSelecting((s) => !s), setSelected([]))}
+          >
+            {selecting ? "Done selecting" : "Select"}
+          </button>
+        </div>
+        {suggest.data && (
+          <p className="muted small" aria-live="polite">
+            {suggest.data.suggested
+              ? `Suggested categories for ${suggest.data.suggested}.`
+              : "Nothing new to suggest."}
+          </p>
+        )}
       </header>
+
+      {selecting && (
+        <div className="select-bar" role="toolbar" aria-label="Selected">
+          <span>{chosen.length} selected</span>
+          <AccountPicker
+            label="Categorize as"
+            accounts={accounts.data ? postable(accounts.data, today()) : []}
+            value=""
+            create={create}
+            onChange={categorizeChosen}
+          />
+          <button
+            type="button"
+            className="primary"
+            disabled={
+              !chosen.length ||
+              bulk.isPending ||
+              chosen.some((i) => i.transaction.postings.some((p) => p.account === UNCATEGORIZED))
+            }
+            onClick={() => void confirmChosen()}
+          >
+            Confirm {chosen.length || ""}
+          </button>
+          {bulk.error && <p className="error">{explain(bulk.error)}</p>}
+        </div>
+      )}
 
       {!queue.items && !queue.error && <p className="muted">Loading…</p>}
       {queue.error && <p className="card error">{explain(queue.error)}</p>}
@@ -69,6 +144,20 @@ export function Review({ book }: { book: string }) {
               transaction={t}
               matches={matches}
               scheduled={!!scheduled.data?.[t.id]}
+              proposal={proposals.data?.[t.id]}
+              similar={(account) => ({
+                account,
+                others: similarPending(t, queued, proposals.data),
+              })}
+              onCategorizeSimilar={(others, account) =>
+                bulk.mutate({
+                  transactions: others,
+                  change: (o) => ({ postings: withCounterpart(o, account).postings }),
+                })
+              }
+              selecting={selecting}
+              selected={selected.includes(t.id)}
+              onSelect={() => toggle(t.id)}
               accounts={accounts.data ? postable(accounts.data, t.date) : []}
               create={create}
               onSkip={() => setSkipped((s) => [...s.filter((x) => x !== t.id), t.id])}
@@ -87,6 +176,14 @@ type ItemProps = {
   matches: ProposedMatch[];
   /** Whether a schedule staged it (so it can be dropped: "Not this time"). */
   scheduled: boolean;
+  /** What categorization proposed for it, if anything. */
+  proposal: ProposalSummary | undefined;
+  /** After picking `account` for it: the similar pending transactions to offer it to. */
+  similar: (account: string) => { account: string; others: Transaction[] };
+  onCategorizeSimilar: (others: Transaction[], account: string) => void;
+  selecting: boolean;
+  selected: boolean;
+  onSelect: () => void;
   accounts: string[];
   create?: AccountCreation;
   onSkip: () => void;
@@ -97,10 +194,17 @@ function QueueItem({
   transaction: t,
   matches,
   scheduled,
+  proposal,
+  similar,
+  onCategorizeSimilar,
+  selecting,
+  selected,
+  onSelect,
   accounts,
   create,
   onSkip,
 }: ItemProps) {
+  const [offer, setOffer] = useState<{ account: string; others: Transaction[] } | null>(null);
   const edit = useEditTransaction(book, t.id);
   const drop = useDropOccurrence(book);
   const confirmMatch = useConfirmMatch(book);
@@ -154,6 +258,12 @@ function QueueItem({
         className={`card item${busy ? " busy" : ""}`}
         aria-label={`${t.payee ?? ""} ${t.narration}`}
       >
+        {selecting && (
+          <label className="check select-one">
+            <input type="checkbox" aria-label="Select" checked={selected} onChange={onSelect} />
+            Select
+          </label>
+        )}
         <div className="item-top">
           <span className="muted">
             {t.date}
@@ -188,8 +298,42 @@ function QueueItem({
               value={view.counterpart.account === UNCATEGORIZED ? "" : view.counterpart.account}
               prefer={preferredRoots(isNegative(view.amount))}
               create={create}
-              onChange={(account) => void save({ postings: withCounterpart(t, account).postings })}
+              onChange={(account) => {
+                void save({ postings: withCounterpart(t, account).postings });
+                const found = similar(account);
+                setOffer(found.others.length ? found : null);
+              }}
             />
+            {proposal?.categorizer && proposal.accounts[0] === view.counterpart.account && (
+              <p className="small muted proposal">
+                Suggested by {proposal.categorizer}
+                {proposal.confidence !== null &&
+                  ` (${Math.round(proposal.confidence * 100)}%)`}: {proposal.reason}
+              </p>
+            )}
+            {offer && (
+              <p className="small offer">
+                Also categorize {offer.others.length} similar as {shortName(offer.account)}?{" "}
+                <button
+                  type="button"
+                  className="plain"
+                  onClick={() => (onCategorizeSimilar(offer.others, offer.account), setOffer(null))}
+                >
+                  Yes
+                </button>{" "}
+                <button type="button" className="plain" onClick={() => setOffer(null)}>
+                  No
+                </button>
+              </p>
+            )}
+            {view.counterpart.account !== UNCATEGORIZED && (
+              <Link
+                className="small remember"
+                href={withBack(`/books/${book}/rules/new?from=${t.id}`, `/books/${book}/review`)}
+              >
+                Remember as a rule…
+              </Link>
+            )}
           </div>
         ) : (
           <ul className="splits">

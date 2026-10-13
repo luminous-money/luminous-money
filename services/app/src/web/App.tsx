@@ -10,6 +10,8 @@ import { Home } from "./pages/Home.js";
 import { Import } from "./pages/Import.js";
 import { Login } from "./pages/Login.js";
 import { Review } from "./pages/Review.js";
+import { RuleEditor } from "./pages/RuleEditor.js";
+import { Rules } from "./pages/Rules.js";
 import { ScheduleEditor } from "./pages/ScheduleEditor.js";
 import { Schedules } from "./pages/Schedules.js";
 import { Setup } from "./pages/Setup.js";
@@ -77,6 +79,13 @@ function Gate() {
           )}
         </Route>
         <Route path="/books/:book/import">{({ book: id }) => <Import key={id} book={id} />}</Route>
+        <Route path="/books/:book/rules">{({ book: id }) => <Rules book={id} />}</Route>
+        <Route path="/books/:book/rules/new">
+          {({ book: id }) => <RuleEditor key="new" book={id} />}
+        </Route>
+        <Route path="/books/:book/rules/:id">
+          {({ book: id, id: rule }) => <RuleEditor key={rule} book={id} id={rule} />}
+        </Route>
         <Route path="/books/:book/schedules">{({ book: id }) => <Schedules book={id} />}</Route>
         <Route path="/books/:book/schedules/new">
           {({ book: id }) => <ScheduleEditor key="new" book={id} />}

@@ -6,9 +6,9 @@ _Updated 2026-10-13._ Keep this current: every finalized change set updates it (
 
 ## State
 
-**M1, M2 and M3 are built.** M2 (credit cards, really "any account, and matching") and M3
-(scheduled transactions) are described in their plans. The milestones ahead (M4–M14, then
-Polish) are in [docs/PLAN.md](docs/PLAN.md).
+**M1 through M4 are built.** M2 (credit cards, really "any account, and matching"), M3
+(scheduled transactions) and M4 (categorization) are described in their plans. The milestones
+ahead (M5–M14, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
 - **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M6.
@@ -48,6 +48,12 @@ What a user can do now:
 - **Review:** pending transactions (skip, categorize, confirm, swipe, create accounts) and
   proposed matches: confirm, "Match with this instead", "Swap" (with the row holding a
   candidate), or "Not a match" (stages the row on its own).
+- **Categorization (M4):** imported rows are staged with a proposed category and clean payee:
+  from the user's **rules** (Rules page; can confirm automatically), from **history** (what the
+  same payee was confirmed as), or from **external providers** (`CATEGORIZERS`, speaking
+  [our API](docs/categorizer-api.md)). Review shows where each came from; "Suggest categories",
+  "Also categorize N similar", "Remember as a rule…" and Select mode speed it up. Acceptance
+  per categorizer shows on the Rules page.
 
 How it's put together:
 - **`services/auth`** (TypeScript): the stub user, JWT sessions in an HttpOnly cookie, and
@@ -60,25 +66,24 @@ How it's put together:
     migrations, backups and export.
 - **`services/app`** (TypeScript): the PWA, plus stars, CSV profiles, imports, the pipeline
   (`src/server/pipeline`: matcher, then assignment), match review (`src/server/matches.ts`) and
-  schedules (`src/shared/schedule.ts` for rules, `src/server/schedules.ts` for the generator), in
-  `app.sqlite`.
+  schedules (`src/shared/schedule.ts` for rules, `src/server/schedules.ts` for the generator), and
+  categorization (`src/server/categorize`: the chain, context, `rules`, `history`, external
+  providers; the external API's types in `src/shared/categorizer-api.ts`), in `app.sqlite`.
 - **`packages/db`** (TypeScript migrations and timestamps, with a lint check) and
   **`packages/csv-import`** (parsing, guessing profiles, reading rows; shared by the browser and
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 106 tests, including the table lint
-    - auth: 9; app: 95; db: 10; csv-import: 22
+    - ledger: 107 tests, including the table lint
+    - auth: 9; app: 114; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 43 API tests and 46 browser tests
+  - `pnpm e2e`: 47 API tests and 50 browser tests
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, with the demo
   seeded for the stub user: the "Demo" book, its checking account and card starred.
 
 ## Next steps
 
-1. **Answer M4's [questions](docs/milestones/m4-categorization/PLAN.md#questions)**
-   (thresholds, auto-confirm, payees, rules vs history, "similar", re-running rules, the
-   external slot, acceptance tracking), then build M4.
+1. Say `elaborate plan for M5` (investment accounts).
 
 ## Gotchas
 
