@@ -22,7 +22,10 @@ import { applyProfile, fits, type CsvProfile, type Row } from "@fava-beans/csv-i
 import { now } from "@fava-beans/db";
 import type { Account, TransactionIn } from "@fava-beans/ledger-client";
 
-import type { ImportResult, ImportRow, Outcome } from "../shared/imports.js";
+import type { ImportResult, ImportRow, Outcome, ProposalSummary } from "../shared/imports.js";
+import { categorize, stagedPostings } from "./categorize/chain.js";
+import { buildRequest } from "./categorize/context.js";
+import type { Categorizer, Chosen, Decision } from "./categorize/types.js";
 import type { AppDb } from "./db.js";
 import type { LedgerPort } from "./ledger.js";
 import { assign } from "./pipeline/assign.js";
@@ -52,25 +55,118 @@ export type Stageable = {
   fingerprint: string;
 };
 
-/** A row as a pending transaction in `account`, uncategorized on the other side. */
+/** A row as a transaction in `account`: pending, with the category and payee the chain
+ * decided (confirmed if a rule says so), or uncategorized on the other side. */
 export function stagedTransaction(
   account: string,
   currency: string,
   batchId: string,
-  row: Stageable
+  row: Stageable,
+  decision: Decision = {}
 ): TransactionIn {
+  const amount = { number: row.amount, currency };
+  const fallback = row.amount.startsWith("-") ? UNCATEGORIZED.out : UNCATEGORIZED.in;
   return {
     date: row.date,
-    flag: "!",
-    payee: row.payee,
+    flag: decision.category?.auto_confirm ? "*" : "!",
+    payee: decision.payee?.payee ?? row.payee,
     narration: row.description,
     tags: [],
     links: [],
     meta: { source: "csv", "import-batch": batchId, "import-id": row.fingerprint },
-    postings: [
-      { account, units: { number: row.amount, currency } },
-      { account: row.amount.startsWith("-") ? UNCATEGORIZED.out : UNCATEGORIZED.in },
-    ],
+    postings: stagedPostings(account, amount, decision.category, fallback),
+  };
+}
+
+/**
+ * Stage rows as transactions in `account`, categorized: the chain proposes a category and
+ * payee for each (from the book's last 14 months), and what it proposed is recorded for review
+ * and acceptance tracking. One atomic ledger write. Returns the created transactions' IDs, in
+ * order, and each one's proposal.
+ */
+export async function stageCategorized({
+  db,
+  ledger,
+  categorizers,
+  book,
+  account,
+  currency,
+  batchId,
+  rows,
+  accounts,
+}: {
+  db: AppDb;
+  ledger: LedgerPort;
+  categorizers: Categorizer[];
+  book: { id: string; name: string };
+  account: string;
+  currency: string;
+  batchId: string;
+  rows: Stageable[];
+  accounts?: Account[];
+}): Promise<{ ids: string[]; proposals: (ProposalSummary | null)[] }> {
+  const incoming = rows.map((row, i) => ({
+    id: `${batchId}:${i}`,
+    date: row.date,
+    account,
+    amount: { number: row.amount, currency },
+    description: row.description,
+    payee: row.payee,
+  }));
+  const request = categorizers.length ? await buildRequest(ledger, book, incoming) : undefined;
+  const decisions = request ? await categorize(categorizers, request) : new Map<string, Decision>();
+  const decided = incoming.map((t) => decisions.get(t.id) ?? {});
+
+  await ensureUncategorized(
+    ledger,
+    book.id,
+    rows.filter((_, i) => !decided[i]!.category),
+    accounts
+  );
+  const created = await ledger.createTransactions(
+    book.id,
+    rows.map((row, i) => stagedTransaction(account, currency, batchId, row, decided[i]))
+  );
+
+  const uses = new Map<string, number>();
+  const stored = created.flatMap((t, i) => {
+    const { category, payee } = decided[i]!;
+    if (category?.rule_id) uses.set(category.rule_id, (uses.get(category.rule_id) ?? 0) + 1);
+    if (!category && !payee) return [];
+    const { auto_confirm: _a, rule_id: _r, categorizer: _c, ...given } = category ?? ({} as Chosen);
+    return [
+      {
+        transaction_id: t.id,
+        book_id: book.id,
+        request_id: request!.request_id,
+        incoming_id: incoming[i]!.id,
+        categorizer: category?.categorizer ?? null,
+        confidence: category?.confidence ?? null,
+        reason: category?.reason ?? payee?.reason ?? null,
+        postings: category?.postings ?? null,
+        payee: payee?.payee ?? null,
+        payee_categorizer: payee?.categorizer ?? null,
+        proposal: category ? given : null,
+      },
+    ];
+  });
+  db.saveProposals(stored);
+  db.countRuleUses(uses);
+  return {
+    ids: created.map((t) => t.id),
+    proposals: decided.map((d) => summarize(d)),
+  };
+}
+
+/** What a decision amounts to, for import results and review. */
+export function summarize({ category, payee }: Decision): ProposalSummary | null {
+  if (!category && !payee) return null;
+  return {
+    categorizer: category?.categorizer ?? null,
+    accounts: category?.postings?.map((p) => p.account) ?? [],
+    payee: payee?.payee ?? null,
+    confidence: category?.confidence ?? null,
+    reason: category?.reason ?? payee?.reason ?? null,
   };
 }
 
@@ -119,6 +215,7 @@ export async function importFile({
   text,
   userId,
   windowDays = DEFAULT_WINDOW_DAYS,
+  categorizers = [],
 }: {
   db: AppDb;
   ledger: LedgerPort;
@@ -128,9 +225,11 @@ export async function importFile({
   text: string;
   userId: string;
   windowDays?: number;
+  /** The categorization chain (none: rows are staged uncategorized). */
+  categorizers?: Categorizer[];
 }): Promise<ImportResult> {
-  if (!(await ledger.book(book)))
-    throw new ImportProblem("no-such-book", `there's no book ${book}`);
+  const bookInfo = await ledger.book(book);
+  if (!bookInfo) throw new ImportProblem("no-such-book", `there's no book ${book}`);
   const [accounts, [target]] = await Promise.all([
     ledger.accounts(book),
     ledger.summary(book, [account]),
@@ -210,20 +309,29 @@ export async function importFile({
 
   const batchId = randomUUID().replace(/-/g, "");
   const ids = new Map<number, string>(assigned);
+  const proposals = new Map<number, ProposalSummary | null>();
   if (stage.length) {
-    const staging = stage.map((row) => ({
-      date: row.date!,
-      amount: row.amount!,
-      description: row.description,
-      payee: row.payee,
-      fingerprint: prints[rows.indexOf(row)]!,
-    }));
-    await ensureUncategorized(ledger, book, staging, accounts);
-    const created = await ledger.createTransactions(
-      book,
-      staging.map((row) => stagedTransaction(account, currency, batchId, row))
-    );
-    stage.forEach((row, i) => ids.set(row.line, created[i]!.id));
+    const staged = await stageCategorized({
+      db,
+      ledger,
+      categorizers,
+      book: { id: book, name: bookInfo.name },
+      account,
+      currency,
+      batchId,
+      accounts,
+      rows: stage.map((row) => ({
+        date: row.date!,
+        amount: row.amount!,
+        description: row.description,
+        payee: row.payee,
+        fingerprint: prints[rows.indexOf(row)]!,
+      })),
+    });
+    stage.forEach((row, i) => {
+      ids.set(row.line, staged.ids[i]!);
+      proposals.set(row.line, staged.proposals[i]!);
+    });
   }
 
   const results: ImportRow[] = rows.map((row, i) => ({
@@ -237,6 +345,7 @@ export async function importFile({
     transaction_id: ids.get(row.line) ?? null,
     candidates: resolutions.get(row.line) ?? [],
     match: resolutions.get(row.line)?.length ? "proposed" : null,
+    proposal: proposals.get(row.line) ?? null,
   }));
   const count = (outcome: Outcome) => outcomes.filter((o) => o === outcome).length;
   const batch = {

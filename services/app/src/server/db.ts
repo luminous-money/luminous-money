@@ -12,7 +12,8 @@ import {
   type Migration,
 } from "@fava-beans/db";
 
-import type { CsvProfile, ImportBatch, ImportRow } from "../shared/imports.js";
+import type { CsvProfile, ImportBatch, ImportRow, ProposalSummary } from "../shared/imports.js";
+import type { CategoryRule, CategoryRuleIn, RuleConditions } from "../shared/rules.js";
 import type { Occurrence, Rule, TransactionTemplate } from "../shared/schedule.js";
 
 export const MIGRATIONS: Migration[] = [
@@ -119,6 +120,37 @@ export const MIGRATIONS: Migration[] = [
     "ALTER TABLE schedule ADD COLUMN auto_confirm INTEGER NOT NULL DEFAULT 0",
     createTable("book_setting", ["book_id TEXT PRIMARY KEY", "time_zone TEXT NOT NULL"]),
   ],
+  // 8: categorization (M4). The user's rules, and the proposal each staged transaction got:
+  // which categorizer, how confident, why, and (once confirmed) whether it was accepted.
+  [
+    createTable("category_rule", [
+      "id TEXT PRIMARY KEY",
+      "book_id TEXT NOT NULL",
+      "name TEXT NOT NULL",
+      "conditions TEXT NOT NULL", // JSON: RuleConditions
+      "account TEXT NOT NULL",
+      "payee TEXT",
+      "auto_confirm INTEGER NOT NULL DEFAULT 0",
+      "applied INTEGER NOT NULL DEFAULT 0",
+    ]),
+    "CREATE INDEX category_rule_book ON category_rule(book_id)",
+    createTable("proposal", [
+      "transaction_id TEXT PRIMARY KEY",
+      "book_id TEXT NOT NULL",
+      "request_id TEXT NOT NULL",
+      "incoming_id TEXT NOT NULL", // the transaction's id in the categorizer request
+      "categorizer TEXT", // whose postings were applied; NULL if none proposed any
+      "confidence REAL",
+      "reason TEXT",
+      "postings TEXT", // JSON: the proposal's postings
+      "payee TEXT",
+      "payee_categorizer TEXT",
+      "proposal TEXT", // JSON: the winning proposal, as its categorizer gave it (for feedback)
+      "accepted INTEGER", // once confirmed: 1 if its postings were kept, 0 if changed
+      "payee_accepted INTEGER",
+    ]),
+    "CREATE INDEX proposal_book ON proposal(book_id)",
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -138,6 +170,54 @@ export type StoredSchedule = {
   created_at: string;
   updated_at: string;
 };
+
+/** The proposal a staged transaction got, as stored. */
+export type StoredProposal = {
+  transaction_id: string;
+  book_id: string;
+  request_id: string;
+  incoming_id: string;
+  categorizer: string | null;
+  confidence: number | null;
+  reason: string | null;
+  postings: { account: string; amount?: { number: string; currency: string } | null }[] | null;
+  payee: string | null;
+  payee_categorizer: string | null;
+  proposal: unknown;
+  accepted: boolean | null;
+  payee_accepted: boolean | null;
+};
+
+type ProposalRecord = Omit<
+  StoredProposal,
+  "postings" | "proposal" | "accepted" | "payee_accepted"
+> & {
+  postings: string | null;
+  proposal: string | null;
+  accepted: number | null;
+  payee_accepted: number | null;
+};
+
+const bool = (n: number | null) => (n === null ? null : n === 1);
+
+const toProposal = (r: ProposalRecord): StoredProposal => ({
+  ...r,
+  postings: r.postings ? JSON.parse(r.postings) : null,
+  proposal: r.proposal ? JSON.parse(r.proposal) : null,
+  accepted: bool(r.accepted),
+  payee_accepted: bool(r.payee_accepted),
+});
+
+type RuleRecord = Omit<CategoryRule, "conditions" | "auto_confirm"> & {
+  conditions: string;
+  auto_confirm: number;
+};
+
+const toRule = (r: RuleRecord): CategoryRule => ({
+  ...r,
+  conditions: JSON.parse(r.conditions) as RuleConditions,
+  auto_confirm: r.auto_confirm === 1,
+});
 
 /** An edit based on a version that has moved on. */
 export class StaleVersion extends Error {}
@@ -395,7 +475,16 @@ export class AppDb {
     const rows = this.db
       .prepare("SELECT * FROM import_row WHERE batch_id = ? ORDER BY line")
       .all(batchId) as RowRecord[];
-    return rows.map(toImportRow);
+    const proposals = new Map(
+      rows.flatMap((r) => {
+        const p =
+          r.transaction_id && r.outcome === "staged"
+            ? this.proposalOf(r.transaction_id)
+            : undefined;
+        return p ? [[r.line, p] as const] : [];
+      })
+    );
+    return rows.map((r) => ({ ...toImportRow(r), proposal: proposals.get(r.line) ?? null }));
   }
 
   batches(book: string, account?: string): ImportBatch[] {
@@ -609,5 +698,175 @@ export class AppDb {
       )
       .all(book) as { transaction_id: string; schedule_id: string }[];
     return Object.fromEntries(rows.map((r) => [r.transaction_id, r.schedule_id]));
+  }
+
+  // Categorization rules
+
+  rules(book: string): CategoryRule[] {
+    const rows = this.db
+      .prepare("SELECT * FROM category_rule WHERE book_id = ? ORDER BY name, created_at")
+      .all(book) as RuleRecord[];
+    return rows.map(toRule);
+  }
+
+  rule(book: string, id: string): CategoryRule | undefined {
+    const r = this.db
+      .prepare("SELECT * FROM category_rule WHERE book_id = ? AND id = ?")
+      .get(book, id) as RuleRecord | undefined;
+    return r && toRule(r);
+  }
+
+  addRule(book: string, rule: CategoryRuleIn): string {
+    const id = randomUUID().replace(/-/g, "");
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO category_rule (id, book_id, name, conditions, account, payee, auto_confirm, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        id,
+        book,
+        rule.name,
+        JSON.stringify(rule.conditions),
+        rule.account,
+        rule.payee,
+        rule.auto_confirm ? 1 : 0,
+        stamp,
+        stamp
+      );
+    return id;
+  }
+
+  /** Replace a rule's fields, against the version read. */
+  updateRule(book: string, id: string, expected: string, rule: CategoryRuleIn): void {
+    transaction(this.db, () => {
+      const current = this.rule(book, id);
+      if (!current) throw new Error(`no rule ${id}`);
+      if (current.updated_at !== expected)
+        throw new StaleVersion("the rule changed since it was read");
+      this.db
+        .prepare(
+          `UPDATE category_rule SET name = ?, conditions = ?, account = ?, payee = ?, auto_confirm = ?,
+             updated_at = ? WHERE id = ?`
+        )
+        .run(
+          rule.name,
+          JSON.stringify(rule.conditions),
+          rule.account,
+          rule.payee,
+          rule.auto_confirm ? 1 : 0,
+          after(current.updated_at),
+          id
+        );
+    });
+  }
+
+  deleteRule(book: string, id: string, expected: string): void {
+    transaction(this.db, () => {
+      const current = this.rule(book, id);
+      if (!current) throw new Error(`no rule ${id}`);
+      if (current.updated_at !== expected)
+        throw new StaleVersion("the rule changed since it was read");
+      this.db.prepare("DELETE FROM category_rule WHERE id = ?").run(id);
+    });
+  }
+
+  /** Count how many transactions rules categorized (bookkeeping, not an edit). */
+  countRuleUses(uses: Map<string, number>): void {
+    const bump = this.db.prepare("UPDATE category_rule SET applied = applied + ? WHERE id = ?");
+    transaction(this.db, () => uses.forEach((n, id) => bump.run(n, id)));
+  }
+
+  // Proposals
+
+  saveProposals(proposals: Omit<StoredProposal, "accepted" | "payee_accepted">[]): void {
+    const stamp = now();
+    const insert = this.db.prepare(
+      `INSERT INTO proposal (transaction_id, book_id, request_id, incoming_id, categorizer, confidence, reason,
+         postings, payee, payee_categorizer, proposal, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (transaction_id) DO UPDATE SET request_id = excluded.request_id,
+         incoming_id = excluded.incoming_id, categorizer = excluded.categorizer,
+         confidence = excluded.confidence, reason = excluded.reason, postings = excluded.postings,
+         payee = excluded.payee, payee_categorizer = excluded.payee_categorizer,
+         proposal = excluded.proposal, accepted = NULL, payee_accepted = NULL,
+         updated_at = excluded.updated_at`
+    );
+    transaction(this.db, () => {
+      for (const p of proposals) {
+        insert.run(
+          p.transaction_id,
+          p.book_id,
+          p.request_id,
+          p.incoming_id,
+          p.categorizer,
+          p.confidence,
+          p.reason,
+          p.postings ? JSON.stringify(p.postings) : null,
+          p.payee,
+          p.payee_categorizer,
+          p.proposal ? JSON.stringify(p.proposal) : null,
+          stamp,
+          stamp
+        );
+      }
+    });
+  }
+
+  /** The book's proposals not yet settled (accepted or not): what review shows. */
+  openProposals(book: string): StoredProposal[] {
+    const rows = this.db
+      .prepare("SELECT * FROM proposal WHERE book_id = ? AND accepted IS NULL")
+      .all(book) as ProposalRecord[];
+    return rows.map(toProposal);
+  }
+
+  /** A staged transaction's proposal, summarized (for import results). */
+  proposalOf(transaction: string): ProposalSummary | undefined {
+    const r = this.db
+      .prepare("SELECT * FROM proposal WHERE transaction_id = ?")
+      .get(transaction) as ProposalRecord | undefined;
+    if (!r) return undefined;
+    const p = toProposal(r);
+    return {
+      categorizer: p.categorizer,
+      accounts: p.postings?.map((x) => x.account) ?? [],
+      payee: p.payee,
+      confidence: p.confidence,
+      reason: p.reason,
+    };
+  }
+
+  proposal(book: string, transaction: string): StoredProposal | undefined {
+    const r = this.db
+      .prepare("SELECT * FROM proposal WHERE book_id = ? AND transaction_id = ?")
+      .get(book, transaction) as ProposalRecord | undefined;
+    return r && toProposal(r);
+  }
+
+  /** Record whether a confirmed transaction kept its proposal. */
+  settleProposal(transaction: string, accepted: boolean, payeeAccepted: boolean | null): void {
+    this.db
+      .prepare(
+        "UPDATE proposal SET accepted = ?, payee_accepted = ?, updated_at = ? WHERE transaction_id = ?"
+      )
+      .run(
+        accepted ? 1 : 0,
+        payeeAccepted === null ? null : payeeAccepted ? 1 : 0,
+        now(),
+        transaction
+      );
+  }
+
+  /** Per categorizer: proposals settled, and how many were accepted unchanged. */
+  acceptance(book: string): { categorizer: string; settled: number; accepted: number }[] {
+    return this.db
+      .prepare(
+        `SELECT categorizer, COUNT(*) AS settled, SUM(accepted) AS accepted FROM proposal
+         WHERE book_id = ? AND accepted IS NOT NULL AND categorizer IS NOT NULL
+         GROUP BY categorizer ORDER BY categorizer`
+      )
+      .all(book) as { categorizer: string; settled: number; accepted: number }[];
   }
 }

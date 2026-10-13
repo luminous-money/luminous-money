@@ -2,6 +2,7 @@
 import type {
   Account,
   AccountSummary,
+  CompactTransaction,
   Transaction,
   TransactionIn,
 } from "@fava-beans/ledger-client";
@@ -86,6 +87,20 @@ export class FakeLedger implements LedgerPort {
     const found = this.transactions.find((t) => t.id === id);
     if (!found) throw new Error(`no transaction ${id}`);
     return found;
+  }
+
+  async compact(_book: string, from: string): Promise<CompactTransaction[]> {
+    return this.transactions
+      .filter((t) => t.date >= from)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((t) => ({
+        id: t.id,
+        date: t.date,
+        flag: t.flag,
+        payee: t.payee ?? null,
+        narration: t.narration ?? null,
+        postings: t.postings.map((p) => ({ account: p.account, amount: p.units ?? null })),
+      }));
   }
 
   async setPostings(

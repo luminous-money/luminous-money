@@ -47,6 +47,19 @@ export type ImportRow = {
   /** For a row with candidates: whether its transaction is still `proposed`, or `confirmed` in
    * review. Null for a row without candidates (nothing to review on the matching side). */
   match: "proposed" | "confirmed" | null;
+  /** For a staged row: the category (and payee) it was staged with, and who proposed it. */
+  proposal?: ProposalSummary | null;
+};
+
+/** What categorization proposed for a staged transaction. */
+export type ProposalSummary = {
+  /** Who proposed the category ("rules", "history", or an external provider); null if only a
+   * payee was proposed. */
+  categorizer: string | null;
+  accounts: string[];
+  payee: string | null;
+  confidence: number | null;
+  reason: string | null;
 };
 
 export type ImportBatch = {

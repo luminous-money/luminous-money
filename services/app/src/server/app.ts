@@ -7,11 +7,16 @@ import { Hono } from "hono";
 
 import { createApi } from "./api.js";
 import type { AppDb } from "./db.js";
+import type { Categorizer } from "./categorize/types.js";
 import type { LedgerPort } from "./ledger.js";
 
 export function createApp(
   webRoot: string,
-  services: { db: AppDb; ledgerFor: (userId: string) => LedgerPort }
+  services: {
+    db: AppDb;
+    ledgerFor: (userId: string) => LedgerPort;
+    categorizers?: Categorizer[];
+  }
 ) {
   const app = new Hono();
 

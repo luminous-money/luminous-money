@@ -21,6 +21,7 @@ import {
   upcomingOccurrences,
   view,
 } from "./schedules.js";
+import type { Categorizer } from "./categorize/types.js";
 import type { LedgerPort } from "./ledger.js";
 
 type Env = { Variables: { user: string } };
@@ -38,9 +39,12 @@ function isTimeZone(zone: string): boolean {
 export function createApi({
   db,
   ledgerFor,
+  categorizers = [],
 }: {
   db: AppDb;
   ledgerFor: (userId: string) => LedgerPort;
+  /** The categorization chain, in order (see categorize/chain.ts). */
+  categorizers?: Categorizer[];
 }) {
   const api = new Hono<Env>().basePath("/api/app/v1");
 
@@ -134,6 +138,7 @@ export function createApi({
         filename: file.name,
         text: await file.text(),
         userId: c.get("user"),
+        categorizers,
       });
       return c.json(result, 201);
     } catch (error) {

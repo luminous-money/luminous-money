@@ -8,6 +8,7 @@ import {
   type Account,
   type components,
   type AccountSummary,
+  type CompactTransaction,
   type Transaction,
   type TransactionIn,
 } from "@fava-beans/ledger-client";
@@ -35,6 +36,8 @@ export interface LedgerPort {
   /** All of them or none. */
   createTransactions(book: string, transactions: TransactionIn[]): Promise<Transaction[]>;
   transaction(book: string, id: string): Promise<Transaction>;
+  /** Every transaction from `from` on, oldest first, compactly: categorizers' context. */
+  compact(book: string, from: string): Promise<CompactTransaction[]>;
   /** Change a transaction's postings, against the version read. */
   setPostings(
     book: string,
@@ -102,6 +105,12 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
       unwrap(
         client.GET("/api/ledger/v1/books/{book_id}/transactions/{directive_id}", {
           params: { path: { book_id: book, directive_id: id } },
+        })
+      ),
+    compact: (book, from) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/transactions/compact", {
+          params: { path: { book_id: book }, query: { from } },
         })
       ),
     setPostings: (book, id, postings, updated_at) =>
