@@ -75,6 +75,8 @@ milestone starts.
       acceptance tracking, "Suggest categories", similar, "Remember", and Select mode.
 - [ ] **M5: Investment accounts.** Lean on what Beancount already provides. The main
       deliverable: storing non-currency holdings, with a currency representation of their value.
+      Planned 2026-10-13 ([plan](milestones/m5-investment-accounts/PLAN.md)), with
+      [questions](milestones/m5-investment-accounts/PLAN.md#questions) open.
 - [ ] **M6: Auth.** Account creation, log in, log out, book ownership and permissions.
 - [ ] **M7: Multiple books per account.**
   - managing multiple books per account, and their visibility (e.g. see only my accounts, only

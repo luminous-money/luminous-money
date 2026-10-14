@@ -83,7 +83,9 @@ How it's put together:
 
 ## Next steps
 
-1. Say `elaborate plan for M5` (investment accounts).
+1. **Answer M5's [questions](docs/milestones/m5-investment-accounts/PLAN.md#questions)**
+   (fetching prices, frequency, booking method, brokerage CSV trades, illiquid assets, home
+   cards, staleness, capital gains), then build M5.
 
 ## Gotchas
 
