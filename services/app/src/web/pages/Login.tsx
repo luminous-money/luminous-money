@@ -1,6 +1,6 @@
 import { explain, useLogIn } from "../lib/queries.js";
 
-/** The first thing a logged-out visitor sees. Creating an account comes with M6. */
+/** The first thing a logged-out visitor sees. Creating an account comes with M10. */
 export function Login() {
   const logIn = useLogIn();
   return (

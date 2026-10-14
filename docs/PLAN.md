@@ -78,18 +78,18 @@ milestone starts.
       Built 2026-10-14 ([plan](milestones/m5-investment-accounts/PLAN.md)): holdings with cost
       basis and gains (account-scoped booking), values and staleness everywhere, prices fetched
       each morning (beanprice), trades with tax-aligned booking and split gains, revalued assets.
-- [ ] **M6: Auth.** Account creation, log in, log out, book ownership and permissions.
-- [ ] **M7: Multiple books per account.**
+- [ ] **M6: Multiple books per account.**
   - managing multiple books per account, and their visibility (e.g. see only my accounts, only
     our shared accounts, or both together)
   - each account clearly belongs to exactly one book
-- [ ] **M8: Sharing books with other users.** Any user can be added to a book with read, write
-      or manage permissions. Every book has an owner.
-- [ ] **M9: Cross-book transactions.** A single transaction that straddles more than one book,
+- [ ] **M7: Cross-book transactions.** A single transaction that straddles more than one book,
       such as a salary that flows into a personal and a shared bank account.
-- [ ] **M10: Reports.** From basic to more complex.
-- [ ] **M11: Budgets.**
-- [ ] **M12: SimpleFIN.** Bank feeds.
+- [ ] **M8: Reports.** From basic to more complex.
+- [ ] **M9: Budgets.**
+- [ ] **M10: Auth.** Account creation, log in, log out, book ownership and permissions.
+- [ ] **M11: SimpleFIN.** Bank feeds.
+- [ ] **M12: Sharing books with other users.** Any user can be added to a book with read, write
+      or manage permissions. Every book has an owner.
 - [ ] **M13: Reconciliation.**
 - [ ] **M14: Suggested recurring transactions.** Nightly, analyze each account's last 14 months
       of transactions and identify ones that look recurring, to suggest as schedules (M3).
@@ -135,12 +135,12 @@ elaborated.
   - the resolver chain: `matcher`, then `rules`, with `external` as a configurable slot (Cati,
     eventually)
 - **Prices** (M5): `bean-price` on a schedule, and manual price entries for illiquid assets.
-- **Cross-book transactions** (M9):
+- **Cross-book transactions** (M7):
   - account pairs, mirroring, and pair-balance assertions
   - a group editor that edits every leg at once and saves only when all of them balance
   - multi-book schedule templates (salary)
   - matching imports to scheduled legs
-- **Reports** (M10):
+- **Reports** (M8):
   - **Check what already exists before building anything.**
   - **If we build our own:** two independent libraries, `@luminous-money/ledger-graphs-api` (a
     plugin for a ledger's API that returns data sets) and `@luminous-money/ledger-graphs-ui` (a
@@ -149,7 +149,7 @@ elaborated.
     concept.
   - **At least:** expense and income pie charts with selectable account depth, number of slices,
     date bounds, and optional averaging per period.
-- **Budgeting** (M11):
+- **Budgeting** (M9):
   - a target budget on any account, for any period
   - no descendant may have a higher base budget than its ancestor (base amounts, before
     rollover)

@@ -21,7 +21,7 @@ everything M1 and M2 built applies:
   nothing is added twice, and the match is confirmed in review.
 - With no bank feed (rent paid by check), it's confirmed in review like any staged transaction.
 
-M3 is single-book. Schedules whose legs straddle books (the salary case in the design) are M9.
+M3 is single-book. Schedules whose legs straddle books (the salary case in the design) are M7.
 
 ## Decisions this plan makes
 
@@ -115,7 +115,7 @@ import the bank's rent row, and it matches.
 
 ## Out of scope for M3
 
-- **Schedules across books** (the salary case): M9.
+- **Schedules across books** (the salary case): M7.
 - **Estimated amounts** that vary per occurrence, and matching them within a tolerance: see the
   questions.
 - **Projected balances** and future occurrences in ledgers: see the questions.

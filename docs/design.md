@@ -44,7 +44,7 @@ So:
   updates entries instead of duplicating them.
 - **Reports are our own, not Fava's.** Fava was the original plan for desktop reporting, run
   read-only over exports. It was dropped (2026-10-09) because it didn't look useful for our
-  purposes; reports will be built on the generic ledger-graphs libraries (PLAN.md, M10).
+  purposes; reports will be built on the generic ledger-graphs libraries (PLAN.md, M8).
   Bringing Fava back would only take an image, a route, and a loop writing exports for it.
 
 **The engine spike is done and proved the approach** (see [`services/ledger`](services/ledger)):
@@ -249,7 +249,7 @@ SQLite ships by default, on the data volume. Each database has exactly one ownin
 |---|---|---|
 | ledger | `ledger` | Books, directives, entry status, cross-book groups and account-pair config, the change log and backup cursors. |
 | app | `app` | CSV profiles and import history (batches, rows, outcomes, candidates). Later: scheduled-transaction templates, categorizer config. |
-| auth | `auth` | Users (and, from M6, credentials). |
+| auth | `auth` | Users (and, from M10, credentials). |
 
 All three live on the one data volume (`ledger.sqlite`, `app.sqlite`, `auth.sqlite`). Every
 service runs as UID 1000, so they can share it. The TypeScript services use `packages/db`: the
@@ -344,7 +344,7 @@ to be told to leave it alone.
 | `/` | (redirect) | Redirects to `/ui/`. |
 
 
-How auth works (built in M1, with a stub user; M6 adds real accounts without changing the
+How auth works (built in M1, with a stub user; M10 adds real accounts without changing the
 shape):
 
 - **Every API route except auth's carries Traefik's forwardAuth check** (the `session`
@@ -364,7 +364,7 @@ shape):
   - For test stacks only, `AUTH_TEST_USERS=true` lets login take an email and log in a separate
     user for it, so tests don't share state. It's off by default, and `pnpm e2e` turns it on.
 - **Books belong to users.** Every book has an owner, and a book endpoint answers only its owner:
-  anyone else gets 404, as if the book didn't exist. Sharing and permissions come in M8.
+  anyone else gets 404, as if the book didn't exist. Sharing and permissions come in M12.
 
 ### Books, starred accounts and balances (M1, M2)
 
@@ -374,7 +374,7 @@ shape):
   or a credit card bought nothing a name and a star don't. Users create any account by its full
   name, anywhere the account rules allow; filing a card under assets is theirs to make.
 - **Starred accounts are the home page.** Stars are per user, kept in `app` (user, book,
-  account), since they're a preference rather than bookkeeping: shared books (M8) can show each
+  account), since they're a preference rather than bookkeeping: shared books (M12) can show each
   user their own, and exports stay free of them. Renaming accounts will have to carry them along,
   as it will CSV profiles.
 - **Display names:** `display-name` metadata if set, else the name's last segment with dashes as
@@ -518,7 +518,7 @@ entries.
 - **When the real deposit arrives through the bank feed, it gets matched, not duplicated.** See
   the resolver pipeline below.
 
-As built in M3 (single-book; legs across books are M9):
+As built in M3 (single-book; legs across books are M7):
 
 - **Schedules live in `app`:** a rule plus a transaction template (no date or flag), owned by a
   user, versioned like every edit.
@@ -674,7 +674,7 @@ The design separates four things:
 | Service | Language | Role |
 |---|---|---|
 | `traefik` | upstream | The only exposed port. Routes by path prefix; forwardAuth to `auth`. |
-| `auth` | TypeScript | Login, logout, who's logged in, and the verify endpoint for forwardAuth. Owns users (a stub until M6). |
+| `auth` | TypeScript | Login, logout, who's logged in, and the verify endpoint for forwardAuth. Owns users (a stub until M10). |
 | `ledger` | Python | System of record for all books. Runs the Beancount engine (booking, validation, BQL). Owns cross-book groups and their invariants, Beancount import/export, the change log and backup chunks. |
 | `app` | TypeScript | Serves the PWA (React + Vite + `vite-plugin-pwa`) and its API (Hono): CSV profiles and imports. Hosts the participants, the context builder and the resolver chain, and owns import history (later schedules too). Modules get split into their own services only when there's a reason. |
 
@@ -767,7 +767,7 @@ case without hiding the general one.
 |---|---|---|
 | System of record | SQLite, behind an interface | One ledger database for all books. |
 | Accounting engine | Beancount v3 | Also the import/export and backup format. |
-| Reports | Our own, on the ledger-graphs libraries | Planned (PLAN.md, M10). Fava was dropped. |
+| Reports | Our own, on the ledger-graphs libraries | Planned (PLAN.md, M8). Fava was dropped. |
 | Mobile UI | PWA: React + Vite + `vite-plugin-pwa` | Served by `app` under `/ui`. |
 | App API server | Hono on Node | Small footprint for the Pi. |
 | Routing | Traefik | forwardAuth to `auth`, no plugins. |

@@ -8,7 +8,7 @@ added by hand during setup, for the whole flow.
 
 ## Users and sessions
 
-- **Build with a user stub,** so that auth (M6) just makes it live later rather than needing
+- **Build with a user stub,** so that auth (M10) just makes it live later rather than needing
   structural changes.
 - **JWT-based sessions.**
 - **A login endpoint** that, for now, simply returns the stub user's token.

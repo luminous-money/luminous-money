@@ -26,7 +26,7 @@ docker compose up -d # run the stack on http://localhost:8080 (FAVA_BEANS_PORT t
 ```
 
 Then open `http://localhost:8080/`, which redirects to the app at `/ui/`. **Log in** logs in the
-stub user (real accounts come with M6); `pnpm seed` gives that user a demo book.
+stub user (real accounts come with M10); `pnpm seed` gives that user a demo book.
 
 Before exposing the stack beyond your machine, set `AUTH_JWT_SECRET` (32+ characters): it signs
 session tokens, and the Compose file only has a development default.

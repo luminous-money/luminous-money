@@ -67,7 +67,7 @@ M2 is four things:
 ### Starred accounts
 
 - **Stars are per user, kept in `app`'s database** (user, book, account). They're a preference,
-  not bookkeeping: once books are shared (M8), your home page and Jess's can differ, and exports
+  not bookkeeping: once books are shared (M12), your home page and Jess's can differ, and exports
   stay free of them. Renaming accounts (the chart of accounts) will have to carry stars along, as
   it will CSV profiles.
 - **Star and unstar** from an account's ledger (a star in its header). Accounts created from the

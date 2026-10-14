@@ -11,7 +11,7 @@ _Updated 2026-10-14._ Keep this current: every finalized change set updates it (
 The milestones ahead (M6–M14, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
-- **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M6.
+- **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M10.
 - **Set up:** name a book, then add an account by its full name (autofill, Tab to complete),
   optionally with its balance on a date from a statement.
 - **Home** shows the user's **starred** accounts as cards: balance (a card's shown as what's
@@ -92,7 +92,7 @@ How it's put together:
 
 ## Next steps
 
-1. Say `elaborate plan for M6` (auth).
+1. Say `elaborate plan for M6` (multiple books).
 
 ## Gotchas
 

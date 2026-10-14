@@ -113,7 +113,7 @@ export function useBooks() {
   return useQuery({ queryKey: keys.books, queryFn: api.books });
 }
 
-/** The book the app shows. M1 users have exactly one; M7 makes this a choice. */
+/** The book the app shows. M1 users have exactly one; M6 makes this a choice. */
 export function useCurrentBook(): { book: Book | undefined; loading: boolean } {
   const books = useBooks();
   return { book: books.data?.[0], loading: books.isPending };

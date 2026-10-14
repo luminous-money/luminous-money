@@ -14,7 +14,7 @@ export async function me(): Promise<User | null> {
   return (await response.json()) as User;
 }
 
-/** Log in. For now this always logs in the one stub user (see M6 for real accounts). */
+/** Log in. For now this always logs in the one stub user (see M10 for real accounts). */
 export async function logIn(): Promise<User> {
   const response = await fetch("/api/auth/v1/login", { method: "POST" });
   if (!response.ok) throw new ApiError(response.status, "couldn't log in");

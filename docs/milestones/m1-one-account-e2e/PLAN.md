@@ -14,7 +14,7 @@ marked **Proposed**.
   starts, and ends with `pnpm test` and `pnpm e2e` green.
 - **Final structure, stubbed behavior.** Auth, users and book ownership take their real shape
   now (a separate `auth` service, JWTs, Traefik forwardAuth, owners on books). Only the behavior
-  is stubbed: there's one user, and logging in always returns that user's token. M6 then fills
+  is stubbed: there's one user, and logging in always returns that user's token. M10 then fills
   in behavior without moving anything.
 - **Reuse what exists:** the transaction detail editor, the account picker, and the review
   queue (which is where imported transactions land for now).
@@ -26,12 +26,12 @@ marked **Proposed**.
 - **A new `auth` service (TypeScript)** at `/api/auth/v1`, owning its own SQLite database (see
   "TypeScript databases" below), as the design already calls for.
   - A `user` table, created by a migration, holding **one stub user**.
-  - `POST /login` returns the stub user's JWT, whatever is sent. M6 replaces this with real
+  - `POST /login` returns the stub user's JWT, whatever is sent. M10 replaces this with real
     credentials.
   - `POST /logout`, `GET /me`, and `GET /verify` (for Traefik).
 - **JWTs are signed with HS256,** using a secret from the environment (`AUTH_JWT_SECRET`, with a
   generated development default in the Compose file). **Proposed:** a 30-day lifetime, and no
-  refresh until M6.
+  refresh until M10.
 - **The session lives in an `HttpOnly`, `SameSite=Strict` cookie** set by `/login`, so the PWA
   never handles the token. **Proposed:** `Authorization: Bearer` is also accepted, for tests and
   non-browser clients.
@@ -65,7 +65,7 @@ marked **Proposed**.
 
   Any book endpoint for a book the caller doesn't own answers 404.
 - **Setup's only job is to make the first book** (and the account). "Manage books" lists the
-  caller's books and renames them; creating more books waits for M7.
+  caller's books and renames them; creating more books waits for M6.
 
 ### Money accounts
 
@@ -217,12 +217,12 @@ the docs, `docs/PLAN.md` and `RESUME.md` updated.
 
 ## Out of scope for M1
 
-- **Real accounts, credentials and permissions:** M6.
-- **More than one book in the UI:** M7. A user has exactly one book in M1.
+- **Real accounts, credentials and permissions:** M10.
+- **More than one book in the UI:** M6. A user has exactly one book in M1.
 - **Credit cards** and matching across two accounts: M2.
 - **Categorization:** M4. Imported transactions are uncategorized.
 - **Investment accounts:** M5.
-- **Bank feeds:** M12.
+- **Bank feeds:** M11.
 
 ## Questions
 
@@ -318,7 +318,7 @@ input is wanted.
     - an `HttpOnly`, `SameSite=Strict` cookie, made `Secure` only behind HTTPS (when Traefik
       sees `X-Forwarded-Proto: https`)
     - Bearer tokens also accepted, for scripts and tests
-    - logging out clears the cookie, but a stolen token stays valid until it expires (M6)
+    - logging out clears the cookie, but a stolen token stays valid until it expires (M10)
 13. **The JWT secret:** Compose ships a development default, and the auth service warns when it's
     in use. Set `AUTH_JWT_SECRET` before the stack leaves your laptop. _Skipped for now:_ whether
     a missing secret should refuse to start.

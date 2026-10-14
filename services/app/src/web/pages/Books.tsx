@@ -12,7 +12,7 @@ import {
 
 /** Manage books: see them, rename them, set their time zone (which decides "today" for their
  * schedules), and export them (the whole book as one Beancount file, the user's own copy of
- * their data). More books come with M7. */
+ * their data). More books come with M6. */
 export function Books() {
   const books = useBooks();
   return (
