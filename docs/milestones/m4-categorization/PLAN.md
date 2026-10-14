@@ -219,3 +219,42 @@ tests over synthetic descriptions (no real data in fixtures).
    there's a categorizer to plug in?
 8. **Acceptance tracking:** worth keeping per resolver (proposed), to tune thresholds from real
    use?
+
+## Follow-ups (2026-10-13), planned before M5
+
+### Why "Suggest categories" suggested only some
+
+It considers the pending transactions whose category is **undecided**: two postings, the other
+side `Expenses:Uncategorized`/`Income:Uncategorized`, or still exactly what was proposed. Of
+those, it can only propose where **a rule matches** or **history has confirmed transactions
+from the same (or a similar) payee** in the last 14 months. In the dev book (2026-10-13, 48
+pending): 17 were categorized when the demo was made (no proposal record, so treated as
+decided and skipped), 12 had history proposals, and 19 were uncategorized with nothing to learn
+from (new payees: the imported PNC rows, against a demo history of made-up merchants). New
+payees are exactly what an external provider (an LLM) is for; see the question below.
+
+### The account ledger gets review's bulk tools
+
+- **"Suggest categories"** in an account's header, for that account's pending transactions
+  (the same chain, scoped: `POST /suggest?account=`).
+- **Select mode**, with **bulk categorize** and **bulk confirm**. In a ledger, "categorize"
+  sets the other side relative to the account being viewed (a transfer's other side is the
+  other account), and skips transactions with more than two postings (saying how many).
+
+### Select mode, in both views
+
+- **A sticky bar across the top** while selecting: how many are selected, **Categorize as…**,
+  **Confirm**, and **Done**. One shared component and selection hook for both views.
+- **Confirm is a bulk action** in both (review has it; the ledger gains it). It confirms the
+  selected pending transactions, and in review also their proposed matches.
+- **Tapping anywhere on a card or row selects it.** While selecting, a card's buttons, links,
+  fields and pickers are disabled, swipes are off, and a ledger row's tap selects instead of
+  opening the transaction.
+
+### Question
+
+- **A fallback guess for new payees?** With no rule and no history for a payee, nothing is
+  proposed and the transaction stays uncategorized. A last-resort categorizer could always
+  propose something weak: the category most used in this account for transactions of the same
+  direction (money in or out) and similar size. Want it, or leave new payees uncategorized
+  until an external provider is configured?

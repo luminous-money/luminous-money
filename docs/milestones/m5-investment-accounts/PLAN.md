@@ -1,12 +1,54 @@
 M5: Investment accounts: plan
 ==================================================================================================
 
-> **Status: planned (2026-10-13), not started.** There's no separate spec: the milestone's line
+> **Status: planned (2026-10-13), answers folded in; not started.** The
+> [answers](#answers-2026-10-13) override anything below that disagrees. There's no separate spec: the milestone's line
 > in [the plan](../../PLAN.md) ("lean on what Beancount already provides; the main deliverable:
 > storing non-currency holdings, with a currency representation of their value"), its notes
 > (prices by `bean-price` on a schedule, manual prices for illiquid assets), and the design's
 > price and performance notes are the brief. Calls marked **Proposed** are open; the
 > [questions](#questions) list the ones that matter most.
+
+## Answers (2026-10-13)
+
+- **Prices are fetched with `beanprice`,** once a day **in the morning** (**Proposed:** 07:00
+  in the book's time zone, which gets the previous trading day's close), through the M3
+  scheduler.
+- **Booking follows tax reporting.** In the US, a sale's cost basis is FIFO unless specific lots
+  are identified, and mutual funds may use average cost; what matters is matching the method
+  the broker reports on the 1099-B. So the booking method is **per account**, FIFO by default,
+  set to match the broker:
+  - **FIFO, LIFO, HIFO,** or **specific lots** (Beancount's STRICT: the Sell form asks which
+    lots) are Beancount's own.
+  - **Average cost** isn't: Beancount 3 refuses `AVERAGE` ("not supported", checked). For such
+    accounts, fava-beans books sales itself: the account uses Beancount's `NONE` booking, and
+    the Sell form reduces at the account's current average cost per unit, which keeps units and
+    total cost basis right. (Its own small piece of code, with tests against hand-worked
+    examples.)
+- **Trades are entered with the forms;** no brokerage CSV trades for now.
+- **Illiquid assets are plain currency balances,** revalued with explicit transactions, so
+  appreciation and depreciation fall in their accounting period. That's also one of the two
+  ways Beancount users do it (the other being a commodity with prices, which Beancount values
+  but never books, so the change never shows in a period); Beancount 3 dropped the plugin that
+  synthesized unrealized-gain entries from prices. "Update value" writes a transaction for the
+  difference, against **`Income:Unrealized-Gains`**. Shares and funds stay commodities with
+  prices: their gains are shown, not booked, until a sale.
+- **Home cards show unrealized gain or loss** as well as value.
+- **Staleness is a property of the asset:**
+  - a **commodity** (shares, funds) carries `stale-after` (days) in its `commodity` directive's
+    metadata, default **7**
+  - a **revalued asset** (a house, a car) is an account whose `open` directive carries
+    `revalue-every` (days), default **350**, so it asks to be updated yearly; "stale" is
+    measured from its last revaluation
+  - both are editable (the Commodities page, and the account's settings), and the add-account
+    form offers "revalued periodically (a house, a car)"
+- **Capital gains are split** into `Income:Capital-Gains:Short-Term` and `…:Long-Term`. The Sell
+  form previews which lots booking will reduce (the account-scoped booking, below), and writes
+  the gain per lot by holding period (more than a year is long-term), as explicit postings.
+
+So these sections change: "Illiquid assets" (plain balances, not a commodity), "Recording
+trades" (per-account booking, average cost, the split gains), and "Getting prices" (the
+morning run). The rest stands.
 
 ## What M5 is
 
@@ -174,7 +216,7 @@ The seed also stars the demo's ETrade node, so its holdings and values show on t
   build on prices and holdings.
 - **Editing lots in the transaction editor:** Polish.
 
-## Questions
+## Questions (answered above)
 
 1. **Fetching prices automatically:** use `beanprice` (Yahoo and other free sources, no API
    keys, but they break now and then), daily, in the ledger? Or manual prices only for now?

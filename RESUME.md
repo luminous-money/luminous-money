@@ -83,9 +83,12 @@ How it's put together:
 
 ## Next steps
 
-1. **Answer M5's [questions](docs/milestones/m5-investment-accounts/PLAN.md#questions)**
-   (fetching prices, frequency, booking method, brokerage CSV trades, illiquid assets, home
-   cards, staleness, capital gains), then build M5.
+1. **Before building:** the user is refining UI and asking questions. Planned so far: M4's
+   [follow-ups](docs/milestones/m4-categorization/PLAN.md#follow-ups-2026-10-13-planned-before-m5)
+   (the ledger gets Suggest and Select mode; a sticky select bar, bulk confirm and
+   tap-to-select in both views; a question about a fallback guess for new payees), and M5's
+   [answers](docs/milestones/m5-investment-accounts/PLAN.md#answers-2026-10-13).
+2. Then build the M4 follow-ups and M5, when asked.
 
 ## Gotchas
 
