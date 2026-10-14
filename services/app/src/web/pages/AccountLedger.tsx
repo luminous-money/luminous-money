@@ -259,17 +259,19 @@ export function AccountLedger({ book, account }: { book: string; account: string
                   {row.amount
                     ? formatMoney(shown(row.amount.number, type), row.amount.currency)
                     : row.amounts?.length
-                      ? row.amounts
-                          .map((a) => formatMoney(shown(a.number, type), a.currency))
-                          .join(" · ")
+                      ? // Several (a buy: cash out, shares in): one per line.
+                        row.amounts.map((a) => (
+                          <span key={a.currency} className="block">
+                            {formatMoney(shown(a.number, type), a.currency)}
+                          </span>
+                        ))
                       : "?"}
                 </span>
                 <span className="muted small">
+                  {/* A running balance in several currencies is noise here: Holdings has it. */}
                   {row.balance
                     ? formatMoney(shown(row.balance.number, type), row.balance.currency)
-                    : (row.balances ?? [])
-                        .map((b) => formatMoney(shown(b.number, type), b.currency))
-                        .join(" · ")}
+                    : ""}
                 </span>
               </span>
             </button>
