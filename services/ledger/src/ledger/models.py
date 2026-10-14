@@ -212,6 +212,11 @@ class PriceOut(Api):
     price: Amount
 
 
+class FetchResult(Api):
+    fetched: list[PriceOut] = Field(description="The latest price of each commodity fetched (recorded unless already there).")
+    errors: dict[str, str] = Field(description="Commodity to why its price couldn't be fetched.")
+
+
 class CommodityOut(Api):
     currency: str
     declared: bool = Field(description="Has a `commodity` directive (else only held or priced).")

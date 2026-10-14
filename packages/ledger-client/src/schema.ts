@@ -361,6 +361,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/prices/fetch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Fetch Prices
+     * @description Fetch the latest prices of the commodities still held that name a source (beanprice).
+     */
+    post: operations["fetch_prices_api_ledger_v1_books__book_id__prices_fetch_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/problems": {
     parameters: {
       query?: never;
@@ -891,6 +911,21 @@ export interface components {
       term: "short" | "long";
       /** Units */
       units: string;
+    };
+    /** FetchResult */
+    FetchResult: {
+      /**
+       * Errors
+       * @description Commodity to why its price couldn't be fetched.
+       */
+      errors: {
+        [key: string]: string;
+      };
+      /**
+       * Fetched
+       * @description The latest price of each commodity fetched (recorded unless already there).
+       */
+      fetched: components["schemas"]["PriceOut"][];
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -2306,6 +2341,37 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["PriceOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  fetch_prices_api_ledger_v1_books__book_id__prices_fetch_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FetchResult"];
         };
       };
       /** @description Validation Error */

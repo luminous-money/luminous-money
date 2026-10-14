@@ -260,3 +260,24 @@ def test_an_account_can_open_with_holdings_at_cost_or_estimated(ledger):
     assert (vti.units, vti.cost.number) == ("4", "750.00")
     assert [lot.label for lot in vti.lots] == [None, "estimated"]
     assert ledger.problems("book") == []
+
+
+def test_prices_are_fetched_for_held_commodities_with_a_source(book, monkeypatch):
+    monkeypatch.setenv("FAVA_BEANS_FIXED_PRICES", '{"VTI": 251.5}')
+    listed = {c.currency: c for c in investments.commodity_list(book, "book")}
+    investments.set_commodity(
+        book, "book", "VTI", models.CommodityIn(name="VTI", price_source="USD:ledger.price_sources.fixed/VTI", updated_at=listed["VTI"].updated_at)
+    )
+    investments.set_commodity(book, "book", "GONE", models.CommodityIn(price_source="USD:ledger.price_sources.fixed/GONE"))
+    investments.set_commodity(book, "book", "BAD", models.CommodityIn(price_source="USD:no.such.module/BAD"))
+    book.create("book", '2024-06-01 * "x"\n  Assets:Bank  1 BAD {1 USD}\n  Assets:Broker:Cash\n')
+
+    result = investments.fetch_prices(book, "book")
+    again = investments.fetch_prices(book, "book")
+
+    assert [(p.commodity, p.price.number) for p in result.fetched] == [("VTI", "251.5")]
+    assert "BAD" in result.errors and "GONE" not in result.errors  # GONE isn't held
+    today = datetime.date.today()
+    assert investments.prices(book, "book", today)[("VTI", "USD")] == (today, Decimal("251.5"))
+    assert len([p for p in investments.price_list(book, "book", "VTI") if p.date == today]) == 1  # not twice
+    assert again.fetched

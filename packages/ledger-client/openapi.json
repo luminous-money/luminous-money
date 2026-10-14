@@ -1021,6 +1021,32 @@
         "title": "DrawnLot",
         "type": "object"
       },
+      "FetchResult": {
+        "properties": {
+          "errors": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Commodity to why its price couldn't be fetched.",
+            "title": "Errors",
+            "type": "object"
+          },
+          "fetched": {
+            "description": "The latest price of each commodity fetched (recorded unless already there).",
+            "items": {
+              "$ref": "#/components/schemas/PriceOut"
+            },
+            "title": "Fetched",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fetched",
+          "errors"
+        ],
+        "title": "FetchResult",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -3763,6 +3789,46 @@
           }
         },
         "summary": "Add Price"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/prices/fetch": {
+      "post": {
+        "description": "Fetch the latest prices of the commodities still held that name a source (beanprice).",
+        "operationId": "fetch_prices_api_ledger_v1_books__book_id__prices_fetch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FetchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fetch Prices"
       }
     },
     "/api/ledger/v1/books/{book_id}/problems": {

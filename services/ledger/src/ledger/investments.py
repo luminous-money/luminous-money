@@ -638,3 +638,69 @@ def trade(ledger, book_id: str, account: str, t: models.TradeIn) -> engine.Direc
     with ledger.store.transaction():
         ledger._write(book_id, [*directives, directive])
     return directive
+
+
+# Fetching prices
+
+
+def held(ledger, book_id: str) -> set[str]:
+    """Commodities with units still held somewhere in the book."""
+    rows = ledger.store._conn.execute(
+        "SELECT p.amount_currency, SUM(CAST(p.amount AS REAL)) FROM posting p JOIN directive d ON d.id = p.directive_id"
+        " WHERE d.book_id = ? AND d.deleted = 0 AND p.amount IS NOT NULL GROUP BY p.amount_currency",
+        (book_id,),
+    ).fetchall()
+    return {currency for currency, total in rows if abs(total or 0) > 1e-9}
+
+
+def fetch_prices(ledger, book_id: str, on: datetime.date | None = None) -> models.FetchResult:
+    """Fetch the latest price of every commodity still held that names a source (its
+    `commodity` directive's `price:`, as beanprice reads it), with beanprice. A price is
+    recorded for the date the source gives, unless one is already there. Failures are kept per
+    commodity; the others carry on."""
+    from beanprice import price as beanprice
+
+    on = on or datetime.date.today()
+    fetched, errors = [], {}
+    still = held(ledger, book_id)
+    for c in commodities(ledger, book_id).values():
+        if not c.price_source or c.currency not in still:
+            continue
+        try:
+            found = None
+            for quote, sources in beanprice.parse_source_map(c.price_source).items():
+                for ps in sources:
+                    answer = ps.module.Source().get_latest_price(ps.symbol)
+                    if answer is None or answer.price is None:
+                        continue
+                    number = (1 / answer.price) if ps.invert else answer.price
+                    date = answer.time.date() if answer.time else on
+                    found = (date, number, answer.quote_currency or quote)
+                    break
+                if found:
+                    break
+            if found is None:
+                raise ValueError(f"no price from {c.price_source}")
+            date, number, quote = found
+            exists = any(
+                r["date"] == date.isoformat() and r["currency"] == quote
+                for r in ledger.store.price_history(book_id, c.currency, limit=5)
+            )
+            if not exists:
+                add_price(
+                    ledger,
+                    book_id,
+                    models.PriceIn(
+                        date=date,
+                        commodity=c.currency,
+                        price=models.Amount(number=engine.decimal_text(number), currency=quote),
+                    ),
+                )
+            fetched.append(
+                models.PriceOut(
+                    id="", date=date, commodity=c.currency, price=models.Amount(number=engine.decimal_text(number), currency=quote)
+                )
+            )
+        except Exception as error:  # a source's failure is the commodity's, not the run's
+            errors[c.currency] = f"{type(error).__name__}: {error}"
+    return models.FetchResult(fetched=fetched, errors=errors)

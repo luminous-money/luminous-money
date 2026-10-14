@@ -5,6 +5,7 @@ description = "System of record for fava-beans books, with Beancount as the acco
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "beancount>=3.2,<3.3",
+    "beanprice>=2.1.0",
     "beanquery>=0.2,<0.3",
     "fastapi>=0.115",
     "uvicorn>=0.30",
