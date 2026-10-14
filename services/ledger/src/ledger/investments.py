@@ -488,10 +488,10 @@ def plan_trade(ledger, book_id: str, account: str, t: models.TradeIn) -> models.
     """What a trade will write, without writing it: the transaction, the lots a sale draws on
     (with each one's gain and term), and the accounts it will open."""
     target = operating_currency(ledger._header(book_id))
-    holding, cash = _resolve(ledger, book_id, account, t)
+    holding, cash_account = _resolve(ledger, book_id, account, t)
     tree = {a.name: a for a in ledger.accounts(book_id)}
     fees = Decimal(t.fees or "0")
-    money = lambda n: models.Amount(number=engine.decimal_text(n), currency=target)  # noqa: E731
+    cash = lambda n: models.Amount(number=engine.decimal_text(n.quantize(CENT)), currency=target)  # noqa: E731
     postings: list[models.Posting] = []
     drawn: list[models.DrawnLot] = []
     narration = t.narration
@@ -504,7 +504,7 @@ def plan_trade(ledger, book_id: str, account: str, t: models.TradeIn) -> models.
                 units=models.Amount(number=t.units, currency=t.commodity),
                 cost=models.Cost(number=t.price, currency=target),
             ),
-            models.Posting(account=cash, units=money(-(units * price + fees))),
+            models.Posting(account=cash_account, units=cash(-(units * price + fees))),
         ]
         narration = narration or f"Buy {t.units} {t.commodity}"
     elif t.kind == "sell":
@@ -575,17 +575,17 @@ def plan_trade(ledger, book_id: str, account: str, t: models.TradeIn) -> models.
                         price=models.Amount(number=t.price, currency=target),
                     )
                 )
-        postings.append(models.Posting(account=cash, units=money(units * price - fees)))
+        postings.append(models.Posting(account=cash_account, units=cash(units * price - fees)))
         for term in ("short", "long"):
             gain = sum((Decimal(d.gain.number) for d in drawn if d.term == term), Decimal(0))
             if gain:
-                postings.append(models.Posting(account=GAINS[term], units=money(-gain)))
+                postings.append(models.Posting(account=GAINS[term], units=cash(-gain)))
         narration = narration or f"Sell {t.units} {t.commodity}"
     else:  # dividend
         amount = Decimal(t.amount)
         postings = [
-            models.Posting(account=cash, units=money(amount)),
-            models.Posting(account=dividends_account(t.commodity), units=money(-amount)),
+            models.Posting(account=cash_account, units=cash(amount)),
+            models.Posting(account=dividends_account(t.commodity), units=cash(-amount)),
         ]
         narration = narration or f"Dividend from {t.commodity}"
         if t.units:  # reinvested
@@ -596,11 +596,11 @@ def plan_trade(ledger, book_id: str, account: str, t: models.TradeIn) -> models.
                     units=models.Amount(number=t.units, currency=t.commodity),
                     cost=models.Cost(number=t.price, currency=target),
                 ),
-                models.Posting(account=cash, units=money(-(units * price))),
+                models.Posting(account=cash_account, units=cash(-(units * price))),
             ]
             narration = t.narration or f"Dividend from {t.commodity}, reinvested"
     if fees:
-        postings.append(models.Posting(account=FEES, units=money(fees)))
+        postings.append(models.Posting(account=FEES, units=cash(fees)))
 
     transaction = models.TransactionIn(date=t.date, flag="*", narration=narration, postings=postings)
     opens = sorted({p.account for p in postings} - {a.name for a in tree.values() if not a.implicit})
@@ -615,7 +615,7 @@ def _drawn(n, cost, currency, acquired, price, sold, label=None) -> models.Drawn
         date=acquired,
         label=label,
         term=term,
-        gain=models.Amount(number=engine.decimal_text(n * (price - cost)), currency=currency),
+        gain=models.Amount(number=engine.decimal_text((n * (price - cost)).quantize(CENT)), currency=currency),
     )
 
 

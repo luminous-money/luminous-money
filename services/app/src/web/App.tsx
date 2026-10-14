@@ -9,7 +9,9 @@ import { Books } from "./pages/Books.js";
 import { Home } from "./pages/Home.js";
 import { Import } from "./pages/Import.js";
 import { Login } from "./pages/Login.js";
+import { Commodities } from "./pages/Commodities.js";
 import { Review } from "./pages/Review.js";
+import { TradePage } from "./pages/TradePage.js";
 import { RuleEditor } from "./pages/RuleEditor.js";
 import { Rules } from "./pages/Rules.js";
 import { ScheduleEditor } from "./pages/ScheduleEditor.js";
@@ -73,12 +75,18 @@ function Gate() {
         <Route path="/import">
           <Import book={book.id} />
         </Route>
+        <Route path="/books/:book/accounts/:account/trade">
+          {({ book: id, account }) => (
+            <TradePage key={account} book={id} account={decodeURIComponent(account)} />
+          )}
+        </Route>
         <Route path="/books/:book/accounts/:account">
           {({ book: id, account }) => (
             <AccountLedger key={account} book={id} account={decodeURIComponent(account)} />
           )}
         </Route>
         <Route path="/books/:book/import">{({ book: id }) => <Import key={id} book={id} />}</Route>
+        <Route path="/books/:book/commodities">{({ book: id }) => <Commodities book={id} />}</Route>
         <Route path="/books/:book/rules">{({ book: id }) => <Rules book={id} />}</Route>
         <Route path="/books/:book/rules/new">
           {({ book: id }) => <RuleEditor key="new" book={id} />}

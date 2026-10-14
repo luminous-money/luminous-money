@@ -26,8 +26,13 @@ docker run --rm "$image" python -m ledger.demo "$@" \
   | curl -fsS -X POST -H "$auth" -H "content-type: text/plain" --data-binary @- "$url/api/ledger/v1/books/$book/import"
 echo
 
-# Star the demo's checking account and card, so the home page shows them (demo.STARRED).
-for account in Assets:US:BofA:Checking Liabilities:US:Chase:Slate; do
+# Star the demo's checking account, card and brokerage, so the home page shows them
+# (demo.STARRED, and the ETrade brokerage).
+for account in Assets:US:BofA:Checking Liabilities:US:Chase:Slate Assets:US:ETrade; do
   curl -fsS -X PUT -H "$auth" "$url/api/app/v1/books/$book/stars/$account" >/dev/null
 done
+# The book's time zone: what "today" is for its schedules and morning price run.
+tz="${FAVA_BEANS_TZ:-$(cat /etc/timezone 2>/dev/null || echo UTC)}"
+curl -fsS -X PUT -H "$auth" -H "content-type: application/json" \
+  --data "{\"time_zone\": \"$tz\"}" "$url/api/app/v1/books/$book/settings" >/dev/null
 echo "Seeded '$book' for the stub user (log in with the Log in button)."

@@ -4,6 +4,9 @@ import { Link, useLocation } from "wouter";
 import { displayName, shortName, shown } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";
 import { withBack } from "../lib/navigation.js";
+import { AccountSettings } from "../components/AccountSettings.js";
+import { AccountValueNote, headline } from "../components/AccountValue.js";
+import { HoldingsPanel } from "../components/Holdings.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { postable } from "../lib/accounts.js";
 import { today } from "../lib/format.js";
@@ -113,13 +116,8 @@ export function AccountLedger({ book, account }: { book: string; account: string
                 {starred ? "★" : "☆"}
               </button>
             </h1>
-            {info && (
-              <p className="muted">
-                {info.balance
-                  .map((b) => formatMoney(shown(b.number, type), b.currency))
-                  .join(" · ") || formatMoney("0.00", info.currencies?.[0] ?? "USD")}
-              </p>
-            )}
+            {info && <p className="muted">{headline(info)}</p>}
+            {info && <AccountValueNote account={info} />}
           </div>
           {info?.kind === "leaf" && !info.implicit && !info.close && (
             <Link
@@ -147,7 +145,12 @@ export function AccountLedger({ book, account }: { book: string; account: string
               : "Nothing new to suggest."}
           </p>
         )}
+        {info && <AccountSettings book={book} account={info} />}
       </header>
+
+      {info && !selection.selecting && (
+        <HoldingsPanel book={book} account={account} summary={info} here={here} />
+      )}
 
       {selection.selecting ? (
         <SelectBar
@@ -255,12 +258,18 @@ export function AccountLedger({ book, account }: { book: string; account: string
                 >
                   {row.amount
                     ? formatMoney(shown(row.amount.number, type), row.amount.currency)
-                    : "?"}
+                    : row.amounts?.length
+                      ? row.amounts
+                          .map((a) => formatMoney(shown(a.number, type), a.currency))
+                          .join(" · ")
+                      : "?"}
                 </span>
                 <span className="muted small">
                   {row.balance
                     ? formatMoney(shown(row.balance.number, type), row.balance.currency)
-                    : ""}
+                    : (row.balances ?? [])
+                        .map((b) => formatMoney(shown(b.number, type), b.currency))
+                        .join(" · ")}
                 </span>
               </span>
             </button>

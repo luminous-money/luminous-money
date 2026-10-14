@@ -29,6 +29,16 @@ export type {
   ProposedMatch,
 } from "../../shared/imports.js";
 
+/** A price run's result: the ledger's, with when it ran. */
+export type PriceFetch = {
+  ran_on: string;
+  at: string;
+  result: {
+    fetched: { commodity: string; date: string; price: { number: string; currency: string } }[];
+    errors: Record<string, string>;
+  };
+};
+
 /** An import the app couldn't run, with a code for the ones the user can fix. */
 export class ImportError extends ApiError {
   constructor(
@@ -217,6 +227,13 @@ export const appApi = {
     book: string
   ): Promise<{ name: string; settled: number; accepted: number }[]> =>
     json(await fetch(`${base(book)}/categorizers`)),
+
+  /** The last morning price run (or "fetch now"): when, and what it fetched or couldn't. */
+  lastPriceFetch: async (book: string): Promise<PriceFetch | null> =>
+    json(await fetch(`${base(book)}/prices/fetch`)),
+
+  fetchPricesNow: async (book: string): Promise<PriceFetch> =>
+    json(await fetch(`${base(book)}/prices/fetch`, { method: "POST" })),
 
   lastImports: async (book: string): Promise<Record<string, string>> =>
     json(await fetch(`${base(book)}/imports/latest`)),

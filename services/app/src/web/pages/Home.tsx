@@ -1,8 +1,8 @@
 import type { Book } from "@fava-beans/ledger-client";
 import { Link } from "wouter";
 
-import { displayName, shown } from "../lib/accounts.js";
-import { formatMoney } from "../lib/decimal.js";
+import { AccountValueNote, headline } from "../components/AccountValue.js";
+import { displayName } from "../lib/accounts.js";
 import { formatWhen } from "../lib/format.js";
 import { explain, useLastImports, useStarredAccounts } from "../lib/queries.js";
 
@@ -44,14 +44,9 @@ export function Home({ book }: { book: Book }) {
             >
               <div className="account-card-top">
                 <h2>{displayName(account)}</h2>
-                <span className="balance">
-                  {account.balance.length
-                    ? account.balance
-                        .map((b) => formatMoney(shown(b.number, account.type), b.currency))
-                        .join(" · ")
-                    : formatMoney("0.00", account.currencies?.[0] ?? "USD")}
-                </span>
+                <span className="balance">{headline(account)}</span>
               </div>
+              <AccountValueNote account={account} />
               <p className="muted small">
                 {last ? `Last updated at: ${formatWhen(last)}` : "No imports yet"}
               </p>

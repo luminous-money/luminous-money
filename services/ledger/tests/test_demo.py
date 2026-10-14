@@ -61,3 +61,10 @@ def test_the_demo_has_a_title_and_named_accounts_to_star(ledger, history):
     assert ledger.book("demo").name == "Demo"
     summary = ledger.summary("demo", list(demo.STARRED))
     assert {a.name: a.display_name for a in summary} == demo.STARRED
+
+
+def test_the_demo_fetches_prices_from_a_source_beanprice_has(history):
+    out = demo.demo_ledger(history, staged_days=21, today=TODAY)
+
+    assert "USD:google/" not in out
+    assert 'price: "USD:yahoo/' in out

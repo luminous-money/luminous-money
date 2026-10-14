@@ -41,6 +41,7 @@ export function Menu() {
           {book && item(`/books/${book.id}/review`, "Review")}
           {book && item(`/books/${book.id}/schedules`, "Schedules")}
           {book && item(`/books/${book.id}/rules`, "Rules")}
+          {book && item(`/books/${book.id}/commodities`, "Commodities")}
           <button type="button" className="menu-item" onClick={() => logOut.mutate()}>
             Log out
           </button>

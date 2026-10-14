@@ -1249,3 +1249,117 @@ button.plain {
 .select-one {
   margin-bottom: 0.4rem;
 }
+
+/* Values: unrealized gains, price dates, staleness */
+
+.value-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  align-items: center;
+  margin: 0.2rem 0 0;
+}
+
+.pill.stale {
+  background: color-mix(in srgb, #d9a400 25%, transparent);
+  color: #7a5600;
+}
+
+/* Holdings on an account's page */
+
+.holdings-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.holding-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.holding-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.holding-row .num {
+  text-align: right;
+}
+
+.block {
+  display: block;
+}
+
+.holding-detail {
+  padding: 0 0 0.75rem;
+}
+
+.lots {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.2rem;
+}
+
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.inline-form label {
+  flex: 1 1 8rem;
+}
+
+.account-settings {
+  margin-top: 0.5rem;
+}
+
+.account-settings[open] {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  overflow: hidden;
+}
+
+.segmented button {
+  flex: 1;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.6rem;
+  border: 0;
+  background: var(--card);
+  color: inherit;
+  cursor: pointer;
+}
+
+.segmented button.on {
+  background: var(--green);
+  color: #fff;
+}
+
+.holding-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 0.4rem;
+}
+
+.holding-fields input {
+  min-width: 0;
+}

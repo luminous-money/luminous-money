@@ -31,15 +31,31 @@ export function AddAccountForm({
   const [balance, setBalance] = useState("");
   const [asOf, setAsOf] = useState(today());
   const [currency, setCurrency] = useState("USD");
+  const [revalued, setRevalued] = useState(false);
+  const [every, setEvery] = useState("350");
+  const [holdings, setHoldings] = useState<{ commodity: string; units: string; cost: string }[]>(
+    []
+  );
   const [error, setError] = useState<string | null>(null);
 
   const check = checkNewAccount(name, accounts.data ?? []);
   const type = check.ok ? check.type : undefined;
   const amount = balance.trim().replace(/,/g, "");
+  const held = holdings.filter((h) => h.commodity.trim() || h.units.trim());
+  const opening = amount !== "" || held.length > 0;
   const valid =
     check.ok &&
-    (amount === "" ||
-      (isDecimal(amount) && /^[A-Z][A-Z0-9'._-]{1,22}$/.test(currency) && asOf !== ""));
+    (!opening ||
+      ((amount === "" || isDecimal(amount)) &&
+        /^[A-Z][A-Z0-9'._-]{1,22}$/.test(currency) &&
+        asOf !== "")) &&
+    held.every(
+      (h) =>
+        h.commodity.trim() &&
+        isDecimal(h.units.trim()) &&
+        (!h.cost.trim() || isDecimal(h.cost.trim()))
+    ) &&
+    (!revalued || Number(every) > 0);
 
   const submit = async () => {
     setError(null);
@@ -48,7 +64,16 @@ export function AddAccountForm({
         await add.mutateAsync({
           name,
           kind: "leaf",
-          opening_balance: amount ? { amount: shown(amount, type), currency, date: asOf } : null,
+          opening_balance: opening
+            ? { amount: shown(amount || "0", type), currency, date: asOf }
+            : null,
+          opening_holdings: held.map((h) => ({
+            commodity: h.commodity.trim().toUpperCase(),
+            units: h.units.trim(),
+            cost: h.cost.trim() || null,
+          })),
+          revalue_every: revalued ? Number(every) : null,
+          booking: null,
         })
       );
     } catch (e) {
@@ -80,7 +105,7 @@ export function AddAccountForm({
           <input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} />
         </label>
       </div>
-      {amount && (
+      {opening && (
         <>
           <label>
             Balance as of
@@ -92,6 +117,63 @@ export function AddAccountForm({
             includes them.
           </p>
         </>
+      )}
+      <fieldset className="rule">
+        <legend>Holdings (shares, funds)</legend>
+        {holdings.map((h, i) => (
+          <div className="holding-fields" key={i}>
+            <input
+              aria-label="Commodity"
+              placeholder="VTI"
+              value={h.commodity}
+              onChange={(e) =>
+                setHoldings(
+                  holdings.map((x, j) =>
+                    j === i ? { ...x, commodity: e.target.value.toUpperCase() } : x
+                  )
+                )
+              }
+            />
+            <input
+              aria-label="Units"
+              placeholder="units"
+              inputMode="decimal"
+              value={h.units}
+              onChange={(e) =>
+                setHoldings(holdings.map((x, j) => (j === i ? { ...x, units: e.target.value } : x)))
+              }
+            />
+            <input
+              aria-label="Total cost"
+              placeholder="total cost"
+              inputMode="decimal"
+              value={h.cost}
+              onChange={(e) =>
+                setHoldings(holdings.map((x, j) => (j === i ? { ...x, cost: e.target.value } : x)))
+              }
+            />
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => setHoldings([...holdings, { commodity: "", units: "", cost: "" }])}
+        >
+          + Add a holding
+        </button>
+        <p className="muted small">
+          As of the date above. Leave the cost blank if you don&apos;t know it: that day&apos;s
+          price is used, marked as estimated.
+        </p>
+      </fieldset>
+      <label className="check">
+        <input type="checkbox" checked={revalued} onChange={(e) => setRevalued(e.target.checked)} />
+        Revalued periodically (a house, a car)
+      </label>
+      {revalued && (
+        <label>
+          Revalue every (days)
+          <input inputMode="numeric" value={every} onChange={(e) => setEvery(e.target.value)} />
+        </label>
       )}
       {error && <p className="error">{error}</p>}
       <div className="actions">

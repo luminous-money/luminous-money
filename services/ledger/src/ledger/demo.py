@@ -44,6 +44,9 @@ STARRED = {"Assets:US:BofA:Checking": "BofA Checking", "Liabilities:US:Chase:Sla
 def demo_ledger(history: str, staged_days: int, today: datetime.date) -> str:
     """Stage the recent purchases in `history` (a Beancount ledger) and return the new ledger,
     titled "Demo", with display names on the accounts it stars."""
+    # bean-example names Google as the price source, which beanprice no longer has; its tickers
+    # are real funds, so fetch them from Yahoo instead.
+    history = re.sub(r'price: "USD:google/(?:[A-Z]+:)?([A-Z0-9.]+)"', r'price: "USD:yahoo/\1"', history)
     for account, name in STARRED.items():
         meta = f'  {engine.DISPLAY_NAME_KEY}: "{name}"\n'
         history = re.sub(rf"^(\d{{4}}-\d\d-\d\d open {re.escape(account)}\b.*\n)", rf"\g<1>{meta}", history, count=1, flags=re.M)

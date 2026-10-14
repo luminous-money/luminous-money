@@ -3,7 +3,13 @@ import {
   createLedgerClient,
   type Account,
   type AccountIn,
+  type AccountPatch,
   type AccountSummary,
+  type CommodityOut,
+  type Holdings,
+  type PriceOut,
+  type TradeIn,
+  type TradePreview,
   type Book,
   type components,
   type LedgerPage,
@@ -64,6 +70,80 @@ export const api = {
       ledger.PATCH("/api/ledger/v1/books/{book_id}", {
         params: { path: { book_id } },
         body: { name, updated_at: version },
+      })
+    ),
+
+  /** What an account (and everything under it) holds, valued. */
+  holdings: (book_id: string, account: string): Promise<Holdings> =>
+    unwrap(
+      ledger.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/holdings", {
+        params: { path: { book_id, account } },
+      })
+    ),
+
+  commodities: (book_id: string): Promise<CommodityOut[]> =>
+    unwrap(
+      ledger.GET("/api/ledger/v1/books/{book_id}/commodities", { params: { path: { book_id } } })
+    ),
+
+  setCommodity: (
+    book_id: string,
+    currency: string,
+    body: {
+      name: string | null;
+      price_source: string | null;
+      stale_after: number | null;
+      updated_at: string | null;
+    }
+  ): Promise<CommodityOut> =>
+    unwrap(
+      ledger.PUT("/api/ledger/v1/books/{book_id}/commodities/{currency}", {
+        params: { path: { book_id, currency } },
+        body,
+      })
+    ),
+
+  addPrice: (
+    book_id: string,
+    body: { date: string; commodity: string; price: { number: string; currency: string } }
+  ): Promise<PriceOut> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/prices", { params: { path: { book_id } }, body })
+    ),
+
+  revalue: (
+    book_id: string,
+    account: string,
+    body: { date: string; value: { number: string; currency: string } }
+  ): Promise<Transaction> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/accounts/{account}/revalue", {
+        params: { path: { book_id, account } },
+        body,
+      })
+    ),
+
+  setAccount: (book_id: string, account: string, body: AccountPatch): Promise<Account> =>
+    unwrap(
+      ledger.PATCH("/api/ledger/v1/books/{book_id}/accounts/{account}", {
+        params: { path: { book_id, account } },
+        body,
+      })
+    ),
+
+  previewTrade: (book_id: string, account: string, body: TradeIn): Promise<TradePreview> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/accounts/{account}/trades/preview", {
+        params: { path: { book_id, account } },
+        body,
+      })
+    ),
+
+  trade: (book_id: string, account: string, body: TradeIn): Promise<Transaction> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/accounts/{account}/trades", {
+        params: { path: { book_id, account } },
+        body,
       })
     ),
 

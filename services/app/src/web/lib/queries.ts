@@ -9,6 +9,7 @@
  * is refetched.
  */
 import type {
+  TradeIn,
   Account,
   Book,
   AccountIn,
@@ -341,6 +342,70 @@ export function useConfirmMatch(book: string) {
     onSuccess: (matches) => matchesChanged(book, matches),
   });
 }
+
+// Investments
+
+export function useHoldings(book: string, account: string, enabled = true) {
+  return useQuery({
+    queryKey: ["book", book, "holdings", account],
+    queryFn: () => api.holdings(book, account),
+    enabled,
+  });
+}
+
+export function useCommodities(book: string) {
+  return useQuery({
+    queryKey: ["book", book, "commodities"],
+    queryFn: () => api.commodities(book),
+  });
+}
+
+export function useLastPriceFetch(book: string) {
+  return useQuery({
+    queryKey: ["book", book, "price-fetch"],
+    queryFn: () => appApi.lastPriceFetch(book),
+  });
+}
+
+/** Anything that changes prices or holdings: refresh everything in the book. */
+function investmentMutation<T, R>(book: string, fn: (input: T) => Promise<R>) {
+  return {
+    mutationFn: fn,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.book(book) }),
+  };
+}
+
+export const useSetCommodity = (book: string) =>
+  useMutation(
+    investmentMutation(book, (c: { currency: string } & Parameters<typeof api.setCommodity>[2]) =>
+      api.setCommodity(book, c.currency, c)
+    )
+  );
+
+export const useAddPrice = (book: string) =>
+  useMutation(
+    investmentMutation(book, (p: Parameters<typeof api.addPrice>[1]) => api.addPrice(book, p))
+  );
+
+export const useRevalue = (book: string, account: string) =>
+  useMutation(
+    investmentMutation(book, (r: Parameters<typeof api.revalue>[2]) =>
+      api.revalue(book, account, r)
+    )
+  );
+
+export const useSetAccount = (book: string, account: string) =>
+  useMutation(
+    investmentMutation(book, (p: Parameters<typeof api.setAccount>[2]) =>
+      api.setAccount(book, account, p)
+    )
+  );
+
+export const useTrade = (book: string, account: string) =>
+  useMutation(investmentMutation(book, (t: TradeIn) => api.trade(book, account, t)));
+
+export const useFetchPrices = (book: string) =>
+  useMutation(investmentMutation(book, () => appApi.fetchPricesNow(book)));
 
 // Categorization
 

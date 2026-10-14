@@ -27,7 +27,9 @@ describe("decimal strings", () => {
   });
 
   it("formats money for display", () => {
-    expect(formatMoney("-1234567.5", "USD")).toBe("−$1,234,567.5");
+    expect(formatMoney("-1234567.5", "USD")).toBe("−$1,234,567.50");
+    expect(formatMoney("230", "USD")).toBe("$230.00");
+    expect(formatMoney("0.125", "USD")).toBe("$0.125");
     expect(formatMoney("10", "VTI")).toBe("10 VTI");
   });
 });

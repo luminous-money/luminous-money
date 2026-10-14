@@ -181,3 +181,13 @@ export async function addTransactions(book: string, account: string, count: numb
     body,
   });
 }
+
+/** Import Beancount text into `book` as the current user. */
+export async function importText(book: string, text: string) {
+  const response = await fetch(`${BASE_URL}/api/ledger/v1/books/${book}/import`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${current.token}`, "content-type": "text/plain" },
+    body: text,
+  });
+  if (!response.ok) throw new Error(`import failed: ${response.status} ${await response.text()}`);
+}

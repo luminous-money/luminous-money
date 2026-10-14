@@ -54,10 +54,12 @@ export function isNegative(value: string): boolean {
 /** For display: thousands separators, and a symbol for the common currencies. */
 export function formatMoney(number: string, currency: string): string {
   const negative = isNegative(number);
-  const [whole = "0", fraction] = number.replace("-", "").split(".");
+  const symbol = SYMBOLS[currency];
+  const [whole = "0", given] = number.replace("-", "").split(".");
+  // Money shows its cents, however it was written ("230" is $230.00); other units as given.
+  const fraction = symbol ? (given ?? "").padEnd(2, "0") : given;
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const digits = fraction ? `${grouped}.${fraction}` : grouped;
-  const symbol = SYMBOLS[currency];
   const body = symbol ? `${symbol}${digits}` : `${digits} ${currency}`;
   return negative ? `−${body}` : body;
 }
