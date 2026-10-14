@@ -9,6 +9,7 @@ import type { CsvProfile } from "@fava-beans/csv-import";
 
 import type { AppDb } from "./db.js";
 import { ImportProblem, importFile } from "./imports.js";
+import { fetchPrices } from "./prices.js";
 import { assignRow, confirmRow, MatchProblem, proposedMatches } from "./matches.js";
 import { UPCOMING_DAYS, type ScheduleIn, type SchedulePatch } from "../shared/schedule.js";
 import { StaleVersion } from "./db.js";
@@ -371,8 +372,23 @@ export function createApi({
     const zone = body.time_zone;
     if (typeof zone !== "string" || !isTimeZone(zone))
       return c.json({ detail: "send a time zone, like America/Chicago" }, 422);
-    db.setTimeZone(book, zone);
+    db.setTimeZone(book, zone, c.get("user"));
     return c.json({ time_zone: zone });
+  });
+
+  // Prices: the last morning run, and fetching now
+
+  api.get("/books/:book/prices/fetch", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    return c.json(db.lastPriceFetch(book) ?? null);
+  });
+
+  api.post("/books/:book/prices/fetch", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    await fetchPrices(db, ledgerFor(c.get("user")), book, bookToday(db, book));
+    return c.json(db.lastPriceFetch(book));
   });
 
   // Schedules

@@ -14,9 +14,10 @@ import {
   editSchedule,
   runSchedules,
   ScheduleProblem,
-  untilMidnight,
   upcomingOccurrences,
 } from "./schedules.js";
+import { untilLocal } from "./daily.js";
+import { pricesJob } from "./prices.js";
 import { FakeLedger } from "./testing.js";
 
 const CHECKING = "Assets:Bank:Checking";
@@ -233,7 +234,27 @@ describe("answers to M3's questions", () => {
 
   it("runs just after the next midnight in a time zone", () => {
     const now = new Date("2024-03-10T05:00:00.000Z");
-    expect(untilMidnight(now, "UTC")).toBe((19 * 3600 + 60) * 1000);
-    expect(untilMidnight(now, "Asia/Tokyo")).toBe((10 * 3600 + 60) * 1000); // 14:00 there
+    expect(untilLocal(now, 0, "UTC")).toBe((19 * 3600 + 60) * 1000);
+    expect(untilLocal(now, 0, "Asia/Tokyo")).toBe((10 * 3600 + 60) * 1000); // 14:00 there
+    expect(untilLocal(now, 7 * 60, "UTC")).toBe((2 * 3600 + 60) * 1000); // 05:00: 07:00 is 2 h off
+    expect(untilLocal(now, 7 * 60, "Asia/Tokyo")).toBe((17 * 3600 + 60) * 1000); // tomorrow's
+  });
+});
+
+describe("the morning price run", () => {
+  it("fetches once a local day, from 07:00, for books with a time zone and owner", async () => {
+    db.setTimeZone("b", "UTC", "u");
+    let clock = new Date("2024-03-10T06:30:00Z");
+    const job = pricesJob(db, ledgerFor, () => clock);
+
+    await job.run();
+    expect(ledger.fetched).toBe(0); // before 07:00
+
+    clock = new Date("2024-03-10T07:05:00Z");
+    await job.run();
+    await job.run();
+    expect(ledger.fetched).toBe(1); // once that day
+    expect(db.lastPriceFetch("b")).toMatchObject({ result: { fetched: [], errors: {} } });
+    expect(job.zones()).toEqual(["UTC"]);
   });
 });

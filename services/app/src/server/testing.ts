@@ -114,6 +114,12 @@ export class FakeLedger implements LedgerPort {
     return found;
   }
 
+  fetched = 0;
+  async fetchPrices() {
+    this.fetched++;
+    return { fetched: [], errors: {} };
+  }
+
   async pending() {
     return this.transactions.filter((t) => t.flag === "!");
   }

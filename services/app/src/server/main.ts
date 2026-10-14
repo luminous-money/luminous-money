@@ -9,7 +9,9 @@ import { httpLedger } from "./ledger.js";
 import { external, providersFrom } from "./categorize/external.js";
 import { history } from "./categorize/history.js";
 import { rules } from "./categorize/rules.js";
-import { startScheduler } from "./schedules.js";
+import { startDaily } from "./daily.js";
+import { pricesJob } from "./prices.js";
+import { schedulesJob } from "./schedules.js";
 
 const port = Number(process.env.PORT ?? 3000);
 const webRoot = process.env.WEB_ROOT ?? fileURLToPath(new URL("../web", import.meta.url));
@@ -25,5 +27,5 @@ const categorizers = [
 
 serve({ fetch: createApp(webRoot, { db, ledgerFor, categorizers }).fetch, port }, (info) => {
   console.log(`app listening on :${info.port}, serving the PWA from ${webRoot}`);
-  startScheduler(db, ledgerFor);
+  startDaily([schedulesJob(db, ledgerFor), pricesJob(db, ledgerFor)]);
 });

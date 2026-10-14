@@ -13,6 +13,8 @@ import {
 } from "@fava-beans/db";
 
 import type { CsvProfile, ImportBatch, ImportRow, ProposalSummary } from "../shared/imports.js";
+import type { FetchResult } from "@fava-beans/ledger-client";
+
 import type { CategoryRule, CategoryRuleIn, RuleConditions } from "../shared/rules.js";
 import type { Occurrence, Rule, TransactionTemplate } from "../shared/schedule.js";
 
@@ -150,6 +152,16 @@ export const MIGRATIONS: Migration[] = [
       "payee_accepted INTEGER",
     ]),
     "CREATE INDEX proposal_book ON proposal(book_id)",
+  ],
+  // 9: fetching prices (M5): a book's owner (who the morning price run acts as), and each
+  // book's last run.
+  [
+    "ALTER TABLE book_setting ADD COLUMN user_id TEXT",
+    createTable("price_fetch", [
+      "book_id TEXT PRIMARY KEY",
+      "ran_on TEXT NOT NULL", // the book's local date
+      "result TEXT NOT NULL", // JSON: the ledger's FetchResult
+    ]),
   ],
 ];
 
@@ -679,14 +691,41 @@ export class AppDb {
     return r?.time_zone;
   }
 
-  setTimeZone(book: string, timeZone: string): void {
+  /** Set the book's time zone, recording who set it: the owner the price run acts as. */
+  setTimeZone(book: string, timeZone: string, user: string): void {
     const stamp = now();
     this.db
       .prepare(
-        `INSERT INTO book_setting (book_id, time_zone, created_at, updated_at) VALUES (?, ?, ?, ?)
-         ON CONFLICT (book_id) DO UPDATE SET time_zone = excluded.time_zone, updated_at = excluded.updated_at`
+        `INSERT INTO book_setting (book_id, time_zone, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (book_id) DO UPDATE SET time_zone = excluded.time_zone, user_id = excluded.user_id,
+           updated_at = excluded.updated_at`
       )
-      .run(book, timeZone, stamp, stamp);
+      .run(book, timeZone, user, stamp, stamp);
+  }
+
+  /** Books whose prices the morning run fetches: those with a time zone and an owner. */
+  priceBooks(): { book_id: string; time_zone: string; user_id: string }[] {
+    return this.db
+      .prepare("SELECT book_id, time_zone, user_id FROM book_setting WHERE user_id IS NOT NULL")
+      .all() as { book_id: string; time_zone: string; user_id: string }[];
+  }
+
+  recordPriceFetch(book: string, ranOn: string, result: unknown): void {
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO price_fetch (book_id, ran_on, result, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (book_id) DO UPDATE SET ran_on = excluded.ran_on, result = excluded.result,
+           updated_at = excluded.updated_at`
+      )
+      .run(book, ranOn, JSON.stringify(result), stamp, stamp);
+  }
+
+  lastPriceFetch(book: string): { ran_on: string; result: FetchResult; at: string } | undefined {
+    const r = this.db
+      .prepare("SELECT ran_on, result, updated_at FROM price_fetch WHERE book_id = ?")
+      .get(book) as { ran_on: string; result: string; updated_at: string } | undefined;
+    return r && { ran_on: r.ran_on, result: JSON.parse(r.result) as FetchResult, at: r.updated_at };
   }
 
   /** Which transactions in the book schedules staged: transaction ID to schedule ID. */

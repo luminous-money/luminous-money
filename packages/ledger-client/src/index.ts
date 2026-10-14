@@ -30,6 +30,7 @@ export type Holdings = Schemas["Holdings"];
 export type Holding = Schemas["Holding"];
 export type CommodityOut = Schemas["CommodityOut"];
 export type PriceOut = Schemas["PriceOut"];
+export type FetchResult = Schemas["FetchResult"];
 export type TradeIn = Schemas["TradeIn"];
 export type TradePreview = Schemas["TradePreview"];
 export type AccountPatch = Schemas["AccountPatch"];

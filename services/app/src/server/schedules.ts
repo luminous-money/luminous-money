@@ -31,6 +31,7 @@ import {
   type UpcomingOccurrence,
 } from "../shared/schedule.js";
 import { StaleVersion, type AppDb, type StoredSchedule } from "./db.js";
+import type { DailyJob } from "./daily.js";
 import type { LedgerPort } from "./ledger.js";
 
 export const SCHEDULE_KEY = "schedule";
@@ -278,41 +279,15 @@ export async function runSchedules({
   return staged;
 }
 
-/** Milliseconds from `now` until just after the next midnight in `timeZone` (or locally). */
-export function untilMidnight(now: Date, timeZone?: string): number {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      hourCycle: "h23",
-      hour: "numeric",
-      minute: "numeric",
-      second: "numeric",
-    })
-      .formatToParts(now)
-      .map((p) => [p.type, Number(p.value)])
-  );
-  const elapsed = (parts.hour! * 3600 + parts.minute! * 60 + parts.second!) * 1000;
-  return 24 * 3600 * 1000 - elapsed - now.getMilliseconds() + 60_000; // a minute past
-}
-
-/**
- * Run the generator now, then once a day: just after the next midnight in any book's time zone
- * (or the app's own), so each book's occurrences are staged on their day. Logs what it does.
- * Returns a stop function.
- */
-export function startScheduler(db: AppDb, ledgerFor: (userId: string) => LedgerPort): () => void {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const tick = async () => {
-    try {
+/** The generator as a daily job: just after midnight in each book with active schedules. */
+export function schedulesJob(db: AppDb, ledgerFor: (userId: string) => LedgerPort): DailyJob {
+  return {
+    name: "scheduler",
+    at: 0,
+    zones: () => db.activeSchedules().map((s) => db.timeZone(s.book_id)),
+    run: async () => {
       const n = await runSchedules({ db, ledgerFor });
-      if (n) console.log(`scheduler: staged ${n} occurrence${n === 1 ? "" : "s"}`);
-    } catch (error) {
-      console.error("scheduler:", error);
-    }
-    const now = new Date();
-    const zones = [undefined, ...new Set(db.activeSchedules().map((s) => db.timeZone(s.book_id)))];
-    timer = setTimeout(() => void tick(), Math.min(...zones.map((z) => untilMidnight(now, z))));
+      return n ? `staged ${n} occurrence${n === 1 ? "" : "s"}` : undefined;
+    },
   };
-  void tick();
-  return () => clearTimeout(timer);
 }

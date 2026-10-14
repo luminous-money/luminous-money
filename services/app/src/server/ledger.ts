@@ -9,6 +9,7 @@ import {
   type components,
   type AccountSummary,
   type CompactTransaction,
+  type FetchResult,
   type Transaction,
   type TransactionIn,
 } from "@fava-beans/ledger-client";
@@ -47,6 +48,8 @@ export interface LedgerPort {
   ): Promise<Transaction>;
   /** The book's pending (`!`) transactions. */
   pending(book: string): Promise<Transaction[]>;
+  /** Fetch the latest prices of commodities still held that name a source. */
+  fetchPrices(book: string): Promise<FetchResult>;
   /** Create and delete (with the versions read) in one write, or not at all. Returns the
    * created transactions. */
   applyChanges(
@@ -120,6 +123,12 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
         client.PATCH("/api/ledger/v1/books/{book_id}/transactions/{directive_id}", {
           params: { path: { book_id: book, directive_id: id } },
           body: { ...changes, updated_at },
+        })
+      ),
+    fetchPrices: (book) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/prices/fetch", {
+          params: { path: { book_id: book } },
         })
       ),
     pending: (book) =>
