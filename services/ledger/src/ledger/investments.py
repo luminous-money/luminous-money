@@ -114,14 +114,14 @@ class ScopedBooking:
     """Account-scoped booking, cached per book and account until the book changes."""
 
     def __init__(self) -> None:
-        self._cache: dict[tuple[str, str], tuple[int, list[data.Directive], list[engine.Problem]]] = {}
+        self._cache: dict[tuple[int, str, str], tuple[int, list[data.Directive], list[engine.Problem]]] = {}
         self._lock = threading.Lock()
 
     def entries(self, ledger, book_id: str, account: str, extra: list[str] | None = None):
         """The booked entries for `account`'s subtree (plus `extra` directive texts, uncached:
         a trade being checked), and Beancount's problems with them."""
         header = ledger._header(book_id)
-        key = (book_id, account)
+        key = (id(ledger.store), book_id, account)
         with self._lock:
             seq = ledger.store.book_seq(book_id)
             cached = self._cache.get(key)
@@ -134,7 +134,7 @@ class ScopedBooking:
         ]
         texts += [r.text for r in ledger.store.find(book_id, kind="transaction", account=account, limit=None)]
         loaded = engine.load(header, texts + (extra or []))
-        problems = [p for p in loaded.problems if "Uncategorized" not in p.message]
+        problems = loaded.problems
         if not extra:
             with self._lock:
                 self._cache[key] = (seq, loaded.entries, problems)
@@ -151,6 +151,14 @@ def inventory(ledger, book_id: str, account: str, extra: list[str] | None = None
     node = realization.get(root, account)
     positions = list(realization.compute_balance(node)) if node is not None else []
     return positions, problems
+
+
+CENT = Decimal("0.01")
+
+
+def money(n: Decimal, currency: str) -> models.Amount:
+    """An amount of money, to the cent (lots at a total cost can leave long fractions)."""
+    return models.Amount(number=engine.decimal_text(n.quantize(CENT)), currency=currency)
 
 
 def holdings(ledger, book_id: str, account: str, on: datetime.date | None = None) -> models.Holdings:
@@ -188,9 +196,9 @@ def holdings(ledger, book_id: str, account: str, on: datetime.date | None = None
             and currency != target
             and (on - price_date).days > (meta.stale_after if meta else DEFAULT_STALE_AFTER)
         ) or (found is None and currency != target)
-        cost_amount = models.Amount(number=engine.decimal_text(cost), currency=cost_currencies.pop()) if cost is not None else None
+        cost_amount = money(cost, cost_currencies.pop()) if cost is not None else None
         gain = (
-            models.Amount(number=engine.decimal_text(value - cost), currency=target)
+            money(value - cost, target)
             if value is not None and cost is not None and cost_amount.currency == target
             else None
         )
@@ -206,18 +214,10 @@ def holdings(ledger, book_id: str, account: str, on: datetime.date | None = None
                 ),
                 price_date=price_date,
                 stale=stale,
-                value=models.Amount(number=engine.decimal_text(value), currency=target) if value is not None else None,
+                value=money(value, target) if value is not None else None,
                 cost=cost_amount,
                 gain=gain,
-                lots=[
-                    models.Lot(
-                        units=engine.decimal_text(p.units.number),
-                        cost=models.Amount(number=engine.decimal_text(p.cost.number), currency=p.cost.currency),
-                        date=p.cost.date,
-                        label=p.cost.label,
-                    )
-                    for p in sorted(lots, key=lambda p: (p.cost.date or datetime.date.min))
-                ],
+                lots=_lots_shown(lots, units, cost, cost_amount),
             )
         )
 
@@ -229,11 +229,34 @@ def holdings(ledger, book_id: str, account: str, on: datetime.date | None = None
         account=account,
         currency=target,
         holdings=out,
-        value=models.Amount(number=engine.decimal_text(total), currency=target) if total is not None else None,
-        gain=models.Amount(number=engine.decimal_text(sum(gains, Decimal(0))), currency=target) if gains else None,
+        value=money(total, target) if total is not None else None,
+        gain=money(sum(gains, Decimal(0)), target) if gains else None,
         as_of=min(dates) if dates else None,
         stale=any(h.stale for h in out),
     )
+
+
+def _lots_shown(lots, units: Decimal, cost: Decimal | None, cost_amount) -> list[models.Lot]:
+    """The lots, oldest first. Average-cost accounts (booked by fava-beans: sales are negative
+    lots at the average) show as one lot at the average cost."""
+    if any(p.units.number < 0 for p in lots) and cost is not None and units:
+        return [
+            models.Lot(
+                units=engine.decimal_text(units),
+                cost=models.Amount(number=engine.decimal_text((cost / units).quantize(Decimal("0.000001"))), currency=cost_amount.currency),
+                date=None,
+                label="average",
+            )
+        ]
+    return [
+        models.Lot(
+            units=engine.decimal_text(p.units.number),
+            cost=models.Amount(number=engine.decimal_text(p.cost.number), currency=p.cost.currency),
+            date=p.cost.date,
+            label=p.cost.label,
+        )
+        for p in sorted(lots, key=lambda p: (p.cost.date or datetime.date.min))
+    ]
 
 
 def valued(ledger, book_id: str, summary: models.AccountSummary, on: datetime.date | None = None) -> models.AccountSummary:
@@ -373,3 +396,245 @@ def set_commodity(ledger, book_id: str, currency: str, c: models.CommodityIn) ->
         ledger.store.put(book_id, [directive])
     return next(x for x in commodity_list(ledger, book_id) if x.currency == currency)
 
+
+
+def opening_lots(ledger, book_id: str, account: str, held: list[models.OpeningHolding], opening: models.OpeningBalance) -> list[models.Posting]:
+    """The postings for holdings an account opens with: each a lot at its cost (its total, or
+    the price on the opening date if unknown, labeled "estimated")."""
+    known = prices(ledger, book_id, opening.date) if any(h.cost is None for h in held) else {}
+    postings = []
+    for h in held:
+        units = Decimal(h.units)
+        if h.cost is not None:
+            total, label = Decimal(h.cost), None
+        else:
+            found = rate(h.commodity, opening.currency, known)
+            if found is None:
+                raise engine.ParseFailure([f"{h.commodity} has no price on {opening.date}: give its cost"])
+            total, label = units * found[0], "estimated"
+        postings.append(
+            models.Posting(
+                account=account,
+                units=models.Amount(number=h.units, currency=h.commodity),
+                cost=models.Cost(
+                    number="0",  # with a total: `{0 # total}`, the parsed form of `{{total}}`
+                    total=engine.decimal_text(total),
+                    currency=opening.currency,
+                    date=opening.date,
+                    label=label,
+                ),
+            )
+        )
+    return postings
+
+
+# Trades
+
+FEES = "Expenses:Financial:Fees"
+GAINS = {"short": "Income:Capital-Gains:Short-Term", "long": "Income:Capital-Gains:Long-Term"}
+
+
+def dividends_account(commodity: str) -> str:
+    return f"Income:Dividends:{engine.segment(commodity)}"
+
+
+def long_term(acquired: datetime.date | None, sold: datetime.date) -> bool:
+    """Held more than a year: long-term (US). A lot of unknown date counts as short-term."""
+    if acquired is None:
+        return False
+    try:
+        anniversary = acquired.replace(year=acquired.year + 1)
+    except ValueError:  # Feb 29
+        anniversary = acquired.replace(year=acquired.year + 1, day=28)
+    return sold > anniversary
+
+
+def booking_method(ledger, book_id: str, account: models.Account) -> str:
+    """How sales from `account` pick lots: its own method, else the book's, else STRICT."""
+    if account.booking:
+        return account.booking
+    for line in ledger._header(book_id):
+        if line.startswith('option "booking_method"'):
+            return line.split('"')[3]
+    return "STRICT"
+
+
+def _resolve(ledger, book_id: str, account: str, t: models.TradeIn) -> tuple[str, str]:
+    """The holding and cash accounts: as given; or for an account with nothing under it, itself;
+    or for a brokerage (accounts under it), its `<account>:<COMMODITY>` and `<account>:Cash`."""
+    tree = {a.name: a for a in ledger.accounts(book_id)}
+    if account not in tree:
+        raise ledger_not_found(account)
+    # Imported books often open parents plainly, so "has accounts under it" decides, not `kind`.
+    if not any(name.startswith(f"{account}:") for name in tree):
+        return t.holding_account or account, t.cash_account or account
+    holding = t.holding_account or f"{account}:{engine.segment(t.commodity)}"
+    cash = t.cash_account or f"{account}:Cash"
+    return holding, cash
+
+
+def ledger_not_found(name: str):
+    from .service import NotFound
+
+    return NotFound(name)
+
+
+def _lots(ledger, book_id: str, holding: str, commodity: str):
+    positions, _ = inventory(ledger, book_id, holding)
+    return [p for p in positions if p.units.currency == commodity and p.cost is not None and p.units.number > 0]
+
+
+def plan_trade(ledger, book_id: str, account: str, t: models.TradeIn) -> models.TradePreview:
+    """What a trade will write, without writing it: the transaction, the lots a sale draws on
+    (with each one's gain and term), and the accounts it will open."""
+    target = operating_currency(ledger._header(book_id))
+    holding, cash = _resolve(ledger, book_id, account, t)
+    tree = {a.name: a for a in ledger.accounts(book_id)}
+    fees = Decimal(t.fees or "0")
+    money = lambda n: models.Amount(number=engine.decimal_text(n), currency=target)  # noqa: E731
+    postings: list[models.Posting] = []
+    drawn: list[models.DrawnLot] = []
+    narration = t.narration
+
+    if t.kind == "buy":
+        units, price = Decimal(t.units), Decimal(t.price)
+        postings = [
+            models.Posting(
+                account=holding,
+                units=models.Amount(number=t.units, currency=t.commodity),
+                cost=models.Cost(number=t.price, currency=target),
+            ),
+            models.Posting(account=cash, units=money(-(units * price + fees))),
+        ]
+        narration = narration or f"Buy {t.units} {t.commodity}"
+    elif t.kind == "sell":
+        units, price = Decimal(t.units), Decimal(t.price)
+        method = booking_method(ledger, book_id, tree.get(holding) or tree[account])
+        lots = _lots(ledger, book_id, holding, t.commodity)
+        held = sum((p.units.number for p in lots), Decimal(0))
+        if units > held:
+            raise engine.ParseFailure([f"only {engine.decimal_text(held)} {t.commodity} held in {holding}"])
+        if method == "NONE":  # average cost, booked here
+            average = sum((p.units.number * p.cost.number for p in lots), Decimal(0)) / held
+            average = average.quantize(Decimal("0.000001"))
+            order = sorted(lots, key=lambda p: p.cost.date or datetime.date.min)  # FIFO for terms
+            remaining = units
+            for p in order:
+                n = min(remaining, p.units.number)
+                if n <= 0:
+                    break
+                drawn.append(_drawn(n, average, target, p.cost.date, price, t.date))
+                remaining -= n
+            postings.append(
+                models.Posting(
+                    account=holding,
+                    units=models.Amount(number=engine.decimal_text(-units), currency=t.commodity),
+                    cost=models.Cost(number=engine.decimal_text(average), currency=target),
+                    price=models.Amount(number=t.price, currency=target),
+                )
+            )
+        else:
+            if method == "STRICT":
+                if not t.lots:
+                    raise engine.ParseFailure(["this account sells specific lots: choose which"])
+                chosen = []
+                for ref in t.lots:
+                    match = next(
+                        (p for p in lots if p.cost.date == ref.date and p.cost.number == Decimal(ref.cost)), None
+                    )
+                    if match is None or Decimal(ref.units) > match.units.number:
+                        raise engine.ParseFailure([f"no lot of {ref.units} {t.commodity} at {ref.cost} on {ref.date}"])
+                    chosen.append((match, Decimal(ref.units)))
+                if sum((n for _, n in chosen), Decimal(0)) != units:
+                    raise engine.ParseFailure(["the chosen lots don't add up to the units sold"])
+            else:
+                key = {
+                    "FIFO": lambda p: (p.cost.date or datetime.date.min, p.cost.number),
+                    "LIFO": lambda p: (-(p.cost.date or datetime.date.min).toordinal(), p.cost.number),
+                    "HIFO": lambda p: (-p.cost.number, p.cost.date or datetime.date.min),
+                }[method]
+                chosen, remaining = [], units
+                for p in sorted(lots, key=key):
+                    if remaining <= 0:
+                        break
+                    n = min(remaining, p.units.number)
+                    chosen.append((p, n))
+                    remaining -= n
+            for p, n in chosen:
+                drawn.append(_drawn(n, p.cost.number, p.cost.currency, p.cost.date, price, t.date, p.cost.label))
+                postings.append(
+                    models.Posting(
+                        account=holding,
+                        units=models.Amount(number=engine.decimal_text(-n), currency=t.commodity),
+                        cost=models.Cost(
+                            number=engine.decimal_text(p.cost.number),
+                            currency=p.cost.currency,
+                            date=p.cost.date,
+                            label=p.cost.label,
+                        ),
+                        price=models.Amount(number=t.price, currency=target),
+                    )
+                )
+        postings.append(models.Posting(account=cash, units=money(units * price - fees)))
+        for term in ("short", "long"):
+            gain = sum((Decimal(d.gain.number) for d in drawn if d.term == term), Decimal(0))
+            if gain:
+                postings.append(models.Posting(account=GAINS[term], units=money(-gain)))
+        narration = narration or f"Sell {t.units} {t.commodity}"
+    else:  # dividend
+        amount = Decimal(t.amount)
+        postings = [
+            models.Posting(account=cash, units=money(amount)),
+            models.Posting(account=dividends_account(t.commodity), units=money(-amount)),
+        ]
+        narration = narration or f"Dividend from {t.commodity}"
+        if t.units:  # reinvested
+            units, price = Decimal(t.units), Decimal(t.price)
+            postings += [
+                models.Posting(
+                    account=holding,
+                    units=models.Amount(number=t.units, currency=t.commodity),
+                    cost=models.Cost(number=t.price, currency=target),
+                ),
+                models.Posting(account=cash, units=money(-(units * price))),
+            ]
+            narration = t.narration or f"Dividend from {t.commodity}, reinvested"
+    if fees:
+        postings.append(models.Posting(account=FEES, units=money(fees)))
+
+    transaction = models.TransactionIn(date=t.date, flag="*", narration=narration, postings=postings)
+    opens = sorted({p.account for p in postings} - {a.name for a in tree.values() if not a.implicit})
+    return models.TradePreview(transaction=transaction, lots=drawn, opens=opens)
+
+
+def _drawn(n, cost, currency, acquired, price, sold, label=None) -> models.DrawnLot:
+    term = "long" if long_term(acquired, sold) else "short"
+    return models.DrawnLot(
+        units=engine.decimal_text(n),
+        cost=models.Amount(number=engine.decimal_text(cost), currency=currency),
+        date=acquired,
+        label=label,
+        term=term,
+        gain=models.Amount(number=engine.decimal_text(n * (price - cost)), currency=currency),
+    )
+
+
+def trade(ledger, book_id: str, account: str, t: models.TradeIn) -> engine.Directive:
+    """Write a trade, after checking it books: opening any accounts it needs (a holding's leaf,
+    fees, gains, dividends) in the same write."""
+    plan = plan_trade(ledger, book_id, account, t)
+    holding, _ = _resolve(ledger, book_id, account, t)
+    opened: dict[str, engine.Directive] = {}
+    for name in plan.opens:
+        commodity = [t.commodity] if name == holding else None
+        for d in ledger._account_directives(book_id, name, "leaf", None, currencies=commodity):
+            opened.setdefault(engine.opened(d.text), d)  # two gains accounts share a parent
+    directives = list(opened.values())
+    directive = engine.transaction_directive(plan.transaction)
+    _, problems = SCOPED.entries(ledger, book_id, holding, [d.text for d in directives] + [directive.text])
+    mine = [p.message for p in problems if p.directive_id == directive.id]
+    if mine:
+        raise engine.ParseFailure(mine)
+    with ledger.store.transaction():
+        ledger._write(book_id, [*directives, directive])
+    return directive

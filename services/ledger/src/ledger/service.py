@@ -15,7 +15,8 @@ from decimal import Decimal
 from . import engine, investments, models
 from .store import Row, Store
 
-DEFAULT_HEADER = ['option "operating_currency" "USD"']
+# New books: dollars, and sales draw on the oldest lots first (US tax reporting's default).
+DEFAULT_HEADER = ['option "operating_currency" "USD"', 'option "booking_method" "FIFO"']
 
 
 class NotFound(KeyError):
@@ -231,7 +232,23 @@ class Ledger:
     def accounts(self, book_id: str) -> list[models.Account]:
         header = self._header(book_id)
         rows = [r for kind in ("open", "close") for r in self.store.find(book_id, kind=kind, limit=None)]
-        return engine.accounts(header, [r.text for r in rows])
+        return engine.accounts(header, [r.text for r in rows], {r.id: r.updated_at for r in rows})
+
+    def set_account(self, book_id: str, name: str, patch: models.AccountPatch) -> models.Account:
+        """Change an account's settings (only those given), against its version: how its sales
+        pick lots, and whether it's a revalued asset (and how often)."""
+        account = next((a for a in self.accounts(book_id) if a.name == name and not a.implicit), None)
+        if account is None:
+            raise NotFound(name)
+        row = next(r for r in self.store.find(book_id, kind="open", limit=None) if engine.opened(r.text) == name)
+        changes = patch.model_dump(exclude_unset=True, exclude={"updated_at"})
+        directive = engine.reopened(
+            row.text,
+            booking=changes.get("booking", account.booking),
+            revalue_every=changes.get("revalue_every", account.revalue_every),
+        )
+        self._put(book_id, engine.parse_one(directive.text, row.id), patch.updated_at)
+        return self._account(book_id, name)
 
     def create_account(self, book_id: str, a: models.AccountIn) -> models.Account:
         """Open an account by its fully qualified name. Its root sets the type.
@@ -249,11 +266,21 @@ class Ledger:
         it is one write.
         """
         opening = a.opening_balance
-        if opening and a.kind != "leaf":
-            raise engine.ParseFailure(["only a leaf account can have an opening balance"])
+        if (opening or a.opening_holdings) and a.kind != "leaf":
+            raise engine.ParseFailure(["only a leaf account can have an opening balance or holdings"])
+        if a.opening_holdings and not opening:
+            raise engine.ParseFailure(["opening holdings need an opening balance's date (its amount can be 0)"])
         opened = a.open or (opening.date if opening else None)
+        meta = {engine.REVALUE_EVERY_KEY: Decimal(a.revalue_every)} if a.revalue_every else None
         directives = self._account_directives(
-            book_id, a.name, a.kind, opened, currencies=[opening.currency] if opening else None
+            book_id,
+            a.name,
+            a.kind,
+            opened,
+            # Only a plain cash account is held to its currency: holdings bring their own.
+            currencies=[opening.currency] if opening and not a.opening_holdings else None,
+            meta=meta,
+            booking=a.booking,
         )
         if opening:
             if self.OPENING_BALANCES not in {x.name for x in self.accounts(book_id) if not x.implicit}:
@@ -264,6 +291,7 @@ class Ledger:
                 narration="Opening balance",
                 postings=[
                     models.Posting(account=a.name, units=models.Amount(number=opening.amount, currency=opening.currency)),
+                    *investments.opening_lots(self, book_id, a.name, a.opening_holdings, opening),
                     models.Posting(account=self.OPENING_BALANCES),
                 ],
             )
@@ -283,7 +311,8 @@ class Ledger:
         opened: datetime.date | None,
         *,
         currencies: list[str] | None = None,
-        meta: dict[str, str] | None = None,
+        meta: dict[str, object] | None = None,
+        booking: str | None = None,
     ) -> list[engine.Directive]:
         """The `open` directives for a new account and any nodes on the way, after checking the
         account rules (see `create_account`)."""
@@ -311,7 +340,7 @@ class Ledger:
         depth = ancestor.name.count(":") + 1
         en_route = [":".join(segments[:i]) for i in range(depth + 1, len(segments))]
         directives = [engine.open_directive(n, opened, "node") for n in en_route]
-        directives.append(engine.open_directive(name, opened, kind, currencies=currencies, meta=meta))
+        directives.append(engine.open_directive(name, opened, kind, currencies=currencies, meta=meta, booking=booking))
         return directives
 
     # Opening balances and summaries

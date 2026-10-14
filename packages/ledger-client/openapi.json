@@ -108,6 +108,18 @@
             ],
             "description": "From the top-level account; None for an unrecognized root.",
             "title": "Type"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its `open` directive's version; send it back to change settings.",
+            "title": "Updated At"
           }
         },
         "required": [
@@ -121,6 +133,24 @@
       "AccountIn": {
         "additionalProperties": false,
         "properties": {
+          "booking": {
+            "anyOf": [
+              {
+                "enum": [
+                  "FIFO",
+                  "LIFO",
+                  "HIFO",
+                  "STRICT",
+                  "NONE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booking"
+          },
           "kind": {
             "default": "leaf",
             "enum": [
@@ -158,12 +188,80 @@
               }
             ],
             "description": "A leaf's balance on a date, recorded as an opening-balance transaction."
+          },
+          "opening_holdings": {
+            "description": "Holdings on the opening balance's date (it's required with these).",
+            "items": {
+              "$ref": "#/components/schemas/OpeningHolding"
+            },
+            "title": "Opening Holdings",
+            "type": "array"
+          },
+          "revalue_every": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A revalued asset (a house, a car): days its value stays current.",
+            "title": "Revalue Every"
           }
         },
         "required": [
           "name"
         ],
         "title": "AccountIn",
+        "type": "object"
+      },
+      "AccountPatch": {
+        "additionalProperties": false,
+        "description": "An account's settings to change; only those sent.",
+        "properties": {
+          "booking": {
+            "anyOf": [
+              {
+                "enum": [
+                  "FIFO",
+                  "LIFO",
+                  "HIFO",
+                  "STRICT",
+                  "NONE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by fava-beans); None: the book's default.",
+            "title": "Booking"
+          },
+          "revalue_every": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A revalued asset: days its value stays current; None: not one.",
+            "title": "Revalue Every"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "updated_at"
+        ],
+        "title": "AccountPatch",
         "type": "object"
       },
       "AccountSummary": {
@@ -325,6 +423,18 @@
             ],
             "description": "From the top-level account; None for an unrecognized root.",
             "title": "Type"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its `open` directive's version; send it back to change settings.",
+            "title": "Updated At"
           },
           "value": {
             "anyOf": [
@@ -855,6 +965,62 @@
         "title": "Directive",
         "type": "object"
       },
+      "DrawnLot": {
+        "description": "A lot a sale draws on.",
+        "properties": {
+          "cost": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "Per unit."
+          },
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "gain": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "term": {
+            "enum": [
+              "short",
+              "long"
+            ],
+            "title": "Term",
+            "type": "string"
+          },
+          "units": {
+            "title": "Units",
+            "type": "string"
+          }
+        },
+        "required": [
+          "units",
+          "cost",
+          "date",
+          "term",
+          "gain"
+        ],
+        "title": "DrawnLot",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1221,6 +1387,35 @@
         "title": "Lot",
         "type": "object"
       },
+      "LotRef": {
+        "additionalProperties": false,
+        "description": "A lot to sell from, for an account that sells specific lots.",
+        "properties": {
+          "cost": {
+            "description": "Its per-unit cost.",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Cost",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "units": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Units",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "cost",
+          "units"
+        ],
+        "title": "LotRef",
+        "type": "object"
+      },
       "MetaDate": {
         "additionalProperties": false,
         "properties": {
@@ -1277,6 +1472,41 @@
           "date"
         ],
         "title": "OpeningBalance",
+        "type": "object"
+      },
+      "OpeningHolding": {
+        "additionalProperties": false,
+        "description": "A holding to open an account with.",
+        "properties": {
+          "commodity": {
+            "pattern": "^[A-Z][A-Z0-9'._-]{0,22}[A-Z0-9]$",
+            "title": "Commodity",
+            "type": "string"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its total cost basis, in the operating currency; None: unknown (the price on the date is used).",
+            "title": "Cost"
+          },
+          "units": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Units",
+            "type": "string"
+          }
+        },
+        "required": [
+          "commodity",
+          "units"
+        ],
+        "title": "OpeningHolding",
         "type": "object"
       },
       "Posting": {
@@ -1483,6 +1713,168 @@
           "value"
         ],
         "title": "RevalueIn",
+        "type": "object"
+      },
+      "TradeIn": {
+        "additionalProperties": false,
+        "description": "A trade, as the forms describe it: the ledger writes the transaction.",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A dividend's amount.",
+            "title": "Amount"
+          },
+          "cash_account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default: the account itself (a leaf), or <node>:Cash.",
+            "title": "Cash Account"
+          },
+          "commodity": {
+            "pattern": "^[A-Z][A-Z0-9'._-]{0,22}[A-Z0-9]$",
+            "title": "Commodity",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "fees": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fees"
+          },
+          "holding_account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default: the account itself (a leaf), or <node>:<COMMODITY>.",
+            "title": "Holding Account"
+          },
+          "kind": {
+            "enum": [
+              "buy",
+              "sell",
+              "dividend"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lots": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LotRef"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For an account that sells specific lots (STRICT).",
+            "title": "Lots"
+          },
+          "narration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narration"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Per unit, in the operating currency.",
+            "title": "Price"
+          },
+          "units": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Bought or sold; for a dividend, units reinvested (if any).",
+            "title": "Units"
+          }
+        },
+        "required": [
+          "kind",
+          "date",
+          "commodity"
+        ],
+        "title": "TradeIn",
+        "type": "object"
+      },
+      "TradePreview": {
+        "properties": {
+          "lots": {
+            "items": {
+              "$ref": "#/components/schemas/DrawnLot"
+            },
+            "title": "Lots",
+            "type": "array"
+          },
+          "opens": {
+            "description": "Accounts the trade will open.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Opens",
+            "type": "array"
+          },
+          "transaction": {
+            "$ref": "#/components/schemas/TransactionIn"
+          }
+        },
+        "required": [
+          "transaction",
+          "lots",
+          "opens"
+        ],
+        "title": "TradePreview",
         "type": "object"
       },
       "Transaction": {
@@ -2353,6 +2745,68 @@
         "summary": "Account Summary"
       }
     },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}": {
+      "patch": {
+        "description": "Change an account's settings: how its sales pick lots; whether it's a revalued asset.",
+        "operationId": "set_account_api_ledger_v1_books__book_id__accounts__account__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Account"
+      }
+    },
     "/api/ledger/v1/books/{book_id}/accounts/{account}/holdings": {
       "get": {
         "description": "What an account and everything under it holds: units, prices, value, cost basis, gains\nand lots per commodity.",
@@ -2552,6 +3006,124 @@
           }
         },
         "summary": "Revalue"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/trades": {
+      "post": {
+        "description": "Write a buy, sale or dividend, checked by booking first.",
+        "operationId": "trade_api_ledger_v1_books__book_id__accounts__account__trades_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Trade"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/trades/preview": {
+      "post": {
+        "description": "What a trade would write: the transaction, and the lots a sale draws on.",
+        "operationId": "preview_trade_api_ledger_v1_books__book_id__accounts__account__trades_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradePreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Trade"
       }
     },
     "/api/ledger/v1/books/{book_id}/commodities": {

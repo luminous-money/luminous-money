@@ -296,7 +296,7 @@ def transactions(texts: list[str]) -> list[tuple[str, models.TransactionIn]]:
     return [(str(e.meta[ID_KEY]), _transaction_model(e)) for e in entries if isinstance(e, data.Transaction)]
 
 
-def accounts(header: list[str], texts: list[str]) -> list[models.Account]:
+def accounts(header: list[str], texts: list[str], versions: dict[str, str] | None = None) -> list[models.Account]:
     """The chart of accounts, sorted by name.
 
     - Opened accounts come from `open` and `close` directives. An `open` with `kind: "node"`
@@ -325,6 +325,7 @@ def accounts(header: list[str], texts: list[str]) -> list[models.Account]:
                 currencies=list(entry.currencies or []),
                 display_name=entry.meta.get(DISPLAY_NAME_KEY),
                 booking=entry.booking.name if entry.booking else None,
+                updated_at=(versions or {}).get(str(entry.meta.get(ID_KEY))),
                 revalue_every=int(entry.meta[REVALUE_EVERY_KEY]) if REVALUE_EVERY_KEY in entry.meta else None,
             )
     for entry in entries:
@@ -377,18 +378,43 @@ def root_types(header: list[str]) -> dict[str, str]:
     return {options[key]: type_ for key, type_ in ROOT_OPTIONS}
 
 
+def opened(text: str) -> str | None:
+    """The account an `open` directive's text opens."""
+    first = text.split("\n", 1)[0].split()
+    return first[2] if len(first) > 2 and first[1] == "open" else None
+
+
+def reopened(text: str, *, booking: str | None, revalue_every: int | None) -> Directive:
+    """An `open` directive with its booking method and `revalue-every` set (None: removed)."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1 or not isinstance(entries[0], data.Open):
+        raise ParseFailure(["not an open directive"])
+    entry = entries[0]
+    meta = {k: v for k, v in entry.meta.items() if k != REVALUE_EVERY_KEY}
+    if revalue_every:
+        meta[REVALUE_EVERY_KEY] = Decimal(revalue_every)
+    return to_directive(entry._replace(meta=meta, booking=data.Booking[booking] if booking else None))
+
+
 def open_directive(
     name: str,
     date: datetime.date,
     kind: str,
     *,
     currencies: list[str] | None = None,
-    meta: dict[str, str] | None = None,
+    meta: dict[str, object] | None = None,
+    booking: str | None = None,
 ) -> Directive:
     """An `open` directive. Built as an entry and printed, so metadata values are quoted and
     escaped properly; parsed again to validate the name."""
     entry_meta = {**({KIND_KEY: NODE} if kind == NODE else {}), **(meta or {})}
-    entry = data.Open(data.new_metadata("<new>", 0, entry_meta), date, name, currencies or None, None)
+    entry = data.Open(
+        data.new_metadata("<new>", 0, entry_meta),
+        date,
+        name,
+        currencies or None,
+        data.Booking[booking] if booking else None,
+    )
     return parse_one(to_directive(entry).text)
 
 

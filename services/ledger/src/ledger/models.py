@@ -147,6 +147,7 @@ class Account(Api):
     revalue_every: int | None = Field(
         None, description="A revalued asset (a house, a car): how many days its value stays current."
     )
+    updated_at: str | None = Field(None, description="Its `open` directive's version; send it back to change settings.")
 
 
 class AccountSummary(Account):
@@ -229,11 +230,76 @@ class CommodityIn(Strict):
     updated_at: str | None = Field(None, description="Required when it's already declared.")
 
 
+class LotRef(Strict):
+    """A lot to sell from, for an account that sells specific lots."""
+
+    date: datetime.date
+    cost: DecimalStr = Field(description="Its per-unit cost.")
+    units: DecimalStr
+
+
+class TradeIn(Strict):
+    """A trade, as the forms describe it: the ledger writes the transaction."""
+
+    kind: Literal["buy", "sell", "dividend"]
+    date: datetime.date
+    commodity: str = Field(pattern=r"^[A-Z][A-Z0-9'._-]{0,22}[A-Z0-9]$")
+    units: DecimalStr | None = Field(None, description="Bought or sold; for a dividend, units reinvested (if any).")
+    price: DecimalStr | None = Field(None, description="Per unit, in the operating currency.")
+    amount: DecimalStr | None = Field(None, description="A dividend's amount.")
+    fees: DecimalStr | None = None
+    cash_account: str | None = Field(None, description="Default: the account itself (a leaf), or <node>:Cash.")
+    holding_account: str | None = Field(None, description="Default: the account itself (a leaf), or <node>:<COMMODITY>.")
+    lots: list[LotRef] | None = Field(None, description="For an account that sells specific lots (STRICT).")
+    narration: str | None = None
+
+
+class DrawnLot(Api):
+    """A lot a sale draws on."""
+
+    units: str
+    cost: Amount = Field(description="Per unit.")
+    date: datetime.date | None
+    label: str | None = None
+    term: Literal["short", "long"]
+    gain: Amount
+
+
+class TradePreview(Api):
+    transaction: TransactionIn
+    lots: list[DrawnLot]
+    opens: list[str] = Field(description="Accounts the trade will open.")
+
+
 class RevalueIn(Strict):
     """A revalued asset's value on a date."""
 
     date: datetime.date
     value: Amount
+
+
+Booking = Literal["FIFO", "LIFO", "HIFO", "STRICT", "NONE"]
+
+
+class AccountPatch(Strict):
+    """An account's settings to change; only those sent."""
+
+    updated_at: str
+    booking: Booking | None = Field(
+        None, description="FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by fava-beans); "
+        "None: the book's default."
+    )
+    revalue_every: int | None = Field(None, ge=1, description="A revalued asset: days its value stays current; None: not one.")
+
+
+class OpeningHolding(Strict):
+    """A holding to open an account with."""
+
+    commodity: str = Field(pattern=r"^[A-Z][A-Z0-9'._-]{0,22}[A-Z0-9]$")
+    units: DecimalStr
+    cost: DecimalStr | None = Field(
+        None, description="Its total cost basis, in the operating currency; None: unknown (the price on the date is used)."
+    )
 
 
 class OpeningBalance(Strict):
@@ -305,6 +371,11 @@ class AccountIn(Strict):
     opening_balance: OpeningBalance | None = Field(
         None, description="A leaf's balance on a date, recorded as an opening-balance transaction."
     )
+    opening_holdings: list[OpeningHolding] = Field(
+        default_factory=list, description="Holdings on the opening balance's date (it's required with these)."
+    )
+    booking: Booking | None = None
+    revalue_every: int | None = Field(None, ge=1, description="A revalued asset (a house, a car): days its value stays current.")
 
 
 class Directive(Api):

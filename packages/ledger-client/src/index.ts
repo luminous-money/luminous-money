@@ -30,6 +30,10 @@ export type Holdings = Schemas["Holdings"];
 export type Holding = Schemas["Holding"];
 export type CommodityOut = Schemas["CommodityOut"];
 export type PriceOut = Schemas["PriceOut"];
+export type TradeIn = Schemas["TradeIn"];
+export type TradePreview = Schemas["TradePreview"];
+export type AccountPatch = Schemas["AccountPatch"];
+export type OpeningHolding = Schemas["OpeningHolding"];
 export type Backup = Schemas["Backup"];
 
 export function createLedgerClient(options: ClientOptions) {

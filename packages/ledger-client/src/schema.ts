@@ -100,6 +100,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Set Account
+     * @description Change an account's settings: how its sales pick lots; whether it's a revalued asset.
+     */
+    patch: operations["set_account_api_ledger_v1_books__book_id__accounts__account__patch"];
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/accounts/{account}/holdings": {
     parameters: {
       query?: never;
@@ -152,6 +172,46 @@ export interface paths {
      * @description Record a revalued asset's value on a date (against Income:Unrealized-Gains).
      */
     post: operations["revalue_api_ledger_v1_books__book_id__accounts__account__revalue_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/trades": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Trade
+     * @description Write a buy, sale or dividend, checked by booking first.
+     */
+    post: operations["trade_api_ledger_v1_books__book_id__accounts__account__trades_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/trades/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Preview Trade
+     * @description What a trade would write: the transaction, and the lots a sale draws on.
+     */
+    post: operations["preview_trade_api_ledger_v1_books__book_id__accounts__account__trades_preview_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -483,9 +543,16 @@ export interface components {
        * @description From the top-level account; None for an unrecognized root.
        */
       type: ("asset" | "liability" | "equity" | "income" | "expense") | null;
+      /**
+       * Updated At
+       * @description Its `open` directive's version; send it back to change settings.
+       */
+      updated_at?: string | null;
     };
     /** AccountIn */
     AccountIn: {
+      /** Booking */
+      booking?: ("FIFO" | "LIFO" | "HIFO" | "STRICT" | "NONE") | null;
       /**
        * Kind
        * @default leaf
@@ -504,6 +571,34 @@ export interface components {
       open?: string | null;
       /** @description A leaf's balance on a date, recorded as an opening-balance transaction. */
       opening_balance?: components["schemas"]["OpeningBalance"] | null;
+      /**
+       * Opening Holdings
+       * @description Holdings on the opening balance's date (it's required with these).
+       */
+      opening_holdings?: components["schemas"]["OpeningHolding"][];
+      /**
+       * Revalue Every
+       * @description A revalued asset (a house, a car): days its value stays current.
+       */
+      revalue_every?: number | null;
+    };
+    /**
+     * AccountPatch
+     * @description An account's settings to change; only those sent.
+     */
+    AccountPatch: {
+      /**
+       * Booking
+       * @description FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by fava-beans); None: the book's default.
+       */
+      booking?: ("FIFO" | "LIFO" | "HIFO" | "STRICT" | "NONE") | null;
+      /**
+       * Revalue Every
+       * @description A revalued asset: days its value stays current; None: not one.
+       */
+      revalue_every?: number | null;
+      /** Updated At */
+      updated_at: string;
     };
     /**
      * AccountSummary
@@ -576,6 +671,11 @@ export interface components {
        * @description From the top-level account; None for an unrecognized root.
        */
       type: ("asset" | "liability" | "equity" | "income" | "expense") | null;
+      /**
+       * Updated At
+       * @description Its `open` directive's version; send it back to change settings.
+       */
+      updated_at?: string | null;
       /** @description Market value in the book's operating currency; None if unpriced. */
       value?: components["schemas"]["Amount"] | null;
       /**
@@ -772,6 +872,26 @@ export interface components {
        */
       updated_at: string;
     };
+    /**
+     * DrawnLot
+     * @description A lot a sale draws on.
+     */
+    DrawnLot: {
+      /** @description Per unit. */
+      cost: components["schemas"]["Amount"];
+      /** Date */
+      date: string | null;
+      gain: components["schemas"]["Amount"];
+      /** Label */
+      label?: string | null;
+      /**
+       * Term
+       * @enum {string}
+       */
+      term: "short" | "long";
+      /** Units */
+      units: string;
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -887,6 +1007,24 @@ export interface components {
       /** Units */
       units: string;
     };
+    /**
+     * LotRef
+     * @description A lot to sell from, for an account that sells specific lots.
+     */
+    LotRef: {
+      /**
+       * Cost
+       * @description Its per-unit cost.
+       */
+      cost: string;
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Units */
+      units: string;
+    };
     /** MetaDate */
     MetaDate: {
       /**
@@ -920,6 +1058,21 @@ export interface components {
        * Format: date
        */
       date: string;
+    };
+    /**
+     * OpeningHolding
+     * @description A holding to open an account with.
+     */
+    OpeningHolding: {
+      /** Commodity */
+      commodity: string;
+      /**
+       * Cost
+       * @description Its total cost basis, in the operating currency; None: unknown (the price on the date is used).
+       */
+      cost?: string | null;
+      /** Units */
+      units: string;
     };
     /** Posting */
     Posting: {
@@ -992,6 +1145,69 @@ export interface components {
        */
       date: string;
       value: components["schemas"]["Amount"];
+    };
+    /**
+     * TradeIn
+     * @description A trade, as the forms describe it: the ledger writes the transaction.
+     */
+    TradeIn: {
+      /**
+       * Amount
+       * @description A dividend's amount.
+       */
+      amount?: string | null;
+      /**
+       * Cash Account
+       * @description Default: the account itself (a leaf), or <node>:Cash.
+       */
+      cash_account?: string | null;
+      /** Commodity */
+      commodity: string;
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Fees */
+      fees?: string | null;
+      /**
+       * Holding Account
+       * @description Default: the account itself (a leaf), or <node>:<COMMODITY>.
+       */
+      holding_account?: string | null;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "buy" | "sell" | "dividend";
+      /**
+       * Lots
+       * @description For an account that sells specific lots (STRICT).
+       */
+      lots?: components["schemas"]["LotRef"][] | null;
+      /** Narration */
+      narration?: string | null;
+      /**
+       * Price
+       * @description Per unit, in the operating currency.
+       */
+      price?: string | null;
+      /**
+       * Units
+       * @description Bought or sold; for a dividend, units reinvested (if any).
+       */
+      units?: string | null;
+    };
+    /** TradePreview */
+    TradePreview: {
+      /** Lots */
+      lots: components["schemas"]["DrawnLot"][];
+      /**
+       * Opens
+       * @description Accounts the trade will open.
+       */
+      opens: string[];
+      transaction: components["schemas"]["TransactionIn"];
     };
     /** Transaction */
     Transaction: {
@@ -1484,6 +1700,49 @@ export interface operations {
       };
     };
   };
+  set_account_api_ledger_v1_books__book_id__accounts__account__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AccountPatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Account"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   holdings_api_ledger_v1_books__book_id__accounts__account__holdings_get: {
     parameters: {
       query?: {
@@ -1576,6 +1835,78 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Transaction"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  trade_api_ledger_v1_books__book_id__accounts__account__trades_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TradeIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Transaction"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  preview_trade_api_ledger_v1_books__book_id__accounts__account__trades_preview_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TradeIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TradePreview"];
         };
       };
       /** @description Validation Error */

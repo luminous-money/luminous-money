@@ -170,6 +170,22 @@ def create_app(ledger: Ledger) -> FastAPI:
         directive = investments.revalue(ledger, book_id, account, r)
         return ledger.transaction(book_id, directive.id)
 
+    @api.patch("/books/{book_id}/accounts/{account}", responses={409: {"description": "Stale version"}})
+    def set_account(book_id: OwnedBook, account: str, patch: models.AccountPatch) -> models.Account:
+        """Change an account's settings: how its sales pick lots; whether it's a revalued asset."""
+        return ledger.set_account(book_id, account, patch)
+
+    @api.post("/books/{book_id}/accounts/{account}/trades/preview")
+    def preview_trade(book_id: OwnedBook, account: str, t: models.TradeIn) -> models.TradePreview:
+        """What a trade would write: the transaction, and the lots a sale draws on."""
+        return investments.plan_trade(ledger, book_id, account, t)
+
+    @api.post("/books/{book_id}/accounts/{account}/trades", status_code=201)
+    def trade(book_id: OwnedBook, account: str, t: models.TradeIn) -> models.Transaction:
+        """Write a buy, sale or dividend, checked by booking first."""
+        directive = investments.trade(ledger, book_id, account, t)
+        return ledger.transaction(book_id, directive.id)
+
     @api.get("/books/{book_id}/prices")
     def price_list(book_id: OwnedBook, commodity: str) -> list[models.PriceOut]:
         """A commodity's prices, newest first."""

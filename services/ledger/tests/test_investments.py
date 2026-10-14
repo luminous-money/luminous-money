@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from conftest import USER, http
 
-from ledger import investments, migrations, models
+from ledger import engine, investments, migrations, models
 
 ON = datetime.date(2024, 6, 30)
 
@@ -170,3 +170,93 @@ def test_investments_over_http(book):
     assert holdings["value"] == {"number": "5495.00", "currency": "USD"}
     assert added.status_code == 201
     assert [c["currency"] for c in commodities] == ["VTI"]
+
+
+def trade(ledger, kind, **fields):
+    return investments.trade(ledger, "book", "Assets:Broker", models.TradeIn(kind=kind, commodity="VTI", **fields))
+
+
+def test_a_buy_writes_a_lot_at_cost_and_opens_what_it_needs(book):
+    trade(book, "buy", date=datetime.date(2024, 4, 1), units="2", price="210.00", fees="1.00")
+
+    h = investments.holdings(book, "book", "Assets:Broker", ON)
+    vti = next(x for x in h.holdings if x.commodity == "VTI")
+    assert vti.units == "17"
+    assert vti.lots[-1].cost.number == "210.00"
+    assert next(x for x in h.holdings if x.commodity == "USD").units == "1474.00"  # 1895 - 421
+    assert "Expenses:Financial:Fees" in {a.name for a in book.accounts("book") if not a.implicit}
+    assert book.problems("book") == []
+
+
+def test_a_sale_draws_on_lots_fifo_and_splits_gains_by_term(book):
+    preview = investments.plan_trade(
+        book, "book", "Assets:Broker", models.TradeIn(kind="sell", commodity="VTI", date=datetime.date(2025, 2, 1), units="12", price="250.00")
+    )
+
+    assert [(d.units, d.cost.number, d.term, d.gain.number) for d in preview.lots] == [
+        ("10", "200.00", "long", "500.00"),  # bought 2024-01-10: more than a year
+        ("2", "220.00", "short", "60.00"),
+    ]
+    trade(book, "sell", date=datetime.date(2025, 2, 1), units="12", price="250.00")
+    assert book.balance("book", investments.GAINS["long"]) == [models.Amount(number="-500.00", currency="USD")]
+    assert book.balance("book", investments.GAINS["short"]) == [models.Amount(number="-60.00", currency="USD")]
+    assert book.problems("book") == []
+
+
+def test_overselling_is_refused(book):
+    with pytest.raises(engine.ParseFailure, match="only 15 VTI"):
+        trade(book, "sell", date=ON, units="16", price="250")
+
+
+def test_average_cost_accounts_are_booked_by_fava_beans(book):
+    vti = next(a for a in book.accounts("book") if a.name == "Assets:Broker:VTI")
+    book.set_account("book", vti.name, models.AccountPatch(updated_at=vti.updated_at, booking="NONE"))
+
+    trade(book, "sell", date=datetime.date(2024, 7, 1), units="3", price="250.00")
+
+    h = investments.holdings(book, "book", "Assets:Broker:VTI", ON)
+    # Average cost 3100 / 15 = 206.666667; 12 units left at that average.
+    assert h.holdings[0].units == "12"
+    assert h.holdings[0].cost.number == "2480.00"
+    assert [(lot.units, lot.cost.number, lot.label) for lot in h.holdings[0].lots] == [("12", "206.666667", "average")]
+
+
+def test_specific_lots_must_be_chosen(book):
+    vti = next(a for a in book.accounts("book") if a.name == "Assets:Broker:VTI")
+    book.set_account("book", vti.name, models.AccountPatch(updated_at=vti.updated_at, booking="STRICT"))
+
+    with pytest.raises(engine.ParseFailure, match="choose"):
+        trade(book, "sell", date=ON, units="5", price="250")
+    trade(book, "sell", date=ON, units="5", price="250", lots=[models.LotRef(date=datetime.date(2024, 3, 10), cost="220.00", units="5")])
+
+    lots = investments.holdings(book, "book", "Assets:Broker:VTI", ON).holdings[0].lots
+    assert [(lot.units, lot.cost.number) for lot in lots] == [("10", "200.00")]
+
+
+def test_a_reinvested_dividend(book):
+    trade(book, "dividend", date=ON, amount="40.00", units="0.16", price="250.00")
+
+    assert book.balance("book", "Income:Dividends:VTI") == [models.Amount(number="-40.00", currency="USD")]
+    assert next(x for x in investments.holdings(book, "book", "Assets:Broker", ON).holdings if x.commodity == "VTI").units == "15.16"
+
+
+def test_an_account_can_open_with_holdings_at_cost_or_estimated(ledger):
+    ledger.apply_text("book", 'option "operating_currency" "USD"\n2024-01-01 price VTI 200 USD\n', owner_id=USER)
+    ledger.create_account(
+        "book",
+        models.AccountIn(
+            name="Assets:Broker:Main",
+            opening_balance=models.OpeningBalance(amount="100.00", date=datetime.date(2024, 1, 2)),
+            opening_holdings=[
+                models.OpeningHolding(commodity="VTI", units="3", cost="550.00"),
+                models.OpeningHolding(commodity="VTI", units="1"),
+            ],
+            revalue_every=None,
+        ),
+    )
+
+    h = investments.holdings(ledger, "book", "Assets:Broker:Main", datetime.date(2024, 1, 3))
+    vti = next(x for x in h.holdings if x.commodity == "VTI")
+    assert (vti.units, vti.cost.number) == ("4", "750.00")
+    assert [lot.label for lot in vti.lots] == [None, "estimated"]
+    assert ledger.problems("book") == []

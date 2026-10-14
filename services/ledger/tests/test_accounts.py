@@ -36,7 +36,7 @@ def test_a_new_book_has_the_five_top_level_nodes(ledger):
 def test_opened_accounts_are_leaves_with_their_open_close_and_constraints(book):
     accounts = tree(book)
 
-    assert accounts["Assets:Bank:Checking"].model_dump() == {
+    assert accounts["Assets:Bank:Checking"].model_dump(exclude={"updated_at"}) == {
         "name": "Assets:Bank:Checking",
         "type": "asset",
         "kind": "leaf",
