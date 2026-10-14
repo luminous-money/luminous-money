@@ -357,12 +357,14 @@ export function useBulkEdit(book: string) {
       transactions,
       change,
     }: {
-      transactions: Transaction[];
-      change: (t: Transaction) => TransactionChanges;
+      /** Each one's current version is read before it's changed. */
+      transactions: { id: string }[];
+      change: (t: Transaction) => TransactionChanges | null;
     }) => {
       for (const t of transactions) {
         const current = await latest(book, t.id);
-        remember(book, await api.patch(book, t.id, change(current), current.updated_at));
+        const changes = change(current);
+        if (changes) remember(book, await api.patch(book, t.id, changes, current.updated_at));
       }
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: keys.book(book) }),
@@ -370,10 +372,10 @@ export function useBulkEdit(book: string) {
 }
 
 /** "Suggest categories" for pending transactions not yet categorized. */
-export function useSuggest(book: string) {
+export function useSuggest(book: string, account?: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () => appApi.suggest(book),
+    mutationFn: () => appApi.suggest(book, account),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
   });
 }

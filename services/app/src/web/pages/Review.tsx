@@ -3,12 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
+import { SelectBar } from "../components/SelectBar.js";
 import { Swipeable, type SwipeHandle } from "../components/Swipeable.js";
 import { postable, preferredRoots, shortName } from "../lib/accounts.js";
 import { add, formatMoney, isNegative, isZero, negate } from "../lib/decimal.js";
 import { appApi, type ProposalSummary, type ProposedMatch } from "../lib/appApi.js";
 import { today } from "../lib/format.js";
 import { withBack } from "../lib/navigation.js";
+import { useSelection } from "../lib/selection.js";
 import { similarPending } from "../lib/similar.js";
 import {
   explain,
@@ -43,8 +45,8 @@ export function Review({ book }: { book: string }) {
   const proposals = useProposals(book);
   const suggest = useSuggest(book);
   const bulk = useBulkEdit(book);
-  const [selecting, setSelecting] = useState(false);
-  const [selected, setSelected] = useState<string[]>([]);
+  const selection = useSelection();
+  const [note, setNote] = useState<string | null>(null);
   const [skipped, setSkipped] = useState(() => readSkipped(book));
   useEffect(() => writeSkipped(book, skipped), [book, skipped]);
 
@@ -55,21 +57,31 @@ export function Review({ book }: { book: string }) {
     ...skipped.flatMap((id) => items.filter((i) => i.transaction.id === id)),
   ];
   const queued = items.map((i) => i.transaction);
-  const chosen = ordered.filter((i) => selected.includes(i.transaction.id));
-  const toggle = (id: string) =>
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
-  const categorizeChosen = (account: string) =>
-    bulk.mutate({
-      transactions: chosen.map((i) => i.transaction).filter((t) => simple(t)),
-      change: (t) => ({ postings: withCounterpart(t, account).postings }),
-    });
+  const chosen = ordered.filter((i) => selection.has(i.transaction.id));
+  const categorizeChosen = (account: string) => {
+    const simpleOnes = chosen.map((i) => i.transaction).filter((t) => simple(t));
+    const skipped = chosen.length - simpleOnes.length;
+    setNote(skipped ? `Skipped ${skipped} with more than two splits.` : null);
+    bulk.mutate(
+      {
+        transactions: simpleOnes,
+        change: (t) => ({ postings: withCounterpart(t, account).postings }),
+      },
+      { onError: (e) => setNote(explain(e)) }
+    );
+  };
   const confirmChosen = async () => {
-    await bulk.mutateAsync({
-      transactions: chosen.map((i) => i.transaction).filter((t) => t.flag === "!"),
-      change: () => ({ flag: "*" }),
-    });
-    for (const m of chosen.flatMap((i) => i.matches)) await appApi.confirmMatch(book, m);
-    setSelected([]);
+    setNote(null);
+    try {
+      await bulk.mutateAsync({
+        transactions: chosen.map((i) => i.transaction).filter((t) => t.flag === "!"),
+        change: () => ({ flag: "*" }),
+      });
+      for (const m of chosen.flatMap((i) => i.matches)) await appApi.confirmMatch(book, m);
+      selection.clear();
+    } catch (e) {
+      setNote(explain(e));
+    }
   };
 
   return (
@@ -87,13 +99,11 @@ export function Review({ book }: { book: string }) {
           <button type="button" disabled={suggest.isPending} onClick={() => suggest.mutate()}>
             {suggest.isPending ? "Suggesting…" : "Suggest categories"}
           </button>
-          <button
-            type="button"
-            aria-pressed={selecting}
-            onClick={() => (setSelecting((s) => !s), setSelected([]))}
-          >
-            {selecting ? "Done selecting" : "Select"}
-          </button>
+          {!selection.selecting && (
+            <button type="button" onClick={selection.start}>
+              Select
+            </button>
+          )}
         </div>
         {suggest.data && (
           <p className="muted small" aria-live="polite">
@@ -104,30 +114,20 @@ export function Review({ book }: { book: string }) {
         )}
       </header>
 
-      {selecting && (
-        <div className="select-bar" role="toolbar" aria-label="Selected">
-          <span>{chosen.length} selected</span>
-          <AccountPicker
-            label="Categorize as"
-            accounts={accounts.data ? postable(accounts.data, today()) : []}
-            value=""
-            create={create}
-            onChange={categorizeChosen}
-          />
-          <button
-            type="button"
-            className="primary"
-            disabled={
-              !chosen.length ||
-              bulk.isPending ||
-              chosen.some((i) => i.transaction.postings.some((p) => p.account === UNCATEGORIZED))
-            }
-            onClick={() => void confirmChosen()}
-          >
-            Confirm {chosen.length || ""}
-          </button>
-          {bulk.error && <p className="error">{explain(bulk.error)}</p>}
-        </div>
+      {selection.selecting && (
+        <SelectBar
+          count={chosen.length}
+          accounts={accounts.data ? postable(accounts.data, today()) : []}
+          create={create}
+          onCategorize={categorizeChosen}
+          onConfirm={() => void confirmChosen()}
+          canConfirm={
+            !chosen.some((i) => i.transaction.postings.some((p) => p.account === UNCATEGORIZED))
+          }
+          busy={bulk.isPending}
+          note={note}
+          onDone={selection.stop}
+        />
       )}
 
       {!queue.items && !queue.error && <p className="muted">Loading…</p>}
@@ -155,9 +155,9 @@ export function Review({ book }: { book: string }) {
                   change: (o) => ({ postings: withCounterpart(o, account).postings }),
                 })
               }
-              selecting={selecting}
-              selected={selected.includes(t.id)}
-              onSelect={() => toggle(t.id)}
+              selecting={selection.selecting}
+              selected={selection.has(t.id)}
+              onSelect={() => selection.toggle(t.id)}
               accounts={accounts.data ? postable(accounts.data, t.date) : []}
               create={create}
               onSkip={() => setSkipped((s) => [...s.filter((x) => x !== t.id), t.id])}
@@ -253,135 +253,152 @@ function QueueItem({
       onSkip={onSkip}
       canConfirm={!uncategorized}
       onBlocked={() => setNudge((n) => n + 1)}
+      disabled={selecting}
     >
       <article
-        className={`card item${busy ? " busy" : ""}`}
+        className={`card item${busy ? " busy" : ""}${selecting ? " selecting" : ""}${selected ? " selected" : ""}`}
         aria-label={`${t.payee ?? ""} ${t.narration}`}
       >
         {selecting && (
-          <label className="check select-one">
-            <input type="checkbox" aria-label="Select" checked={selected} onChange={onSelect} />
-            Select
-          </label>
-        )}
-        <div className="item-top">
-          <span className="muted">
-            {t.date}
-            {view && ` · ${shortName(view.anchor.account)}`}
-          </span>
-          {view && (
-            <span className={`amount ${isNegative(view.amount) ? "out" : "in"}`}>
-              {formatMoney(view.amount, view.currency)}
-            </span>
-          )}
-        </div>
-        {t.payee && <div className="payee">{t.payee}</div>}
-        <input
-          className="description"
-          aria-label="Description"
-          placeholder="Add a description"
-          value={narration}
-          onChange={(e) => setNarration(e.target.value)}
-          onBlur={saveNarration}
-          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-        />
-
-        {view ? (
-          <div
-            // Re-keyed on every blocked swipe so the nudge animation replays.
-            key={nudge}
-            className={`category${view.counterpart.account === UNCATEGORIZED ? " needs" : ""}${nudge ? " nudge" : ""}`}
-          >
-            <AccountPicker
-              label="Category"
-              accounts={accounts}
-              value={view.counterpart.account === UNCATEGORIZED ? "" : view.counterpart.account}
-              prefer={preferredRoots(isNegative(view.amount))}
-              create={create}
-              onChange={(account) => {
-                void save({ postings: withCounterpart(t, account).postings });
-                const found = similar(account);
-                setOffer(found.others.length ? found : null);
-              }}
-            />
-            {proposal?.categorizer && proposal.accounts[0] === view.counterpart.account && (
-              <p className="small muted proposal">
-                Suggested by {proposal.categorizer}
-                {proposal.confidence !== null &&
-                  ` (${Math.round(proposal.confidence * 100)}%)`}: {proposal.reason}
-              </p>
-            )}
-            {offer && (
-              <p className="small offer">
-                Also categorize {offer.others.length} similar as {shortName(offer.account)}?{" "}
-                <button
-                  type="button"
-                  className="plain"
-                  onClick={() => (onCategorizeSimilar(offer.others, offer.account), setOffer(null))}
-                >
-                  Yes
-                </button>{" "}
-                <button type="button" className="plain" onClick={() => setOffer(null)}>
-                  No
-                </button>
-              </p>
-            )}
-            {view.counterpart.account !== UNCATEGORIZED && (
-              <Link
-                className="small remember"
-                href={withBack(`/books/${book}/rules/new?from=${t.id}`, `/books/${book}/review`)}
-              >
-                Remember as a rule…
-              </Link>
-            )}
-          </div>
-        ) : (
-          <ul className="splits">
-            {t.postings.map((p, i) => (
-              <li key={i}>
-                <AccountName name={p.account} />
-                <span>{p.units ? formatMoney(p.units.number, p.units.currency) : "auto"}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {scheduled && t.flag === "!" && (
-          <p className="small scheduled-line">
-            <span className="muted">↻ From a schedule</span>
-            <button
-              type="button"
-              className="plain"
-              disabled={drop.isPending}
-              onClick={() => drop.mutate(t, { onError: (e) => setError(explain(e)) })}
-            >
-              Not this time
-            </button>
-          </p>
-        )}
-
-        {matches.map((m) => (
-          <MatchPanel key={`${m.batch_id}:${m.line}`} book={book} row={m} />
-        ))}
-
-        {error && <p className="error">{error}</p>}
-
-        <div className="actions">
-          <button type="button" onClick={() => void swipe.current?.commit("skip")}>
-            Skip
-          </button>
-          <Link href={detail} className="button">
-            {view ? "Split…" : "Open"}
-          </Link>
+          // Tapping anywhere on the card selects it: this covers the card, so its own buttons,
+          // links and fields can't be reached while selecting.
           <button
             type="button"
-            className="primary"
-            disabled={uncategorized}
-            title={uncategorized ? "Choose a category first" : undefined}
-            onClick={() => void swipe.current?.commit("confirm")}
+            role="checkbox"
+            aria-checked={selected}
+            aria-label="Select"
+            className="select-overlay"
+            onClick={onSelect}
           >
-            Confirm
+            <span className="select-mark" aria-hidden="true">
+              {selected ? "✓" : ""}
+            </span>
           </button>
+        )}
+        {/* While selecting, the card's own controls are inert (nor reachable by keyboard). */}
+        <div inert={selecting}>
+          <div className="item-top">
+            <span className="muted">
+              {t.date}
+              {view && ` · ${shortName(view.anchor.account)}`}
+            </span>
+            {view && (
+              <span className={`amount ${isNegative(view.amount) ? "out" : "in"}`}>
+                {formatMoney(view.amount, view.currency)}
+              </span>
+            )}
+          </div>
+          {t.payee && <div className="payee">{t.payee}</div>}
+          <input
+            className="description"
+            aria-label="Description"
+            placeholder="Add a description"
+            value={narration}
+            onChange={(e) => setNarration(e.target.value)}
+            onBlur={saveNarration}
+            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          />
+
+          {view ? (
+            <div
+              // Re-keyed on every blocked swipe so the nudge animation replays.
+              key={nudge}
+              className={`category${view.counterpart.account === UNCATEGORIZED ? " needs" : ""}${nudge ? " nudge" : ""}`}
+            >
+              <AccountPicker
+                label="Category"
+                accounts={accounts}
+                value={view.counterpart.account === UNCATEGORIZED ? "" : view.counterpart.account}
+                prefer={preferredRoots(isNegative(view.amount))}
+                create={create}
+                onChange={(account) => {
+                  void save({ postings: withCounterpart(t, account).postings });
+                  const found = similar(account);
+                  setOffer(found.others.length ? found : null);
+                }}
+              />
+              {proposal?.categorizer && proposal.accounts[0] === view.counterpart.account && (
+                <p className="small muted proposal">
+                  Suggested by {proposal.categorizer}
+                  {proposal.confidence !== null &&
+                    ` (${Math.round(proposal.confidence * 100)}%)`}: {proposal.reason}
+                </p>
+              )}
+              {offer && (
+                <p className="small offer">
+                  Also categorize {offer.others.length} similar as {shortName(offer.account)}?{" "}
+                  <button
+                    type="button"
+                    className="plain"
+                    onClick={() => (
+                      onCategorizeSimilar(offer.others, offer.account),
+                      setOffer(null)
+                    )}
+                  >
+                    Yes
+                  </button>{" "}
+                  <button type="button" className="plain" onClick={() => setOffer(null)}>
+                    No
+                  </button>
+                </p>
+              )}
+              {view.counterpart.account !== UNCATEGORIZED && (
+                <Link
+                  className="small remember"
+                  href={withBack(`/books/${book}/rules/new?from=${t.id}`, `/books/${book}/review`)}
+                >
+                  Remember as a rule…
+                </Link>
+              )}
+            </div>
+          ) : (
+            <ul className="splits">
+              {t.postings.map((p, i) => (
+                <li key={i}>
+                  <AccountName name={p.account} />
+                  <span>{p.units ? formatMoney(p.units.number, p.units.currency) : "auto"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {scheduled && t.flag === "!" && (
+            <p className="small scheduled-line">
+              <span className="muted">↻ From a schedule</span>
+              <button
+                type="button"
+                className="plain"
+                disabled={drop.isPending}
+                onClick={() => drop.mutate(t, { onError: (e) => setError(explain(e)) })}
+              >
+                Not this time
+              </button>
+            </p>
+          )}
+
+          {matches.map((m) => (
+            <MatchPanel key={`${m.batch_id}:${m.line}`} book={book} row={m} />
+          ))}
+
+          {error && <p className="error">{error}</p>}
+
+          <div className="actions">
+            <button type="button" onClick={() => void swipe.current?.commit("skip")}>
+              Skip
+            </button>
+            <Link href={detail} className="button">
+              {view ? "Split…" : "Open"}
+            </Link>
+            <button
+              type="button"
+              className="primary"
+              disabled={uncategorized}
+              title={uncategorized ? "Choose a category first" : undefined}
+              onClick={() => void swipe.current?.commit("confirm")}
+            >
+              Confirm
+            </button>
+          </div>
         </div>
       </article>
     </Swipeable>

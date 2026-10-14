@@ -84,16 +84,17 @@ async function apply(
   return true;
 }
 
-/** "Suggest categories": run the chain over the pending transactions open to categorizing.
- * Returns how many got a proposal. */
+/** "Suggest categories": run the chain over the pending transactions open to categorizing
+ * (those from `account` or its subaccounts, if given). Returns how many got a proposal. */
 export async function suggestPending(
-  services: Services & { categorizers: Categorizer[] }
+  services: Services & { categorizers: Categorizer[]; account?: string }
 ): Promise<number> {
-  const { db, ledger, book, categorizers } = services;
+  const { db, ledger, book, categorizers, account } = services;
   const pending = await ledger.pending(book.id);
+  const inScope = (name: string) => !account || name === account || name.startsWith(`${account}:`);
   const open = pending.flatMap((t) => {
     const incoming = openToCategorizing(t, db.proposal(book.id, t.id));
-    return incoming ? [{ t, incoming }] : [];
+    return incoming && inScope(incoming.account) ? [{ t, incoming }] : [];
   });
   if (!open.length || !categorizers.length) return 0;
   const request = await buildRequest(

@@ -325,7 +325,8 @@ export function createApi({
       : c.json({ detail: "no proposal" }, 404);
   });
 
-  /** "Suggest categories" for pending transactions not yet categorized. */
+  /** "Suggest categories" for pending transactions not yet categorized (`?account=`: only
+   * those from that account and its subaccounts). */
   api.post("/books/:book/suggest", async (c) => {
     const { book } = c.req.param();
     const info = await bookOf(c.get("user"), book);
@@ -335,6 +336,7 @@ export function createApi({
       ledger: ledgerFor(c.get("user")),
       book: info,
       categorizers,
+      account: c.req.query("account") || undefined,
     });
     return c.json({ suggested });
   });

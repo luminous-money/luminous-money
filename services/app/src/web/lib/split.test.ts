@@ -1,7 +1,7 @@
 import type { Posting, Transaction } from "@fava-beans/ledger-client";
 import { describe, expect, it } from "vitest";
 
-import { checkBalance, simple, toInput, withCounterpart } from "./split.js";
+import { checkBalance, simple, toInput, withCounterpart, withOtherSide } from "./split.js";
 
 const usd = (number: string) => ({ number, currency: "USD" });
 const posting = (account: string, units?: string, rest: Partial<Posting> = {}): Posting => ({
@@ -120,4 +120,27 @@ describe("balance checks while editing", () => {
 
     expect(checkBalance([lot, posting("Assets:Cash", "-200")])).toEqual({ state: "deferred" });
   });
+});
+
+it("sets the other side relative to the account being viewed", () => {
+  const transfer = {
+    date: "2024-03-01",
+    flag: "!",
+    narration: "",
+    tags: [],
+    links: [],
+    meta: {},
+    postings: [
+      { account: "Assets:Bank:Checking", units: { number: "-500", currency: "USD" } },
+      { account: "Liabilities:Card", units: null },
+    ],
+  };
+
+  expect(
+    withOtherSide(transfer, "Liabilities:Card", "Assets:Bank:Savings")!.postings[0]!.account
+  ).toBe("Assets:Bank:Savings");
+  expect(withOtherSide(transfer, "Assets:Bank", "Expenses:Fees")!.postings[1]!.account).toBe(
+    "Expenses:Fees"
+  );
+  expect(withOtherSide(transfer, "Expenses:Food", "Expenses:Fees")).toBeNull();
 });

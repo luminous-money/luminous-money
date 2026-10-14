@@ -97,3 +97,52 @@ test("Select mode categorizes and confirms several at once", async ({ page }) =>
 
   await expect(page.getByRole("article")).toHaveCount(1);
 });
+
+test("in Select mode, tapping anywhere on a card selects it, and its own controls are off", async ({
+  page,
+}) => {
+  await withPending(page, ["ONE", "TWO"]);
+  await page.getByRole("button", { name: "Select" }).click();
+  const bar = page.getByRole("toolbar", { name: "Selected" });
+
+  const first = page.getByRole("article").first();
+  await first.click({ position: { x: 60, y: 150 } }); // over the category picker
+  await expect(bar).toContainText("1 selected");
+  await expect(page.getByRole("combobox", { name: "Category" })).toHaveCount(0); // didn't open
+  await first.click();
+  await expect(bar).toContainText("0 selected");
+  await bar.getByRole("button", { name: "Done" }).click();
+  await expect(bar).toHaveCount(0);
+});
+
+test("an account's ledger suggests categories, and categorizes and confirms in bulk", async ({
+  page,
+}) => {
+  const { book } = await withPending(page, ["CORNER CAFE #9", "TEA ONE", "TEA TWO"]);
+  await page.goto(
+    `/ui/books/${book.id}/accounts/${encodeURIComponent("Assets:Bank:PNC-Checking")}`
+  );
+
+  await page.getByRole("button", { name: "Suggest categories" }).click();
+  await expect(page.getByText("Suggested categories for 1.")).toBeVisible();
+  const list = page.getByRole("list", { name: "Transactions" });
+  // Now with history's clean payee, and its category.
+  await expect(list.getByRole("button", { name: /Corner Cafe.*pending/ })).toContainText(
+    "Food:Coffee"
+  );
+
+  await page.getByRole("button", { name: "Select" }).click();
+  await list.getByRole("checkbox", { name: /TEA ONE/ }).click();
+  await list.getByRole("checkbox", { name: /TEA TWO/ }).click();
+  const bar = page.getByRole("toolbar", { name: "Selected" });
+  await expect(bar).toContainText("2 selected");
+  await expect(bar.getByRole("button", { name: "Confirm 2" })).toBeDisabled(); // uncategorized
+  await bar.getByRole("button", { name: /^Categorize as:/ }).click();
+  await page.getByRole("combobox", { name: "Categorize as" }).fill("tea");
+  await page.keyboard.press("Enter");
+  await expect(list.getByRole("checkbox", { name: /TEA ONE/ })).toContainText("Food:Tea");
+  await bar.getByRole("button", { name: "Confirm 2" }).click();
+
+  await expect(list.getByRole("checkbox", { name: /TEA ONE/ })).not.toContainText("pending");
+  await expect(list.getByRole("checkbox", { name: /TEA TWO/ })).not.toContainText("pending");
+});

@@ -1,12 +1,21 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 import { displayName, shortName, shown } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";
 import { withBack } from "../lib/navigation.js";
+import { SelectBar } from "../components/SelectBar.js";
+import { postable } from "../lib/accounts.js";
+import { today } from "../lib/format.js";
+import { useSelection } from "../lib/selection.js";
+import { UNCATEGORIZED, withOtherSide } from "../lib/split.js";
 import {
   explain,
+  useAccountCreation,
   useAccountLedger,
+  useAccounts,
+  useBulkEdit,
+  useSuggest,
   useScheduled,
   useSetStar,
   useStars,
@@ -32,6 +41,12 @@ export function AccountLedger({ book, account }: { book: string; account: string
   const stars = useStars(book);
   const setStar = useSetStar(book);
   const scheduled = useScheduled(book);
+  const suggest = useSuggest(book, account);
+  const bulk = useBulkEdit(book);
+  const accounts = useAccounts(book);
+  const create = useAccountCreation(book);
+  const selection = useSelection();
+  const [note, setNote] = useState<string | null>(null);
   const upcoming = useUpcoming(book);
   const ahead = upcoming.data && info ? upcomingFor(upcoming.data, account, info.balance) : [];
   const starred = stars.data?.includes(account) ?? false;
@@ -52,6 +67,29 @@ export function AccountLedger({ book, account }: { book: string; account: string
 
   const rows = ledger.data?.pages.flatMap((page) => page.rows) ?? [];
   const open = (id: string) => navigate(withBack(`/books/${book}/transactions/${id}`, here));
+  const chosen = rows.filter((r) => selection.has(r.id));
+  const categorizeChosen = (category: string) => {
+    const simpleOnes = chosen.filter((r) => r.splits === 2);
+    const skipped = chosen.length - simpleOnes.length;
+    setNote(skipped ? `Skipped ${skipped} with more than two splits.` : null);
+    bulk.mutate(
+      {
+        transactions: simpleOnes,
+        change: (t) => {
+          const moved = withOtherSide(t, account, category);
+          return moved && { postings: moved.postings };
+        },
+      },
+      { onError: (e) => setNote(explain(e)) }
+    );
+  };
+  const confirmChosen = () => {
+    setNote(null);
+    bulk.mutate(
+      { transactions: chosen.filter((r) => r.flag === "!"), change: () => ({ flag: "*" }) },
+      { onSuccess: selection.clear, onError: (e) => setNote(explain(e)) }
+    );
+  };
 
   return (
     <main>
@@ -92,30 +130,61 @@ export function AccountLedger({ book, account }: { book: string; account: string
             </Link>
           )}
         </div>
+        {!selection.selecting && (
+          <div className="actions">
+            <button type="button" disabled={suggest.isPending} onClick={() => suggest.mutate()}>
+              {suggest.isPending ? "Suggesting…" : "Suggest categories"}
+            </button>
+            <button type="button" onClick={selection.start}>
+              Select
+            </button>
+          </div>
+        )}
+        {suggest.data && (
+          <p className="muted small" aria-live="polite">
+            {suggest.data.suggested
+              ? `Suggested categories for ${suggest.data.suggested}.`
+              : "Nothing new to suggest."}
+          </p>
+        )}
       </header>
 
-      <div className="ledger-add">
-        <button
-          type="button"
-          className="primary"
-          onClick={() =>
-            navigate(
-              withBack(
-                `/books/${book}/transactions/new?account=${encodeURIComponent(account)}`,
-                here
+      {selection.selecting ? (
+        <SelectBar
+          count={chosen.length}
+          accounts={accounts.data ? postable(accounts.data, today()) : []}
+          create={create}
+          onCategorize={categorizeChosen}
+          onConfirm={confirmChosen}
+          canConfirm={!chosen.some((r) => r.counterpart === UNCATEGORIZED)}
+          busy={bulk.isPending}
+          note={note}
+          onDone={selection.stop}
+        />
+      ) : (
+        <div className="ledger-add">
+          <button
+            type="button"
+            className="primary"
+            onClick={() =>
+              navigate(
+                withBack(
+                  `/books/${book}/transactions/new?account=${encodeURIComponent(account)}`,
+                  here
+                )
               )
-            )
-          }
-        >
-          + Add transaction
-        </button>
-      </div>
+            }
+          >
+            + Add transaction
+          </button>
+        </div>
+      )}
 
       {ledger.isPending && <p className="muted">Loading…</p>}
       {ledger.error && <p className="card error">{explain(ledger.error)}</p>}
       {ledger.data && rows.length === 0 && <p className="card muted">No transactions yet.</p>}
 
-      {ahead.length > 0 && (
+      {ahead.length > 0 && !selection.selecting && (
         <ol className="ledger upcoming-rows" aria-label="Upcoming">
           {ahead.map((row) => (
             <li key={row.key}>
@@ -154,8 +223,11 @@ export function AccountLedger({ book, account }: { book: string; account: string
           <li key={row.id}>
             <button
               type="button"
-              className={`ledger-row${row.flag === "!" ? " pending" : ""}`}
-              onClick={() => open(row.id)}
+              className={`ledger-row${row.flag === "!" ? " pending" : ""}${selection.has(row.id) ? " selected" : ""}`}
+              onClick={() => (selection.selecting ? selection.toggle(row.id) : open(row.id))}
+              {...(selection.selecting
+                ? { role: "checkbox", "aria-checked": selection.has(row.id) }
+                : {})}
             >
               <span className="ledger-date">{row.date}</span>
               <span className="ledger-what">

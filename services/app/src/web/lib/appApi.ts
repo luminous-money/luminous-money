@@ -204,8 +204,14 @@ export const appApi = {
     await fetch(`${base(book)}/proposals/${transaction}/settle`, { method: "POST" });
   },
 
-  suggest: async (book: string): Promise<{ suggested: number }> =>
-    json(await fetch(`${base(book)}/suggest`, { method: "POST" })),
+  /** Suggest categories for pending transactions (from `account`, if given). */
+  suggest: async (book: string, account?: string): Promise<{ suggested: number }> =>
+    json(
+      await fetch(
+        `${base(book)}/suggest${account ? `?account=${encodeURIComponent(account)}` : ""}`,
+        { method: "POST" }
+      )
+    ),
 
   categorizers: async (
     book: string

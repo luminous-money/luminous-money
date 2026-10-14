@@ -220,7 +220,7 @@ tests over synthetic descriptions (no real data in fixtures).
 8. **Acceptance tracking:** worth keeping per resolver (proposed), to tune thresholds from real
    use?
 
-## Follow-ups (2026-10-13), planned before M5
+## Follow-ups (2026-10-13), built 2026-10-14
 
 ### Why "Suggest categories" suggested only some
 

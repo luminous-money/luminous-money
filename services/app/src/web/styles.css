@@ -1181,14 +1181,69 @@ button.plain {
 .select-bar {
   position: sticky;
   top: 0;
-  z-index: 2;
-  display: grid;
+  z-index: 3;
+  margin: 0 -0.25rem 0.75rem;
+  padding: 0.5rem 0.25rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+
+.select-bar-row {
+  display: flex;
+  align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 1rem;
+}
+
+.select-bar-row > :nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+
+.select-count {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* A card or row being selected: tapping anywhere toggles it. */
+.item.selecting {
+  position: relative;
+}
+
+.item.selected,
+.ledger-row.selected {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+}
+
+.select-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: 0.6rem;
+}
+
+.select-mark {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 2px solid var(--green);
   background: var(--card);
+  color: var(--green);
+  font-weight: 700;
+}
+
+.selected .select-mark {
+  background: var(--green);
+  color: #fff;
 }
 
 .select-one {

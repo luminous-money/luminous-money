@@ -102,3 +102,20 @@ export function checkBalance(postings: Posting[]): Balance {
   }
   return { state: "balanced", auto: [] };
 }
+
+/**
+ * `t` with its other side set to `account`, relative to `own` (the account being viewed, or one
+ * under it): for a two-posting transaction touching it, the posting that isn't its. Null for
+ * anything else (more postings, or not touching `own`).
+ */
+export function withOtherSide(
+  t: TransactionIn,
+  own: string,
+  account: string
+): TransactionIn | null {
+  if (t.postings.length !== 2) return null;
+  const mine = (name: string) => name === own || name.startsWith(`${own}:`);
+  const index = mine(t.postings[0]!.account) ? 1 : mine(t.postings[1]!.account) ? 0 : -1;
+  if (index === -1) return null;
+  return { ...t, postings: t.postings.map((p, i) => (i === index ? { ...p, account } : p)) };
+}
