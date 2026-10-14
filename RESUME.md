@@ -92,7 +92,7 @@ How it's put together:
 
 ## Next steps
 
-1. Say `elaborate plan for M6` (multiple books).
+1. Answer the questions in [the M6 plan](docs/milestones/m6-multiple-books/PLAN.md#questions) (multiple books), then say `build M6`.
 
 ## Gotchas
 
