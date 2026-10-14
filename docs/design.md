@@ -402,6 +402,43 @@ shape):
 - **An account's ledger** is its transactions newest first, in keyset pages of 200. Each shows
   its running balance and the other account (or `<multiple>`).
 
+### Investments (M5)
+
+- **No investment account kind.** Any account can hold any commodity. A **brokerage** is an
+  account with accounts under it (imported books often open parents plainly, so "has accounts
+  under it" decides, not `kind`); its balances, summary, ledger and holdings cover the subtree.
+  A leaf holding several commodities works too.
+- **Prices are the books' `price` directives,** read with SQL through a derived `price` table
+  (ledger migration 4). Value is in the book's operating currency, through one other currency
+  if need be.
+- **Posting amounts are weighed as booking would:** a blank amount opposite lots at a known
+  cost, or priced postings, is filled in (migration 5 recomputed old ones), so running balances
+  survive buys. Only a reduction whose lot booking must pick (`{}`) is left to Beancount.
+- **Cost basis without a full load: account-scoped booking.** Booking is per account, so the
+  ledger books only an account's slice (every open, close and commodity, and the transactions
+  touching the subtree), cached until the book changes: 222 ms cold and 72 ms cached for the
+  decades-scale book's brokerage, against 4 s for a full load (x86).
+- **Booking follows tax reporting:** per account, matching what the broker reports (1099-B);
+  new books default to FIFO. FIFO, LIFO, HIFO and specific lots (STRICT) are Beancount's.
+  **Average cost** isn't (Beancount 3 refuses `AVERAGE`), so such accounts use `NONE` booking
+  and fava-beans reduces at the average cost (shown as one average lot).
+- **Trades are built by the ledger** from a form's description: a buy is a lot at cost; a sale
+  writes each lot it draws on explicitly (by the account's method), with the gain per lot
+  split into `Income:Capital-Gains:Short-Term` and `:Long-Term` (held more than a year); a
+  dividend can be reinvested. Previewed, then checked by account-scoped booking before writing.
+  Trades are entered by hand (no brokerage CSV trades yet).
+- **Revalued assets** (a house, a car) are plain currency balances whose `open` carries
+  `revalue-every` (days, default 350). "Update value" writes the change against
+  `Income:Unrealized-Gains`, so it falls in its period. Shares and funds keep prices: their
+  gains are shown, not booked, until a sale.
+- **Staleness is the asset's:** a commodity's `stale-after` (default 7 days), a revalued
+  account's `revalue-every`.
+- **Prices are fetched with beanprice** (its `price:` metadata on `commodity` directives, e.g.
+  `USD:yahoo/VTI`), each morning at 07:00 in the book's time zone (after the previous close),
+  as one of `app`'s daily jobs (alongside the schedule generator at midnight), for books with a
+  time zone and owner. A price is recorded unless that date has one; failures are per
+  commodity. `ledger.price_sources.fixed` is a no-network source for demos and tests.
+
 ### Importing CSVs (M1)
 
 - **CSV profiles** say how a bank's export is laid out: the preamble, header, date column and

@@ -1,14 +1,14 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-13._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-14._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
 
-**M1 through M4 are built.** M2 (credit cards, really "any account, and matching"), M3
-(scheduled transactions) and M4 (categorization) are described in their plans. The milestones
-ahead (M5–M14, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+**M1 through M5 are built.** M2 (credit cards, really "any account, and matching"), M3
+(scheduled transactions), M4 (categorization) and M5 (investments) are described in their plans.
+The milestones ahead (M6–M14, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
 - **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M6.
@@ -54,14 +54,23 @@ What a user can do now:
   [our API](docs/categorizer-api.md)). Review shows where each came from; "Suggest categories",
   "Also categorize N similar", "Remember as a rule…" and Select mode speed it up. Acceptance
   per categorizer shows on the Rules page.
+- **Select mode** (review and account ledgers): a sticky bar (Categorize as…, Confirm, Done);
+  tap anywhere on a card or row to select. Ledgers also have "Suggest categories".
+- **Investments (M5):** starred brokerages and holdings show **value, unrealized gain** and how
+  fresh their prices are; account pages list **holdings** (lots, Update price) and **Trade**
+  (buy, sell with a lot preview and short/long-term gains, dividends); houses and cars are
+  **revalued** (Update value, every 350 days); **Commodities** shows prices and their sources.
+  Prices are fetched each morning (beanprice). Accounts can open with holdings.
 
 How it's put together:
 - **`services/auth`** (TypeScript): the stub user, JWT sessions in an HttpOnly cookie, and
   `/verify` for Traefik's forwardAuth, which guards every other API and sets `X-User-Id`.
 - **`services/ledger`** (Python): the system of record.
   - Books are owned by users and named by their `option "title"`.
-  - Accounts with optional opening balances; summaries (balances, `as_of`) and account ledgers
-    computed with SQL.
+  - Accounts with optional opening balances and holdings; summaries (balances, `as_of`,
+    value, gain) and account ledgers computed with SQL; subtrees for brokerages.
+  - Investments (`investments.py`): prices, valuation, account-scoped booking for cost basis,
+    holdings, trades, revaluation, beanprice fetching.
   - Versioned PATCH edits, batch writes, atomic create-and-delete (`/transactions/changes`),
     migrations, backups and export.
 - **`services/app`** (TypeScript): the PWA, plus stars, CSV profiles, imports, the pipeline
@@ -74,23 +83,24 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 107 tests, including the table lint
-    - auth: 9; app: 114; db: 10; csv-import: 22
+    - ledger: 128 tests, including the table lint
+    - auth: 9; app: 116; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 47 API tests and 50 browser tests
+  - `pnpm e2e`: 51 API tests and 56 browser tests
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, with the demo
   seeded for the stub user: the "Demo" book, its checking account and card starred.
 
 ## Next steps
 
-1. **Before building:** the user is refining UI and asking questions. Planned so far: M4's
-   [follow-ups](docs/milestones/m4-categorization/PLAN.md#follow-ups-2026-10-13-planned-before-m5)
-   (the ledger gets Suggest and Select mode; a sticky select bar, bulk confirm and
-   tap-to-select in both views; a question about a fallback guess for new payees), and M5's
-   [answers](docs/milestones/m5-investment-accounts/PLAN.md#answers-2026-10-13).
-2. Then build the M4 follow-ups and M5, when asked.
+1. Say `elaborate plan for M6` (auth).
 
 ## Gotchas
+
+- **Fetching prices needs the network** (beanprice's sources: Yahoo and friends, which change
+  now and then). A commodity's source is its `commodity` directive's `price:` metadata;
+  `ledger.price_sources.fixed` is a no-network source for tests and demos.
+- **The morning price run only covers books with a time zone** (set in Manage books, or when a
+  book is created in the app, or by `pnpm seed`), since that records who it acts as.
 
 - **`pnpm up` is pnpm's own `update` command,** not the `up` script: it bumps dependencies. Use
   `pnpm run up` (foreground), or `docker buildx bake && docker compose up -d`.

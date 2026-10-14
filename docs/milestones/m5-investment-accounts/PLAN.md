@@ -1,7 +1,7 @@
 M5: Investment accounts: plan
 ==================================================================================================
 
-> **Status: planned (2026-10-13), answers folded in; not started.** The
+> **Status: built (2026-10-14).** Every slice is done, with unit, API and browser tests. The
 > [answers](#answers-2026-10-13) override anything below that disagrees. There's no separate spec: the milestone's line
 > in [the plan](../../PLAN.md) ("lean on what Beancount already provides; the main deliverable:
 > storing non-currency holdings, with a currency representation of their value"), its notes
