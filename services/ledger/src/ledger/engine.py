@@ -37,6 +37,8 @@ KIND_KEY = "kind"
 # An account's human name, since account names can't have spaces. Optional: the app falls back
 # to the name's last segment.
 DISPLAY_NAME_KEY = "display-name"
+# A revalued asset (a house, a car): how many days its value stays current (M5).
+REVALUE_EVERY_KEY = "revalue-every"
 NODE = "node"
 ROOT_OPTIONS = (
     ("name_assets", "asset"),
@@ -82,6 +84,7 @@ class Directive:
     postings: tuple[Posting, ...] = ()
     payee: str | None = None  # transactions only
     narration: str | None = None  # transactions only
+    price: tuple[str, Decimal, str] | None = None  # price directives only: commodity, number, currency
 
 
 @dataclass(frozen=True)
@@ -184,16 +187,43 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
         postings=postings,
         payee=getattr(entry, "payee", None),
         narration=getattr(entry, "narration", None),
+        price=(entry.currency, entry.amount.number, entry.amount.currency) if isinstance(entry, data.Price) else None,
     )
+
+
+def _weight(p: data.Posting) -> tuple[Decimal, str] | None:
+    """What a posting with an explicit amount contributes to balancing, as booking would weigh
+    it: its units, or for a lot at a known cost its units times the cost (`{{total}}`: the
+    total), or with a price its units times the price. None when only booking could say (a
+    reduction like `{}` that leaves the lot to booking)."""
+    units = p.units
+    cost = p.cost
+    if cost is not None:
+        per = getattr(cost, "number_per", getattr(cost, "number", MISSING))
+        total = getattr(cost, "number_total", None)
+        currency = cost.currency
+        if currency is MISSING or currency is None:
+            return None
+        if total not in (None, MISSING):
+            return ((total + (units.number * per if per not in (None, MISSING) else 0)) * (1 if units.number > 0 else -1), currency)
+        if per in (None, MISSING):
+            return None
+        return (units.number * per, currency)
+    if p.price is not None and p.price is not MISSING:
+        if p.price.number is MISSING or p.price.currency is MISSING:
+            return None
+        return (units.number * p.price.number, p.price.currency)
+    return (units.number, units.currency)
 
 
 def _amounts(entry: data.Transaction) -> list[tuple[Decimal, str] | None]:
     """Each posting's change to its account, in units, without full booking.
 
     Explicit amounts are themselves. A single elided amount is filled in, as booking would, when
-    that's unambiguous: every other posting is in one currency with no cost or price, so the
-    elided one is minus their sum. Anything else (several elided amounts, mixed currencies, lots,
-    prices) is left to booking: None.
+    that's unambiguous: the other postings' weights (units, or for lots and prices their cost or
+    price) are all in one currency, so the elided one is minus their sum. Anything else (several
+    elided amounts, mixed currencies, a reduction whose lot only booking can pick) is left to
+    booking: None.
     """
     explicit = [
         None if p.units is MISSING or p.units.number is MISSING or p.units.currency is MISSING else (p.units.number, p.units.currency)
@@ -202,10 +232,10 @@ def _amounts(entry: data.Transaction) -> list[tuple[Decimal, str] | None]:
     elided = [i for i, amount in enumerate(explicit) if amount is None]
     if len(elided) != 1:
         return explicit
-    others = [p for i, p in enumerate(entry.postings) if i != elided[0]]
-    currencies = {amount[1] for amount in explicit if amount}
-    if len(currencies) == 1 and all(p.cost is None and p.price is None for p in others):
-        explicit[elided[0]] = (-sum((amount[0] for amount in explicit if amount), Decimal(0)), currencies.pop())
+    weights = [_weight(p) for i, p in enumerate(entry.postings) if i != elided[0]]
+    currencies = {w[1] for w in weights if w}
+    if all(weights) and len(currencies) == 1:
+        explicit[elided[0]] = (-sum((w[0] for w in weights), Decimal(0)), currencies.pop())
     return explicit
 
 
@@ -294,6 +324,8 @@ def accounts(header: list[str], texts: list[str]) -> list[models.Account]:
                 open=entry.date,
                 currencies=list(entry.currencies or []),
                 display_name=entry.meta.get(DISPLAY_NAME_KEY),
+                booking=entry.booking.name if entry.booking else None,
+                revalue_every=int(entry.meta[REVALUE_EVERY_KEY]) if REVALUE_EVERY_KEY in entry.meta else None,
             )
     for entry in entries:
         if isinstance(entry, data.Close) and entry.account in found:

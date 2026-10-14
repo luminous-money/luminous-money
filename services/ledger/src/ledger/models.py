@@ -140,6 +140,13 @@ class Account(Api):
     close: datetime.date | None = None
     currencies: list[str] = Field(default_factory=list, description="Constraint from the open directive; empty means any.")
     display_name: str | None = Field(None, description="A human name, from `display-name` metadata if set.")
+    booking: str | None = Field(
+        None, description="How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); "
+        "None: the book's default."
+    )
+    revalue_every: int | None = Field(
+        None, description="A revalued asset (a house, a car): how many days its value stays current."
+    )
 
 
 class AccountSummary(Account):
@@ -152,6 +159,81 @@ class AccountSummary(Account):
         description="The date of its opening balance, which includes everything up to then (imports skip rows up "
         "to it); None without one."
     )
+    value: Amount | None = Field(None, description="Market value in the book's operating currency; None if unpriced.")
+    gain: Amount | None = Field(None, description="Unrealized gain (or loss) on holdings with a cost basis.")
+    value_as_of: datetime.date | None = Field(None, description="The oldest price behind `value`.")
+    stale: bool = Field(False, description="A price (or a revalued asset's value) is older than it should be.")
+    revalued_on: datetime.date | None = Field(None, description="A revalued asset's last revaluation (or opening).")
+
+
+class Lot(Api):
+    units: str
+    cost: Amount
+    date: datetime.date | None
+    label: str | None = None
+
+
+class Holding(Api):
+    commodity: str
+    name: str | None = None
+    units: str
+    price: Amount | None = Field(description="The latest price, in the operating currency; None for that currency itself.")
+    price_date: datetime.date | None
+    stale: bool
+    value: Amount | None
+    cost: Amount | None = Field(description="Total cost basis of its lots; None for cash.")
+    gain: Amount | None
+    lots: list[Lot]
+
+
+class Holdings(Api):
+    """What an account (and everything under it) holds."""
+
+    account: str
+    currency: str = Field(description="The valuation currency: the book's operating currency.")
+    holdings: list[Holding]
+    value: Amount | None
+    gain: Amount | None
+    as_of: datetime.date | None = Field(description="The oldest price behind `value`.")
+    stale: bool
+
+
+class PriceIn(Strict):
+    date: datetime.date
+    commodity: str = Field(pattern=r"^[A-Z][A-Z0-9'._-]{0,22}[A-Z0-9]$")
+    price: Amount = Field(description="What one unit was worth, in a currency.")
+
+
+class PriceOut(Api):
+    id: str
+    date: datetime.date
+    commodity: str
+    price: Amount
+
+
+class CommodityOut(Api):
+    currency: str
+    declared: bool = Field(description="Has a `commodity` directive (else only held or priced).")
+    name: str | None
+    price_source: str | None = Field(description='Where prices are fetched from, as beanprice reads it: "USD:yahoo/VTI".')
+    stale_after: int = Field(description="Days before its price counts as stale.")
+    price: Amount | None = Field(description="The latest price, in the operating currency.")
+    price_date: datetime.date | None
+    updated_at: str | None = Field(description="Its `commodity` directive's version; send it back to change it.")
+
+
+class CommodityIn(Strict):
+    name: str | None = None
+    price_source: str | None = None
+    stale_after: int | None = Field(None, ge=1)
+    updated_at: str | None = Field(None, description="Required when it's already declared.")
+
+
+class RevalueIn(Strict):
+    """A revalued asset's value on a date."""
+
+    date: datetime.date
+    value: Amount
 
 
 class OpeningBalance(Strict):
@@ -186,8 +268,19 @@ class LedgerRow(Api):
     flag: str
     payee: str | None
     narration: str | None
-    amount: Amount | None = Field(description="The account's change in this transaction; None if only booking could say.")
-    balance: Amount | None = Field(description="The account's running balance after this transaction, pending included.")
+    amount: Amount | None = Field(
+        description="The account's change in this transaction, if it's in one currency; None for several, or if only "
+        "booking could say."
+    )
+    balance: Amount | None = Field(description="The account's running balance in `amount`'s currency, pending included.")
+    amounts: list[Amount] = Field(
+        default_factory=list,
+        description="The account's change in every currency (a buy: cash out, shares in); empty if only booking could say.",
+    )
+    balances: list[Amount] = Field(
+        default_factory=list,
+        description="The running balance in every currency held so far; empty once only booking could say.",
+    )
     counterpart: str | None = Field(description="The other split's account, for a two-split transaction; None for more.")
     splits: int
     updated_at: str

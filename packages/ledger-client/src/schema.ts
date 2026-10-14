@@ -100,6 +100,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/holdings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Holdings
+     * @description What an account and everything under it holds: units, prices, value, cost basis, gains
+     *     and lots per commodity.
+     */
+    get: operations["holdings_api_ledger_v1_books__book_id__accounts__account__holdings_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/accounts/{account}/ledger": {
     parameters: {
       query?: never;
@@ -110,6 +131,66 @@ export interface paths {
     /** Account Ledger */
     get: operations["account_ledger_api_ledger_v1_books__book_id__accounts__account__ledger_get"];
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/revalue": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Revalue
+     * @description Record a revalued asset's value on a date (against Income:Unrealized-Gains).
+     */
+    post: operations["revalue_api_ledger_v1_books__book_id__accounts__account__revalue_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/commodities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Commodity List
+     * @description Every commodity declared, held or priced, with its latest price.
+     */
+    get: operations["commodity_list_api_ledger_v1_books__book_id__commodities_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/commodities/{currency}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Set Commodity
+     * @description Declare a commodity, or change its name, price source or staleness.
+     */
+    put: operations["set_commodity_api_ledger_v1_books__book_id__commodities__currency__put"];
     post?: never;
     delete?: never;
     options?: never;
@@ -190,6 +271,30 @@ export interface paths {
      * @description Apply Beancount text. Creates the book, owned by the caller, if it doesn't exist.
      */
     post: operations["import_text_api_ledger_v1_books__book_id__import_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/prices": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Price List
+     * @description A commodity's prices, newest first.
+     */
+    get: operations["price_list_api_ledger_v1_books__book_id__prices_get"];
+    put?: never;
+    /**
+     * Add Price
+     * @description Record a price (replacing one for the same commodity, currency and date).
+     */
+    post: operations["add_price_api_ledger_v1_books__book_id__prices_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -335,6 +440,11 @@ export interface components {
   schemas: {
     /** Account */
     Account: {
+      /**
+       * Booking
+       * @description How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); None: the book's default.
+       */
+      booking?: string | null;
       /** Close */
       close?: string | null;
       /**
@@ -363,6 +473,11 @@ export interface components {
       name: string;
       /** Open */
       open?: string | null;
+      /**
+       * Revalue Every
+       * @description A revalued asset (a house, a car): how many days its value stays current.
+       */
+      revalue_every?: number | null;
       /**
        * Type
        * @description From the top-level account; None for an unrecognized root.
@@ -405,6 +520,11 @@ export interface components {
        * @description The current balance, pending transactions included: one amount per currency held.
        */
       balance: components["schemas"]["Amount"][];
+      /**
+       * Booking
+       * @description How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); None: the book's default.
+       */
+      booking?: string | null;
       /** Close */
       close?: string | null;
       /**
@@ -417,6 +537,8 @@ export interface components {
        * @description A human name, from `display-name` metadata if set.
        */
       display_name?: string | null;
+      /** @description Unrealized gain (or loss) on holdings with a cost basis. */
+      gain?: components["schemas"]["Amount"] | null;
       /**
        * Implicit
        * @description Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.
@@ -434,10 +556,33 @@ export interface components {
       /** Open */
       open?: string | null;
       /**
+       * Revalue Every
+       * @description A revalued asset (a house, a car): how many days its value stays current.
+       */
+      revalue_every?: number | null;
+      /**
+       * Revalued On
+       * @description A revalued asset's last revaluation (or opening).
+       */
+      revalued_on?: string | null;
+      /**
+       * Stale
+       * @description A price (or a revalued asset's value) is older than it should be.
+       * @default false
+       */
+      stale: boolean;
+      /**
        * Type
        * @description From the top-level account; None for an unrecognized root.
        */
       type: ("asset" | "liability" | "equity" | "income" | "expense") | null;
+      /** @description Market value in the book's operating currency; None if unpriced. */
+      value?: components["schemas"]["Amount"] | null;
+      /**
+       * Value As Of
+       * @description The oldest price behind `value`.
+       */
+      value_as_of?: string | null;
     };
     /** Amount */
     Amount: {
@@ -495,6 +640,51 @@ export interface components {
        * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
        */
       updated_at: string;
+    };
+    /** CommodityIn */
+    CommodityIn: {
+      /** Name */
+      name?: string | null;
+      /** Price Source */
+      price_source?: string | null;
+      /** Stale After */
+      stale_after?: number | null;
+      /**
+       * Updated At
+       * @description Required when it's already declared.
+       */
+      updated_at?: string | null;
+    };
+    /** CommodityOut */
+    CommodityOut: {
+      /** Currency */
+      currency: string;
+      /**
+       * Declared
+       * @description Has a `commodity` directive (else only held or priced).
+       */
+      declared: boolean;
+      /** Name */
+      name: string | null;
+      /** @description The latest price, in the operating currency. */
+      price: components["schemas"]["Amount"] | null;
+      /** Price Date */
+      price_date: string | null;
+      /**
+       * Price Source
+       * @description Where prices are fetched from, as beanprice reads it: "USD:yahoo/VTI".
+       */
+      price_source: string | null;
+      /**
+       * Stale After
+       * @description Days before its price counts as stale.
+       */
+      stale_after: number;
+      /**
+       * Updated At
+       * @description Its `commodity` directive's version; send it back to change it.
+       */
+      updated_at: string | null;
     };
     /** CompactPosting */
     CompactPosting: {
@@ -587,6 +777,51 @@ export interface components {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
     };
+    /** Holding */
+    Holding: {
+      /** Commodity */
+      commodity: string;
+      /** @description Total cost basis of its lots; None for cash. */
+      cost: components["schemas"]["Amount"] | null;
+      gain: components["schemas"]["Amount"] | null;
+      /** Lots */
+      lots: components["schemas"]["Lot"][];
+      /** Name */
+      name?: string | null;
+      /** @description The latest price, in the operating currency; None for that currency itself. */
+      price: components["schemas"]["Amount"] | null;
+      /** Price Date */
+      price_date: string | null;
+      /** Stale */
+      stale: boolean;
+      /** Units */
+      units: string;
+      value: components["schemas"]["Amount"] | null;
+    };
+    /**
+     * Holdings
+     * @description What an account (and everything under it) holds.
+     */
+    Holdings: {
+      /** Account */
+      account: string;
+      /**
+       * As Of
+       * @description The oldest price behind `value`.
+       */
+      as_of: string | null;
+      /**
+       * Currency
+       * @description The valuation currency: the book's operating currency.
+       */
+      currency: string;
+      gain: components["schemas"]["Amount"] | null;
+      /** Holdings */
+      holdings: components["schemas"]["Holding"][];
+      /** Stale */
+      stale: boolean;
+      value: components["schemas"]["Amount"] | null;
+    };
     /** LedgerPage */
     LedgerPage: {
       /**
@@ -605,10 +840,20 @@ export interface components {
      * @description One transaction, as one account's ledger shows it.
      */
     LedgerRow: {
-      /** @description The account's change in this transaction; None if only booking could say. */
+      /** @description The account's change in this transaction, if it's in one currency; None for several, or if only booking could say. */
       amount: components["schemas"]["Amount"] | null;
-      /** @description The account's running balance after this transaction, pending included. */
+      /**
+       * Amounts
+       * @description The account's change in every currency (a buy: cash out, shares in); empty if only booking could say.
+       */
+      amounts?: components["schemas"]["Amount"][];
+      /** @description The account's running balance in `amount`'s currency, pending included. */
       balance: components["schemas"]["Amount"] | null;
+      /**
+       * Balances
+       * @description The running balance in every currency held so far; empty once only booking could say.
+       */
+      balances?: components["schemas"]["Amount"][];
       /**
        * Counterpart
        * @description The other split's account, for a two-split transaction; None for more.
@@ -631,6 +876,16 @@ export interface components {
       splits: number;
       /** Updated At */
       updated_at: string;
+    };
+    /** Lot */
+    Lot: {
+      cost: components["schemas"]["Amount"];
+      /** Date */
+      date: string | null;
+      /** Label */
+      label?: string | null;
+      /** Units */
+      units: string;
     };
     /** MetaDate */
     MetaDate: {
@@ -687,6 +942,31 @@ export interface components {
       /** @description Omit to let booking fill in the balancing amount. */
       units?: components["schemas"]["Amount"] | null;
     };
+    /** PriceIn */
+    PriceIn: {
+      /** Commodity */
+      commodity: string;
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** @description What one unit was worth, in a currency. */
+      price: components["schemas"]["Amount"];
+    };
+    /** PriceOut */
+    PriceOut: {
+      /** Commodity */
+      commodity: string;
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Id */
+      id: string;
+      price: components["schemas"]["Amount"];
+    };
     /** Problem */
     Problem: {
       /** Directive Id */
@@ -700,6 +980,18 @@ export interface components {
       columns: string[];
       /** Rows */
       rows: unknown[][];
+    };
+    /**
+     * RevalueIn
+     * @description A revalued asset's value on a date.
+     */
+    RevalueIn: {
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      value: components["schemas"]["Amount"];
     };
     /** Transaction */
     Transaction: {
@@ -1192,6 +1484,40 @@ export interface operations {
       };
     };
   };
+  holdings_api_ledger_v1_books__book_id__accounts__account__holdings_get: {
+    parameters: {
+      query?: {
+        on?: string | null;
+      };
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Holdings"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   account_ledger_api_ledger_v1_books__book_id__accounts__account__ledger_get: {
     parameters: {
       query?: {
@@ -1215,6 +1541,116 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["LedgerPage"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  revalue_api_ledger_v1_books__book_id__accounts__account__revalue_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RevalueIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Transaction"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  commodity_list_api_ledger_v1_books__book_id__commodities_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CommodityOut"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  set_commodity_api_ledger_v1_books__book_id__commodities__currency__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        currency: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CommodityIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CommodityOut"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {
@@ -1471,6 +1907,74 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Applied"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  price_list_api_ledger_v1_books__book_id__prices_get: {
+    parameters: {
+      query: {
+        commodity: string;
+      };
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PriceOut"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  add_price_api_ledger_v1_books__book_id__prices_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PriceIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PriceOut"];
         };
       };
       /** @description Validation Error */

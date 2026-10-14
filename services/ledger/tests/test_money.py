@@ -181,16 +181,20 @@ def test_balances_include_pending_and_fill_in_elided_amounts(book):
     assert book.balance("book", account) == [models.Amount(number="2970.00", currency="USD")]
 
 
-def test_amounts_only_booking_could_say_fall_back_to_beancount(book):
-    assert engine.parse_one(
-        '2024-01-01 * "x"\n  Assets:Brokerage  1 VTI {100 USD}\n  Assets:Cash\n'
-    ).postings[1].amount is None  # behind a cost: left to booking
+def test_amounts_behind_a_known_cost_are_weighed_and_others_fall_back_to_beancount(book):
+    bought = engine.parse_one('2024-01-01 * "x"\n  Assets:Brokerage  1 VTI {100 USD}\n  Assets:Cash\n')
+    sold = engine.parse_one('2024-01-01 * "x"\n  Assets:Brokerage  -1 VTI {} @ 110 USD\n  Income:Gains\n  Assets:Cash  110 USD\n')
+    assert bought.postings[1].amount == Decimal("-100")  # the lot's cost
+    assert sold.postings[1].amount is None  # which lot is booking's call: left to it
 
     book.create_account("book", models.AccountIn(name="Assets:Brokerage"))
     book.create_account("book", models.AccountIn(name="Assets:Cash"))
+    book.create_account("book", models.AccountIn(name="Income:Gains"))
     book.create("book", '2024-02-01 * "Buy"\n  Assets:Brokerage  2 VTI {100 USD}\n  Assets:Cash\n')
+    book.create("book", '2024-03-01 * "Sell"\n  Assets:Brokerage  -1 VTI {} @ 110 USD\n  Assets:Cash  110 USD\n  Income:Gains\n')
 
-    assert book.balance("book", "Assets:Cash") == [models.Amount(number="-200", currency="USD")]
+    assert book.balance("book", "Assets:Cash") == [models.Amount(number="-90", currency="USD")]
+    assert book.balance("book", "Income:Gains") == [models.Amount(number="-10", currency="USD")]  # via Beancount
 
 
 def test_the_backfill_fills_in_amounts_payees_and_narrations_written_before_it(book):

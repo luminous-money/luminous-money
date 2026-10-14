@@ -25,7 +25,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from . import engine, models
+from . import engine, investments, models
 from .service import Ledger, NotFound
 from .store import Row, StaleVersion, Store
 
@@ -155,6 +155,40 @@ def create_app(ledger: Ledger) -> FastAPI:
         """Accounts with their balances and opening-balance dates: what the home page's cards and a
         ledger's header show."""
         return ledger.summary(book_id, account)
+
+    # Investments (M5)
+
+    @api.get("/books/{book_id}/accounts/{account}/holdings")
+    def holdings(book_id: OwnedBook, account: str, on: datetime.date | None = None) -> models.Holdings:
+        """What an account and everything under it holds: units, prices, value, cost basis, gains
+        and lots per commodity."""
+        return investments.holdings(ledger, book_id, account, on)
+
+    @api.post("/books/{book_id}/accounts/{account}/revalue", status_code=201)
+    def revalue(book_id: OwnedBook, account: str, r: models.RevalueIn) -> models.Transaction:
+        """Record a revalued asset's value on a date (against Income:Unrealized-Gains)."""
+        directive = investments.revalue(ledger, book_id, account, r)
+        return ledger.transaction(book_id, directive.id)
+
+    @api.get("/books/{book_id}/prices")
+    def price_list(book_id: OwnedBook, commodity: str) -> list[models.PriceOut]:
+        """A commodity's prices, newest first."""
+        return investments.price_list(ledger, book_id, commodity)
+
+    @api.post("/books/{book_id}/prices", status_code=201)
+    def add_price(book_id: OwnedBook, price: models.PriceIn) -> models.PriceOut:
+        """Record a price (replacing one for the same commodity, currency and date)."""
+        return investments.add_price(ledger, book_id, price)
+
+    @api.get("/books/{book_id}/commodities")
+    def commodity_list(book_id: OwnedBook) -> list[models.CommodityOut]:
+        """Every commodity declared, held or priced, with its latest price."""
+        return investments.commodity_list(ledger, book_id)
+
+    @api.put("/books/{book_id}/commodities/{currency}", responses={409: {"description": "Stale version"}})
+    def set_commodity(book_id: OwnedBook, currency: str, c: models.CommodityIn) -> models.CommodityOut:
+        """Declare a commodity, or change its name, price source or staleness."""
+        return investments.set_commodity(ledger, book_id, currency, c)
 
     @api.get("/books/{book_id}/accounts/{account}/ledger")
     def account_ledger(

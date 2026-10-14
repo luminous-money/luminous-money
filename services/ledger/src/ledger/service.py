@@ -12,7 +12,7 @@ import threading
 from dataclasses import dataclass
 from decimal import Decimal
 
-from . import engine, models
+from . import engine, investments, models
 from .store import Row, Store
 
 DEFAULT_HEADER = ['option "operating_currency" "USD"']
@@ -347,10 +347,14 @@ class Ledger:
         openings = self.store.opening_dates(book_id, self.OPENING_BALANCES)
         by_name = {a.name: a for a in self.accounts(book_id)}
         return [
-            models.AccountSummary(
-                **by_name[name].model_dump(),
-                balance=self.balance(book_id, name),
-                as_of=openings.get(name),
+            investments.valued(
+                self,
+                book_id,
+                models.AccountSummary(
+                    **by_name[name].model_dump(),
+                    balance=self.balance(book_id, name),
+                    as_of=openings.get(name),
+                ),
             )
             for name in dict.fromkeys(names)
             if name in by_name
@@ -373,7 +377,8 @@ class Ledger:
         return [models.Amount(number=engine.decimal_text(n), currency=c) for c, n in sorted(totals.items())]
 
     def _booked_balance(self, book_id: str, account: str) -> list[models.Amount]:
-        _, rows = self.query(book_id, f"SELECT sum(units(position)) AS total WHERE account = '{account}'")
+        pattern = f"^{account}(:|$)"  # account names are letters, digits, dashes and colons
+        _, rows = self.query(book_id, f"SELECT sum(units(position)) AS total WHERE account ~ '{pattern}'")
         positions = rows[0][0] if rows and rows[0][0] else []
         return [models.Amount(number=n, currency=c) for n, c in (p.split(" ")[:2] for p in positions)]
 
@@ -392,15 +397,18 @@ class Ledger:
         for entry in self.store.account_entries(book_id, account):
             pieces = entry["amounts"].split(";")
             amount = None
+            net: dict[str, Decimal] | None = None
             if "?" not in pieces:
-                net: dict[str, Decimal] = {}
+                net = {}
                 for number, currency in (piece.split(" ") for piece in pieces):
                     net[currency] = net.get(currency, Decimal(0)) + Decimal(number)
+                net = {c: n for c, n in net.items() if n != 0} or net  # a transfer within the subtree nets to 0
                 if len(net) == 1:
                     [(currency, number)] = net.items()
                     amount = (number, currency)
-            if totals is not None and amount:
-                totals[amount[1]] = totals.get(amount[1], Decimal(0)) + amount[0]
+            if totals is not None and net is not None:
+                for currency, number in net.items():
+                    totals[currency] = totals.get(currency, Decimal(0)) + number
             else:
                 totals = None
             others = entry["others"].split(",") if entry["others"] else []
@@ -415,6 +423,8 @@ class Ledger:
                         narration=entry["narration"],
                         amount=_amount(amount),
                         balance=_amount((totals[amount[1]], amount[1])) if totals is not None and amount else None,
+                        amounts=[_amount((n, c)) for c, n in sorted((net or {}).items())],
+                        balances=[_amount((n, c)) for c, n in sorted((totals or {}).items()) if n != 0],
                         counterpart=others[0] if entry["splits"] == 2 and len(others) == 1 else None,
                         splits=entry["splits"],
                         updated_at=entry["updated_at"],

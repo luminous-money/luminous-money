@@ -177,6 +177,14 @@ class Store:
                     for i, p in enumerate(d.postings)
                 ],
             )
+            self._conn.execute("DELETE FROM price WHERE directive_id = ?", (d.id,))
+            if d.price is not None:
+                commodity, number, currency = d.price
+                self._conn.execute(
+                    "INSERT INTO price (directive_id, book_id, date, commodity, number, currency, created_at, updated_at)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (d.id, book_id, d.date.isoformat(), commodity, str(number), currency, stamp, stamp),
+                )
 
     def delete(self, book_id: str, directive_ids: list[str]) -> list[str]:
         """Tombstone directives. Returns the IDs that were live in this book."""
@@ -194,6 +202,7 @@ class Store:
                 (seq, after(row["updated_at"]), directive_id),
             )
             self._conn.execute("DELETE FROM posting WHERE directive_id = ?", (directive_id,))
+            self._conn.execute("DELETE FROM price WHERE directive_id = ?", (directive_id,))
             deleted.append(directive_id)
         return deleted
 
@@ -232,25 +241,27 @@ class Store:
         return row is not None
 
     def account_entries(self, book_id: str, account: str) -> list[sqlite3.Row]:
-        """Every live transaction posting to `account`, oldest first: what its ledger and balance
-        are made of. Each row has the transaction's id, date, ordinal, flag, payee, narration,
-        updated_at, its number of splits, the other accounts it posts to (comma-separated), and
-        the account's amounts in it (`amounts`, as "number currency" pairs, with "?" for an
-        amount only booking could say)."""
+        """Every live transaction posting to `account` or an account under it, oldest first: what
+        its ledger and balance are made of. Each row has the transaction's id, date, ordinal,
+        flag, payee, narration, updated_at, its number of splits, the accounts outside the subtree
+        it posts to (comma-separated), and the subtree's amounts in it (`amounts`, as "number
+        currency" pairs, with "?" for an amount only booking could say). For a leaf, the subtree
+        is just the account."""
+        mine = "(%s.account = :account OR %s.account LIKE :under)"
         return self._conn.execute(
-            """
+            f"""
             SELECT d.id, d.date, d.ordinal, d.flag, d.payee, d.narration, d.updated_at,
                    (SELECT COUNT(*) FROM posting n WHERE n.directive_id = d.id) AS splits,
                    (SELECT GROUP_CONCAT(DISTINCT o.account) FROM posting o
-                     WHERE o.directive_id = d.id AND o.account <> :account) AS others,
+                     WHERE o.directive_id = d.id AND NOT {mine % ("o", "o")}) AS others,
                    (SELECT GROUP_CONCAT(COALESCE(a.amount || ' ' || a.amount_currency, '?'), ';') FROM posting a
-                     WHERE a.directive_id = d.id AND a.account = :account) AS amounts
+                     WHERE a.directive_id = d.id AND {mine % ("a", "a")}) AS amounts
             FROM directive d
             WHERE d.book_id = :book AND d.deleted = 0 AND d.kind = 'transaction'
-              AND d.id IN (SELECT directive_id FROM posting WHERE account = :account)
+              AND d.id IN (SELECT directive_id FROM posting p WHERE {mine % ("p", "p")})
             ORDER BY d.date, d.ordinal
             """,
-            {"book": book_id, "account": account},
+            {"book": book_id, "account": account, "under": f"{account}:%"},
         ).fetchall()
 
     def first_postings(self, book_id: str, accounts: set[str]) -> dict[str, str]:
@@ -279,17 +290,45 @@ class Store:
             (book_id, date_from),
         ).fetchall()
 
+    def latest_prices(self, book_id: str, on: str) -> list[sqlite3.Row]:
+        """For each commodity and quote currency, its latest price dated `on` or earlier: commodity,
+        currency, date, number. The last written wins a tie on date."""
+        return self._conn.execute(
+            """
+            SELECT commodity, currency, date, number FROM (
+                SELECT commodity, currency, date, number,
+                       ROW_NUMBER() OVER (PARTITION BY commodity, currency ORDER BY date DESC, rowid DESC) AS n
+                FROM price WHERE book_id = ? AND date <= ?
+            ) WHERE n = 1
+            """,
+            (book_id, on),
+        ).fetchall()
+
+    def price_history(self, book_id: str, commodity: str, limit: int = 400) -> list[sqlite3.Row]:
+        """A commodity's prices, newest first: directive_id, date, number, currency."""
+        return self._conn.execute(
+            "SELECT directive_id, date, number, currency FROM price WHERE book_id = ? AND commodity = ?"
+            " ORDER BY date DESC, rowid DESC LIMIT ?",
+            (book_id, commodity, limit),
+        ).fetchall()
+
     def opening_dates(self, book_id: str, equity: str) -> dict[str, str]:
         """For each account, the date of its first live transaction against `equity`: its opening
         balance."""
+        return self.dates_with(book_id, equity)
+
+    def dates_with(self, book_id: str, other: str, latest: bool = False) -> dict[str, str]:
+        """For each account, the date of its first (or `latest`) live transaction that also posts
+        to `other`."""
+        which = "MAX" if latest else "MIN"
         rows = self._conn.execute(
-            """
-            SELECT p.account, MIN(d.date) FROM directive d JOIN posting p ON p.directive_id = d.id
+            f"""
+            SELECT p.account, {which}(d.date) FROM directive d JOIN posting p ON p.directive_id = d.id
             WHERE d.book_id = :book AND d.deleted = 0 AND d.kind = 'transaction' AND p.account <> :equity
               AND d.id IN (SELECT directive_id FROM posting WHERE account = :equity)
             GROUP BY p.account
             """,
-            {"book": book_id, "equity": equity},
+            {"book": book_id, "equity": other},
         ).fetchall()
         return {account: date for account, date in rows}
 

@@ -19,6 +19,7 @@ import tempfile
 import time
 from contextlib import contextmanager
 
+from ledger import investments
 from ledger.service import Ledger
 from ledger.store import Store
 
@@ -110,6 +111,17 @@ def main() -> None:
         ledger.account_ledger("bench", busiest, cursor=page.next_cursor)
     with timed("balance from SQL (same account)"):
         ledger.balance("bench", busiest)
+
+    brokerage = "Assets:US:ETrade"
+    investments.SCOPED._cache.clear()
+    with timed(f"holdings with cost basis, cold ({brokerage}: account-scoped booking)"):
+        held = investments.holdings(ledger, "bench", brokerage)
+    with timed("holdings, cached (unchanged book)"):
+        investments.holdings(ledger, "bench", brokerage)
+    with timed("summary with value and gain (cached booking)"):
+        ledger.summary("bench", [brokerage])
+    with timed("latest prices (SQL)"):
+        investments.prices(ledger, "bench", today)
 
     with timed("BQL: balances by account"):
         ledger.query("bench", "SELECT account, sum(position) GROUP BY account")

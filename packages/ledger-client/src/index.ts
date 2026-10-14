@@ -26,6 +26,10 @@ export type AccountIn = Schemas["AccountIn"];
 export type LedgerPage = Schemas["LedgerPage"];
 export type LedgerRow = Schemas["LedgerRow"];
 export type CompactTransaction = Schemas["CompactTransaction"];
+export type Holdings = Schemas["Holdings"];
+export type Holding = Schemas["Holding"];
+export type CommodityOut = Schemas["CommodityOut"];
+export type PriceOut = Schemas["PriceOut"];
 export type Backup = Schemas["Backup"];
 
 export function createLedgerClient(options: ClientOptions) {

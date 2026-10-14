@@ -3,6 +3,18 @@
     "schemas": {
       "Account": {
         "properties": {
+          "booking": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); None: the book's default.",
+            "title": "Booking"
+          },
           "close": {
             "anyOf": [
               {
@@ -65,6 +77,18 @@
               }
             ],
             "title": "Open"
+          },
+          "revalue_every": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A revalued asset (a house, a car): how many days its value stays current.",
+            "title": "Revalue Every"
           },
           "type": {
             "anyOf": [
@@ -166,6 +190,18 @@
             "title": "Balance",
             "type": "array"
           },
+          "booking": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); None: the book's default.",
+            "title": "Booking"
+          },
           "close": {
             "anyOf": [
               {
@@ -198,6 +234,17 @@
             "description": "A human name, from `display-name` metadata if set.",
             "title": "Display Name"
           },
+          "gain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unrealized gain (or loss) on holdings with a cost basis."
+          },
           "implicit": {
             "default": false,
             "description": "Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.",
@@ -229,6 +276,37 @@
             ],
             "title": "Open"
           },
+          "revalue_every": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A revalued asset (a house, a car): how many days its value stays current.",
+            "title": "Revalue Every"
+          },
+          "revalued_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A revalued asset's last revaluation (or opening).",
+            "title": "Revalued On"
+          },
+          "stale": {
+            "default": false,
+            "description": "A price (or a revalued asset's value) is older than it should be.",
+            "title": "Stale",
+            "type": "boolean"
+          },
           "type": {
             "anyOf": [
               {
@@ -247,6 +325,30 @@
             ],
             "description": "From the top-level account; None for an unrecognized root.",
             "title": "Type"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Market value in the book's operating currency; None if unpriced."
+          },
+          "value_as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The oldest price behind `value`.",
+            "title": "Value As Of"
           }
         },
         "required": [
@@ -387,6 +489,147 @@
           "updated_at"
         ],
         "title": "BookPatch",
+        "type": "object"
+      },
+      "CommodityIn": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "price_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Source"
+          },
+          "stale_after": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale After"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when it's already declared.",
+            "title": "Updated At"
+          }
+        },
+        "title": "CommodityIn",
+        "type": "object"
+      },
+      "CommodityOut": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "declared": {
+            "description": "Has a `commodity` directive (else only held or priced).",
+            "title": "Declared",
+            "type": "boolean"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest price, in the operating currency."
+          },
+          "price_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "price_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where prices are fetched from, as beanprice reads it: \"USD:yahoo/VTI\".",
+            "title": "Price Source"
+          },
+          "stale_after": {
+            "description": "Days before its price counts as stale.",
+            "title": "Stale After",
+            "type": "integer"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its `commodity` directive's version; send it back to change it.",
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "currency",
+          "declared",
+          "name",
+          "price_source",
+          "stale_after",
+          "price",
+          "price_date",
+          "updated_at"
+        ],
+        "title": "CommodityOut",
         "type": "object"
       },
       "CompactPosting": {
@@ -625,6 +868,176 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "Holding": {
+        "properties": {
+          "commodity": {
+            "title": "Commodity",
+            "type": "string"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Total cost basis of its lots; None for cash."
+          },
+          "gain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lots": {
+            "items": {
+              "$ref": "#/components/schemas/Lot"
+            },
+            "title": "Lots",
+            "type": "array"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest price, in the operating currency; None for that currency itself."
+          },
+          "price_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "units": {
+            "title": "Units",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "commodity",
+          "units",
+          "price",
+          "price_date",
+          "stale",
+          "value",
+          "cost",
+          "gain",
+          "lots"
+        ],
+        "title": "Holding",
+        "type": "object"
+      },
+      "Holdings": {
+        "description": "What an account (and everything under it) holds.",
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The oldest price behind `value`.",
+            "title": "As Of"
+          },
+          "currency": {
+            "description": "The valuation currency: the book's operating currency.",
+            "title": "Currency",
+            "type": "string"
+          },
+          "gain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/Holding"
+            },
+            "title": "Holdings",
+            "type": "array"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "account",
+          "currency",
+          "holdings",
+          "value",
+          "gain",
+          "as_of",
+          "stale"
+        ],
+        "title": "Holdings",
+        "type": "object"
+      },
       "LedgerPage": {
         "properties": {
           "next_cursor": {
@@ -667,7 +1080,15 @@
                 "type": "null"
               }
             ],
-            "description": "The account's change in this transaction; None if only booking could say."
+            "description": "The account's change in this transaction, if it's in one currency; None for several, or if only booking could say."
+          },
+          "amounts": {
+            "description": "The account's change in every currency (a buy: cash out, shares in); empty if only booking could say.",
+            "items": {
+              "$ref": "#/components/schemas/Amount"
+            },
+            "title": "Amounts",
+            "type": "array"
           },
           "balance": {
             "anyOf": [
@@ -678,7 +1099,15 @@
                 "type": "null"
               }
             ],
-            "description": "The account's running balance after this transaction, pending included."
+            "description": "The account's running balance in `amount`'s currency, pending included."
+          },
+          "balances": {
+            "description": "The running balance in every currency held so far; empty once only booking could say.",
+            "items": {
+              "$ref": "#/components/schemas/Amount"
+            },
+            "title": "Balances",
+            "type": "array"
           },
           "counterpart": {
             "anyOf": [
@@ -749,6 +1178,47 @@
           "updated_at"
         ],
         "title": "LedgerRow",
+        "type": "object"
+      },
+      "Lot": {
+        "properties": {
+          "cost": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "units": {
+            "title": "Units",
+            "type": "string"
+          }
+        },
+        "required": [
+          "units",
+          "cost",
+          "date"
+        ],
+        "title": "Lot",
         "type": "object"
       },
       "MetaDate": {
@@ -891,6 +1361,60 @@
         "title": "Posting",
         "type": "object"
       },
+      "PriceIn": {
+        "additionalProperties": false,
+        "properties": {
+          "commodity": {
+            "pattern": "^[A-Z][A-Z0-9'._-]{0,22}[A-Z0-9]$",
+            "title": "Commodity",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "price": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "What one unit was worth, in a currency."
+          }
+        },
+        "required": [
+          "date",
+          "commodity",
+          "price"
+        ],
+        "title": "PriceIn",
+        "type": "object"
+      },
+      "PriceOut": {
+        "properties": {
+          "commodity": {
+            "title": "Commodity",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "price": {
+            "$ref": "#/components/schemas/Amount"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "commodity",
+          "price"
+        ],
+        "title": "PriceOut",
+        "type": "object"
+      },
       "Problem": {
         "properties": {
           "directive_id": {
@@ -939,6 +1463,26 @@
           "rows"
         ],
         "title": "QueryResult",
+        "type": "object"
+      },
+      "RevalueIn": {
+        "additionalProperties": false,
+        "description": "A revalued asset's value on a date.",
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Amount"
+          }
+        },
+        "required": [
+          "date",
+          "value"
+        ],
+        "title": "RevalueIn",
         "type": "object"
       },
       "Transaction": {
@@ -1809,6 +2353,72 @@
         "summary": "Account Summary"
       }
     },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/holdings": {
+      "get": {
+        "description": "What an account and everything under it holds: units, prices, value, cost basis, gains\nand lots per commodity.",
+        "operationId": "holdings_api_ledger_v1_books__book_id__accounts__account__holdings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "On"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Holdings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Holdings"
+      }
+    },
     "/api/ledger/v1/books/{book_id}/accounts/{account}/ledger": {
       "get": {
         "operationId": "account_ledger_api_ledger_v1_books__book_id__accounts__account__ledger_get",
@@ -1883,6 +2493,171 @@
           }
         },
         "summary": "Account Ledger"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/revalue": {
+      "post": {
+        "description": "Record a revalued asset's value on a date (against Income:Unrealized-Gains).",
+        "operationId": "revalue_api_ledger_v1_books__book_id__accounts__account__revalue_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevalueIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revalue"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/commodities": {
+      "get": {
+        "description": "Every commodity declared, held or priced, with its latest price.",
+        "operationId": "commodity_list_api_ledger_v1_books__book_id__commodities_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CommodityOut"
+                  },
+                  "title": "Response Commodity List Api Ledger V1 Books  Book Id  Commodities Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Commodity List"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/commodities/{currency}": {
+      "put": {
+        "description": "Declare a commodity, or change its name, price source or staleness.",
+        "operationId": "set_commodity_api_ledger_v1_books__book_id__commodities__currency__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "currency",
+            "required": true,
+            "schema": {
+              "title": "Currency",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommodityIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommodityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Commodity"
       }
     },
     "/api/ledger/v1/books/{book_id}/directives": {
@@ -2315,6 +3090,107 @@
           }
         },
         "summary": "Import Text"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/prices": {
+      "get": {
+        "description": "A commodity's prices, newest first.",
+        "operationId": "price_list_api_ledger_v1_books__book_id__prices_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "commodity",
+            "required": true,
+            "schema": {
+              "title": "Commodity",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriceOut"
+                  },
+                  "title": "Response Price List Api Ledger V1 Books  Book Id  Prices Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Price List"
+      },
+      "post": {
+        "description": "Record a price (replacing one for the same commodity, currency and date).",
+        "operationId": "add_price_api_ledger_v1_books__book_id__prices_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Price"
       }
     },
     "/api/ledger/v1/books/{book_id}/problems": {

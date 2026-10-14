@@ -57,6 +57,21 @@ def _backfill_derived_columns(conn: sqlite3.Connection) -> None:
             )
 
 
+def _backfill_prices(conn: sqlite3.Connection) -> None:
+    """Fill in migration 4's price table from the price directives written before it."""
+    from . import engine
+
+    for row in conn.execute("SELECT id, book_id, text FROM directive WHERE deleted = 0 AND kind = 'price'").fetchall():
+        directive = engine.parse_one(row[2], row[0])
+        commodity, number, currency = directive.price
+        stamp = now()
+        conn.execute(
+            "INSERT INTO price (directive_id, book_id, date, commodity, number, currency, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (row[0], row[1], directive.date.isoformat(), commodity, str(number), currency, stamp, stamp),
+        )
+
+
 MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
     # 1: the baseline.
     [
@@ -121,6 +136,26 @@ MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
         "CREATE INDEX posting_account_directive ON posting(account, directive_id)",
         _backfill_derived_columns,
     ],
+    # 4: prices, read with SQL (M5): each price directive's commodity, number and currency, so
+    # "the latest price of X" is one indexed query.
+    [
+        create_table(
+            "price",
+            [
+                "directive_id TEXT PRIMARY KEY REFERENCES directive(id) ON DELETE CASCADE",
+                "book_id TEXT NOT NULL",
+                "date TEXT NOT NULL",
+                "commodity TEXT NOT NULL",
+                "number TEXT NOT NULL",
+                "currency TEXT NOT NULL",
+            ],
+        ),
+        "CREATE INDEX price_latest ON price(book_id, commodity, currency, date)",
+        _backfill_prices,
+    ],
+    # 5: posting amounts again (M5): an elided amount is now filled in when the others are lots
+    # at a known cost or priced (a buy's cash side), as booking would weigh them.
+    [_backfill_derived_columns],
 ]
 
 
