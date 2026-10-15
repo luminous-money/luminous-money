@@ -68,3 +68,16 @@ def test_the_demo_fetches_prices_from_a_source_beanprice_has(history):
 
     assert "USD:google/" not in out
     assert 'price: "USD:yahoo/' in out
+
+
+def test_the_household_demo_is_a_small_valid_book_with_some_purchases_staged(ledger):
+    ledger.apply_text("household", demo.household_ledger(TODAY))
+
+    staged = ledger.transactions("household", flag="!")
+
+    assert ledger.book("household").name == "Demo Household"
+    assert ledger.problems("household") == []
+    assert staged and all(t.date >= TODAY - datetime.timedelta(days=14) for t in staged)
+    assert {p.account for t in staged for p in t.postings} >= {"Assets:Bank:Joint-Checking", demo.UNCATEGORIZED}
+    assert list(demo.HOUSEHOLD_STARRED) == ["Assets:Bank:Joint-Checking"]
+    assert float(ledger.balance("household", "Assets:Bank:Joint-Checking")[0].number) > 0

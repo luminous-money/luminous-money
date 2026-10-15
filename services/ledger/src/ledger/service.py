@@ -23,6 +23,10 @@ class NotFound(KeyError):
     pass
 
 
+class NameTaken(ValueError):
+    """A book name the owner already uses: the input's problem (422), not a conflict (409)."""
+
+
 @dataclass(frozen=True)
 class Applied:
     put: int
@@ -71,7 +75,7 @@ class Ledger:
             return
         for other in self.store.books(owner_id):
             if other != book_id and (engine.book_title(self.store.header(other) or []) or "").casefold() == name.casefold():
-                raise ValueError(f"you already have a book named {name!r}")
+                raise NameTaken(f"you already have a book named {name!r}")
 
     def create_book(
         self,

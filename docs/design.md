@@ -312,6 +312,8 @@ A backup request says "since cursor *N*" and gets back:
 - **Non-ledger state:** a dump of the app and auth databases. They're small and rarely change, so
   dumping them whole is simpler than computing diffs.
 - **A new cursor** to use next time.
+- **Books deleted since the cursor** (`deleted_books`). Their chunks hold every directive's
+  tombstone.
 
 **Restoring** means replaying the chunks in order (the latest version of each ID wins, and
 tombstones delete), then loading the state dumps. A full export at any cursor is also available.
@@ -478,6 +480,25 @@ the shared book on someone's behalf) recorded as legs in several books, kept in 
 pairs and mirroring. Instead, each book records its own side of such an event, as an ordinary
 transaction, from its own accounts' data: money leaving personal checking for joint checking is a
 transfer out in one book and a deposit in the other.
+
+As built in M6:
+
+- **The selected book is in the URL.** Every page but Manage books is under `/books/:book/…`, so
+  links and bookmarks say which book they mean, and TanStack Query's keys are already per book.
+  `/` opens the last book used, remembered per device (and user) in local storage.
+- **The masthead's book switcher** lists the user's books and Manage books.
+- **Names are unique per owner,** ignoring case, since the switcher shows names alone. A taken
+  name is the input's problem (422), not a version conflict (409).
+- **Creating a book goes through `app`,** which creates the ledger's book and its settings (time
+  zone, owner) together, so every book has a time zone. Books from before that get the browser's
+  once, the first time the PWA sees them.
+- **A book can start from Beancount text,** such as an export: a restore. It's a copy: every
+  directive gets a new ID (IDs are unique across books), tombstones are dropped, and the text's
+  title gives way to the new name. Text that doesn't parse creates nothing.
+- **Deleting a book is for good,** behind typing its name, with Export offered alongside. The
+  ledger tombstones every directive and marks the book deleted rather than dropping its row, so
+  the next incremental backup carries the deletion (the chunk's tombstones, and the backup's
+  `deleted_books`). `app` then forgets everything it kept about the book, in one transaction.
 
 ### Scheduled transactions
 

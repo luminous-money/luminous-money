@@ -9,6 +9,8 @@ import {
 } from "../../shared/schedule.js";
 import type { CategoryRule, CategoryRuleIn, CategoryRulePatch } from "../../shared/rules.js";
 import type { ProposalSummary } from "../../shared/imports.js";
+import type { Book } from "@fava-beans/ledger-client";
+
 import { ApiError } from "./ledger.js";
 
 export type {
@@ -28,6 +30,9 @@ export type {
   Outcome,
   ProposedMatch,
 } from "../../shared/imports.js";
+
+/** A book: the ledger's, with what the app keeps about it. */
+export type BookInfo = Book & { time_zone: string | null };
 
 /** A price run's result: the ledger's, with when it ran. */
 export type PriceFetch = {
@@ -63,6 +68,27 @@ async function json<T>(response: Response): Promise<T> {
 const base = (book: string) => `/api/app/v1/books/${encodeURIComponent(book)}`;
 
 export const appApi = {
+  /** The user's books, oldest first, with their time zones. */
+  books: async (): Promise<BookInfo[]> => json(await fetch("/api/app/v1/books")),
+
+  /** A new book in `time_zone`; with `text` (Beancount, e.g. an export), a copy of it. */
+  createBook: async (body: { name: string; time_zone: string; text?: string }): Promise<BookInfo> =>
+    json(
+      await fetch("/api/app/v1/books", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      })
+    ),
+
+  /** Delete the book and everything in it, against the version read. */
+  deleteBook: async (book: string, updatedAt: string): Promise<void> => {
+    const response = await fetch(`${base(book)}?updated_at=${encodeURIComponent(updatedAt)}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) await json(response);
+  },
+
   /** The account's CSV profiles (its bank's file formats), oldest first. */
   profiles: async (book: string, account: string): Promise<CsvProfile[]> =>
     json(await fetch(`${base(book)}/profiles/${encodeURIComponent(account)}`)),

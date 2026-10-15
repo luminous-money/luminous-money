@@ -4,7 +4,7 @@ fava-beans
 A self-hostable, database-driven, double-entry accounting system. It uses
 [Beancount](https://github.com/beancount/beancount) as its accounting engine and its import/export
 format, and has a mobile-first app built for fast review and categorization. One server hosts many
-books and handles transactions that span several of them.
+books, each independent: switching books is like switching profiles.
 
 > **Status: early build.** M1 is built: log in, set up a book and a bank account, import its CSV,
 > and work through its ledger and the review queue. Nothing here touches real money yet: the plan is to build and polish the UI against test
@@ -26,7 +26,7 @@ docker compose up -d # run the stack on http://localhost:8080 (FAVA_BEANS_PORT t
 ```
 
 Then open `http://localhost:8080/`, which redirects to the app at `/ui/`. **Log in** logs in the
-stub user (real accounts come with M10); `pnpm seed` gives that user a demo book.
+stub user (real accounts come with M10); `pnpm seed` gives that user two demo books.
 
 Before exposing the stack beyond your machine, set `AUTH_JWT_SECRET` (32+ characters): it signs
 session tokens, and the Compose file only has a development default.
@@ -47,7 +47,7 @@ session tokens, and the Compose file only has a development default.
 | `pnpm e2e` | Build everything and run the end-to-end suites (API and browser) against a throwaway stack |
 | `pnpm e2e:local` | Run both end-to-end suites against an already-running stack (start it with `AUTH_TEST_USERS=true`) |
 | `pnpm test:unit` | The TypeScript unit tests on the host (no Docker) |
-| `pnpm seed [book]` | Seed a demo book with recent purchases staged for review (default book: `demo`) |
+| `pnpm seed [book]` | Seed a demo book with recent purchases staged for review (default: `demo`, plus the small `demo-household`) |
 | `pnpm generate` | Regenerate `packages/ledger-client` after changing the ledger's API |
 | `pnpm release` | Build `linux/amd64` + `linux/arm64` images and push them (set `REGISTRY`, `VERSION`) |
 | `pnpm --filter @fava-beans/app dev` | Vite dev server for the PWA, proxying `/api` to a running stack |

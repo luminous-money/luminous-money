@@ -26,10 +26,12 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 import type { AccountCreation } from "../components/AccountPicker.js";
 import {
   appApi,
+  type BookInfo,
   type CsvProfile,
   type CategoryRule,
   type CategoryRuleIn,
@@ -109,31 +111,55 @@ export function useLogOut() {
 
 // Books
 
+/** The user's books, oldest first, with their time zones. */
 export function useBooks() {
-  return useQuery({ queryKey: keys.books, queryFn: api.books });
-}
-
-/** The book the app shows. M1 users have exactly one; M6 makes this a choice. */
-export function useCurrentBook(): { book: Book | undefined; loading: boolean } {
-  const books = useBooks();
-  return { book: books.data?.[0], loading: books.isPending };
+  return useQuery({ queryKey: keys.books, queryFn: appApi.books });
 }
 
 /** The browser's time zone: a new book's, to start with. */
 export const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-/** Create a book, in the browser's time zone. */
+/** Create a book, in the browser's time zone; with `text` (an export), as a copy of it. */
 export function useCreateBook() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (name: string) => {
-      const book = await api.createBook(name);
-      await appApi.setTimeZone(book.id, browserTimeZone());
-      return book;
-    },
+    mutationFn: ({ name, text }: { name: string; text?: string }) =>
+      appApi.createBook({ name, text, time_zone: browserTimeZone() }),
     onSuccess: (book) =>
-      client.setQueryData<Book[]>(keys.books, (books) => [...(books ?? []), book]),
+      client.setQueryData<BookInfo[]>(keys.books, (books) => [...(books ?? []), book]),
   });
+}
+
+/** Delete a book and everything in it, and forget what was cached about it. */
+export function useDeleteBook() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (book: BookInfo) => appApi.deleteBook(book.id, book.updated_at),
+    onSuccess: (_, book) => {
+      client.removeQueries({ queryKey: keys.book(book.id) });
+      client.setQueryData<BookInfo[]>(keys.books, (books) =>
+        books?.filter((b) => b.id !== book.id)
+      );
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.conflict)
+        void client.invalidateQueries({ queryKey: keys.books });
+    },
+  });
+}
+
+/** Give books without a time zone (made before every book got one) the browser's, once. */
+export function useTimeZoneBackfill(books: BookInfo[] | undefined) {
+  const client = useQueryClient();
+  const done = useRef(new Set<string>());
+  useEffect(() => {
+    const missing = (books ?? []).filter((b) => !b.time_zone && !done.current.has(b.id));
+    if (!missing.length) return;
+    missing.forEach((b) => done.current.add(b.id));
+    void Promise.all(missing.map((b) => appApi.setTimeZone(b.id, browserTimeZone()))).then(() =>
+      client.invalidateQueries({ queryKey: keys.books })
+    );
+  }, [books, client]);
 }
 
 export function useTimeZone(book: string) {
@@ -147,7 +173,10 @@ export function useSetTimeZone(book: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (zone: string) => appApi.setTimeZone(book, zone),
-    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.book(book) });
+      void client.invalidateQueries({ queryKey: keys.books });
+    },
   });
 }
 
@@ -157,8 +186,8 @@ export function useRenameBook() {
     mutationFn: ({ book, name }: { book: Book; name: string }) =>
       api.renameBook(book.id, name, book.updated_at),
     onSuccess: (renamed) =>
-      client.setQueryData<Book[]>(keys.books, (books) =>
-        books?.map((b) => (b.id === renamed.id ? renamed : b))
+      client.setQueryData<BookInfo[]>(keys.books, (books) =>
+        books?.map((b) => (b.id === renamed.id ? { ...b, ...renamed } : b))
       ),
     onError: (error) => {
       if (error instanceof ApiError && error.conflict)

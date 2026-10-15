@@ -6,6 +6,7 @@ import { ImportResults } from "../components/ImportResults.js";
 import { ProfileEditor } from "../components/ProfileEditor.js";
 import { displayName } from "../lib/accounts.js";
 import { ImportError, type ImportResult } from "../lib/appApi.js";
+import { bookHome } from "../lib/books.js";
 import { useBack, useParam } from "../lib/navigation.js";
 import {
   explain,
@@ -196,7 +197,8 @@ export function Import({ book }: { book: string }) {
           {error && <p className="error">{error}</p>}
           {all.data && open.length === 0 && (
             <p className="muted">
-              No accounts to import into yet. <Link href="/accounts/new">Add one</Link>
+              No accounts to import into yet.{" "}
+              <Link href={`${bookHome(book)}/accounts/new`}>Add one</Link>
             </p>
           )}
         </section>

@@ -8,6 +8,7 @@ import { Swipeable, type SwipeHandle } from "../components/Swipeable.js";
 import { postable, preferredRoots, shortName } from "../lib/accounts.js";
 import { add, formatMoney, isNegative, isZero, negate } from "../lib/decimal.js";
 import { appApi, type ProposalSummary, type ProposedMatch } from "../lib/appApi.js";
+import { bookHome } from "../lib/books.js";
 import { today } from "../lib/format.js";
 import { withBack } from "../lib/navigation.js";
 import { useSelection } from "../lib/selection.js";
@@ -87,7 +88,7 @@ export function Review({ book }: { book: string }) {
   return (
     <main>
       <header className="page-head">
-        <Link href="/" className="back">
+        <Link href={bookHome(book)} className="back">
           ‹ Books
         </Link>
         <h1>Review</h1>

@@ -682,6 +682,25 @@ export class AppDb {
     return new Map(rows.map(({ transaction_id, ...r }) => [transaction_id, toSchedule(r)]));
   }
 
+  /** Forget everything kept here about a book: once the ledger has deleted it. */
+  forgetBook(book: string): void {
+    transaction(this.db, () => {
+      for (const sql of [
+        "DELETE FROM import_row WHERE batch_id IN (SELECT id FROM import_batch WHERE book_id = ?)",
+        "DELETE FROM import_batch WHERE book_id = ?",
+        "DELETE FROM csv_profile WHERE book_id = ?",
+        "DELETE FROM star WHERE book_id = ?",
+        "DELETE FROM schedule_occurrence WHERE schedule_id IN (SELECT id FROM schedule WHERE book_id = ?)",
+        "DELETE FROM schedule WHERE book_id = ?",
+        "DELETE FROM category_rule WHERE book_id = ?",
+        "DELETE FROM proposal WHERE book_id = ?",
+        "DELETE FROM price_fetch WHERE book_id = ?",
+        "DELETE FROM book_setting WHERE book_id = ?",
+      ])
+        this.db.prepare(sql).run(book);
+    });
+  }
+
   // Book settings
 
   /** The book's time zone (IANA, e.g. "America/Chicago"), if set. */

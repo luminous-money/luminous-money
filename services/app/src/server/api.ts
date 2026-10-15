@@ -3,7 +3,7 @@
  * checking the session), and acts as them toward the ledger, so book ownership is the ledger's
  * call: a book the caller doesn't own answers 404 here too.
  */
-import { Hono } from "hono";
+import { Hono, type Context, type Next } from "hono";
 
 import type { CsvProfile } from "@fava-beans/csv-import";
 
@@ -26,7 +26,7 @@ import type { Categorizer } from "./categorize/types.js";
 import { ruleProblem } from "./categorize/rules.js";
 import { applyRule, coveredBy, settle, suggestPending } from "./categorize/service.js";
 import type { CategoryRuleIn, CategoryRulePatch } from "../shared/rules.js";
-import type { LedgerPort } from "./ledger.js";
+import { LedgerError, type Book, type LedgerPort } from "./ledger.js";
 
 type Env = { Variables: { user: string } };
 
@@ -54,12 +54,14 @@ export function createApi({
 
   api.get("/health", (c) => c.json({ status: "ok" }));
 
-  api.use("/books/*", async (c, next) => {
+  const caller = async (c: Context<Env>, next: Next) => {
     const user = c.req.header("x-user-id");
     if (!user) return c.json({ detail: "not logged in" }, 401);
     c.set("user", user);
     return next();
-  });
+  };
+  api.use("/books", caller);
+  api.use("/books/*", caller);
 
   /** 404 unless the caller owns the book. */
   const owned = async (user: string, book: string) =>
@@ -354,6 +356,55 @@ export function createApi({
         accepted: stats.get(cat.name)?.accepted ?? 0,
       }))
     );
+  });
+
+  // Books: the ledger's, with what `app` keeps about each (its time zone). Creating one sets
+  // its time zone too, and deleting one forgets everything kept here about it.
+
+  const withSettings = (book: Book) => ({ ...book, time_zone: db.timeZone(book.id) ?? null });
+  const ledgerStatus = (error: unknown) => {
+    if (error instanceof LedgerError && [404, 409, 422].includes(error.status))
+      return [{ detail: error.message }, error.status as 404 | 409 | 422] as const;
+    throw error;
+  };
+
+  api.get("/books", async (c) => {
+    const books = await ledgerFor(c.get("user")).listBooks();
+    return c.json(books.map(withSettings));
+  });
+
+  api.post("/books", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      name?: unknown;
+      time_zone?: unknown;
+      text?: unknown;
+    };
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name) return c.json({ detail: "name the book" }, 422);
+    if (typeof body.time_zone !== "string" || !isTimeZone(body.time_zone))
+      return c.json({ detail: "send a time zone, like America/Chicago" }, 422);
+    if (body.text !== undefined && body.text !== null && typeof body.text !== "string")
+      return c.json({ detail: "text is Beancount, as a string" }, 422);
+    try {
+      const book = await ledgerFor(c.get("user")).createBook(name, body.text ?? undefined);
+      db.setTimeZone(book.id, body.time_zone, c.get("user"));
+      return c.json(withSettings(book), 201);
+    } catch (error) {
+      return c.json(...ledgerStatus(error));
+    }
+  });
+
+  api.delete("/books/:book", async (c) => {
+    const { book } = c.req.param();
+    const updatedAt = c.req.query("updated_at");
+    if (!updatedAt) return c.json({ detail: "send the updated_at you read" }, 422);
+    try {
+      await ledgerFor(c.get("user")).deleteBook(book, updatedAt);
+    } catch (error) {
+      return c.json(...ledgerStatus(error));
+    }
+    db.forgetBook(book);
+    return c.body(null, 204);
   });
 
   // Book settings (kept in `app`): for now, the book's time zone, which decides "today" for

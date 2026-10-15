@@ -6,9 +6,10 @@ _Updated 2026-10-14._ Keep this current: every finalized change set updates it (
 
 ## State
 
-**M1 through M5 are built.** M2 (credit cards, really "any account, and matching"), M3
-(scheduled transactions), M4 (categorization) and M5 (investments) are described in their plans.
-The milestones ahead (M6–M14, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+**M1 through M6 are built.** M2 (credit cards, really "any account, and matching"), M3
+(scheduled transactions), M4 (categorization), M5 (investments) and M6 (multiple books) are
+described in their plans. M7 (cross-book transactions) was dropped: books are independent. The
+milestones ahead (M8–M14, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
 - **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M10.
@@ -17,8 +18,13 @@ What a user can do now:
 - **Home** shows the user's **starred** accounts as cards: balance (a card's shown as what's
   owed) and when each was last updated by an import, plus "Import transactions" and "Add an
   account" (added accounts are starred).
-- **Menu:** Home, Manage books (list, rename, export as a Beancount file), Review, Schedules,
-  Log out.
+- **Books (M6):** the selected book is the context for everything, and it's in the URL
+  (`/books/:book/…`); `/` opens the last book used on this device.
+  - The masthead's **book switcher** lists your books and Manage books.
+  - **Manage books:** create a book (empty, or from a Beancount file such as an export), open,
+    rename, export, set the time zone, and delete (type the name; Export offered). Names are
+    unique per user.
+- **Menu:** the book's Home, Review, Schedules, Rules and Commodities; Manage books; Log out.
 - **Schedules:** a transaction plus a rule (every N days/weeks/months/years, days of the month,
   weekends moved or kept, an optional end), made new or with "Repeat…" on any transaction.
   - Due occurrences are staged (at startup, after saves, and daily after midnight in the book's
@@ -83,24 +89,26 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 128 tests, including the table lint
-    - auth: 9; app: 116; db: 10; csv-import: 22
+    - ledger: 133 tests, including the table lint
+    - auth: 9; app: 117; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 51 API tests and 56 browser tests
+  - `pnpm e2e`: 54 API tests and 62 browser tests
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, with the demo
-  seeded for the stub user: the "Demo" book, its checking account and card starred.
+  seeded for the stub user: the "Demo" book (checking, card and ETrade brokerage starred) and
+  "Demo Household" (joint checking starred).
 
 ## Next steps
 
-1. Answer the questions in [the M6 plan](docs/milestones/m6-multiple-books/PLAN.md#questions) (multiple books), then say `build M6`.
+1. Say `elaborate plan for M8` (reports).
 
 ## Gotchas
 
 - **Fetching prices needs the network** (beanprice's sources: Yahoo and friends, which change
   now and then). A commodity's source is its `commodity` directive's `price:` metadata;
   `ledger.price_sources.fixed` is a no-network source for tests and demos.
-- **The morning price run only covers books with a time zone** (set in Manage books, or when a
-  book is created in the app, or by `pnpm seed`), since that records who it acts as.
+- **The morning price run only covers books with a time zone,** since that records who it acts
+  as. Every book gets one: on creation, by `pnpm seed`, or (older books) the browser's the first
+  time the PWA loads them.
 
 - **`pnpm up` is pnpm's own `update` command,** not the `up` script: it bumps dependencies. Use
   `pnpm run up` (foreground), or `docker buildx bake && docker compose up -d`.
@@ -110,8 +118,8 @@ How it's put together:
   a user of its own: `AUTH_TEST_USERS=true docker compose up -d`. (`pnpm e2e` sets it for its
   throwaway stack.) It also leaves test users and books behind; to clean up, run
   `docker compose down -v && docker compose up -d && pnpm seed`.
-- **`pnpm seed` refuses to seed a book that already exists,** because the demo gets new IDs on
-  every run and importing twice would duplicate everything.
+- **`pnpm seed` skips a book that already exists,** because the demo gets new IDs on every run
+  and importing twice would duplicate everything. Pass another book ID for a fresh one.
 - **Databases from before a service's migrations are refused** with a message to recreate them
   (`docker compose down -v`). No real data exists yet, so there's no backfill.
 - **All services share the data volume as UID 1000.** A volume created by an older, root-owned

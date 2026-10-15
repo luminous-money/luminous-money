@@ -27,8 +27,15 @@ export class LedgerError extends Error {
 }
 
 export interface LedgerPort {
+  /** The user's books, oldest first. */
+  listBooks(): Promise<Book[]>;
   /** The book, if it exists and the user owns it. */
   book(book: string): Promise<Book | undefined>;
+  /** A new book, named `name` (unique among the user's books), optionally starting as a copy of
+   * Beancount `text` (an export). */
+  createBook(name: string, text?: string): Promise<Book>;
+  /** Delete the book and everything in it, against the version read. */
+  deleteBook(book: string, updated_at: string): Promise<void>;
   accounts(book: string): Promise<Account[]>;
   /** The accounts asked for that exist, with balances and opening-balance dates. */
   summary(book: string, accounts: string[]): Promise<AccountSummary[]>;
@@ -73,6 +80,20 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
   };
 
   return {
+    listBooks: () => unwrap(client.GET("/api/ledger/v1/books")),
+    createBook: (name, text) =>
+      unwrap(client.POST("/api/ledger/v1/books", { body: { name, text: text ?? null } })),
+    async deleteBook(book, updated_at) {
+      const { error, response } = await client.DELETE("/api/ledger/v1/books/{book_id}", {
+        params: { path: { book_id: book }, query: { updated_at } },
+      });
+      if (response.ok) return;
+      const detail = (error as { detail?: unknown } | undefined)?.detail;
+      throw new LedgerError(
+        response.status,
+        typeof detail === "string" ? detail : "couldn't delete"
+      );
+    },
     async book(book) {
       const { data, response } = await client.GET("/api/ledger/v1/books/{book_id}", {
         params: { path: { book_id: book } },

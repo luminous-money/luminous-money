@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 
 import { displayName, shortName, shown } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";
+import { bookHome } from "../lib/books.js";
 import { withBack } from "../lib/navigation.js";
 import { AccountSettings } from "../components/AccountSettings.js";
 import { AccountValueNote, headline } from "../components/AccountValue.js";
@@ -97,7 +98,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
   return (
     <main>
       <header className="page-head">
-        <Link href="/" className="back">
+        <Link href={bookHome(book)} className="back">
           ‹ Home
         </Link>
         <div className="home-head">

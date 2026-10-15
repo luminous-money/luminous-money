@@ -3,6 +3,7 @@ import { Link } from "wouter";
 
 import { AccountValueNote, headline } from "../components/AccountValue.js";
 import { displayName } from "../lib/accounts.js";
+import { bookHome } from "../lib/books.js";
 import { formatWhen } from "../lib/format.js";
 import { explain, useLastImports, useStarredAccounts } from "../lib/queries.js";
 
@@ -19,7 +20,7 @@ export function Home({ book }: { book: Book }) {
           <h1>{book.name}</h1>
           <p className="muted">Your accounts</p>
         </div>
-        <Link href="/import" className="button primary-link">
+        <Link href={`${bookHome(book.id)}/import`} className="button primary-link">
           Import transactions
         </Link>
       </header>
@@ -29,7 +30,7 @@ export function Home({ book }: { book: Book }) {
       {accounts.data?.length === 0 && (
         <p className="card done">
           No starred accounts yet. Star one from its ledger, or{" "}
-          <Link href="/accounts/new">add an account</Link>.
+          <Link href={`${bookHome(book.id)}/accounts/new`}>add an account</Link>.
         </p>
       )}
 
@@ -57,7 +58,7 @@ export function Home({ book }: { book: Book }) {
 
       {accounts.data && accounts.data.length > 0 && (
         <p className="center">
-          <Link href="/accounts/new">+ Add an account</Link>
+          <Link href={`${bookHome(book.id)}/accounts/new`}>+ Add an account</Link>
         </p>
       )}
     </main>

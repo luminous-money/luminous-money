@@ -2505,14 +2505,7 @@
             "description": "Successful Response"
           },
           "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
+            "description": "Name taken, or text that doesn't parse"
           }
         },
         "summary": "Create Named Book"
@@ -2639,14 +2632,7 @@
             "description": "Stale version"
           },
           "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
+            "description": "Name taken"
           }
         },
         "summary": "Rename Book"

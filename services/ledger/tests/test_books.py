@@ -102,8 +102,8 @@ def test_book_names_are_unique_per_user_ignoring_case(ledger):
     first = me.post("/api/ledger/v1/books", json={"name": "Household"}).json()
     other = me.post("/api/ledger/v1/books", json={"name": "Personal"}).json()
 
-    assert me.post("/api/ledger/v1/books", json={"name": "household"}).status_code == 409
-    assert me.patch(f"/api/ledger/v1/books/{other['id']}", json={"name": "HOUSEHOLD", "updated_at": other["updated_at"]}).status_code == 409
+    assert me.post("/api/ledger/v1/books", json={"name": "household"}).status_code == 422
+    assert me.patch(f"/api/ledger/v1/books/{other['id']}", json={"name": "HOUSEHOLD", "updated_at": other["updated_at"]}).status_code == 422
     assert me.patch(f"/api/ledger/v1/books/{first['id']}", json={"name": "household", "updated_at": first["updated_at"]}).status_code == 200
     assert http(ledger, OTHER).post("/api/ledger/v1/books", json={"name": "Household"}).status_code == 201
 

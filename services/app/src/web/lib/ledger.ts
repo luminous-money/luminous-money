@@ -60,10 +60,7 @@ function describe(error: unknown): string | undefined {
 }
 
 export const api = {
-  books: (): Promise<Book[]> => unwrap(ledger.GET("/api/ledger/v1/books")),
-
-  createBook: (name: string): Promise<Book> =>
-    unwrap(ledger.POST("/api/ledger/v1/books", { body: { name } })),
+  // Books are listed, created and deleted through the app API (appApi), which keeps their settings.
 
   renameBook: (book_id: string, name: string, version: string): Promise<Book> =>
     unwrap(

@@ -7,7 +7,7 @@ import type {
   TransactionIn,
 } from "@fava-beans/ledger-client";
 
-import type { Book, LedgerPage, LedgerPort } from "./ledger.js";
+import { LedgerError, type Book, type LedgerPage, type LedgerPort } from "./ledger.js";
 
 export class FakeLedger implements LedgerPort {
   books = new Map<string, Book>();
@@ -39,6 +39,23 @@ export class FakeLedger implements LedgerPort {
 
   async book(book: string) {
     return this.books.get(book);
+  }
+
+  async listBooks() {
+    return [...this.books.values()];
+  }
+
+  async createBook(name: string) {
+    const id = `b${this.next++}`;
+    this.books.set(id, { id, name, created_at: "", updated_at: "v1" });
+    return this.books.get(id)!;
+  }
+
+  async deleteBook(book: string, updated_at: string) {
+    const found = this.books.get(book);
+    if (!found) throw new LedgerError(404, `not found: ${book}`);
+    if (found.updated_at !== updated_at) throw new LedgerError(409, "stale");
+    this.books.delete(book);
   }
 
   async accounts() {

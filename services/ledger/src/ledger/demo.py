@@ -64,6 +64,63 @@ def demo_ledger(history: str, staged_days: int, today: datetime.date) -> str:
     return engine.render(engine.with_title(parsed.header, "Demo"), texts)
 
 
+#: The second demo book's account `pnpm seed` stars.
+HOUSEHOLD_STARRED = {"Assets:Bank:Joint-Checking": "Joint Checking"}
+
+
+def household_ledger(today: datetime.date, months: int = 4, staged_days: int = 14) -> str:
+    """A small, made-up shared household book, titled "Demo Household": a joint checking account
+    two people pay into, with rent, utilities and groceries. Purchases in the last
+    `staged_days` are staged, as in the main demo. Deterministic for a given `today`."""
+    checking = "Assets:Bank:Joint-Checking"
+    begin = (today.replace(day=1) - datetime.timedelta(days=31 * months)).replace(day=1)
+    usd = lambda n: models.Amount(number=f"{n:.2f}", currency="USD")  # noqa: E731
+    vary = lambda key, low, high: low + int(hashlib.sha256(key.encode()).hexdigest(), 16) % (high - low)  # noqa: E731
+
+    def pay(date, payee, narration, account, amount):
+        return models.TransactionIn(
+            date=date,
+            flag="*",
+            payee=payee,
+            narration=narration,
+            postings=[
+                models.Posting(account=checking, units=usd(-amount)),
+                models.Posting(account=account, units=usd(amount)),
+            ],
+        )
+
+    accounts = ["Equity:Opening-Balances", "Income:Contributions:Kael", "Income:Contributions:Jess",
+                "Expenses:Home:Rent", "Expenses:Home:Utilities", "Expenses:Food:Groceries", UNCATEGORIZED]
+    texts = [engine.parse_one(f'{begin.isoformat()} open {checking} USD\n  {engine.DISPLAY_NAME_KEY}: "Joint Checking"\n').text]
+    texts += [engine.parse_one(f"{begin.isoformat()} open {a}\n").text for a in accounts]
+    batch = [models.TransactionIn(
+        date=begin, flag="*", payee=None, narration="Opening balance",
+        postings=[models.Posting(account=checking, units=usd(1200)), models.Posting(account="Equity:Opening-Balances", units=None)],
+    )]
+    day = begin
+    while day <= today:
+        if day.day == 1:
+            for person in ("Kael", "Jess"):
+                batch.append(models.TransactionIn(
+                    date=day, flag="*", payee=person, narration="Monthly contribution",
+                    postings=[models.Posting(account=checking, units=usd(1600)),
+                              models.Posting(account=f"Income:Contributions:{person}", units=None)],
+                ))
+            batch.append(pay(day, "Maple Street Rentals", "Rent", "Expenses:Home:Rent", 2400))
+        if day.day == 15:
+            batch.append(pay(day, "City Power & Water", "Utilities", "Expenses:Home:Utilities", vary(f"u{day}", 90, 160)))
+        if day.weekday() == 5:
+            batch.append(pay(day, "Green Grocer", "Groceries", "Expenses:Food:Groceries", vary(f"g{day}", 60, 150) + 0.37))
+        day += datetime.timedelta(days=1)
+    since = today - datetime.timedelta(days=staged_days)
+    for t in batch:
+        directive_id = engine.new_id()
+        if t.date >= since and is_purchase(t) and t.postings[1].account.startswith("Expenses:Food"):
+            t = stage(directive_id, t)
+        texts.append(engine.transaction_directive(t, directive_id).text)
+    return engine.render(engine.with_title(['option "operating_currency" "USD"'], "Demo Household"), texts)
+
+
 def is_purchase(t: models.TransactionIn) -> bool:
     """One expense paid from one bank or card account: what a bank feed delivers."""
     if len(t.postings) != 2:
@@ -91,9 +148,13 @@ def main() -> None:
     args.add_argument("--years", type=int, default=2, help="years of history (default 2)")
     args.add_argument("--staged-days", type=int, default=45, help="stage purchases this recent (default 45)")
     args.add_argument("--seed", type=int, default=3, help="bean-example random seed (default 3)")
+    args.add_argument("--household", action="store_true", help="the small second demo book instead")
     opts = args.parse_args()
 
     today = datetime.date.today()
+    if opts.household:
+        sys.stdout.write(household_ledger(today))
+        return
     sys.stdout.write(demo_ledger(generate(opts.years, opts.seed, today), opts.staged_days, today))
 
 

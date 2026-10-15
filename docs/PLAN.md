@@ -78,8 +78,10 @@ milestone starts.
       Built 2026-10-14 ([plan](milestones/m5-investment-accounts/PLAN.md)): holdings with cost
       basis and gains (account-scoped booking), values and staleness everywhere, prices fetched
       each morning (beanprice), trades with tax-aligned booking and split gains, revalued assets.
-- [ ] **M6: Multiple books.** A book switcher and a books manager (create, delete). The selected
-      book is the context for everything, like switching profiles; nothing spans books.
+- [x] **M6: Multiple books.** A book switcher and a books manager (create, delete). The selected
+      book is the context for everything, like switching profiles; nothing spans books. Built
+      2026-10-14: book-prefixed pages, the masthead switcher, creating books (also from an
+      export), deleting them (with backups carrying it), unique names, a second demo book.
 - ~~**M7: Cross-book transactions.**~~ Dropped (2026-10-14): books are independent, and each
   records its own side of an event that touches two (design.md, "Books are independent").
 - [ ] **M8: Reports.** From basic to more complex.

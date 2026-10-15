@@ -26,7 +26,7 @@ from fastapi import APIRouter, Body, Depends, FastAPI, Header, HTTPException, Qu
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from . import engine, investments, models
-from .service import Ledger, NotFound
+from .service import Ledger, NameTaken, NotFound
 from .store import Row, StaleVersion, Store
 
 BeancountText = Annotated[str, Body(media_type="text/plain")]
@@ -92,6 +92,10 @@ def create_app(ledger: Ledger) -> FastAPI:
     async def stale(_, exc: StaleVersion):
         return JSONResponse({"detail": str(exc), "updated_at": exc.current}, status_code=409)
 
+    @app.exception_handler(NameTaken)
+    async def name_taken(_, exc: NameTaken):
+        return JSONResponse({"detail": str(exc)}, status_code=422)
+
     @app.exception_handler(ValueError)
     async def invalid(_, exc: ValueError):
         return JSONResponse({"detail": str(exc)}, status_code=409)
@@ -102,7 +106,7 @@ def create_app(ledger: Ledger) -> FastAPI:
     def books(user: User) -> list[models.Book]:
         return ledger.books(user)
 
-    @api.post("/books", status_code=201)
+    @api.post("/books", status_code=201, responses={422: {"description": "Name taken, or text that doesn't parse"}})
     def create_named_book(book: models.BookIn, user: User) -> models.Book:
         return ledger.create_book(name=book.name, owner_id=user, text=book.text)
 
@@ -114,7 +118,7 @@ def create_app(ledger: Ledger) -> FastAPI:
     def get_book(book_id: OwnedBook) -> models.Book:
         return ledger.book(book_id)
 
-    @api.patch("/books/{book_id}", responses={409: {"description": "Stale version"}})
+    @api.patch("/books/{book_id}", responses={409: {"description": "Stale version"}, 422: {"description": "Name taken"}})
     def rename_book(book_id: OwnedBook, patch: models.BookPatch) -> models.Book:
         return ledger.rename_book(book_id, patch.name, expected=patch.updated_at)
 

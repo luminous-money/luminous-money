@@ -73,8 +73,8 @@ test("buying and selling through the Trade form", async ({ page }) => {
 });
 
 test("a house is revalued with Update value", async ({ page }) => {
-  await setUpUser(page);
-  await page.goto("/ui/accounts/new");
+  const { book } = await setUpUser(page);
+  await page.goto(`/ui/books/${book.id}/accounts/new`);
   await page.getByRole("combobox", { name: "Account" }).fill("Assets:Property:House");
   await page.getByRole("textbox", { name: "Balance" }).fill("400000");
   await page.getByLabel("Balance as of").fill(day(-400));

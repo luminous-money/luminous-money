@@ -23,7 +23,7 @@ export function Setup({ book, onDone }: { book: Book | undefined; onDone: () => 
           className="card editor"
           onSubmit={(e) => {
             e.preventDefault();
-            if (name.trim()) create.mutate(name.trim());
+            if (name.trim()) create.mutate({ name: name.trim() });
           }}
         >
           <label>

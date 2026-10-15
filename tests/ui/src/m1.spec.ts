@@ -54,8 +54,8 @@ test("a new user sets up their books and first account, and lands home", async (
 test("an account is added by its full name, starred onto the home page, a card showing what's owed", async ({
   page,
 }) => {
-  await setUpUser(page);
-  await page.goto("/ui/accounts/new");
+  const { book } = await setUpUser(page);
+  await page.goto(`/ui/books/${book.id}/accounts/new`);
 
   const name = page.getByRole("combobox", { name: "Account" });
   await name.fill("Liabilities:Cards:Chase-Sapphire");

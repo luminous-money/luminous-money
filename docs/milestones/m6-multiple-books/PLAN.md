@@ -1,7 +1,17 @@
 M6: Multiple books: plan
 ==================================================================================================
 
-> **Status: plan, waiting on [the questions](#questions).** Calls marked **Proposed** are open.
+> **Status: built (2026-10-14),** with unit, API and browser tests. The
+> [answers](#answers-2026-10-14) settle the questions. One change while building: the orphan
+> sweep was dropped, since `app` forgets a deleted book in one local transaction right after the
+> ledger deletes it; and a taken name is a 422, not a 409 (which the app reads as "changed
+> elsewhere").
+
+## Answers (2026-10-14)
+
+1. **The last book is remembered per device.**
+2. **Deleting is permanent,** behind typing the book's name, with Export offered (not required).
+3. **Creating a book from a Beancount file is in M6.**
 
 ## What M6 is
 

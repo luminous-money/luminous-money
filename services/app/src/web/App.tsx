@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, Route, Router, Switch } from "wouter";
+import { Link, Redirect, Route, Router, Switch } from "wouter";
 
+import { BookSwitcher } from "./components/BookSwitcher.js";
 import { Menu } from "./components/Menu.js";
-import { useCurrentBook, useMe } from "./lib/queries.js";
+import type { BookInfo } from "./lib/appApi.js";
+import { bookHome, rememberBook, startingBook, useBookInPath } from "./lib/books.js";
+import { useBooks, useMe, useTimeZoneBackfill } from "./lib/queries.js";
 import { AccountLedger } from "./pages/AccountLedger.js";
 import { AddAccount } from "./pages/AddAccount.js";
 import { Books } from "./pages/Books.js";
@@ -31,14 +34,23 @@ export function App() {
 }
 
 /** Where you land: logged out, the login screen; a new user (no books yet), setup, which stays
- * up until it's finished (the book, then its first account); otherwise, the app. */
+ * up until it's finished (the book, then its first account); otherwise, the app. Every page but
+ * Manage books is in a book (`/books/:book/…`): `/` opens the last one used here. */
 function Gate() {
   const me = useMe();
-  const { book, loading } = useCurrentBook();
+  const books = useBooks();
+  const user = me.data?.id ?? "";
+  const inPath = useBookInPath();
   const [settingUp, setSettingUp] = useState(false);
+  const empty = books.data?.length === 0;
   useEffect(() => {
-    if (me.data && !loading && !book) setSettingUp(true);
-  }, [me.data, loading, book]);
+    if (me.data && empty) setSettingUp(true);
+  }, [me.data, empty]);
+  useTimeZoneBackfill(books.data);
+  const book = books.data?.find((b) => b.id === inPath);
+  useEffect(() => {
+    if (user && book) rememberBook(user, book.id);
+  }, [user, book]);
 
   if (me.isPending) return <Masthead />;
   if (!me.data) {
@@ -49,89 +61,112 @@ function Gate() {
       </>
     );
   }
-  if (loading) return <Masthead />;
-  if (!book || settingUp) {
+  if (!books.data) return <Masthead />;
+  if (empty || settingUp) {
     return (
       <>
         <Masthead />
-        <Setup book={book} onDone={() => setSettingUp(false)} />
+        <Setup book={books.data[0]} onDone={() => setSettingUp(false)} />
       </>
     );
   }
 
+  const start = startingBook(user, books.data)!;
   return (
     <>
-      <Masthead menu />
-      <Switch>
-        <Route path="/">
-          <Home book={book} />
-        </Route>
-        <Route path="/books">
-          <Books />
-        </Route>
-        <Route path="/accounts/new">
-          <AddAccount book={book} />
-        </Route>
-        <Route path="/import">
-          <Import book={book.id} />
-        </Route>
-        <Route path="/books/:book/accounts/:account/trade">
-          {({ book: id, account }) => (
-            <TradePage key={account} book={id} account={decodeURIComponent(account)} />
-          )}
-        </Route>
-        <Route path="/books/:book/accounts/:account">
-          {({ book: id, account }) => (
-            <AccountLedger key={account} book={id} account={decodeURIComponent(account)} />
-          )}
-        </Route>
-        <Route path="/books/:book/import">{({ book: id }) => <Import key={id} book={id} />}</Route>
-        <Route path="/books/:book/commodities">{({ book: id }) => <Commodities book={id} />}</Route>
-        <Route path="/books/:book/rules">{({ book: id }) => <Rules book={id} />}</Route>
-        <Route path="/books/:book/rules/new">
-          {({ book: id }) => <RuleEditor key="new" book={id} />}
-        </Route>
-        <Route path="/books/:book/rules/:id">
-          {({ book: id, id: rule }) => <RuleEditor key={rule} book={id} id={rule} />}
-        </Route>
-        <Route path="/books/:book/schedules">{({ book: id }) => <Schedules book={id} />}</Route>
-        <Route path="/books/:book/schedules/new">
-          {({ book: id }) => <ScheduleEditor key="new" book={id} />}
-        </Route>
-        <Route path="/books/:book/schedules/:id">
-          {({ book: id, id: schedule }) => (
-            <ScheduleEditor key={schedule} book={id} id={schedule} />
-          )}
-        </Route>
-        <Route path="/books/:book/review">{({ book: id }) => <Review book={id} />}</Route>
-        <Route path="/books/:book/transactions/new">
-          {({ book: id }) => <NewTransactionPage book={id} />}
-        </Route>
-        <Route path="/books/:book/transactions/:id">
-          {({ book: id, id: transaction }) => (
-            <TransactionPage key={transaction} book={id} id={transaction} />
-          )}
-        </Route>
-        <Route>
-          <main>
-            <p className="card">
-              Nothing here. <Link href="/">Back home</Link>
-            </p>
-          </main>
-        </Route>
-      </Switch>
+      <Masthead books={books.data} book={book ?? (inPath ? undefined : start)} />
+      {inPath && !book ? (
+        <NotFound />
+      ) : (
+        <Switch>
+          <Route path="/">
+            <Redirect to={bookHome(start.id)} replace />
+          </Route>
+          <Route path="/books">
+            <Books />
+          </Route>
+          <Route path="/books/:book">{() => <Home key={book!.id} book={book!} />}</Route>
+          <Route path="/books/:book/accounts/new">
+            {() => <AddAccount key={book!.id} book={book!} />}
+          </Route>
+          <Route path="/books/:book/accounts/:account/trade">
+            {({ book: id, account }) => (
+              <TradePage key={account} book={id} account={decodeURIComponent(account)} />
+            )}
+          </Route>
+          <Route path="/books/:book/accounts/:account">
+            {({ book: id, account }) => (
+              <AccountLedger key={account} book={id} account={decodeURIComponent(account)} />
+            )}
+          </Route>
+          <Route path="/books/:book/import">
+            {({ book: id }) => <Import key={id} book={id} />}
+          </Route>
+          <Route path="/books/:book/commodities">
+            {({ book: id }) => <Commodities key={id} book={id} />}
+          </Route>
+          <Route path="/books/:book/rules">{({ book: id }) => <Rules key={id} book={id} />}</Route>
+          <Route path="/books/:book/rules/new">
+            {({ book: id }) => <RuleEditor key="new" book={id} />}
+          </Route>
+          <Route path="/books/:book/rules/:id">
+            {({ book: id, id: rule }) => <RuleEditor key={rule} book={id} id={rule} />}
+          </Route>
+          <Route path="/books/:book/schedules">
+            {({ book: id }) => <Schedules key={id} book={id} />}
+          </Route>
+          <Route path="/books/:book/schedules/new">
+            {({ book: id }) => <ScheduleEditor key="new" book={id} />}
+          </Route>
+          <Route path="/books/:book/schedules/:id">
+            {({ book: id, id: schedule }) => (
+              <ScheduleEditor key={schedule} book={id} id={schedule} />
+            )}
+          </Route>
+          <Route path="/books/:book/review">
+            {({ book: id }) => <Review key={id} book={id} />}
+          </Route>
+          <Route path="/books/:book/transactions/new">
+            {({ book: id }) => <NewTransactionPage book={id} />}
+          </Route>
+          <Route path="/books/:book/transactions/:id">
+            {({ book: id, id: transaction }) => (
+              <TransactionPage key={transaction} book={id} id={transaction} />
+            )}
+          </Route>
+          <Route>
+            <NotFound />
+          </Route>
+        </Switch>
+      )}
     </>
   );
 }
 
-function Masthead({ menu = false }: { menu?: boolean }) {
+function NotFound() {
+  return (
+    <main>
+      <p className="card">
+        Nothing here. <Link href="/">Back home</Link>
+      </p>
+    </main>
+  );
+}
+
+/** The brand; once you're in, the book switcher and the menu. */
+function Masthead({ books, book }: { books?: BookInfo[]; book?: BookInfo }) {
   return (
     <header className="masthead">
       <Link href="/" className="brand">
         <img src="/ui/icon.svg" alt="" className="logo" />
         <span className="wordmark">fava-beans</span>
       </Link>
-      {menu && <Menu />}
+      {books && (
+        <div className="masthead-end">
+          <BookSwitcher books={books} book={book} />
+          <Menu />
+        </div>
+      )}
     </header>
   );
 }

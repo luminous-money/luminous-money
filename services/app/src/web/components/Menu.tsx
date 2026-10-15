@@ -1,30 +1,27 @@
-import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 
-import { useCurrentBook, useLogOut } from "../lib/queries.js";
+import { bookHome, useSelectedBook } from "../lib/books.js";
+import { usePopover } from "../lib/popover.js";
+import { useBooks, useLogOut, useMe } from "../lib/queries.js";
 
-/** The hamburger menu: Home, Manage books, Review, and logging out. */
+/** The hamburger menu: the selected book's Home, Review, Schedules, Rules and Commodities;
+ * Manage books; and logging out. */
 export function Menu() {
-  const [open, setOpen] = useState(false);
-  const panel = useRef<HTMLDivElement>(null);
-  const { book } = useCurrentBook();
+  const { open, setOpen, ref } = usePopover();
+  const me = useMe();
+  const books = useBooks();
+  const book = useSelectedBook(me.data?.id ?? "", books.data ?? []);
   const logOut = useLogOut();
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => !panel.current?.contains(e.target as Node) && setOpen(false);
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [open]);
 
   const item = (href: string, label: string) => (
     <Link href={href} className="menu-item" onClick={() => setOpen(false)}>
       {label}
     </Link>
   );
+  const home = book && bookHome(book.id);
 
   return (
-    <div className="menu" ref={panel}>
+    <div className="menu" ref={ref}>
       <button
         type="button"
         className="icon menu-button"
@@ -36,12 +33,12 @@ export function Menu() {
       </button>
       {open && (
         <nav className="menu-panel" aria-label="Main">
-          {item("/", "Home")}
+          {home && item(home, "Home")}
+          {home && item(`${home}/review`, "Review")}
+          {home && item(`${home}/schedules`, "Schedules")}
+          {home && item(`${home}/rules`, "Rules")}
+          {home && item(`${home}/commodities`, "Commodities")}
           {item("/books", "Manage books")}
-          {book && item(`/books/${book.id}/review`, "Review")}
-          {book && item(`/books/${book.id}/schedules`, "Schedules")}
-          {book && item(`/books/${book.id}/rules`, "Rules")}
-          {book && item(`/books/${book.id}/commodities`, "Commodities")}
           <button type="button" className="menu-item" onClick={() => logOut.mutate()}>
             Log out
           </button>

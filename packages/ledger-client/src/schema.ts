@@ -1537,14 +1537,12 @@ export interface operations {
           "application/json": components["schemas"]["Book"];
         };
       };
-      /** @description Validation Error */
+      /** @description Name taken, or text that doesn't parse */
       422: {
         headers: {
           [name: string]: unknown;
         };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
+        content?: never;
       };
     };
   };
@@ -1680,14 +1678,12 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description Validation Error */
+      /** @description Name taken */
       422: {
         headers: {
           [name: string]: unknown;
         };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
+        content?: never;
       };
     };
   };
