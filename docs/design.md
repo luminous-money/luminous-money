@@ -345,25 +345,56 @@ to be told to leave it alone.
 | `/` | (redirect) | Redirects to `/ui/`. |
 
 
-How auth works (built in M1, with a stub user; M8 adds real accounts without changing the
-shape):
+How auth works (M8; the shape is M1's):
 
 - **Every API route except auth's carries Traefik's forwardAuth check** (the `session`
   middleware).
   - Before forwarding a request, Traefik calls `auth`'s `GET /verify`. Without a valid session
-    the answer is 401, and the request never reaches a service.
+    or API token the answer is 401, and the request never reaches a service.
   - On success, `auth` answers with `X-User-Id`, and Traefik sets that header on the forwarded
     request, replacing anything the client sent.
 - **There's no Traefik plugin.** The token logic lives in the `auth` service, in TypeScript.
 - **Services trust `X-User-Id`,** since they're only reachable through Traefik on the internal
-  network. `app` passes it on when it calls the ledger as that user.
-- **Sessions are HS256 JWTs** (30 days, no refresh yet), signed with `AUTH_JWT_SECRET`.
-  - The browser carries the token in an `HttpOnly`, `SameSite=Strict` cookie, `Secure` behind
-    HTTPS. The PWA never touches the token.
-  - Scripts and tests can send it as a Bearer token instead.
-- **The stub:** one user, created on startup; `POST /login` always logs that user in.
-  - For test stacks only, `AUTH_TEST_USERS=true` lets login take an email and log in a separate
-    user for it, so tests don't share state. It's off by default, and `pnpm e2e` turns it on.
+  network. `app` passes it on when it calls the ledger as that user; `auth` does the same to
+  delete an account's books.
+- **No special accounts.** fava-beans may run as a public service, so anyone can sign up, and
+  there's nothing global to administer: everyone is an ordinary user, including whoever runs the
+  server. Operator tasks (reset links, disabling an account, key rotation) go through `auth`'s
+  command line (`node dist/cli.js`), not an admin role.
+- **Who you are is apart from how you prove it.** A user is a name and an email (unique,
+  case-insensitive). An `identity` is a way to log in: a password now, and OIDC providers later
+  as another kind, with nothing else moving. Sessions record which one started them.
+- **Passwords** follow NIST SP 800-63B rev. 4 and OWASP:
+  - 15 to 128 characters, NFKC-normalized, with no composition rules or forced rotation
+  - checked against Have I Been Pwned's range API (k-anonymous; it passes if HIBP is down)
+  - Argon2id (19 MiB, 2 passes) from Node's own `crypto` (Node 24), stored as PHC strings and
+    redone at login when the parameters rise
+  - guessing slows down per account and per client IP
+- **Tokens are short-lived access with rotating refresh** (OAuth 2.1 / browser-apps BCP shape).
+  - **Access tokens:** 10-minute Ed25519 JWTs (`sub`, `sid`). The key pair lives in `auth.sqlite`,
+    and the public keys are published at `/.well-known/jwks.json`; `cli.js rotate-keys` adds one.
+  - **Refresh tokens:** opaque, hashed, rotated on every use. A token used again after a
+    10-second grace ends its whole session (theft); the grace covers two tabs at once.
+  - **A session is a refresh-token family.** It ends after 60 days unused or a year at most, or
+    when ended: logging out, ending it from another device, a password change (the others) or
+    reset (all).
+  - `/verify` checks each access token's session in the database (one indexed read), so ending a
+    session stops its access token at once, even from the CLI's separate process.
+- **In the browser, tokens never touch JavaScript.**
+  - Both are `HttpOnly`, `SameSite=Strict` cookies, `Secure` (and `__Host-`/`__Secure-`
+    prefixed) behind HTTPS. The refresh cookie's path is `/api/auth/v1/token`, so it goes
+    nowhere else.
+  - On a 401 the PWA refreshes once, under a Web Lock across tabs, and retries; while open, it
+    refreshes ahead of expiry.
+  - `auth` refuses writes whose `Origin` isn't its own.
+- **Other clients** get tokens in the body (`"delivery": "body"`) and send `Authorization:
+  Bearer`. **API tokens** (`fb_…`, hashed, optionally expiring) serve scripts and backups; they
+  reach every API but can't manage the account.
+- **Email is optional** (`SMTP_URL`): with it, verification and reset links (to
+  `FAVA_BEANS_PUBLIC_URL`, never the request's Host). Without it, resets go through the CLI.
+- **Deleting an account** deletes every book it owns, through `app`'s book deletion.
+- **Test stacks** (`AUTH_TEST_USERS=true`) let login take an email alone, so tests don't share
+  state. It's off by default, and `pnpm e2e` turns it on.
 - **Books belong to users.** Every book has an owner, and a book endpoint answers only its owner:
   anyone else gets 404, as if the book didn't exist. Sharing and permissions come in M12.
 
@@ -668,7 +699,7 @@ The design separates four things:
 | Service | Language | Role |
 |---|---|---|
 | `traefik` | upstream | The only exposed port. Routes by path prefix; forwardAuth to `auth`. |
-| `auth` | TypeScript | Login, logout, who's logged in, and the verify endpoint for forwardAuth. Owns users (a stub until M8). |
+| `auth` | TypeScript | Sign-up, login, sessions and tokens, accounts, and the verify endpoint for forwardAuth. Owns users and their identities. |
 | `ledger` | Python | System of record for all books. Runs the Beancount engine (booking, validation, BQL). Owns Beancount import/export, the change log and backup chunks. |
 | `app` | TypeScript | Serves the PWA (React + Vite + `vite-plugin-pwa`) and its API (Hono): CSV profiles and imports. Hosts the participants, the context builder and the resolver chain, and owns import history (later schedules too). Modules get split into their own services only when there's a reason. |
 

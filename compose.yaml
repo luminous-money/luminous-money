@@ -26,10 +26,19 @@ services:
   auth:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/auth:${FAVA_BEANS_VERSION:-dev}
     environment:
-      # Signs session tokens. Set your own (32+ characters) before exposing the stack.
-      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-insecure-development-secret-change-me-0123456789}
+      # Email, for password resets and checking addresses (optional: without it, resets go
+      # through `node dist/cli.js reset-link`). FAVA_BEANS_PUBLIC_URL is where the links in
+      # emails point, e.g. https://books.example.com.
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      FAVA_BEANS_PUBLIC_URL: ${FAVA_BEANS_PUBLIC_URL:-}
+      # New passwords are checked against Have I Been Pwned (by hash prefix only).
+      AUTH_BREACHED_PASSWORDS: ${AUTH_BREACHED_PASSWORDS:-true}
       # Test stacks only: lets `login` take an email and log in a separate user for it.
       AUTH_TEST_USERS: ${AUTH_TEST_USERS:-false}
+      # Deleting an account deletes its books, through these.
+      LEDGER_URL: http://ledger:8000
+      APP_URL: http://app:3000
     volumes:
       - data:/data
     deploy: *restart

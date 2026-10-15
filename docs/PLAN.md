@@ -84,7 +84,10 @@ milestone starts.
       export), deleting them (with backups carrying it), unique names, a second demo book.
 - ~~**M7: Cross-book transactions.**~~ Dropped (2026-10-14): books are independent, and each
   records its own side of an event that touches two (design.md, "Books are independent").
-- [ ] **M8: Auth.** Account creation, log in, log out, book ownership and permissions.
+- [x] **M8: Auth.** Account creation, log in, log out, book ownership and permissions. Built
+      2026-10-15: open sign-up with no special accounts, Argon2id and breached-password checks,
+      10-minute access tokens with rotating refresh, API tokens, email links (optional SMTP),
+      account deletion, the operator's CLI, identities ready for OIDC.
 - [ ] **M9: SimpleFIN.** Bank feeds.
 - [ ] **M10: Budgets.**
 - [ ] **M11: Reports.** From basic to more complex.

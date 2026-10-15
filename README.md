@@ -16,7 +16,7 @@ books, each independent: switching books is like switching profiles.
 
 ## Quick start
 
-You need Docker with buildx, plus Node 22 and pnpm 11 (via corepack) for the TypeScript
+You need Docker with buildx, plus Node 24 and pnpm 11 (via corepack) for the TypeScript
 workspace.
 
 ```sh
@@ -25,16 +25,17 @@ pnpm build           # build every service image (docker buildx bake)
 docker compose up -d # run the stack on http://localhost:8080 (FAVA_BEANS_PORT to change)
 ```
 
-Then open `http://localhost:8080/`, which redirects to the app at `/ui/`. **Log in** logs in the
-stub user (real accounts come with M8); `pnpm seed` gives that user two demo books.
+Then open `http://localhost:8080/`, which redirects to the app at `/ui/`, and **create an
+account** (anyone can). For demo data, make an API token on "Your account" and run
+`FAVA_BEANS_TOKEN=fb_… pnpm seed`, which gives your account two demo books.
 
-Before exposing the stack beyond your machine, set `AUTH_JWT_SECRET` (32+ characters): it signs
-session tokens, and the Compose file only has a development default.
+Running it for real (HTTPS, email for password resets, backups, the operator's commands) is in
+[docs/operating.md](docs/operating.md).
 
 | Path | What |
 |---|---|
 | `/ui/` | The PWA: books, then each book's review queue |
-| `/api/auth/v1/login` | Log in (`POST`); every other API needs the session it starts |
+| `/api/auth/v1` | Sign up, log in, sessions and API tokens; every other API needs a session or token |
 | `/api/ledger/v1/docs` | The ledger API's interactive docs |
 | `/api/app/v1/health` | The app API |
 
@@ -65,7 +66,7 @@ node.Dockerfile       the shared TypeScript workspace stage, its checks, and the
 deploy/
   traefik/            routing (file provider): /api/* and /ui/*
 services/
-  auth/               TypeScript: users and sessions (a stub user for now) → /api/auth/v1
+  auth/               TypeScript: accounts, sessions and tokens          → /api/auth/v1
   ledger/             Python: system of record, Beancount engine      → /api/ledger/v1
   app/                TypeScript: PWA, CSV imports, the pipeline       → /ui, /api/app/v1
 packages/

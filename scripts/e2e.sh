@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 docker buildx bake default e2e ui-tests || exit 1
 
 compose="docker compose -p fava-beans-e2e -f compose.yaml -f compose.e2e.yaml"
-$compose up -d traefik auth ledger app || exit 1
+$compose up -d traefik auth ledger app mailpit || exit 1
 $compose run --rm e2e
 api=$?
 $compose run --rm ui

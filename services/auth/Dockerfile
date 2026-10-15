@@ -6,7 +6,7 @@ FROM workspace AS build
 RUN pnpm --filter "@fava-beans/auth..." build \
   && pnpm --filter @fava-beans/auth deploy --prod --legacy /out
 
-FROM node:22-slim AS runtime
+FROM node:24-slim AS runtime
 WORKDIR /srv
 COPY --from=build /out ./
 ENV NODE_ENV=production PORT=3000 AUTH_DATA_DIR=/data

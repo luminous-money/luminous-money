@@ -16,14 +16,12 @@ const menu = async (page: Page, item: string) => {
 test.describe("logged out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("arriving shows log in, with create account disabled for now", async ({ page }) => {
+  test("arriving shows log in, with a way to create an account", async ({ page }) => {
     await page.goto("/ui/");
 
-    await expect(page.getByRole("button", { name: "Log in" })).toBeEnabled();
-    await expect(page.getByRole("button", { name: "Create account" })).toBeDisabled();
-
-    await page.getByRole("button", { name: "Log in" }).click();
-    await expect(page.getByRole("button", { name: "Log in" })).toBeHidden();
+    await expect(page.getByRole("form", { name: "Log in" })).toBeVisible();
+    await page.getByRole("button", { name: "Create an account" }).click();
+    await expect(page.getByRole("form", { name: "Create an account" })).toBeVisible();
   });
 });
 

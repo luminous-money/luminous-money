@@ -5,7 +5,9 @@ import { BookSwitcher } from "./components/BookSwitcher.js";
 import { Menu } from "./components/Menu.js";
 import type { BookInfo } from "./lib/appApi.js";
 import { bookHome, rememberBook, startingBook, useBookInPath } from "./lib/books.js";
-import { useBooks, useMe, useTimeZoneBackfill } from "./lib/queries.js";
+import { useBooks, useMe, useSessionLifecycle, useTimeZoneBackfill } from "./lib/queries.js";
+import { Account } from "./pages/Account.js";
+import { ResetPassword, VerifyEmail } from "./pages/EmailLinks.js";
 import { AccountLedger } from "./pages/AccountLedger.js";
 import { AddAccount } from "./pages/AddAccount.js";
 import { Books } from "./pages/Books.js";
@@ -38,6 +40,7 @@ export function App() {
  * Manage books is in a book (`/books/:book/…`): `/` opens the last one used here. */
 function Gate() {
   const me = useMe();
+  useSessionLifecycle(!!me.data);
   const books = useBooks();
   const user = me.data?.id ?? "";
   const inPath = useBookInPath();
@@ -57,7 +60,13 @@ function Gate() {
     return (
       <>
         <Masthead />
-        <Login />
+        <Switch>
+          <Route path="/reset/:token">{({ token }) => <ResetPassword token={token} />}</Route>
+          <Route path="/verify/:token">{({ token }) => <VerifyEmail token={token} />}</Route>
+          <Route>
+            <Login />
+          </Route>
+        </Switch>
       </>
     );
   }
@@ -85,6 +94,10 @@ function Gate() {
           <Route path="/books">
             <Books />
           </Route>
+          <Route path="/account">
+            <Account />
+          </Route>
+          <Route path="/verify/:token">{({ token }) => <VerifyEmail token={token} />}</Route>
           <Route path="/books/:book">{() => <Home key={book!.id} book={book!} />}</Route>
           <Route path="/books/:book/accounts/new">
             {() => <AddAccount key={book!.id} book={book!} />}

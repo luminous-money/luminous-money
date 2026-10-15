@@ -17,7 +17,13 @@ import {
   type TransactionIn,
 } from "@fava-beans/ledger-client";
 
-export const ledger = createLedgerClient({ baseUrl: window.location.origin });
+import { apiFetch } from "./session.js";
+
+// Every call refreshes the session on a 401 (see session.ts).
+export const ledger = createLedgerClient({
+  baseUrl: window.location.origin,
+  fetch: (request) => apiFetch(request),
+});
 
 export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"], "updated_at">;
 export type AccountKind = components["schemas"]["AccountIn"]["kind"];

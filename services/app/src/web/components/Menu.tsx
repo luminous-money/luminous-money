@@ -5,7 +5,7 @@ import { usePopover } from "../lib/popover.js";
 import { useBooks, useLogOut, useMe } from "../lib/queries.js";
 
 /** The hamburger menu: the selected book's Home, Review, Schedules, Rules and Commodities;
- * Manage books; and logging out. */
+ * Manage books; your account; and logging out. */
 export function Menu() {
   const { open, setOpen, ref } = usePopover();
   const me = useMe();
@@ -39,6 +39,7 @@ export function Menu() {
           {home && item(`${home}/rules`, "Rules")}
           {home && item(`${home}/commodities`, "Commodities")}
           {item("/books", "Manage books")}
+          {item("/account", "Your account")}
           <button type="button" className="menu-item" onClick={() => logOut.mutate()}>
             Log out
           </button>

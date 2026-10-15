@@ -12,6 +12,7 @@ import type { ProposalSummary } from "../../shared/imports.js";
 import type { Book } from "@fava-beans/ledger-client";
 
 import { ApiError } from "./ledger.js";
+import { apiFetch } from "./session.js";
 
 export type {
   Schedule,
@@ -69,12 +70,12 @@ const base = (book: string) => `/api/app/v1/books/${encodeURIComponent(book)}`;
 
 export const appApi = {
   /** The user's books, oldest first, with their time zones. */
-  books: async (): Promise<BookInfo[]> => json(await fetch("/api/app/v1/books")),
+  books: async (): Promise<BookInfo[]> => json(await apiFetch("/api/app/v1/books")),
 
   /** A new book in `time_zone`; with `text` (Beancount, e.g. an export), a copy of it. */
   createBook: async (body: { name: string; time_zone: string; text?: string }): Promise<BookInfo> =>
     json(
-      await fetch("/api/app/v1/books", {
+      await apiFetch("/api/app/v1/books", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
@@ -83,7 +84,7 @@ export const appApi = {
 
   /** Delete the book and everything in it, against the version read. */
   deleteBook: async (book: string, updatedAt: string): Promise<void> => {
-    const response = await fetch(`${base(book)}?updated_at=${encodeURIComponent(updatedAt)}`, {
+    const response = await apiFetch(`${base(book)}?updated_at=${encodeURIComponent(updatedAt)}`, {
       method: "DELETE",
     });
     if (!response.ok) await json(response);
@@ -91,7 +92,7 @@ export const appApi = {
 
   /** The account's CSV profiles (its bank's file formats), oldest first. */
   profiles: async (book: string, account: string): Promise<CsvProfile[]> =>
-    json(await fetch(`${base(book)}/profiles/${encodeURIComponent(account)}`)),
+    json(await apiFetch(`${base(book)}/profiles/${encodeURIComponent(account)}`)),
 
   /** Save a profile: in place of the account's others (`replace`), or alongside them (`add`). */
   saveProfile: async (
@@ -101,7 +102,7 @@ export const appApi = {
     mode: "replace" | "add"
   ): Promise<CsvProfile[]> =>
     json(
-      await fetch(`${base(book)}/profiles/${encodeURIComponent(account)}`, {
+      await apiFetch(`${base(book)}/profiles/${encodeURIComponent(account)}`, {
         method: mode === "replace" ? "PUT" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(mode === "replace" ? [profile] : profile),
@@ -112,28 +113,28 @@ export const appApi = {
     const form = new FormData();
     form.set("account", account);
     form.set("file", file);
-    return json(await fetch(`${base(book)}/imports`, { method: "POST", body: form }));
+    return json(await apiFetch(`${base(book)}/imports`, { method: "POST", body: form }));
   },
 
   /** The caller's starred accounts in the book, in the order they were starred. */
-  stars: async (book: string): Promise<string[]> => json(await fetch(`${base(book)}/stars`)),
+  stars: async (book: string): Promise<string[]> => json(await apiFetch(`${base(book)}/stars`)),
 
   setStar: async (book: string, account: string, starred: boolean): Promise<string[]> =>
     json(
-      await fetch(`${base(book)}/stars/${encodeURIComponent(account)}`, {
+      await apiFetch(`${base(book)}/stars/${encodeURIComponent(account)}`, {
         method: starred ? "PUT" : "DELETE",
       })
     ),
 
   /** Import rows whose match is up for review. */
   matches: async (book: string): Promise<ProposedMatch[]> =>
-    json(await fetch(`${base(book)}/matches`)),
+    json(await apiFetch(`${base(book)}/matches`)),
 
   /** Set a row's transaction: a candidate (swapping if another row holds it), or null for a
    * new one. */
   assign: async (book: string, row: ProposedMatch, transaction: string | null) =>
     json<ProposedMatch[]>(
-      await fetch(`${base(book)}/imports/${row.batch_id}/rows/${row.line}/assign`, {
+      await apiFetch(`${base(book)}/imports/${row.batch_id}/rows/${row.line}/assign`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ transaction }),
@@ -142,20 +143,20 @@ export const appApi = {
 
   confirmMatch: async (book: string, row: ProposedMatch) =>
     json<ProposedMatch[]>(
-      await fetch(`${base(book)}/imports/${row.batch_id}/rows/${row.line}/confirm`, {
+      await apiFetch(`${base(book)}/imports/${row.batch_id}/rows/${row.line}/confirm`, {
         method: "POST",
       })
     ),
 
   schedules: async (book: string): Promise<Schedule[]> =>
-    json(await fetch(`${base(book)}/schedules`)),
+    json(await apiFetch(`${base(book)}/schedules`)),
 
   schedule: async (book: string, id: string): Promise<Schedule> =>
-    json(await fetch(`${base(book)}/schedules/${id}`)),
+    json(await apiFetch(`${base(book)}/schedules/${id}`)),
 
   createSchedule: async (book: string, schedule: ScheduleIn): Promise<Schedule> =>
     json(
-      await fetch(`${base(book)}/schedules`, {
+      await apiFetch(`${base(book)}/schedules`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(schedule),
@@ -164,7 +165,7 @@ export const appApi = {
 
   editSchedule: async (book: string, id: string, patch: SchedulePatch): Promise<Schedule> =>
     json(
-      await fetch(`${base(book)}/schedules/${id}`, {
+      await apiFetch(`${base(book)}/schedules/${id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(patch),
@@ -172,7 +173,7 @@ export const appApi = {
     ),
 
   async deleteSchedule(book: string, schedule: Schedule): Promise<void> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${base(book)}/schedules/${schedule.id}?updated_at=${encodeURIComponent(schedule.updated_at)}`,
       { method: "DELETE" }
     );
@@ -180,20 +181,20 @@ export const appApi = {
   },
 
   upcoming: async (book: string, days = UPCOMING_DAYS): Promise<UpcomingOccurrence[]> =>
-    json(await fetch(`${base(book)}/schedules/upcoming?days=${days}`)),
+    json(await apiFetch(`${base(book)}/schedules/upcoming?days=${days}`)),
 
   /** Transaction ID to schedule ID, for every transaction a schedule staged. */
   scheduled: async (book: string): Promise<Record<string, string>> =>
-    json(await fetch(`${base(book)}/schedules/occurrences`)),
+    json(await apiFetch(`${base(book)}/schedules/occurrences`)),
 
   /** The book's time zone (IANA), or null if it was never set. */
   timeZone: async (book: string): Promise<string | null> =>
-    (await json<{ time_zone: string | null }>(await fetch(`${base(book)}/settings`))).time_zone,
+    (await json<{ time_zone: string | null }>(await apiFetch(`${base(book)}/settings`))).time_zone,
 
   setTimeZone: async (book: string, timeZone: string): Promise<string> =>
     (
       await json<{ time_zone: string }>(
-        await fetch(`${base(book)}/settings`, {
+        await apiFetch(`${base(book)}/settings`, {
           method: "PUT",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ time_zone: timeZone }),
@@ -201,10 +202,11 @@ export const appApi = {
       )
     ).time_zone,
 
-  rules: async (book: string): Promise<CategoryRule[]> => json(await fetch(`${base(book)}/rules`)),
+  rules: async (book: string): Promise<CategoryRule[]> =>
+    json(await apiFetch(`${base(book)}/rules`)),
 
   rule: async (book: string, id: string): Promise<CategoryRule> =>
-    json(await fetch(`${base(book)}/rules/${id}`)),
+    json(await apiFetch(`${base(book)}/rules/${id}`)),
 
   /** Create or change a rule; the answer says how many pending transactions it covers. */
   saveRule: async (
@@ -213,7 +215,7 @@ export const appApi = {
     id?: string
   ): Promise<CategoryRule & { covers: number }> =>
     json(
-      await fetch(`${base(book)}/rules${id ? `/${id}` : ""}`, {
+      await apiFetch(`${base(book)}/rules${id ? `/${id}` : ""}`, {
         method: id ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(rule),
@@ -221,7 +223,7 @@ export const appApi = {
     ),
 
   async deleteRule(book: string, rule: CategoryRule): Promise<void> {
-    const response = await fetch(
+    const response = await apiFetch(
       `${base(book)}/rules/${rule.id}?updated_at=${encodeURIComponent(rule.updated_at)}`,
       { method: "DELETE" }
     );
@@ -229,21 +231,21 @@ export const appApi = {
   },
 
   applyRule: async (book: string, id: string): Promise<{ applied: number }> =>
-    json(await fetch(`${base(book)}/rules/${id}/apply`, { method: "POST" })),
+    json(await apiFetch(`${base(book)}/rules/${id}/apply`, { method: "POST" })),
 
   /** Transaction ID to what categorization proposed, for transactions still waiting. */
   proposals: async (book: string): Promise<Record<string, ProposalSummary>> =>
-    json(await fetch(`${base(book)}/proposals`)),
+    json(await apiFetch(`${base(book)}/proposals`)),
 
   /** Record whether a confirmed transaction kept its proposal (no proposal: nothing to do). */
   settle: async (book: string, transaction: string): Promise<void> => {
-    await fetch(`${base(book)}/proposals/${transaction}/settle`, { method: "POST" });
+    await apiFetch(`${base(book)}/proposals/${transaction}/settle`, { method: "POST" });
   },
 
   /** Suggest categories for pending transactions (from `account`, if given). */
   suggest: async (book: string, account?: string): Promise<{ suggested: number }> =>
     json(
-      await fetch(
+      await apiFetch(
         `${base(book)}/suggest${account ? `?account=${encodeURIComponent(account)}` : ""}`,
         { method: "POST" }
       )
@@ -252,21 +254,21 @@ export const appApi = {
   categorizers: async (
     book: string
   ): Promise<{ name: string; settled: number; accepted: number }[]> =>
-    json(await fetch(`${base(book)}/categorizers`)),
+    json(await apiFetch(`${base(book)}/categorizers`)),
 
   /** The last morning price run (or "fetch now"): when, and what it fetched or couldn't. */
   lastPriceFetch: async (book: string): Promise<PriceFetch | null> =>
-    json(await fetch(`${base(book)}/prices/fetch`)),
+    json(await apiFetch(`${base(book)}/prices/fetch`)),
 
   fetchPricesNow: async (book: string): Promise<PriceFetch> =>
-    json(await fetch(`${base(book)}/prices/fetch`, { method: "POST" })),
+    json(await apiFetch(`${base(book)}/prices/fetch`, { method: "POST" })),
 
   lastImports: async (book: string): Promise<Record<string, string>> =>
-    json(await fetch(`${base(book)}/imports/latest`)),
+    json(await apiFetch(`${base(book)}/imports/latest`)),
 
   batches: async (book: string, account?: string): Promise<ImportBatch[]> =>
     json(
-      await fetch(
+      await apiFetch(
         `${base(book)}/imports${account ? `?account=${encodeURIComponent(account)}` : ""}`
       )
     ),

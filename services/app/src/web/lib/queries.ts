@@ -42,7 +42,17 @@ import {
 } from "./appApi.js";
 import type { CategoryRulePatch } from "../../shared/rules.js";
 import { api, ApiError, type TransactionChanges } from "./ledger.js";
-import { logIn, logOut, me, type User } from "./session.js";
+import {
+  account,
+  authConfig,
+  keepFresh,
+  LOGGED_OUT,
+  logIn,
+  logOut,
+  me,
+  signUp,
+  type User,
+} from "./session.js";
 
 /** A 401 from anywhere means the session is over: forget the user, and the app shows login. */
 const onError = (error: unknown) => {
@@ -101,6 +111,14 @@ export function useLogIn() {
   });
 }
 
+export function useSignUp() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: signUp,
+    onSuccess: (user: User) => switchSession(client, user),
+  });
+}
+
 export function useLogOut() {
   const client = useQueryClient();
   return useMutation({
@@ -109,11 +127,69 @@ export function useLogOut() {
   });
 }
 
+/** Follow the session: when it ends (and can't be refreshed), show Log in; while it lasts,
+ * refresh it ahead of expiry. */
+export function useSessionLifecycle(loggedIn: boolean) {
+  const client = useQueryClient();
+  useEffect(() => {
+    const ended = () => {
+      if (client.getQueryData(keys.me)) switchSession(client, null);
+    };
+    window.addEventListener(LOGGED_OUT, ended);
+    return () => window.removeEventListener(LOGGED_OUT, ended);
+  }, [client]);
+  useEffect(() => (loggedIn ? keepFresh() : undefined), [loggedIn]);
+}
+
+export function useAuthConfig() {
+  return useQuery({ queryKey: ["auth-config"], queryFn: authConfig, staleTime: Infinity });
+}
+
+/** Account edits that change who's logged in (name, email) update the session's user. */
+export function useUpdateAccount() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: account.update,
+    onSuccess: (user: User) => client.setQueryData(keys.me, user),
+    onError: (error) => {
+      if (error instanceof ApiError && error.conflict)
+        void client.invalidateQueries({ queryKey: keys.me });
+    },
+  });
+}
+
+export function useSessions() {
+  return useQuery({ queryKey: ["account", "sessions"], queryFn: account.sessions });
+}
+
+export function useApiTokens() {
+  return useQuery({ queryKey: ["account", "tokens"], queryFn: account.tokens });
+}
+
+/** An account change, refreshing what it touched. */
+export function useAccountChange<A, R>(fn: (args: A) => Promise<R>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => client.invalidateQueries({ queryKey: ["account"] }),
+  });
+}
+
+/** Delete the account: everything goes, and nobody's logged in. */
+export function useDeleteAccount() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: account.delete,
+    onSuccess: () => switchSession(client, null),
+  });
+}
+
 // Books
 
 /** The user's books, oldest first, with their time zones. */
 export function useBooks() {
-  return useQuery({ queryKey: keys.books, queryFn: appApi.books });
+  const me = useMe();
+  return useQuery({ queryKey: keys.books, queryFn: appApi.books, enabled: !!me.data });
 }
 
 /** The browser's time zone: a new book's, to start with. */

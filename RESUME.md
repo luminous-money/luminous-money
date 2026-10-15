@@ -1,18 +1,21 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-14._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-15._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
 
-**M1 through M6 are built.** M2 (credit cards, really "any account, and matching"), M3
-(scheduled transactions), M4 (categorization), M5 (investments) and M6 (multiple books) are
-described in their plans. M7 (cross-book transactions) was dropped: books are independent. The
-milestones ahead (M8–M14, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+**M1 through M8 are built** (M7, cross-book transactions, was dropped: books are independent).
+M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
+(categorization), M5 (investments), M6 (multiple books) and M8 (auth) are described in their
+plans. The milestones ahead (M9–M14, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
-- **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M8.
+- **Accounts (M8):** anyone creates one (name, email, a 15+ character password not known from
+  breaches) and logs in on any number of devices; "Forgot password?" emails a reset link when
+  the server has mail. **Your account:** name and email (confirmed by emailed link), password,
+  devices (log any out, or everywhere else), API tokens for scripts, and deleting it all.
 - **Set up:** name a book, then add an account by its full name (autofill, Tab to complete),
   optionally with its balance on a date from a statement.
 - **Home** shows the user's **starred** accounts as cards: balance (a card's shown as what's
@@ -69,8 +72,10 @@ What a user can do now:
   Prices are fetched each morning (beanprice). Accounts can open with holdings.
 
 How it's put together:
-- **`services/auth`** (TypeScript): the stub user, JWT sessions in an HttpOnly cookie, and
-  `/verify` for Traefik's forwardAuth, which guards every other API and sets `X-User-Id`.
+- **`services/auth`** (TypeScript): users and identities (passwords now, OIDC later), Argon2id,
+  10-minute Ed25519 access tokens with rotating refresh tokens (HttpOnly cookies in the browser),
+  API tokens, email links, the operator's CLI (`dist/cli.js`), and `/verify` for Traefik's
+  forwardAuth, which guards every other API and sets `X-User-Id`.
 - **`services/ledger`** (Python): the system of record.
   - Books are owned by users and named by their `option "title"`.
   - Accounts with optional opening balances and holdings; summaries (balances, `as_of`,
@@ -90,16 +95,20 @@ How it's put together:
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 133 tests, including the table lint
-    - auth: 9; app: 117; db: 10; csv-import: 22
+    - auth: 20; app: 117; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 54 API tests and 62 browser tests
-- **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, with the demo
-  seeded for the stub user: the "Demo" book (checking, card and ETrade brokerage starred) and
-  "Demo Household" (joint checking starred).
+  - `pnpm e2e`: 60 API tests and 67 browser tests (with Mailpit as the mail server)
+- **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
+  mail. Kael's account claimed the old stub user, so it owns the "Demo"
+  book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps
 
-1. Answer the questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions) (auth), then say `build M8`. After M8 comes M9 (SimpleFIN): syncing real bank accounts.
+1. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions)
+   (email verification required or not, session lifetime, passkeys/2FA timing, which OIDC
+   providers first).
+2. Set up a live stack for real data ([docs/operating.md](docs/operating.md)).
+3. Say `elaborate plan for M9` (SimpleFIN): syncing real bank accounts.
 
 ## Gotchas
 
@@ -112,12 +121,18 @@ How it's put together:
 
 - **`pnpm up` is pnpm's own `update` command,** not the `up` script: it bumps dependencies. Use
   `pnpm run up` (foreground), or `docker buildx bake && docker compose up -d`.
-- **The JWT secret:** Compose ships a development default for `AUTH_JWT_SECRET`, and auth warns
-  about it. Set a real one before the stack leaves your machine.
+- **Auth keeps its signing keys in `auth.sqlite`;** `AUTH_JWT_SECRET` is gone (auth warns if
+  it's still set). Wiping the volume logs everyone out, as well as deleting them.
+- **`FAVA_BEANS_PUBLIC_URL` must be the address users reach,** when set: `auth` refuses writes
+  from any other origin (so a LAN IP and a hostname can't both be used).
+- **The host's Node may be older than the images' (24).** `auth`'s unit tests need Node 24
+  (built-in Argon2id); `pnpm test` runs them in Docker, or run
+  `docker run --rm -v "$PWD":"$PWD" -w "$PWD/services/auth" node:24-slim npx vitest run`.
 - **`pnpm e2e:local` needs `AUTH_TEST_USERS=true`** on the running stack, so each test can log in
   a user of its own: `AUTH_TEST_USERS=true docker compose up -d`. (`pnpm e2e` sets it for its
   throwaway stack.) It also leaves test users and books behind; to clean up, run
-  `docker compose down -v && docker compose up -d && pnpm seed`.
+  `docker compose down -v && docker compose up -d`, sign up again, and `pnpm seed` with a new
+  API token.
 - **`pnpm seed` skips a book that already exists,** because the demo gets new IDs on every run
   and importing twice would duplicate everything. Pass another book ID for a fresh one.
 - **Databases from before a service's migrations are refused** with a message to recreate them
@@ -131,7 +146,7 @@ How it's put together:
 - **`openapi-typescript` treats fields with defaults as required,** so the generated request
   types ask for `flag` and `narration` even though the API defaults them.
 - **TypeScript is pinned to 5.x.** `openapi-typescript` needs the TypeScript 5 compiler API.
-- **`node:sqlite` is experimental in Node 22;** its warning is silenced in the service images.
+- **`node:sqlite` is still experimental in Node 24;** its warning is silenced in the service images.
 - **pnpm 11 checks the lockfile against a supply-chain policy, which needs registry access.**
   That's why `node.Dockerfile` installs with `--prefer-offline`, not `--offline`.
 - **Swarm hasn't been exercised for real.** `docker stack config -c compose.yaml` accepts the

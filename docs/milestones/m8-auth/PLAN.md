@@ -1,9 +1,12 @@
 M8: Auth: plan
 ==================================================================================================
 
-> **Status: planned, building.** The [answers](#answers-2026-10-14) replaced the first draft's
-> owner and admin accounts. Calls marked **Proposed** are open; the [questions](#questions)
-> list the ones that matter most.
+> **Status: built (2026-10-15),** with unit, API and browser tests. The
+> [answers](#answers-2026-10-14) replaced the first draft's owner and admin accounts. One change
+> while building: `/verify` checks each token's session in the database (one indexed read)
+> rather than an in-memory list of ended sessions, so sessions ended by the CLI (a separate
+> process) stop at once too. Wrong passwords when confirming a change are 403s, since the PWA
+> reads a 401 as a lost session. The [questions](#questions) are still open.
 
 ## Answers (2026-10-14)
 
@@ -103,11 +106,8 @@ permissions on your books are M12.
     and last used.
   - **Ending sessions:** logging out ends yours; you can end any other, or "log out everywhere
     else". Changing your password ends the others; a reset ends all of them.
-- **Revocation is immediate, despite stateless access tokens.**
-  - `/verify` (in `auth`) checks the token's `sid` against an in-memory list of sessions ended in
-    the last 10 minutes.
-  - That list is loaded from the database at start.
-  - So logging out stops the token at once, with no database read per request.
+- **Revocation is immediate.** `/verify` (in `auth`) checks the token's session in the
+  database (one indexed read), so logging out stops the token at once.
 - **In the browser, tokens never touch JavaScript** (the OAuth browser-apps BCP's
   backend-for-frontend shape, with Traefik and `auth` as the backend):
   - The access token is an HttpOnly, SameSite=Strict cookie, path `/`. Its name has the `__Host-`

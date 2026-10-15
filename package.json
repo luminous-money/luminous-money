@@ -4,7 +4,7 @@
   "private": true,
   "description": "Self-hostable, database-driven double-entry accounting with Beancount as the engine.",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "packageManager": "pnpm@11.24.0",
   "scripts": {

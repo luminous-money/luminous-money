@@ -1,8 +1,10 @@
 #!/bin/sh
 # Seed a demo book into a running stack: realistic history from bean-example, with recent
-# purchases staged for review (services/ledger/src/ledger/demo.py), owned by the stub user. The
-# default also seeds a small second book, "Demo Household" (`--household`), to switch to.
+# purchases staged for review (services/ledger/src/ledger/demo.py). The default also seeds a
+# small second book, "Demo Household" (`--household`), to switch to. The books go to whoever
+# FAVA_BEANS_TOKEN belongs to: make an API token on the "Your account" page.
 #
+#   FAVA_BEANS_TOKEN=fb_... pnpm seed
 #   pnpm seed                         books "demo" and "demo-household" on http://localhost:8080
 #   pnpm seed other --years 5         another book; extra options go to `python -m ledger.demo`
 #   FAVA_BEANS_URL=http://pi:8080 pnpm seed
@@ -14,8 +16,11 @@ book="${1:-demo}"
 url="${FAVA_BEANS_URL:-http://localhost:8080}"
 image="${FAVA_BEANS_REGISTRY:-fava-beans}/ledger:${FAVA_BEANS_VERSION:-dev}"
 
-token=$(curl -fsS -X POST "$url/api/auth/v1/login" | sed -E 's/.*"token":"([^"]+)".*/\1/')
-auth="authorization: Bearer $token"
+if [ -z "${FAVA_BEANS_TOKEN:-}" ]; then
+  echo "set FAVA_BEANS_TOKEN to an API token (Your account → API tokens) for the account to seed" >&2
+  exit 1
+fi
+auth="authorization: Bearer $FAVA_BEANS_TOKEN"
 
 tz="${FAVA_BEANS_TZ:-$(cat /etc/timezone 2>/dev/null || echo UTC)}"
 
@@ -36,7 +41,7 @@ seed() {
   done
   curl -fsS -X PUT -H "$auth" -H "content-type: application/json" \
     --data "{\"time_zone\": \"$tz\"}" "$url/api/app/v1/books/$id/settings" >/dev/null
-  echo "Seeded '$id' for the stub user (log in with the Log in button)."
+  echo "Seeded '$id'."
 }
 
 # The demo's checking account, card and brokerage (demo.STARRED, and the ETrade brokerage).

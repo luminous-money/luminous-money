@@ -22,17 +22,27 @@ async function withAccount() {
 describe("sessions", () => {
   before(stackIsUp);
 
-  it("log in with an HttpOnly cookie, and log out", async () => {
+  it("log in with HttpOnly cookies, and log out", async () => {
     const user = await newUser();
-    const cookie = user.response.headers.get("set-cookie") ?? "";
-
-    assert.match(cookie, /fava_beans_session=.*HttpOnly.*SameSite=Strict/i);
-    const me = await fetch(`${BASE_URL}/api/auth/v1/me`, {
-      headers: { cookie: cookie.split(";")[0]! },
+    const response = await fetch(`${BASE_URL}/api/auth/v1/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: user.email }),
     });
+    const [access, refresh] = response.headers.getSetCookie();
+
+    assert.match(access ?? "", /^fb_access=.*HttpOnly.*SameSite=Strict/i);
+    assert.match(refresh ?? "", /^fb_refresh=.*Path=\/api\/auth\/v1\/token.*HttpOnly/i);
+    const cookie = [access, refresh].map((c) => c!.split(";")[0]).join("; ");
+    const me = await fetch(`${BASE_URL}/api/auth/v1/me`, { headers: { cookie } });
     assert.equal(((await me.json()) as { id: string }).id, user.id);
-    const out = await fetch(`${BASE_URL}/api/auth/v1/logout`, { method: "POST" });
-    assert.match(out.headers.get("set-cookie") ?? "", /Max-Age=0/);
+    const out = await fetch(`${BASE_URL}/api/auth/v1/token/revoke`, {
+      method: "POST",
+      headers: { cookie },
+    });
+    assert.match(out.headers.getSetCookie().join(), /Max-Age=0/);
+    const after = await fetch(`${BASE_URL}/api/ledger/v1/books`, { headers: { cookie } });
+    assert.equal(after.status, 401);
   });
 });
 

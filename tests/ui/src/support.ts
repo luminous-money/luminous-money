@@ -23,8 +23,12 @@ let current: Session;
 /** Log `page` in as a brand-new user, and act as them from here on. */
 export async function logIn(page: Page): Promise<Session> {
   const email = `ui-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}@test.local`;
-  const response = await page.request.post("/api/auth/v1/login", { data: { email } });
-  const { token } = (await response.json()) as { token: string };
+  // The page's session (cookies), and one for the helpers (tokens in the body, as a script).
+  await page.request.post("/api/auth/v1/login", { data: { email } });
+  const response = await page.request.post("/api/auth/v1/login", {
+    data: { email, delivery: "body" },
+  });
+  const { access_token: token } = (await response.json()) as { access_token: string };
   const ledger = createLedgerClient({
     baseUrl: BASE_URL,
     headers: { authorization: `Bearer ${token}` },

@@ -10,17 +10,15 @@ import { createLedgerClient, type TransactionIn } from "@fava-beans/ledger-clien
 export const BASE_URL = process.env.FAVA_BEANS_URL ?? "http://localhost:8080";
 
 /**
- * A session for the suite: logged in once, lazily, as the stub user. Every ledger call carries
- * it as a Bearer token; `authed` does the same for plain fetches.
+ * A session for the suite: logged in once, lazily, as a shared test user (the e2e stack runs
+ * auth with AUTH_TEST_USERS). Every ledger call carries its access token as a Bearer token;
+ * `authed` does the same for plain fetches. Access tokens last ten minutes, longer than a run.
  */
 let session: Promise<string> | undefined;
 
 export function token(): Promise<string> {
-  session ??= fetch(`${BASE_URL}/api/auth/v1/login`, { method: "POST" })
-    .then(async (response) => {
-      assert.equal(response.status, 200);
-      return ((await response.json()) as { token: string }).token;
-    })
+  session ??= logIn("e2e@test.local")
+    .then(({ access_token }) => access_token)
     .catch((error: unknown) => {
       session = undefined;
       throw error;
@@ -135,19 +133,29 @@ export async function newBook(prefix: string): Promise<string> {
 }
 
 /** A user of the suite's own (the e2e stack runs auth with AUTH_TEST_USERS). */
-export async function newUser() {
-  const email = `e2e-${randomBytes(4).toString("hex")}@test.local`;
+/** Log in a test user (made if new) with the tokens in the body, as a script would. */
+export async function logIn(email: string) {
   const response = await fetch(`${BASE_URL}/api/auth/v1/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, delivery: "body" }),
   });
-  const { token, user } = (await response.json()) as { token: string; user: { id: string } };
+  assert.equal(response.status, 200);
+  return (await response.json()) as {
+    access_token: string;
+    refresh_token: string;
+    user: { id: string; email: string };
+  };
+}
+
+export async function newUser() {
+  const email = `e2e-${randomBytes(4).toString("hex")}@test.local`;
+  const { access_token: token, user } = await logIn(email);
   const headers = { authorization: `Bearer ${token}` };
   return {
     id: user.id,
+    email,
     token,
-    response,
     ledger: createLedgerClient({ baseUrl: BASE_URL, headers }),
     app: (path: string, init: RequestInit = {}) =>
       fetch(`${BASE_URL}/api/app/v1${path}`, {
@@ -155,4 +163,21 @@ export async function newUser() {
         headers: { ...headers, ...(init.headers as Record<string, string>) },
       }),
   };
+}
+
+/** Mailpit, the e2e stack's mail server: the link in the newest email to `to`. */
+export async function linkMailedTo(to: string, kind: "reset" | "verify"): Promise<string> {
+  const mailpit = process.env.MAILPIT_URL ?? "http://mailpit:8025";
+  return eventually(async () => {
+    const search = await fetch(
+      `${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`
+    );
+    const { messages } = (await search.json()) as { messages: { ID: string }[] };
+    if (!messages.length) throw new Error(`no email to ${to} yet`);
+    const message = await fetch(`${mailpit}/api/v1/message/${messages[0]!.ID}`);
+    const { Text } = (await message.json()) as { Text: string };
+    const token = new RegExp(`/ui/${kind}/([\\w-]+)`).exec(Text)?.[1];
+    if (!token) throw new Error(`no ${kind} link in the newest email to ${to}`);
+    return token;
+  });
 }

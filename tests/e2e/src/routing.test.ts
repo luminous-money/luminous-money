@@ -23,7 +23,7 @@ describe("routing through Traefik", () => {
         assert.equal((await fetch(`${BASE_URL}${path}`)).status, 401, path);
       }
       assert.equal((await fetch(`${BASE_URL}/api/auth/v1/me`)).status, 401);
-      assert.equal((await fetch(`${BASE_URL}/api/auth/v1/login`, { method: "POST" })).status, 200);
+      assert.equal((await fetch(`${BASE_URL}/api/auth/v1/config`)).status, 200);
     });
 
     it("ignores a user ID a client tries to send itself", async () => {

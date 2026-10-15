@@ -2,7 +2,7 @@
 # The TypeScript workspace. TypeScript services build FROM the `workspace` stage, passed to them
 # as a named context by docker-bake.hcl.
 
-FROM node:22-slim AS workspace
+FROM node:24-slim AS workspace
 RUN corepack enable
 WORKDIR /repo
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./

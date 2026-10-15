@@ -5,18 +5,28 @@ services:
   traefik:
     ports: !reset []
 
-  # Each test logs in a user of its own, so tests never share books.
+  # Each test logs in a user of its own, so tests never share books. Mail goes to Mailpit, whose
+  # API the suites read links from; breached-password checks stay off the network.
   auth:
     environment:
       AUTH_TEST_USERS: "true"
+      AUTH_BREACHED_PASSWORDS: "false"
+      AUTH_SIGNUPS_PER_HOUR: "100000"
+      SMTP_URL: smtp://mailpit:1025
+      MAIL_FROM: fava-beans <books@fava-beans.test>
+      FAVA_BEANS_PUBLIC_URL: http://traefik
+    depends_on: [mailpit]
+
+  mailpit:
+    image: axllent/mailpit:v1.27
 
   e2e:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/e2e:${FAVA_BEANS_VERSION:-dev}
     profiles: [tests]
-    depends_on: [traefik, auth, ledger, app]
+    depends_on: [traefik, auth, ledger, app, mailpit]
 
   ui:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/ui-tests:${FAVA_BEANS_VERSION:-dev}
     profiles: [tests]
-    depends_on: [traefik, auth, ledger, app]
+    depends_on: [traefik, auth, ledger, app, mailpit]
     ipc: host # Chromium needs more shared memory than Docker's default
