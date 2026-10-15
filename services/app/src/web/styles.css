@@ -160,6 +160,13 @@ body {
 
 .book .actions {
   margin-top: 0;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+}
+
+.book .actions > * {
+  flex: 1 1 auto;
+  text-align: center;
 }
 
 button.danger {
@@ -773,6 +780,7 @@ button:focus-visible,
 button.switcher-button {
   display: flex;
   align-items: center;
+  gap: 0.35rem;
   max-width: min(13rem, 45vw);
   min-height: 2.5rem;
   padding: 0.4rem 0.8rem;

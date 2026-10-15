@@ -18,7 +18,7 @@ export function BookSwitcher({ books, book }: { books: BookInfo[]; book: BookInf
         onClick={() => setOpen((o) => !o)}
       >
         <span className="switcher-name">{book?.name ?? "Books"}</span>
-        <span aria-hidden> ▾</span>
+        <span aria-hidden>▾</span>
       </button>
       {open && (
         <nav className="menu-panel" aria-label="Books">
