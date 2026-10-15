@@ -403,7 +403,12 @@ class Book(Api):
 
 
 class BookIn(Strict):
-    name: str = Field(min_length=1)
+    name: str = Field(min_length=1, description="Unique among the caller's books, ignoring case.")
+    text: str | None = Field(
+        None,
+        description="Beancount text to start the book with, such as an export: copied in with new"
+        " directive IDs, its title replaced by `name`. Text that doesn't parse creates nothing (422).",
+    )
 
 
 class BookPatch(Strict):
@@ -430,3 +435,7 @@ class Backup(Api):
     since: int
     cursor: int
     chunks: dict[str, str] = Field(description="Book ID to a Beancount chunk.")
+    deleted_books: list[str] = Field(
+        default_factory=list,
+        description="Books deleted since the cursor. Their chunks hold every directive's tombstone.",
+    )

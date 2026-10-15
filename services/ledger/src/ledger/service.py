@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import datetime
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from . import engine, investments, models
@@ -34,6 +34,7 @@ class Backup:
     since: int
     cursor: int
     chunks: dict[str, str]  # book id -> Beancount text (header, changed directives, tombstones)
+    deleted_books: list[str] = field(default_factory=list)  # deleted since the cursor
 
 
 class Ledger:
@@ -50,7 +51,7 @@ class Ledger:
 
     def book(self, book_id: str) -> models.Book:
         row = self.store.book(book_id)
-        if row is None:
+        if row is None or row["deleted"]:
             raise NotFound(book_id)
         header = [line for line in row["header"].split("\n") if line]
         return models.Book(
@@ -62,7 +63,15 @@ class Ledger:
 
     def owns(self, book_id: str, user_id: str) -> bool:
         row = self.store.book(book_id)
-        return row is not None and row["owner_id"] == user_id
+        return row is not None and not row["deleted"] and row["owner_id"] == user_id
+
+    def _check_name(self, name: str, owner_id: str | None, book_id: str | None = None) -> None:
+        """Book names are unique per owner, ignoring case: the switcher shows names alone."""
+        if owner_id is None:
+            return
+        for other in self.store.books(owner_id):
+            if other != book_id and (engine.book_title(self.store.header(other) or []) or "").casefold() == name.casefold():
+                raise ValueError(f"you already have a book named {name!r}")
 
     def create_book(
         self,
@@ -71,16 +80,26 @@ class Ledger:
         *,
         name: str | None = None,
         owner_id: str | None = None,
+        text: str | None = None,
     ) -> models.Book:
-        """Create a book. Its ID is generated unless given; its name becomes its title."""
+        """Create a book. Its ID is generated unless given; its name becomes its title.
+
+        With `text` (Beancount, such as an export), the book starts with its contents, as a copy:
+        every directive gets a new ID, and the text's own title gives way to `name`. Text that
+        doesn't parse creates nothing."""
         book_id = book_id or engine.new_id()
-        header = header or DEFAULT_HEADER
+        parsed = engine.parse_text(text, fresh_ids=True) if text is not None else None
+        header = header or (parsed and parsed.header) or DEFAULT_HEADER
         if name is not None:
             header = engine.with_title(header, name)
         with self.store.transaction():
             if self.store.book(book_id) is not None:
                 raise ValueError(f"book {book_id} already exists")
+            if name is not None:
+                self._check_name(name, owner_id)
             self.store.put_book(book_id, header, owner_id)
+            if parsed is not None:
+                self.store.put(book_id, parsed.directives)
         return self.book(book_id)
 
     def rename_book(self, book_id: str, name: str, *, expected: str | None = None) -> models.Book:
@@ -89,8 +108,21 @@ class Ledger:
         with self.store.transaction():
             if expected is not None:
                 self.store.check_book_version(book_id, expected)
+            self._check_name(name, self.store.book(book_id)["owner_id"], book_id)
             self.store.put_book(book_id, header)
         return self.book(book_id)
+
+    def delete_book(self, book_id: str, *, expected: str | None = None) -> None:
+        """Delete a book and everything in it. Its directives become tombstones, so the next
+        incremental backup carries the deletion."""
+        with self.store.transaction():
+            if self.store.book(book_id) is None or self.store.book(book_id)["deleted"]:
+                raise NotFound(book_id)
+            if expected is not None:
+                self.store.check_book_version(book_id, expected)
+            self.store.delete_book(book_id)
+        with self._load_lock:
+            self._loaded.pop(book_id, None)
 
     def _header(self, book_id: str) -> list[str]:
         header = self.store.header(book_id)
@@ -135,7 +167,8 @@ class Ledger:
         with self.store.transaction():
             cursor = self.store.cursor()
             chunks = {}
-            for book_id in self.store.books() if books is None else books:
+            books = self.store.books(deleted=True) if books is None else books
+            for book_id in books:
                 if not self.store.book_changed_since(book_id, since):
                     continue
                 today = datetime.date.today()
@@ -144,7 +177,8 @@ class Ledger:
                     for r in self.store.changed_since(book_id, since)
                 ]
                 chunks[book_id] = engine.render(self._header(book_id), texts)
-        return Backup(since=since, cursor=cursor, chunks=chunks)
+            deleted = self.store.books_deleted_since(since, books)
+        return Backup(since=since, cursor=cursor, chunks=chunks, deleted_books=deleted)
 
     # Directives
 

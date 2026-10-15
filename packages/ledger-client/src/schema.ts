@@ -54,7 +54,11 @@ export interface paths {
     /** Create Book */
     put: operations["create_book_api_ledger_v1_books__book_id__put"];
     post?: never;
-    delete?: never;
+    /**
+     * Delete Book
+     * @description Delete the book and everything in it. Backups carry the deletion as tombstones.
+     */
+    delete: operations["delete_book_api_ledger_v1_books__book_id__delete"];
     options?: never;
     head?: never;
     /** Rename Book */
@@ -729,6 +733,11 @@ export interface components {
       };
       /** Cursor */
       cursor: number;
+      /**
+       * Deleted Books
+       * @description Books deleted since the cursor. Their chunks hold every directive's tombstone.
+       */
+      deleted_books?: string[];
       /** Since */
       since: number;
     };
@@ -748,8 +757,16 @@ export interface components {
     };
     /** BookIn */
     BookIn: {
-      /** Name */
+      /**
+       * Name
+       * @description Unique among the caller's books, ignoring case.
+       */
       name: string;
+      /**
+       * Text
+       * @description Beancount text to start the book with, such as an export: copied in with new directive IDs, its title replaced by `name`. Text that doesn't parse creates nothing (422).
+       */
+      text?: string | null;
     };
     /** BookPatch */
     BookPatch: {
@@ -1581,6 +1598,45 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["Book"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_book_api_ledger_v1_books__book_id__delete: {
+    parameters: {
+      query: {
+        /** @description The `updated_at` this edit was based on. */
+        updated_at: string;
+      };
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {

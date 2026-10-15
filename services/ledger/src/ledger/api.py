@@ -104,7 +104,7 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     @api.post("/books", status_code=201)
     def create_named_book(book: models.BookIn, user: User) -> models.Book:
-        return ledger.create_book(name=book.name, owner_id=user)
+        return ledger.create_book(name=book.name, owner_id=user, text=book.text)
 
     @api.put("/books/{book_id}", status_code=201)
     def create_book(book_id: str, user: User) -> models.Book:
@@ -118,10 +118,15 @@ def create_app(ledger: Ledger) -> FastAPI:
     def rename_book(book_id: OwnedBook, patch: models.BookPatch) -> models.Book:
         return ledger.rename_book(book_id, patch.name, expected=patch.updated_at)
 
+    @api.delete("/books/{book_id}", status_code=204, responses={409: {"description": "Stale version"}})
+    def delete_book(book_id: OwnedBook, updated_at: VersionParam) -> None:
+        """Delete the book and everything in it. Backups carry the deletion as tombstones."""
+        ledger.delete_book(book_id, expected=updated_at)
+
     @api.post("/books/{book_id}/import")
     def import_text(book_id: str, text: BeancountText, user: User) -> models.Applied:
         """Apply Beancount text. Creates the book, owned by the caller, if it doesn't exist."""
-        if ledger.store.book(book_id) is not None and not ledger.owns(book_id, user):
+        if ledger.store.book(book_id) is not None and not ledger.owns(book_id, user):  # or deleted
             raise NotFound(book_id)
         applied = ledger.apply_text(book_id, text, owner_id=user)
         return models.Applied(put=applied.put, deleted=applied.deleted)
@@ -314,8 +319,8 @@ def create_app(ledger: Ledger) -> FastAPI:
     @api.get("/backup")
     def backup(user: User, since: int = 0) -> models.Backup:
         """The caller's books, changed since `since`."""
-        b = ledger.backup(since, books=ledger.store.books(user))
-        return models.Backup(since=b.since, cursor=b.cursor, chunks=b.chunks)
+        b = ledger.backup(since, books=ledger.store.books(user, deleted=True))
+        return models.Backup(since=b.since, cursor=b.cursor, chunks=b.chunks, deleted_books=b.deleted_books)
 
     app.include_router(api)
     return app

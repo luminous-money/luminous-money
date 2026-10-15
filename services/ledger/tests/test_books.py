@@ -95,3 +95,68 @@ def test_backups_carry_only_the_callers_books(ledger):
 
     assert len(chunks) == 1
     assert '"Mine"' in next(iter(chunks.values()))
+
+
+def test_book_names_are_unique_per_user_ignoring_case(ledger):
+    me = http(ledger)
+    first = me.post("/api/ledger/v1/books", json={"name": "Household"}).json()
+    other = me.post("/api/ledger/v1/books", json={"name": "Personal"}).json()
+
+    assert me.post("/api/ledger/v1/books", json={"name": "household"}).status_code == 409
+    assert me.patch(f"/api/ledger/v1/books/{other['id']}", json={"name": "HOUSEHOLD", "updated_at": other["updated_at"]}).status_code == 409
+    assert me.patch(f"/api/ledger/v1/books/{first['id']}", json={"name": "household", "updated_at": first["updated_at"]}).status_code == 200
+    assert http(ledger, OTHER).post("/api/ledger/v1/books", json={"name": "Household"}).status_code == 201
+
+
+def _features_text() -> str:
+    with open(FEATURES) as f:
+        return f.read().replace('include "features-prices.beancount"\n', "")
+
+
+def test_a_book_created_from_an_export_is_a_copy_under_the_new_name(ledger):
+    me = http(ledger)
+    me.post("/api/ledger/v1/books/original/import", content=_features_text(), headers={"content-type": "text/plain"})
+    exported = me.get("/api/ledger/v1/books/original/export").text
+
+    created = me.post("/api/ledger/v1/books", json={"name": "Restored", "text": exported})
+
+    copy = created.json()["id"]
+    assert created.status_code == 201
+    assert created.json()["name"] == "Restored"
+    original_ids = {r.id for r in ledger.store.live("original")}
+    copy_ids = {r.id for r in ledger.store.live(copy)}
+    assert len(copy_ids) == len(original_ids) and not copy_ids & original_ids
+    assert ledger.problems(copy) == ledger.problems("original")
+    assert [b["name"] for b in me.get("/api/ledger/v1/books").json()] == ["Feature fixture", "Restored"]
+
+
+def test_text_that_does_not_parse_creates_no_book(ledger):
+    me = http(ledger)
+
+    created = me.post("/api/ledger/v1/books", json={"name": "Broken", "text": "2024-01-01 open\n"})
+
+    assert created.status_code == 422
+    assert me.get("/api/ledger/v1/books").json() == []
+
+
+def test_deleting_a_book_is_versioned_and_leaves_nothing_behind_but_tombstones(ledger):
+    me = http(ledger)
+    me.post("/api/ledger/v1/books/doomed/import", content=_features_text(), headers={"content-type": "text/plain"})
+    book = me.get("/api/ledger/v1/books/doomed").json()
+    full = me.get("/api/ledger/v1/backup").json()
+    directives = len(ledger.store.live("doomed"))
+
+    assert me.delete("/api/ledger/v1/books/doomed", params={"updated_at": "stale"}).status_code == 409
+    assert http(ledger, OTHER).delete("/api/ledger/v1/books/doomed", params={"updated_at": book["updated_at"]}).status_code == 404
+    assert me.delete("/api/ledger/v1/books/doomed", params={"updated_at": book["updated_at"]}).status_code == 204
+
+    assert me.get("/api/ledger/v1/books").json() == []
+    assert me.get("/api/ledger/v1/books/doomed").status_code == 404
+    assert me.get("/api/ledger/v1/books/doomed/accounts").status_code == 404
+    assert me.post("/api/ledger/v1/books/doomed/import", content="; hi\n", headers={"content-type": "text/plain"}).status_code == 404
+    assert ledger.store.live("doomed") == []
+    assert ledger.store._conn.execute("SELECT count(*) FROM posting p JOIN directive d ON d.id = p.directive_id WHERE d.book_id = 'doomed'").fetchone()[0] == 0
+    increment = me.get("/api/ledger/v1/backup", params={"since": full["cursor"]}).json()
+    assert increment["deleted_books"] == ["doomed"]
+    assert increment["chunks"]["doomed"].count('custom "fava-beans" "deleted"') == directives
+    assert me.post("/api/ledger/v1/books", json={"name": "Feature fixture"}).status_code == 201

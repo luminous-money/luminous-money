@@ -523,6 +523,14 @@
             "title": "Cursor",
             "type": "integer"
           },
+          "deleted_books": {
+            "description": "Books deleted since the cursor. Their chunks hold every directive's tombstone.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Deleted Books",
+            "type": "array"
+          },
           "since": {
             "title": "Since",
             "type": "integer"
@@ -569,9 +577,22 @@
         "additionalProperties": false,
         "properties": {
           "name": {
+            "description": "Unique among the caller's books, ignoring case.",
             "minLength": 1,
             "title": "Name",
             "type": "string"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Beancount text to start the book with, such as an export: copied in with new directive IDs, its title replaced by `name`. Text that doesn't parse creates nothing (422).",
+            "title": "Text"
           }
         },
         "required": [
@@ -2498,6 +2519,51 @@
       }
     },
     "/api/ledger/v1/books/{book_id}": {
+      "delete": {
+        "description": "Delete the book and everything in it. Backups carry the deletion as tombstones.",
+        "operationId": "delete_book_api_ledger_v1_books__book_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `updated_at` this edit was based on.",
+            "in": "query",
+            "name": "updated_at",
+            "required": true,
+            "schema": {
+              "description": "The `updated_at` this edit was based on.",
+              "title": "Updated At",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Book"
+      },
       "get": {
         "operationId": "get_book_api_ledger_v1_books__book_id__get",
         "parameters": [

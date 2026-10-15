@@ -156,6 +156,9 @@ MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
     # 5: posting amounts again (M5): an elided amount is now filled in when the others are lots
     # at a known cost or priced (a buy's cash side), as booking would weigh them.
     [_backfill_derived_columns],
+    # 6: deleting books (M6). A deleted book keeps its row (and its directives' tombstones), so
+    # incremental backups can carry the deletion; nothing else sees it.
+    ["ALTER TABLE book ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"],
 ]
 
 

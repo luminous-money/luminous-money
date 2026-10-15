@@ -111,11 +111,13 @@ def new_id() -> str:
     return uuid.uuid4().hex
 
 
-def parse_text(text: str) -> Parsed:
+def parse_text(text: str, *, fresh_ids: bool = False) -> Parsed:
+    """Parse Beancount text. With `fresh_ids`, every directive gets a new ID (and tombstones are
+    dropped): a copy, not the same directives again."""
     entries, errors, options = parser.parse_string(text)
     if options["include"]:
         errors = [*errors, "include is only supported when importing files; inline the included text"]
-    return _parsed([(text, entries, errors)])
+    return _parsed([(text, entries, errors)], fresh_ids=fresh_ids)
 
 
 def parse_file(path: str) -> Parsed:
@@ -141,7 +143,7 @@ def _parse_recursive(path: str, seen: set[str]) -> list[tuple[str, list, list]]:
     return results
 
 
-def _parsed(sources: list[tuple[str, list, list]]) -> Parsed:
+def _parsed(sources: list[tuple[str, list, list]], *, fresh_ids: bool = False) -> Parsed:
     messages = [e if isinstance(e, str) else _message(e) for _, _, errs in sources for e in errs]
     if messages:
         raise ParseFailure(messages)
@@ -154,9 +156,10 @@ def _parsed(sources: list[tuple[str, list, list]]) -> Parsed:
     directives, tombstones = [], []
     for entry in positioned:
         if _is_tombstone(entry):
-            tombstones.append(entry.values[1].value)
+            if not fresh_ids:
+                tombstones.append(entry.values[1].value)
         else:
-            directives.append(to_directive(entry))
+            directives.append(to_directive(entry, new_id() if fresh_ids else None))
     return Parsed(header=_dedupe(header), directives=directives, tombstones=tombstones)
 
 

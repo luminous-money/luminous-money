@@ -87,16 +87,40 @@ class Store:
 
     # Books
 
-    def books(self, owner_id: str | None = None) -> list[str]:
-        """Every book's ID, or just those `owner_id` owns."""
+    def books(self, owner_id: str | None = None, *, deleted: bool = False) -> list[str]:
+        """Every book's ID, or just those `owner_id` owns; deleted ones too with `deleted`."""
+        live = "" if deleted else " AND deleted = 0"
         if owner_id is None:
-            return [r["id"] for r in self._conn.execute("SELECT id FROM book ORDER BY id")]
-        rows = self._conn.execute("SELECT id FROM book WHERE owner_id = ? ORDER BY created_at, id", (owner_id,))
+            return [r["id"] for r in self._conn.execute(f"SELECT id FROM book WHERE 1{live} ORDER BY id")]
+        rows = self._conn.execute(
+            f"SELECT id FROM book WHERE owner_id = ?{live} ORDER BY created_at, id", (owner_id,)
+        )
         return [r["id"] for r in rows]
 
     def book(self, book_id: str) -> sqlite3.Row | None:
-        """The book's row: id, header, owner_id, created_at, updated_at."""
+        """The book's row: id, header, owner_id, deleted, created_at, updated_at. Deleted books
+        have one too: check `deleted`."""
         return self._conn.execute("SELECT * FROM book WHERE id = ?", (book_id,)).fetchone()
+
+    def delete_book(self, book_id: str) -> None:
+        """Tombstone every directive in the book, then mark the book deleted."""
+        live = [r["id"] for r in self._conn.execute(
+            "SELECT id FROM directive WHERE book_id = ? AND deleted = 0", (book_id,)
+        )]
+        self.delete(book_id, live)
+        seq = self._change(book_id, None, "delete-book")
+        row = self.book(book_id)
+        self._conn.execute(
+            "UPDATE book SET deleted = 1, seq = ?, updated_at = ? WHERE id = ?",
+            (seq, after(row["updated_at"]), book_id),
+        )
+
+    def books_deleted_since(self, seq: int, books: list[str]) -> list[str]:
+        """Of `books`, those deleted after cursor `seq`."""
+        rows = self._conn.execute(
+            "SELECT DISTINCT book_id FROM change WHERE op = 'delete-book' AND seq > ?", (seq,)
+        )
+        return sorted({r["book_id"] for r in rows} & set(books))
 
     def header(self, book_id: str) -> list[str] | None:
         row = self._conn.execute("SELECT header FROM book WHERE id = ?", (book_id,)).fetchone()
