@@ -78,12 +78,10 @@ milestone starts.
       Built 2026-10-14 ([plan](milestones/m5-investment-accounts/PLAN.md)): holdings with cost
       basis and gains (account-scoped booking), values and staleness everywhere, prices fetched
       each morning (beanprice), trades with tax-aligned booking and split gains, revalued assets.
-- [ ] **M6: Multiple books per account.**
-  - managing multiple books per account, and their visibility (e.g. see only my accounts, only
-    our shared accounts, or both together)
-  - each account clearly belongs to exactly one book
-- [ ] **M7: Cross-book transactions.** A single transaction that straddles more than one book,
-      such as a salary that flows into a personal and a shared bank account.
+- [ ] **M6: Multiple books.** A book switcher and a books manager (create, delete). The selected
+      book is the context for everything, like switching profiles; nothing spans books.
+- ~~**M7: Cross-book transactions.**~~ Dropped (2026-10-14): books are independent, and each
+  records its own side of an event that touches two (design.md, "Books are independent").
 - [ ] **M8: Reports.** From basic to more complex.
 - [ ] **M9: Budgets.**
 - [ ] **M10: Auth.** Account creation, log in, log out, book ownership and permissions.
@@ -135,11 +133,6 @@ elaborated.
   - the resolver chain: `matcher`, then `rules`, with `external` as a configurable slot (Cati,
     eventually)
 - **Prices** (M5): `bean-price` on a schedule, and manual price entries for illiquid assets.
-- **Cross-book transactions** (M7):
-  - account pairs, mirroring, and pair-balance assertions
-  - a group editor that edits every leg at once and saves only when all of them balance
-  - multi-book schedule templates (salary)
-  - matching imports to scheduled legs
 - **Reports** (M8):
   - **Check what already exists before building anything.**
   - **If we build our own:** two independent libraries, `@luminous-money/ledger-graphs-api` (a

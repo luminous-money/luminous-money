@@ -28,13 +28,12 @@ We rejected it:
 We also considered keeping Beancount `.beancount` files as the system of record, and rejected
 that too. It meant building database features on top of text files: stable IDs, splitting files by
 month, a parse cache, a separate index, enforcing a single writer, and cursors on file changes.
-Saving one cross-book edit to several files also couldn't be atomic.
 
 So:
 
 - **A database is the system of record.** Every Beancount directive (transactions, opens and
   closes, prices, balance assertions, commodities) is a row, with an ID, timestamps, author,
-  status and cross-book group as ordinary columns.
+  status as ordinary columns.
 - **Beancount is the accounting engine.** Booking (lots, cost basis, capital gains), multiple
   currencies and commodities, validation (balancing, balance assertions), plugins and BQL all run
   in Beancount over entries loaded from the database. Rebuilding that would turn months of work
@@ -237,8 +236,8 @@ separate repos and connect over HTTP.)
 ### Many books, one ledger database
 
 - A book is a first-class record, and every ledger API is scoped to a book.
-- **All books live in one ledger database.** That lets a cross-book group commit as a single
-  database transaction.
+- **All books live in one ledger database,** which keeps one change log and one backup cursor
+  for everything.
 - **Only `ledger` writes to the ledger database.** Every other service goes through its API.
 
 ### SQLite by default, one database per owning service
@@ -247,7 +246,7 @@ SQLite ships by default, on the data volume. Each database has exactly one ownin
 
 | Database | Owner | Holds |
 |---|---|---|
-| ledger | `ledger` | Books, directives, entry status, cross-book groups and account-pair config, the change log and backup cursors. |
+| ledger | `ledger` | Books, directives, entry status, the change log and backup cursors. |
 | app | `app` | CSV profiles and import history (batches, rows, outcomes, candidates). Later: scheduled-transaction templates, categorizer config. |
 | auth | `auth` | Users (and, from M10, credentials). |
 
@@ -338,7 +337,7 @@ to be told to leave it alone.
 | Route | Goes to | Notes |
 |---|---|---|
 | `/api/auth/v1` | `auth` | Login, logout, who's logged in, and the verify endpoint. The only API without the session check. |
-| `/api/ledger/v1` | `ledger` | Books API: entries, staging, cross-book groups, BQL, import/export, backup. |
+| `/api/ledger/v1` | `ledger` | Books API: entries, staging, BQL, import/export, backup. |
 | `/api/app/v1` | `app` | Review queue, the resolver pipeline, schedules, import sources. |
 | `/ui` | `app` | The review PWA. Unknown paths under `/ui` get the app shell, for client-side routing. |
 | `/` | (redirect) | Redirects to `/ui/`. |
@@ -467,58 +466,33 @@ shape):
   within ±5 days, ranked by closeness in date. It identifies and ranks; nothing acts on matches
   yet.
 
-### Cross-book transactions
+### Books are independent
 
-Some financial events belong in more than one book. Examples:
+A book is a self-contained set of accounts and transactions, and **the selected book is the
+context for everything** in the app, like switching profiles. Nothing spans books: no combined
+views, and no transactions across them.
 
-- An expense paid from the shared book with Jess is an accounts receivable there and a matching
-  accounts payable in Kael's personal book.
-- Kael's salary lands partly in the personal book and partly in the shared book.
-
-Both are the same concept: **a cross-book group is a set of legs, one per book.** Each leg is an
-ordinary transaction that balances within its own book. All the legs share a group ID, which
-exports as a Beancount link (`^xbook-<id>`).
-
-**Account pairs** are declared in the ledger, e.g. `shared:Assets:Receivable:Kael` ↔
-`kael:Liabilities:Payable:Shared`. Each pair's balances must stay equal and opposite, and drift is
-flagged as a ledger error.
-
-There are three ways to create a group:
-
-- **Mirroring:** when a confirmed transaction touches one side of a pair, the system stages the
-  opposite leg in the other book, as `!`.
-- **Schedules:** a recurring template whose legs straddle several books (see below). Its legs are
-  staged as `!`.
-- **Manual entry:** composing a group directly in the app.
-
-**A group is always edited as a whole.**
-
-- Opening any leg opens the group.
-- It can only be saved when every leg balances within its book and every paired account mirrors
-  its counterpart.
-- The save is one atomic write.
-- Because the user is reconciling every side at once, a manual edit doesn't re-stage anything.
-
-Staging only applies to legs the system creates. (Once per-book permissions exist, editing a group
-that touches a book you can't write to will need a rule. That's deferred.)
+**Cross-book transactions were dropped (2026-10-14).** The design used to have "cross-book
+groups": one event (a salary split between a personal and a shared account, an expense paid from
+the shared book on someone's behalf) recorded as legs in several books, kept in step by account
+pairs and mirroring. Instead, each book records its own side of such an event, as an ordinary
+transaction, from its own accounts' data: money leaving personal checking for joint checking is a
+transfer out in one book and a deposit in the other.
 
 ### Scheduled transactions
 
 The scheduler is a participant like the importers: when a template comes due, it stages `!`
 entries.
 
-- **A template can have legs in several books,** which makes it a scheduled cross-book group.
-- **Salary is the motivating case.** One template, monthly, with legs like these:
-  - personal book: gross pay, taxes and deductions, the net deposit to personal checking, and
-    the transfer to shared
-  - shared book: the matching contribution arriving in joint checking
+- **Salary is the motivating case:** one template, monthly, with gross pay, taxes and deductions,
+  and the net deposit.
 - **Amounts can vary from one occurrence to the next,** so each split of a template can carry
   a **match tolerance** (an amount either way, default 0). An import within it matches, and
   confirming the match takes the bank's amount; the blank split absorbs the difference.
 - **When the real deposit arrives through the bank feed, it gets matched, not duplicated.** See
   the resolver pipeline below.
 
-As built in M3 (single-book; legs across books are M7):
+As built in M3:
 
 - **Schedules live in `app`:** a rule plus a transaction template (no date or flag), owned by a
   user, versioned like every edit.
@@ -638,7 +612,6 @@ The design separates four things:
 - **Shared state:** the ledger database.
 - **Participants:** anything that proposes entries.
   - importers: SimpleFIN, CSV upload, manual entry
-  - the cross-book mirror
   - the scheduler
 
   Adding a source means adding a participant, not changing the pipeline.
@@ -675,7 +648,7 @@ The design separates four things:
 |---|---|---|
 | `traefik` | upstream | The only exposed port. Routes by path prefix; forwardAuth to `auth`. |
 | `auth` | TypeScript | Login, logout, who's logged in, and the verify endpoint for forwardAuth. Owns users (a stub until M10). |
-| `ledger` | Python | System of record for all books. Runs the Beancount engine (booking, validation, BQL). Owns cross-book groups and their invariants, Beancount import/export, the change log and backup chunks. |
+| `ledger` | Python | System of record for all books. Runs the Beancount engine (booking, validation, BQL). Owns Beancount import/export, the change log and backup chunks. |
 | `app` | TypeScript | Serves the PWA (React + Vite + `vite-plugin-pwa`) and its API (Hono): CSV profiles and imports. Hosts the participants, the context builder and the resolver chain, and owns import history (later schedules too). Modules get split into their own services only when there's a reason. |
 
 ## The review app
@@ -685,10 +658,9 @@ The main custom build: a mobile-first PWA. Features, in priority order:
 1. **Process staged entries:** confirm a match or proposal with one tap, or change it.
 2. **Bulk categorization:** select many entries and assign them at once.
 3. **CSV import:** upload a bank export from the phone.
-4. **Scheduled transactions:** define templates, including multi-book ones, and see what's due.
+4. **Scheduled transactions:** define templates and see what's due.
 
-It also needs a book switcher, and an editor for cross-book groups that shows every leg and won't
-save until they all balance.
+It also needs a book switcher (M6).
 
 ### How the review queue works
 
