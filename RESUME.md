@@ -12,7 +12,7 @@ described in their plans. M7 (cross-book transactions) was dropped: books are in
 milestones ahead (M8–M14, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
-- **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M10.
+- **Arrive and log in.** "Log in" logs in the stub user; "Create account" is disabled until M8.
 - **Set up:** name a book, then add an account by its full name (autofill, Tab to complete),
   optionally with its balance on a date from a statement.
 - **Home** shows the user's **starred** accounts as cards: balance (a card's shown as what's
@@ -99,7 +99,7 @@ How it's put together:
 
 ## Next steps
 
-1. Say `elaborate plan for M8` (reports).
+1. Answer the questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions) (auth), then say `build M8`. After M8 comes M9 (SimpleFIN): syncing real bank accounts.
 
 ## Gotchas
 

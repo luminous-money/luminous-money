@@ -212,7 +212,7 @@ The seed also stars the demo's ETrade node, so its holdings and values show on t
   reporting.
 - **Loans and amortization** (a mortgage's principal and interest split): its payments can be a
   schedule (M3); amortization is later.
-- **Net worth and performance reports** (time-weighted returns, allocation): M8, which can
+- **Net worth and performance reports** (time-weighted returns, allocation): M11, which can
   build on prices and holdings.
 - **Editing lots in the transaction editor:** Polish.
 

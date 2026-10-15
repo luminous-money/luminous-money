@@ -1,6 +1,6 @@
 /**
  * The user store. For M1 there's exactly one user, the stub, created on startup; logging in
- * always yields that user. M10 adds real accounts and credentials without moving anything.
+ * always yields that user. M8 adds real accounts and credentials without moving anything.
  */
 import { createHash } from "node:crypto";
 

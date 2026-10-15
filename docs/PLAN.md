@@ -84,10 +84,10 @@ milestone starts.
       export), deleting them (with backups carrying it), unique names, a second demo book.
 - ~~**M7: Cross-book transactions.**~~ Dropped (2026-10-14): books are independent, and each
   records its own side of an event that touches two (design.md, "Books are independent").
-- [ ] **M8: Reports.** From basic to more complex.
-- [ ] **M9: Budgets.**
-- [ ] **M10: Auth.** Account creation, log in, log out, book ownership and permissions.
-- [ ] **M11: SimpleFIN.** Bank feeds.
+- [ ] **M8: Auth.** Account creation, log in, log out, book ownership and permissions.
+- [ ] **M9: SimpleFIN.** Bank feeds.
+- [ ] **M10: Budgets.**
+- [ ] **M11: Reports.** From basic to more complex.
 - [ ] **M12: Sharing books with other users.** Any user can be added to a book with read, write
       or manage permissions. Every book has an owner.
 - [ ] **M13: Reconciliation.**
@@ -135,7 +135,7 @@ elaborated.
   - the resolver chain: `matcher`, then `rules`, with `external` as a configurable slot (Cati,
     eventually)
 - **Prices** (M5): `bean-price` on a schedule, and manual price entries for illiquid assets.
-- **Reports** (M8):
+- **Reports** (M11):
   - **Check what already exists before building anything.**
   - **If we build our own:** two independent libraries, `@luminous-money/ledger-graphs-api` (a
     plugin for a ledger's API that returns data sets) and `@luminous-money/ledger-graphs-ui` (a
@@ -144,7 +144,7 @@ elaborated.
     concept.
   - **At least:** expense and income pie charts with selectable account depth, number of slices,
     date bounds, and optional averaging per period.
-- **Budgeting** (M9):
+- **Budgeting** (M10):
   - a target budget on any account, for any period
   - no descendant may have a higher base budget than its ancestor (base amounts, before
     rollover)

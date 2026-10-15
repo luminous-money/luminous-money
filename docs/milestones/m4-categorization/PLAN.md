@@ -66,7 +66,7 @@ the category, and makes doing it by hand faster when it can't:
 5. **The external slot:** the HTTP contract for an outside categorizer (an LLM such as Cati,
    later), configured per installation. **Proposed:** the contract and a test stub only.
 
-The pipeline stays source-agnostic, so SimpleFIN (M11) and anything else that stages
+The pipeline stays source-agnostic, so SimpleFIN (M9) and anything else that stages
 transactions goes through the same chain.
 
 ## Decisions this plan makes
