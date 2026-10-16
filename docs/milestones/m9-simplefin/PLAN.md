@@ -1,10 +1,9 @@
 M9: SimpleFIN: plan
 ==================================================================================================
 
-> **Status: plan, revised with [the answers](#answers-2026-10-15),** and waiting on the
-> [remaining questions](#questions). Calls marked **Proposed** are open. Real connections can
-> run on the dev stack: its data is disposable, and a wipe only means pasting the connection back
-> in.
+> **Status: building,** with [the answers](#answers-2026-10-15) (the questions below are
+> answered too). Real connections can run on the dev stack: its data is disposable, and a wipe
+> only means pasting the connection back in.
 
 ## Answers (2026-10-15)
 
@@ -21,6 +20,14 @@ M9: SimpleFIN: plan
 7. **The balance an account shows is the books'.** A synced account adds a smaller line under
    it with the bank's: "Reported today 6:00 am: $13,234.56".
 8. **Brokerages link too, anchored on Fidelity** (see [Brokerages](#brokerages)).
+
+And to the questions below:
+
+1. **Start over** may delete transfers' other sides: it's the user's choice, and not the default.
+2. **"Not at the bank"** transactions stay pending.
+3. **Brokerage lots:** one estimated lot per symbol is fine.
+4. **The ledger's configuration** stays as it is (its two variables); only the TypeScript
+   services move to `@wymp/config-simple`.
 
 ## What M9 is
 
@@ -225,11 +232,7 @@ to it.
 - **`SIMPLEFIN_ENCRYPTION_KEY` is `REQUIRED` in production and development,** so the dev stack
   needs one of its own in Compose's own `.env` (gitignored):
   `SIMPLEFIN_ENCRYPTION_KEY=$(openssl rand -base64 32)`.
-- **Proposed: the ledger (Python) gets the same shape** in a small `config.py`:
-  - every setting in one place, required ones failing at boot
-  - `.env/<APP_ENV>` and `.env/local` loaded with `python-dotenv`
-
-  `@wymp/config-simple` is TypeScript-only ([question 4](#questions)).
+- **The ledger (Python) keeps its two environment variables** as they are (answer 4).
 
 ### Test infrastructure
 
@@ -264,10 +267,8 @@ to it.
 
 ## How it gets built
 
-1. **Configuration:**
-   - `@wymp/config-simple` in `auth` and `app` (`src/config.ts`, `.env/` files, `APP_ENV` in
-     Compose)
-   - the ledger's `config.py`
+1. **Configuration:** `@wymp/config-simple` in `auth` and `app` (`src/config.ts`, `.env/` files,
+   `APP_ENV` in Compose).
 2. **Look at Fidelity:** a throwaway local script dumps the shape of a real Fidelity account
    (redacted, never committed). The brokerage section is adjusted to it.
 3. **Storage:**

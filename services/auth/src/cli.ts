@@ -15,10 +15,11 @@ import { text } from "node:stream/consumers";
 
 import { DAY } from "./secrets.js";
 import { hashPassword, passwordProblem } from "./passwords.js";
-import { fromEnvironment } from "./services.js";
+import { config } from "./config.js";
+import { fromConfig } from "./services.js";
 
 const [command, ...args] = process.argv.slice(2);
-const services = fromEnvironment();
+const services = fromConfig(config);
 const { users, sessions, links, keys } = services;
 
 function userFor(email: string | undefined) {

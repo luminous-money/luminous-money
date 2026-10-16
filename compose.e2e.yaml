@@ -5,17 +5,20 @@ services:
   traefik:
     ports: !reset []
 
-  # Each test logs in a user of its own, so tests never share books. Mail goes to Mailpit, whose
-  # API the suites read links from; breached-password checks stay off the network.
+  # APP_ENV=test: each service's .env/test (test users, mail to Mailpit, the fake SimpleFIN
+  # server, no outside calls). Each test logs in a user of its own, so tests never share books.
   auth:
     environment:
-      AUTH_TEST_USERS: "true"
-      AUTH_BREACHED_PASSWORDS: "false"
-      AUTH_SIGNUPS_PER_HOUR: "100000"
-      SMTP_URL: smtp://mailpit:1025
-      MAIL_FROM: fava-beans <books@fava-beans.test>
-      FAVA_BEANS_PUBLIC_URL: http://traefik
+      - APP_ENV=test
     depends_on: [mailpit]
+
+  app:
+    environment:
+      - APP_ENV=test
+    depends_on: [simplefin-fake]
+
+  simplefin-fake:
+    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/simplefin-fake:${FAVA_BEANS_VERSION:-dev}
 
   mailpit:
     image: axllent/mailpit:v1.27
@@ -23,10 +26,10 @@ services:
   e2e:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/e2e:${FAVA_BEANS_VERSION:-dev}
     profiles: [tests]
-    depends_on: [traefik, auth, ledger, app, mailpit]
+    depends_on: [traefik, auth, ledger, app, mailpit, simplefin-fake]
 
   ui:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/ui-tests:${FAVA_BEANS_VERSION:-dev}
     profiles: [tests]
-    depends_on: [traefik, auth, ledger, app, mailpit]
+    depends_on: [traefik, auth, ledger, app, mailpit, simplefin-fake]
     ipc: host # Chromium needs more shared memory than Docker's default

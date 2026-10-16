@@ -203,3 +203,38 @@ def test_changes_create_and_delete_in_one_write_or_not_at_all(book):
     assert client.post(
         f"{url}/changes", json={"delete": [{"id": old["id"], "updated_at": old["updated_at"]}]}
     ).status_code == 404
+
+
+def test_changes_update_too_against_the_version_read_all_or_nothing(book):
+    client = http(book)
+    url = "/api/ledger/v1/books/book/transactions"
+    staged = client.post(url, json=COFFEE).json()
+    other = client.post(url, json={**COFFEE, "narration": "Second"}).json()
+
+    stale = client.post(
+        f"{url}/changes",
+        json={
+            "create": [COFFEE],
+            "update": [
+                {"id": staged["id"], "updated_at": staged["updated_at"], "flag": "*"},
+                {"id": other["id"], "updated_at": "2000-01-01T00:00:00.000000Z", "flag": "*"},
+            ],
+        },
+    )
+    assert stale.status_code == 409
+    assert client.get(f"{url}/{staged['id']}").json()["flag"] == "!"
+
+    done = client.post(
+        f"{url}/changes",
+        json={
+            "update": [
+                {"id": staged["id"], "updated_at": staged["updated_at"], "flag": "*"},
+                {"id": other["id"], "updated_at": other["updated_at"], "narration": "Renamed"},
+            ],
+        },
+    )
+    assert done.status_code == 200
+    assert done.json() == []
+    assert client.get(f"{url}/{staged['id']}").json()["flag"] == "*"
+    renamed = client.get(f"{url}/{other['id']}").json()
+    assert (renamed["narration"], renamed["flag"], renamed["payee"]) == ("Renamed", other["flag"], other["payee"])

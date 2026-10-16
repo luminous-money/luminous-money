@@ -10,6 +10,9 @@ export type DailyJob = {
   at: number;
   /** The time zones it runs in (undefined: the app's own). */
   zones(): (string | undefined)[];
+  /** More local times it wants to wake at, beyond `at` in its zones (e.g. one per bank
+   * connection, at its own minute). */
+  times?(): { at: number; zone: string | undefined }[];
   /** Do whatever is due; returns a line to log, if anything happened. */
   run(): Promise<string | void>;
 };
@@ -57,9 +60,10 @@ export function startDaily(jobs: DailyJob[]): () => void {
       }
     }
     const now = new Date();
-    const waits = jobs.flatMap((job) =>
-      [undefined, ...new Set(job.zones())].map((zone) => untilLocal(now, job.at, zone))
-    );
+    const waits = jobs.flatMap((job) => [
+      ...[undefined, ...new Set(job.zones())].map((zone) => untilLocal(now, job.at, zone)),
+      ...(job.times?.() ?? []).map((t) => untilLocal(now, t.at, t.zone)),
+    ]);
     timer = setTimeout(() => void tick(), Math.min(...waits));
   };
   void tick();

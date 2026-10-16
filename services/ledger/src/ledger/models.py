@@ -103,13 +103,6 @@ class Deletion(Strict):
     updated_at: Version
 
 
-class TransactionChanges(Strict):
-    """Transactions to create and delete, in one write: all of it, or none."""
-
-    create: list[TransactionIn] = Field(default_factory=list)
-    delete: list[Deletion] = Field(default_factory=list, description="Each with the version read.")
-
-
 class TransactionPatch(Strict):
     """Change only the fields given. `postings`, when given, replaces all of them."""
 
@@ -122,6 +115,20 @@ class TransactionPatch(Strict):
     links: list[str] | None = None
     meta: Meta | None = None
     postings: list[Posting] | None = Field(None, min_length=1)
+
+
+class TransactionEdit(TransactionPatch):
+    """A patch to one transaction, by ID, against the version read."""
+
+    id: str
+
+
+class TransactionChanges(Strict):
+    """Transactions to create, change and delete, in one write: all of it, or none."""
+
+    create: list[TransactionIn] = Field(default_factory=list)
+    update: list[TransactionEdit] = Field(default_factory=list, description="Each with the version read.")
+    delete: list[Deletion] = Field(default_factory=list, description="Each with the version read.")
 
 
 AccountType = Literal["asset", "liability", "equity", "income", "expense"]

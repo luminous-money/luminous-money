@@ -468,8 +468,8 @@ export interface paths {
     put?: never;
     /**
      * Apply Changes
-     * @description Create and delete transactions in one atomic write: all of it, or none. Returns the
-     *     created ones.
+     * @description Create, change (versioned patches) and delete transactions in one atomic write: all of
+     *     it, or none. Returns the created ones.
      */
     post: operations["apply_changes_api_ledger_v1_books__book_id__transactions_changes_post"];
     delete?: never;
@@ -1308,7 +1308,7 @@ export interface components {
     };
     /**
      * TransactionChanges
-     * @description Transactions to create and delete, in one write: all of it, or none.
+     * @description Transactions to create, change and delete, in one write: all of it, or none.
      */
     TransactionChanges: {
       /** Create */
@@ -1318,6 +1318,47 @@ export interface components {
        * @description Each with the version read.
        */
       delete?: components["schemas"]["Deletion"][];
+      /**
+       * Update
+       * @description Each with the version read.
+       */
+      update?: components["schemas"]["TransactionEdit"][];
+    };
+    /**
+     * TransactionEdit
+     * @description A patch to one transaction, by ID, against the version read.
+     */
+    TransactionEdit: {
+      /** Date */
+      date?: string | null;
+      /** Flag */
+      flag?: string | null;
+      /** Id */
+      id: string;
+      /** Links */
+      links?: string[] | null;
+      /** Meta */
+      meta?: {
+        [key: string]:
+          | string
+          | boolean
+          | components["schemas"]["MetaNumber"]
+          | components["schemas"]["MetaDate"]
+          | components["schemas"]["Amount"];
+      } | null;
+      /** Narration */
+      narration?: string | null;
+      /** Payee */
+      payee?: string | null;
+      /** Postings */
+      postings?: components["schemas"]["Posting"][] | null;
+      /** Tags */
+      tags?: string[] | null;
+      /**
+       * Updated At
+       * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       */
+      updated_at: string;
     };
     /** TransactionIn */
     TransactionIn: {

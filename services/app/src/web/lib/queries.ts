@@ -31,6 +31,8 @@ import { useEffect, useRef } from "react";
 import type { AccountCreation } from "../components/AccountPicker.js";
 import {
   appApi,
+  bankFeeds,
+  type LinkRequest,
   type BookInfo,
   type CsvProfile,
   type CategoryRule,
@@ -755,3 +757,39 @@ export function readSkipped(book: string): string[] {
 export function writeSkipped(book: string, ids: string[]) {
   sessionStorage.setItem(skippedKey(book), JSON.stringify(ids));
 }
+
+// Bank feeds
+
+const bankKeys = {
+  connections: ["bank-feeds"] as const,
+  status: (book: string) => ["book", book, "bank-status"] as const,
+};
+
+export function useBankConnections() {
+  return useQuery({ queryKey: bankKeys.connections, queryFn: bankFeeds.connections });
+}
+
+/** What each linked account's bank reports, by account. */
+export function useBankStatus(book: string) {
+  return useQuery({ queryKey: bankKeys.status(book), queryFn: () => bankFeeds.status(book) });
+}
+
+/** A bank-feed change: refresh the connections, and (it may have imported) the book. */
+function useBankChange<A, R>(fn: (args: A) => Promise<R>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: bankKeys.connections });
+      void client.invalidateQueries({ queryKey: ["book"] });
+    },
+  });
+}
+
+export const useConnectBank = () => useBankChange(bankFeeds.connect);
+export const useDisconnectBank = () => useBankChange(bankFeeds.disconnect);
+export const useSyncBank = () => useBankChange(bankFeeds.sync);
+export const useLinkBank = (book: string) =>
+  useBankChange((link: LinkRequest) => bankFeeds.link(book, link));
+export const useUnlinkBank = (book: string) =>
+  useBankChange((id: string) => bankFeeds.unlink(book, id));

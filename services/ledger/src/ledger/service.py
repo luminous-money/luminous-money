@@ -212,12 +212,15 @@ class Ledger:
 
     def patch_transaction(self, book_id: str, directive_id: str, patch: models.TransactionPatch) -> engine.Directive:
         """Change only the fields given, against the version given."""
+        return self.update_transaction(book_id, directive_id, self._patched(book_id, directive_id, patch), expected=patch.updated_at)
+
+    def _patched(self, book_id: str, directive_id: str, patch: models.TransactionPatch) -> models.TransactionIn:
+        """The transaction with `patch`'s fields applied (not written)."""
         current = self.transaction(book_id, directive_id)
-        changes = patch.model_dump(exclude_unset=True, exclude={"updated_at"})
-        merged = models.TransactionIn.model_validate(
+        changes = patch.model_dump(exclude_unset=True, exclude={"updated_at", "id"})
+        return models.TransactionIn.model_validate(
             {**current.model_dump(include=set(models.TransactionIn.model_fields)), **changes}
         )
-        return self.update_transaction(book_id, directive_id, merged, expected=patch.updated_at)
 
     def set_flag(self, book_id: str, directive_id: str, flag: str, *, expected: str | None = None) -> engine.Directive:
         """Confirm (`*`) or re-stage (`!`) a transaction."""
@@ -519,18 +522,23 @@ class Ledger:
         return directives
 
     def apply_changes(self, book_id: str, changes: models.TransactionChanges) -> list[engine.Directive]:
-        """Create and delete transactions in one atomic write: all of it, or none. A deletion
-        whose version has moved on refuses the whole write (StaleVersion)."""
+        """Create, change and delete transactions in one atomic write: all of it, or none. An
+        update or deletion whose version has moved on refuses the whole write (StaleVersion).
+        Returns the created transactions."""
         self._header(book_id)
         kinds = self._kinds(book_id)
         created = [self._postable(book_id, engine.transaction_directive(t), kinds) for t in changes.create]
         with self.store.transaction():
-            for d in changes.delete:
+            for d in [*changes.update, *changes.delete]:
                 row = self.store.get(book_id, d.id)
                 if row is None or row.deleted or row.kind != "transaction":
                     raise NotFound(d.id)
                 self.store.check_version(book_id, d.id, d.updated_at)
-            self._write(book_id, created)
+            updated = [
+                self._postable(book_id, engine.transaction_directive(self._patched(book_id, u.id, u), u.id), kinds)
+                for u in changes.update
+            ]
+            self._write(book_id, created + updated)
             self.store.delete(book_id, [d.id for d in changes.delete])
         return created
 

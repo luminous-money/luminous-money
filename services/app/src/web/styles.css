@@ -1469,3 +1469,27 @@ code.secret {
   background: var(--paper);
   border-radius: 0.4rem;
 }
+
+/* Bank feeds */
+
+.reported {
+  margin: 0.15rem 0 0;
+}
+
+.bank-errors {
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0;
+}
+
+.link-form {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.link-form .check {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}

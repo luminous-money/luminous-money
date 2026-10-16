@@ -9,7 +9,7 @@ RUN pnpm --filter "@fava-beans/app..." build \
 FROM node:24-slim AS runtime
 WORKDIR /srv
 COPY --from=build /out ./
-ENV NODE_ENV=production PORT=3000 APP_DATA_DIR=/data
+ENV NODE_ENV=production APP_ENV=production
 EXPOSE 3000
 RUN mkdir /data && chown node:node /data
 USER node

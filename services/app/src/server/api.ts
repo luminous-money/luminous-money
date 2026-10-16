@@ -27,6 +27,8 @@ import { ruleProblem } from "./categorize/rules.js";
 import { applyRule, coveredBy, settle, suggestPending } from "./categorize/service.js";
 import type { CategoryRuleIn, CategoryRulePatch } from "../shared/rules.js";
 import { LedgerError, type Book, type LedgerPort } from "./ledger.js";
+import { simplefinRoutes } from "./simplefin/routes.js";
+import type { SimplefinDeps } from "./simplefin/sync.js";
 
 type Env = { Variables: { user: string } };
 
@@ -40,15 +42,23 @@ function isTimeZone(zone: string): boolean {
   }
 }
 
+/** What bank feeds need beyond the rest (simplefin/). */
+export type SimplefinServices = Pick<
+  SimplefinDeps,
+  "store" | "sealer" | "policy" | "fetcher" | "clock"
+>;
+
 export function createApi({
   db,
   ledgerFor,
   categorizers = [],
+  simplefin,
 }: {
   db: AppDb;
   ledgerFor: (userId: string) => LedgerPort;
   /** The categorization chain, in order (see categorize/chain.ts). */
   categorizers?: Categorizer[];
+  simplefin?: SimplefinServices;
 }) {
   const api = new Hono<Env>().basePath("/api/app/v1");
 
@@ -62,10 +72,14 @@ export function createApi({
   };
   api.use("/books", caller);
   api.use("/books/*", caller);
+  api.use("/simplefin/*", caller);
+  api.use("/me", caller);
 
   /** 404 unless the caller owns the book. */
   const owned = async (user: string, book: string) =>
     (await ledgerFor(user).book(book)) !== undefined;
+
+  if (simplefin) simplefinRoutes(api, { ...simplefin, db, ledgerFor, categorizers }, owned);
 
   const isProfile = (p: unknown): p is CsvProfile => {
     const profile = p as CsvProfile | undefined;

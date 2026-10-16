@@ -25,6 +25,7 @@ import {
   useEditTransaction,
   useProposals,
   useScheduled,
+  useBankStatus,
   useReviewQueue,
   useSuggest,
   writeSkipped,
@@ -43,6 +44,8 @@ export function Review({ book }: { book: string }) {
   const accounts = useAccounts(book);
   const create = useAccountCreation(book);
   const scheduled = useScheduled(book);
+  const bank = useBankStatus(book);
+  const notAtBank = new Set(Object.values(bank.data ?? {}).flatMap((s) => s.not_at_bank));
   const proposals = useProposals(book);
   const suggest = useSuggest(book);
   const bulk = useBulkEdit(book);
@@ -145,6 +148,7 @@ export function Review({ book }: { book: string }) {
               transaction={t}
               matches={matches}
               scheduled={!!scheduled.data?.[t.id]}
+              notAtBank={notAtBank.has(t.id)}
               proposal={proposals.data?.[t.id]}
               similar={(account) => ({
                 account,
@@ -177,6 +181,8 @@ type ItemProps = {
   matches: ProposedMatch[];
   /** Whether a schedule staged it (so it can be dropped: "Not this time"). */
   scheduled: boolean;
+  /** Whether it's in a bank-linked account, in the bank's time, but the bank doesn't have it. */
+  notAtBank: boolean;
   /** What categorization proposed for it, if anything. */
   proposal: ProposalSummary | undefined;
   /** After picking `account` for it: the similar pending transactions to offer it to. */
@@ -195,6 +201,7 @@ function QueueItem({
   transaction: t,
   matches,
   scheduled,
+  notAtBank,
   proposal,
   similar,
   onCategorizeSimilar,
@@ -361,6 +368,13 @@ function QueueItem({
                 </li>
               ))}
             </ul>
+          )}
+
+          {notAtBank && !scheduled && matches.length === 0 && (
+            <p className="small">
+              <span className="pill stale">Not at the bank</span>{" "}
+              <span className="muted">Your bank doesn't have this one: keep it, or delete it.</span>
+            </p>
           )}
 
           {scheduled && t.flag === "!" && (

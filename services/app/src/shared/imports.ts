@@ -62,9 +62,14 @@ export type ProposalSummary = {
   reason: string | null;
 };
 
+/** Where a batch of rows came from: a CSV file, or a bank feed. */
+export type ImportSource = "csv" | "simplefin";
+
 export type ImportBatch = {
   id: string;
   account: string;
+  source: ImportSource;
+  /** The file's name, or (for a bank feed) the institution's. */
   filename: string;
   created_at: string;
   rows: number;

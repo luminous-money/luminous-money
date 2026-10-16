@@ -11,6 +11,13 @@ import type { CategoryRule, CategoryRuleIn, CategoryRulePatch } from "../../shar
 import type { ProposalSummary } from "../../shared/imports.js";
 import type { Book } from "@fava-beans/ledger-client";
 
+import type {
+  BankConnection,
+  BankStatus,
+  LinkPreview,
+  LinkRequest,
+} from "../../shared/bank-feeds.js";
+
 import { ApiError } from "./ledger.js";
 import { apiFetch } from "./session.js";
 
@@ -21,6 +28,15 @@ export type {
   UpcomingOccurrence,
 } from "../../shared/schedule.js";
 export type { CategoryRule, CategoryRuleIn, RuleConditions } from "../../shared/rules.js";
+export type {
+  BankAccount,
+  BankConnection,
+  BankError,
+  BankStatus,
+  LinkMode,
+  LinkPreview,
+  LinkRequest,
+} from "../../shared/bank-feeds.js";
 export type {
   ProposalSummary,
   CsvProfile,
@@ -67,6 +83,44 @@ async function json<T>(response: Response): Promise<T> {
 }
 
 const base = (book: string) => `/api/app/v1/books/${encodeURIComponent(book)}`;
+
+const post = (body: unknown, method = "POST"): RequestInit => ({
+  method,
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+/** Bank feeds: connections are the user's; links go into a book. */
+export const bankFeeds = {
+  connections: async (): Promise<BankConnection[]> =>
+    json(await apiFetch("/api/app/v1/simplefin/connections")),
+  connect: async (setupToken: string): Promise<BankConnection> =>
+    json(await apiFetch("/api/app/v1/simplefin/connections", post({ setup_token: setupToken }))),
+  disconnect: async (id: string): Promise<void> => {
+    const response = await apiFetch(`/api/app/v1/simplefin/connections/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) await json(response);
+  },
+  sync: async (
+    id: string
+  ): Promise<{ batches: number; staged: number; matched: number; connection: BankConnection }> =>
+    json(
+      await apiFetch(`/api/app/v1/simplefin/connections/${encodeURIComponent(id)}/sync`, post({}))
+    ),
+  preview: async (book: string, link: LinkRequest): Promise<LinkPreview> =>
+    json(await apiFetch(`${base(book)}/simplefin/links/preview`, post(link))),
+  link: async (book: string, link: LinkRequest): Promise<{ preview: LinkPreview }> =>
+    json(await apiFetch(`${base(book)}/simplefin/links`, post(link))),
+  unlink: async (book: string, id: string): Promise<void> => {
+    const response = await apiFetch(`${base(book)}/simplefin/links/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) await json(response);
+  },
+  status: async (book: string): Promise<Record<string, BankStatus>> =>
+    json(await apiFetch(`${base(book)}/simplefin/status`)),
+};
 
 export const appApi = {
   /** The user's books, oldest first, with their time zones. */

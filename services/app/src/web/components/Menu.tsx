@@ -38,6 +38,7 @@ export function Menu() {
           {home && item(`${home}/schedules`, "Schedules")}
           {home && item(`${home}/rules`, "Rules")}
           {home && item(`${home}/commodities`, "Commodities")}
+          {home && item(`${home}/connections`, "Bank connections")}
           {item("/books", "Manage books")}
           {item("/account", "Your account")}
           <button type="button" className="menu-item" onClick={() => logOut.mutate()}>

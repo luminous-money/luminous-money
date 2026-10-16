@@ -5,13 +5,15 @@ import { AccountValueNote, headline } from "../components/AccountValue.js";
 import { displayName } from "../lib/accounts.js";
 import { bookHome } from "../lib/books.js";
 import { formatWhen } from "../lib/format.js";
-import { explain, useLastImports, useStarredAccounts } from "../lib/queries.js";
+import { explain, useBankStatus, useLastImports, useStarredAccounts } from "../lib/queries.js";
+import { ReportedLine } from "../components/BankStatus.js";
 
 /** The user's starred accounts, with their balances (as shown: a card's is what's owed) and when
  * each was last updated by an import. */
 export function Home({ book }: { book: Book }) {
   const accounts = useStarredAccounts(book.id);
   const imports = useLastImports(book.id);
+  const bank = useBankStatus(book.id);
 
   return (
     <main>
@@ -48,6 +50,9 @@ export function Home({ book }: { book: Book }) {
                 <span className="balance">{headline(account)}</span>
               </div>
               <AccountValueNote account={account} />
+              {bank.data?.[account.name] && (
+                <ReportedLine status={bank.data[account.name]!} type={account.type} />
+              )}
               <p className="muted small">
                 {last ? `Last updated at: ${formatWhen(last)}` : "No imports yet"}
               </p>

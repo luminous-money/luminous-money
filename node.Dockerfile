@@ -34,3 +34,15 @@ COPY --from=workspace /repo /repo
 RUN corepack enable && pnpm --filter "@fava-beans/ui-tests..." build
 ENV FAVA_BEANS_URL=http://traefik
 CMD ["pnpm", "--filter", "@fava-beans/ui-tests", "test"]
+
+# A fake SimpleFIN server (tests/simplefin-fake), for the e2e stack.
+FROM workspace AS simplefin-fake-build
+RUN pnpm --filter "@fava-beans/simplefin-fake..." build \
+  && pnpm --filter @fava-beans/simplefin-fake deploy --prod --legacy /out
+
+FROM node:24-slim AS simplefin-fake
+WORKDIR /srv
+COPY --from=simplefin-fake-build /out ./
+USER node
+EXPOSE 8080
+CMD ["node", "dist/main.js"]

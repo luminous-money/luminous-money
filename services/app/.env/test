@@ -1,0 +1,5 @@
+# The e2e stack (APP_ENV=test): the fake SimpleFIN server, over plain HTTP, with a fixed key for
+# its made-up data.
+SIMPLEFIN_ENCRYPTION_KEY=njq+/gPlbFRkrci0WD3h9Va4gUZ4pjZz32YduU/AjDI=
+SIMPLEFIN_HOSTS=simplefin-fake
+SIMPLEFIN_ALLOW_INSECURE=true

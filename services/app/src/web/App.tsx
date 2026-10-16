@@ -7,6 +7,7 @@ import type { BookInfo } from "./lib/appApi.js";
 import { bookHome, rememberBook, startingBook, useBookInPath } from "./lib/books.js";
 import { useBooks, useMe, useSessionLifecycle, useTimeZoneBackfill } from "./lib/queries.js";
 import { Account } from "./pages/Account.js";
+import { BankConnections } from "./pages/BankConnections.js";
 import { ResetPassword, VerifyEmail } from "./pages/EmailLinks.js";
 import { AccountLedger } from "./pages/AccountLedger.js";
 import { AddAccount } from "./pages/AddAccount.js";
@@ -135,6 +136,9 @@ function Gate() {
             {({ book: id, id: schedule }) => (
               <ScheduleEditor key={schedule} book={id} id={schedule} />
             )}
+          </Route>
+          <Route path="/books/:book/connections">
+            {({ book: id }) => <BankConnections key={id} book={id} />}
           </Route>
           <Route path="/books/:book/review">
             {({ book: id }) => <Review key={id} book={id} />}

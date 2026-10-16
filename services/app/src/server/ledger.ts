@@ -6,16 +6,23 @@
 import {
   createLedgerClient,
   type Account,
+  type AccountIn,
   type components,
   type AccountSummary,
   type CompactTransaction,
   type FetchResult,
+  type Holdings,
+  type PriceOut,
+  type TradeIn,
+  type TradePreview,
   type Transaction,
   type TransactionIn,
 } from "@fava-beans/ledger-client";
 
 export type Book = components["schemas"]["Book"];
 export type LedgerPage = components["schemas"]["LedgerPage"];
+export type TransactionEdit = components["schemas"]["TransactionEdit"];
+export type PriceIn = components["schemas"]["PriceIn"];
 
 export class LedgerError extends Error {
   constructor(
@@ -39,7 +46,15 @@ export interface LedgerPort {
   accounts(book: string): Promise<Account[]>;
   /** The accounts asked for that exist, with balances and opening-balance dates. */
   summary(book: string, accounts: string[]): Promise<AccountSummary[]>;
-  createAccount(book: string, name: string): Promise<Account>;
+  /** A leaf by its full name (nodes on the way are made too), with any of AccountIn's extras:
+   * an opening balance, opening holdings. */
+  createAccount(book: string, name: string, extra?: Partial<AccountIn>): Promise<Account>;
+  /** An account's (or a brokerage's) holdings: units, cost basis, value per commodity. */
+  holdings(book: string, account: string): Promise<Holdings>;
+  /** Record a price (one per commodity and date: the same date replaces it). */
+  addPrice(book: string, price: PriceIn): Promise<PriceOut>;
+  /** What a trade would write: its transaction (lots booked, gains split), not written. */
+  previewTrade(book: string, account: string, trade: TradeIn): Promise<TradePreview>;
   accountLedger(book: string, account: string, cursor?: string): Promise<LedgerPage>;
   /** All of them or none. */
   createTransactions(book: string, transactions: TransactionIn[]): Promise<Transaction[]>;
@@ -57,11 +72,15 @@ export interface LedgerPort {
   pending(book: string): Promise<Transaction[]>;
   /** Fetch the latest prices of commodities still held that name a source. */
   fetchPrices(book: string): Promise<FetchResult>;
-  /** Create and delete (with the versions read) in one write, or not at all. Returns the
-   * created transactions. */
+  /** Create, change and delete (with the versions read) in one write, or not at all. Returns
+   * the created transactions. */
   applyChanges(
     book: string,
-    changes: { create: TransactionIn[]; delete: { id: string; updated_at: string }[] }
+    changes: {
+      create: TransactionIn[];
+      update?: TransactionEdit[];
+      delete: { id: string; updated_at: string }[];
+    }
   ): Promise<Transaction[]>;
 }
 
@@ -114,11 +133,31 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
           params: { path: { book_id: book }, query: { account: accounts } },
         })
       ),
-    createAccount: (book, name) =>
+    createAccount: (book, name, extra = {}) =>
       unwrap(
         client.POST("/api/ledger/v1/books/{book_id}/accounts", {
           params: { path: { book_id: book } },
-          body: { name, kind: "leaf" },
+          body: { name, kind: "leaf", ...extra },
+        })
+      ),
+    holdings: (book, account) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/holdings", {
+          params: { path: { book_id: book, account } },
+        })
+      ),
+    addPrice: (book, price) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/prices", {
+          params: { path: { book_id: book } },
+          body: price,
+        })
+      ),
+    previewTrade: (book, account, trade) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/accounts/{account}/trades/preview", {
+          params: { path: { book_id: book, account } },
+          body: trade,
         })
       ),
     accountLedger: (book, account, cursor) =>
@@ -162,7 +201,7 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
       unwrap(
         client.POST("/api/ledger/v1/books/{book_id}/transactions/changes", {
           params: { path: { book_id: book } },
-          body: changes,
+          body: { ...changes, update: changes.update ?? [] },
         })
       ),
     createTransactions: (book, transactions) =>

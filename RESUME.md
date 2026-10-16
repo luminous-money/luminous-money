@@ -104,13 +104,14 @@ How it's put together:
 
 ## Next steps
 
-1. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions)
-   (email verification required or not, session lifetime, passkeys/2FA timing, which OIDC
-   providers first).
-2. Answer the questions in [the M9 plan](docs/milestones/m9-simplefin/PLAN.md#questions)
-   (SimpleFIN), then say `build M9`. The dev stack is fine for real connections (its data is
-   disposable); a separate live stack ([docs/operating.md](docs/operating.md)) waits for
-   hydration, when the data has to last.
+1. **Finish M9 (SimpleFIN):** it's built and on the dev stack, with unit tests passing (app:
+   131, including 14 for SimpleFIN), but **`pnpm test` and `pnpm e2e` haven't been run on it
+   yet**. The new suites (`tests/e2e/src/m9.test.ts`, `tests/ui/src/m9.spec.ts`) haven't run,
+   and `tests/ui/src/m9.spec.ts`'s second test doesn't check the "Not at the bank" pill yet.
+   Then the docs: design.md ("Bank feeds", "Configuration"), operating.md
+   (`SIMPLEFIN_ENCRYPTION_KEY`, `SIMPLEFIN_HOSTS`, `APP_ENV`), and PLAN.md. And the Fidelity
+   look (plan step 2), once a Fidelity account is connected.
+2. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
 
 ## Gotchas
 
@@ -123,6 +124,12 @@ How it's put together:
 
 - **`pnpm up` is pnpm's own `update` command,** not the `up` script: it bumps dependencies. Use
   `pnpm run up` (foreground), or `docker buildx bake && docker compose up -d`.
+- **The dev stack needs `SIMPLEFIN_ENCRYPTION_KEY`** (app won't start without it): it's in the
+  repo root's `.env` (gitignored), which Compose reads. Keep it: stored SimpleFIN connections
+  can't be opened without it.
+- **`auth` and `app` read settings through `@wymp/config-simple`** (`src/config.ts`, plus
+  `.env/<APP_ENV>` files in each service). Its `configValue` reads a third argument that's an
+  array as validators, not a default: give list defaults as a string and split them.
 - **Auth keeps its signing keys in `auth.sqlite`;** `AUTH_JWT_SECRET` is gone (auth warns if
   it's still set). Wiping the volume logs everyone out, as well as deleting them.
 - **`FAVA_BEANS_PUBLIC_URL` must be the address users reach,** when set: `auth` refuses writes

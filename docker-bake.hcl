@@ -3,7 +3,7 @@
 #   docker buildx bake             build every service image for this machine
 #   docker buildx bake test        run every test suite and contract check
 #   docker buildx bake generate    export ledger's OpenAPI schema into packages/ledger-client
-#   docker buildx bake e2e ui-tests  build the end-to-end test images (run them with `pnpm e2e`)
+#   docker buildx bake e2e ui-tests simplefin-fake  build the end-to-end test images (`pnpm e2e`)
 #   docker buildx bake release     build linux/amd64 + linux/arm64 and push (set REGISTRY, VERSION)
 #
 # The root package.json wraps these as `pnpm build`, `pnpm test`, `pnpm generate`, `pnpm release`.
@@ -100,6 +100,13 @@ target "e2e" {
   dockerfile = "node.Dockerfile"
   target     = "e2e"
   tags       = ["${REGISTRY}/e2e:${VERSION}"]
+}
+
+target "simplefin-fake" {
+  context    = "."
+  dockerfile = "node.Dockerfile"
+  target     = "simplefin-fake"
+  tags       = ["${REGISTRY}/simplefin-fake:${VERSION}"]
 }
 
 target "ui-tests" {

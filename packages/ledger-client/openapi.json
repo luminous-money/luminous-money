@@ -2027,7 +2027,7 @@
       },
       "TransactionChanges": {
         "additionalProperties": false,
-        "description": "Transactions to create and delete, in one write: all of it, or none.",
+        "description": "Transactions to create, change and delete, in one write: all of it, or none.",
         "properties": {
           "create": {
             "items": {
@@ -2043,9 +2043,158 @@
             },
             "title": "Delete",
             "type": "array"
+          },
+          "update": {
+            "description": "Each with the version read.",
+            "items": {
+              "$ref": "#/components/schemas/TransactionEdit"
+            },
+            "title": "Update",
+            "type": "array"
           }
         },
         "title": "TransactionChanges",
+        "type": "object"
+      },
+      "TransactionEdit": {
+        "additionalProperties": false,
+        "description": "A patch to one transaction, by ID, against the version read.",
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "maxLength": 1,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flag"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "links": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Links"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MetaNumber"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MetaDate"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Amount"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "narration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narration"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "postings": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Posting"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postings"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "updated_at": {
+            "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "updated_at",
+          "id"
+        ],
+        "title": "TransactionEdit",
         "type": "object"
       },
       "TransactionIn": {
@@ -4204,7 +4353,7 @@
     },
     "/api/ledger/v1/books/{book_id}/transactions/changes": {
       "post": {
-        "description": "Create and delete transactions in one atomic write: all of it, or none. Returns the\ncreated ones.",
+        "description": "Create, change (versioned patches) and delete transactions in one atomic write: all of\nit, or none. Returns the created ones.",
         "operationId": "apply_changes_api_ledger_v1_books__book_id__transactions_changes_post",
         "parameters": [
           {

@@ -7,6 +7,7 @@ import { bookHome } from "../lib/books.js";
 import { withBack } from "../lib/navigation.js";
 import { AccountSettings } from "../components/AccountSettings.js";
 import { AccountValueNote, headline } from "../components/AccountValue.js";
+import { BankErrors, ReportedLine } from "../components/BankStatus.js";
 import { HoldingsPanel } from "../components/Holdings.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { postable } from "../lib/accounts.js";
@@ -23,6 +24,8 @@ import {
   useScheduled,
   useSetStar,
   useStars,
+  useBankStatus,
+  useSyncBank,
   useSummary,
   useUpcoming,
 } from "../lib/queries.js";
@@ -43,6 +46,10 @@ export function AccountLedger({ book, account }: { book: string; account: string
   const summary = useSummary(book, [account]);
   const info = summary.data?.[0];
   const stars = useStars(book);
+  const bank = useBankStatus(book);
+  const syncBank = useSyncBank();
+  // A brokerage's feed is linked to the brokerage; its cash shows it too.
+  const linked = bank.data?.[account] ?? bank.data?.[account.replace(/:Cash$/, "")];
   const setStar = useSetStar(book);
   const scheduled = useScheduled(book);
   const suggest = useSuggest(book, account);
@@ -119,6 +126,8 @@ export function AccountLedger({ book, account }: { book: string; account: string
             </h1>
             {info && <p className="muted">{headline(info)}</p>}
             {info && <AccountValueNote account={info} />}
+            {linked && <ReportedLine status={linked} type={info?.type} />}
+            {linked && <BankErrors status={linked} />}
           </div>
           {info?.kind === "leaf" && !info.implicit && !info.close && (
             <Link
@@ -137,6 +146,15 @@ export function AccountLedger({ book, account }: { book: string; account: string
             <button type="button" onClick={selection.start}>
               Select
             </button>
+            {linked && (
+              <button
+                type="button"
+                disabled={syncBank.isPending}
+                onClick={() => syncBank.mutate(linked.connection_id)}
+              >
+                {syncBank.isPending ? "Syncing…" : "Sync now"}
+              </button>
+            )}
           </div>
         )}
         {suggest.data && (

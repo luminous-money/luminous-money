@@ -239,8 +239,8 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     @api.post("/books/{book_id}/transactions/changes", responses={409: {"description": "Stale version"}})
     def apply_changes(book_id: OwnedBook, changes: models.TransactionChanges) -> list[models.Transaction]:
-        """Create and delete transactions in one atomic write: all of it, or none. Returns the
-        created ones."""
+        """Create, change (versioned patches) and delete transactions in one atomic write: all of
+        it, or none. Returns the created ones."""
         created = ledger.apply_changes(book_id, changes)
         return [ledger.transaction(book_id, d.id) for d in created]
 

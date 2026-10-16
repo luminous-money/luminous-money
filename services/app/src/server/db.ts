@@ -12,7 +12,13 @@ import {
   type Migration,
 } from "@fava-beans/db";
 
-import type { CsvProfile, ImportBatch, ImportRow, ProposalSummary } from "../shared/imports.js";
+import type {
+  CsvProfile,
+  ImportBatch,
+  ImportRow,
+  ImportSource,
+  ProposalSummary,
+} from "../shared/imports.js";
 import type { FetchResult } from "@fava-beans/ledger-client";
 
 import type { CategoryRule, CategoryRuleIn, RuleConditions } from "../shared/rules.js";
@@ -162,6 +168,70 @@ export const MIGRATIONS: Migration[] = [
       "ran_on TEXT NOT NULL", // the book's local date
       "result TEXT NOT NULL", // JSON: the ledger's FetchResult
     ]),
+  ],
+  // 10: bank feeds (M9). A SimpleFIN connection is a user's (its access URL sealed); each of its
+  // accounts keeps the last snapshot (balances, holdings) and a mirror of the transactions the
+  // bank has sent; a link ties one to an account in a book. Batches say where they came from.
+  [
+    createTable("simplefin_connection", [
+      "id TEXT PRIMARY KEY",
+      "user_id TEXT NOT NULL",
+      "access_url TEXT NOT NULL", // sealed (simplefin/crypto.ts)
+      "host TEXT NOT NULL",
+      "sync_minute INTEGER NOT NULL", // minutes past local midnight for the daily sync
+      "requests_on TEXT", // the UTC date `requests` counts
+      "requests INTEGER NOT NULL DEFAULT 0",
+      "last_sync_at TEXT",
+      "errors TEXT NOT NULL DEFAULT '[]'", // JSON: SfError[] from the last request
+    ]),
+    "CREATE INDEX simplefin_connection_user ON simplefin_connection(user_id)",
+    createTable(
+      "simplefin_account",
+      [
+        "connection_id TEXT NOT NULL REFERENCES simplefin_connection(id) ON DELETE CASCADE",
+        "account_id TEXT NOT NULL",
+        "name TEXT NOT NULL",
+        "institution TEXT NOT NULL",
+        "currency TEXT NOT NULL",
+        "balance TEXT NOT NULL",
+        "available_balance TEXT",
+        "balance_date INTEGER NOT NULL", // Unix seconds
+        "holdings TEXT NOT NULL DEFAULT '[]'", // JSON: SfHolding[]
+        "history_from TEXT", // the earliest date fetched (ISO), as far as we've asked
+        "history_complete INTEGER NOT NULL DEFAULT 0",
+      ],
+      ["PRIMARY KEY (connection_id, account_id)"]
+    ),
+    createTable(
+      "simplefin_transaction",
+      [
+        "connection_id TEXT NOT NULL REFERENCES simplefin_connection(id) ON DELETE CASCADE",
+        "account_id TEXT NOT NULL",
+        "id TEXT NOT NULL",
+        "posted INTEGER NOT NULL",
+        "transacted_at INTEGER",
+        "amount TEXT NOT NULL",
+        "description TEXT NOT NULL",
+        "payee TEXT",
+        "memo TEXT",
+      ],
+      ["PRIMARY KEY (connection_id, account_id, id)"]
+    ),
+    createTable(
+      "simplefin_link",
+      [
+        "id TEXT PRIMARY KEY",
+        "user_id TEXT NOT NULL",
+        "connection_id TEXT NOT NULL REFERENCES simplefin_connection(id) ON DELETE CASCADE",
+        "account_id TEXT NOT NULL",
+        "book_id TEXT NOT NULL",
+        "account TEXT NOT NULL",
+        "kind TEXT NOT NULL", // 'cash' | 'brokerage'
+        "starts_on TEXT NOT NULL", // bank transactions before this date aren't imported
+      ],
+      ["UNIQUE (connection_id, account_id)", "UNIQUE (book_id, account)"]
+    ),
+    "ALTER TABLE import_batch ADD COLUMN source TEXT NOT NULL DEFAULT 'csv'",
   ],
 ];
 
@@ -358,17 +428,23 @@ export class AppDb {
     return new Set(found.map((r) => r.fingerprint));
   }
 
-  /** Which of `transactions` a row of the account's imports already holds (staged or matched):
-   * they can't be matched again from this account. */
-  claimed(book: string, account: string, transactions: string[]): Set<string> {
+  /** Which of `transactions` a row of the account's imports from `source` already holds
+   * (staged or matched): they can't be matched again from the same stream. Another source (a
+   * CSV and a bank feed) seeing the same event isn't a conflict, so it may match them. */
+  claimed(
+    book: string,
+    account: string,
+    transactions: string[],
+    source: ImportSource = "csv"
+  ): Set<string> {
     if (!transactions.length) return new Set();
     const found = this.db
       .prepare(
         `SELECT r.transaction_id FROM import_row r JOIN import_batch b ON b.id = r.batch_id
-         WHERE b.book_id = ? AND b.account = ? AND r.outcome IN ('staged', 'matched')
+         WHERE b.book_id = ? AND b.account = ? AND b.source = ? AND r.outcome IN ('staged', 'matched')
            AND r.transaction_id IN (SELECT value FROM json_each(?))`
       )
-      .all(book, account, JSON.stringify(transactions)) as { transaction_id: string }[];
+      .all(book, account, source, JSON.stringify(transactions)) as { transaction_id: string }[];
     return new Set(found.map((r) => r.transaction_id));
   }
 
@@ -377,14 +453,15 @@ export class AppDb {
     transaction(this.db, () => {
       this.db
         .prepare(
-          `INSERT INTO import_batch (id, book_id, account, user_id, filename, rows, staged, matched, duplicates, skipped, unreadable, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO import_batch (id, book_id, account, user_id, source, filename, rows, staged, matched, duplicates, skipped, unreadable, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           batch.id,
           batch.book_id,
           batch.account,
           batch.user_id,
+          batch.source,
           batch.filename,
           batch.rows,
           batch.staged,
@@ -696,6 +773,7 @@ export class AppDb {
         "DELETE FROM proposal WHERE book_id = ?",
         "DELETE FROM price_fetch WHERE book_id = ?",
         "DELETE FROM book_setting WHERE book_id = ?",
+        "DELETE FROM simplefin_link WHERE book_id = ?",
       ])
         this.db.prepare(sql).run(book);
     });

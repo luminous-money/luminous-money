@@ -1,6 +1,6 @@
-/** Deleting an account's books, through the other services, acting as the user (inside the
- * stack, services trust X-User-Id). Each goes through `app`'s book deletion, so backups carry it
- * and `app` forgets what it kept about the book. */
+/** Deleting an account's data in the other services, acting as the user (inside the stack,
+ * services trust X-User-Id): each book through `app`'s book deletion (so backups carry it and
+ * `app` forgets what it kept about the book), then `app`'s user-level data (bank connections). */
 import type { BookDeleter } from "./app.js";
 
 export function booksOverHttp(ledgerUrl: string, appUrl: string): BookDeleter {
@@ -16,5 +16,7 @@ export function booksOverHttp(ledgerUrl: string, appUrl: string): BookDeleter {
       if (!deleted.ok && deleted.status !== 404)
         throw new Error(`couldn't delete book ${book.id}: ${deleted.status}`);
     }
+    const forgotten = await fetch(`${appUrl}/api/app/v1/me`, { method: "DELETE", headers });
+    if (!forgotten.ok) throw new Error(`couldn't delete the user's app data: ${forgotten.status}`);
   };
 }

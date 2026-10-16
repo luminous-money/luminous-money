@@ -13,3 +13,20 @@ export function today(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
+
+/** When a bank reported something (Unix seconds), as "today 6:00am", "yesterday 6:02am", or
+ * "Oct 12 6:00am". */
+export function formatReported(seconds: number, now = new Date()): string {
+  const at = new Date(seconds * 1000);
+  const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" })
+    .format(at)
+    .replace(/\s/g, "")
+    .toLowerCase();
+  const day = (d: Date) => d.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (day(at) === day(now)) return `today ${time}`;
+  if (day(at) === day(yesterday)) return `yesterday ${time}`;
+  const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(at);
+  return `${date} ${time}`;
+}

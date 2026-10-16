@@ -1,0 +1,31 @@
+{
+  "name": "@fava-beans/simplefin-fake",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A fake SimpleFIN server, scripted by tests: in process for unit tests, and as a service in the e2e stack.",
+  "type": "module",
+  "main": "dist/fake.js",
+  "types": "dist/fake.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/fake.d.ts",
+      "default": "./dist/fake.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.3",
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
+  }
+}

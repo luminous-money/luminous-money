@@ -1,7 +1,8 @@
 /**
- * Importing a CSV file into an account (any open leaf).
+ * Importing rows into an account (any open leaf): from a CSV file (`importFile`), or from a bank
+ * feed (`importRows` directly, simplefin/).
  *
- * 1. The file is read with the first of the account's CSV profiles whose layout it fits.
+ * 1. A file is read with the first of the account's CSV profiles whose layout it fits.
  * 2. Each readable row gets a fingerprint. A row whose fingerprint an earlier import already
  *    brought in (staged or matched) is a duplicate, and is skipped.
  * 3. Rows dated on or before the account's `as_of` (its opening balance's date, if it has one)
@@ -22,7 +23,13 @@ import { applyProfile, fits, type CsvProfile, type Row } from "@fava-beans/csv-i
 import { now } from "@fava-beans/db";
 import type { Account, TransactionIn } from "@fava-beans/ledger-client";
 
-import type { ImportResult, ImportRow, Outcome, ProposalSummary } from "../shared/imports.js";
+import type {
+  ImportResult,
+  ImportRow,
+  ImportSource,
+  Outcome,
+  ProposalSummary,
+} from "../shared/imports.js";
 import { categorize, stagedPostings } from "./categorize/chain.js";
 import { buildRequest } from "./categorize/context.js";
 import type { Categorizer, Chosen, Decision } from "./categorize/types.js";
@@ -62,7 +69,8 @@ export function stagedTransaction(
   currency: string,
   batchId: string,
   row: Stageable,
-  decision: Decision = {}
+  decision: Decision = {},
+  source: ImportSource = "csv"
 ): TransactionIn {
   const amount = { number: row.amount, currency };
   const fallback = row.amount.startsWith("-") ? UNCATEGORIZED.out : UNCATEGORIZED.in;
@@ -73,28 +81,12 @@ export function stagedTransaction(
     narration: row.description,
     tags: [],
     links: [],
-    meta: { source: "csv", "import-batch": batchId, "import-id": row.fingerprint },
+    meta: { source, "import-batch": batchId, "import-id": row.fingerprint },
     postings: stagedPostings(account, amount, decision.category, fallback),
   };
 }
 
-/**
- * Stage rows as transactions in `account`, categorized: the chain proposes a category and
- * payee for each (from the book's last 14 months), and what it proposed is recorded for review
- * and acceptance tracking. One atomic ledger write. Returns the created transactions' IDs, in
- * order, and each one's proposal.
- */
-export async function stageCategorized({
-  db,
-  ledger,
-  categorizers,
-  book,
-  account,
-  currency,
-  batchId,
-  rows,
-  accounts,
-}: {
+type StageInput = {
   db: AppDb;
   ledger: LedgerPort;
   categorizers: Categorizer[];
@@ -104,7 +96,48 @@ export async function stageCategorized({
   batchId: string;
   rows: Stageable[];
   accounts?: Account[];
-}): Promise<{ ids: string[]; proposals: (ProposalSummary | null)[] }> {
+  source?: ImportSource;
+};
+
+/** Rows staged, but not yet written: the transactions to create, and what to record once they
+ * exist (their proposals, for review and acceptance tracking). */
+export type PreparedStage = {
+  transactions: TransactionIn[];
+  proposals: (ProposalSummary | null)[];
+  /** Record the proposals, given the created transactions' IDs (in order). */
+  record(ids: string[]): void;
+};
+
+/**
+ * Stage rows as transactions in `account`, categorized: the chain proposes a category and
+ * payee for each (from the book's last 14 months), and what it proposed is recorded for review
+ * and acceptance tracking. One atomic ledger write. Returns the created transactions' IDs, in
+ * order, and each one's proposal.
+ */
+export async function stageCategorized(
+  input: StageInput
+): Promise<{ ids: string[]; proposals: (ProposalSummary | null)[] }> {
+  const prepared = await prepareStage(input);
+  const created = await input.ledger.createTransactions(input.book.id, prepared.transactions);
+  const ids = created.map((t) => t.id);
+  prepared.record(ids);
+  return { ids, proposals: prepared.proposals };
+}
+
+/** Categorize rows and build their transactions, without writing them, so a caller can fold
+ * them into a larger atomic write. Opens the uncategorized accounts they need. */
+export async function prepareStage({
+  db,
+  ledger,
+  categorizers,
+  book,
+  account,
+  currency,
+  batchId,
+  rows,
+  accounts,
+  source = "csv",
+}: StageInput): Promise<PreparedStage> {
   const incoming = rows.map((row, i) => ({
     id: `${batchId}:${i}`,
     date: row.date,
@@ -123,39 +156,41 @@ export async function stageCategorized({
     rows.filter((_, i) => !decided[i]!.category),
     accounts
   );
-  const created = await ledger.createTransactions(
-    book.id,
-    rows.map((row, i) => stagedTransaction(account, currency, batchId, row, decided[i]))
+  const transactions = rows.map((row, i) =>
+    stagedTransaction(account, currency, batchId, row, decided[i], source)
   );
-
-  const uses = new Map<string, number>();
-  const stored = created.flatMap((t, i) => {
-    const { category, payee } = decided[i]!;
-    if (category?.rule_id) uses.set(category.rule_id, (uses.get(category.rule_id) ?? 0) + 1);
-    if (!category && !payee) return [];
-    const { auto_confirm: _a, rule_id: _r, categorizer: _c, ...given } = category ?? ({} as Chosen);
-    return [
-      {
-        transaction_id: t.id,
-        book_id: book.id,
-        request_id: request!.request_id,
-        incoming_id: incoming[i]!.id,
-        categorizer: category?.categorizer ?? null,
-        confidence: category?.confidence ?? null,
-        reason: category?.reason ?? payee?.reason ?? null,
-        postings: category?.postings ?? null,
-        payee: payee?.payee ?? null,
-        payee_categorizer: payee?.categorizer ?? null,
-        proposal: category ? given : null,
-      },
-    ];
-  });
-  db.saveProposals(stored);
-  db.countRuleUses(uses);
-  return {
-    ids: created.map((t) => t.id),
-    proposals: decided.map((d) => summarize(d)),
+  const record = (ids: string[]) => {
+    const uses = new Map<string, number>();
+    const stored = ids.flatMap((id, i) => {
+      const { category, payee } = decided[i]!;
+      if (category?.rule_id) uses.set(category.rule_id, (uses.get(category.rule_id) ?? 0) + 1);
+      if (!category && !payee) return [];
+      const {
+        auto_confirm: _a,
+        rule_id: _r,
+        categorizer: _c,
+        ...given
+      } = category ?? ({} as Chosen);
+      return [
+        {
+          transaction_id: id,
+          book_id: book.id,
+          request_id: request!.request_id,
+          incoming_id: incoming[i]!.id,
+          categorizer: category?.categorizer ?? null,
+          confidence: category?.confidence ?? null,
+          reason: category?.reason ?? payee?.reason ?? null,
+          postings: category?.postings ?? null,
+          payee: payee?.payee ?? null,
+          payee_categorizer: payee?.categorizer ?? null,
+          proposal: category ? given : null,
+        },
+      ];
+    });
+    db.saveProposals(stored);
+    db.countRuleUses(uses);
   };
+  return { transactions, proposals: decided.map((d) => summarize(d)), record };
 }
 
 /** What a decision amounts to, for import results and review. */
@@ -206,28 +241,19 @@ export function fingerprints(rows: Row[]): (string | null)[] {
   });
 }
 
-export async function importFile({
-  db,
-  ledger,
-  book,
-  account,
-  filename,
-  text,
-  userId,
-  windowDays = DEFAULT_WINDOW_DAYS,
-  categorizers = [],
-}: {
+type ImportInput = {
   db: AppDb;
   ledger: LedgerPort;
   book: string;
   account: string;
-  filename: string;
-  text: string;
   userId: string;
   windowDays?: number;
   /** The categorization chain (none: rows are staged uncategorized). */
   categorizers?: Categorizer[];
-}): Promise<ImportResult> {
+};
+
+/** The account rows are imported into, if it can take them: an open leaf. */
+async function importTarget(ledger: LedgerPort, book: string, account: string) {
   const bookInfo = await ledger.book(book);
   if (!bookInfo) throw new ImportProblem("no-such-book", `there's no book ${book}`);
   const [accounts, [target]] = await Promise.all([
@@ -239,6 +265,17 @@ export async function importFile({
       "not-importable",
       `${account} isn't an open account that holds transactions`
     );
+  return { bookInfo, accounts, target };
+}
+
+/** Import a CSV file into an account, with the first of its profiles the file fits. */
+export async function importFile({
+  filename,
+  text,
+  ...input
+}: ImportInput & { filename: string; text: string }): Promise<ImportResult> {
+  const { db, ledger, book, account } = input;
+  await importTarget(ledger, book, account);
   const profiles = db.profiles(book, account);
   if (!profiles.length) throw new ImportProblem("no-profile", `${account} has no CSV profile yet`);
   const profile: CsvProfile | undefined = profiles.find((p) => fits(p, text));
@@ -249,8 +286,33 @@ export async function importFile({
     );
   }
 
+  return importRows({
+    ...input,
+    source: "csv",
+    label: filename,
+    rows: applyProfile(text, profile),
+  });
+}
+
+/**
+ * Import rows into an account, from any source: skip what's come in before (fingerprints) and
+ * what the opening balance already includes, match what's already in the books, stage the rest
+ * categorized, and record the batch.
+ */
+export async function importRows({
+  db,
+  ledger,
+  book,
+  account,
+  userId,
+  source,
+  label,
+  rows,
+  windowDays = DEFAULT_WINDOW_DAYS,
+  categorizers = [],
+}: ImportInput & { source: ImportSource; label: string; rows: Row[] }): Promise<ImportResult> {
+  const { bookInfo, accounts, target } = await importTarget(ledger, book, account);
   const currency = target.currencies?.[0] ?? "USD";
-  const rows = applyProfile(text, profile);
   const prints = fingerprints(rows);
   const before = db.importedBefore(
     book,
@@ -285,7 +347,7 @@ export async function importFile({
       account,
       shift(dates[0]!, -windowDays),
       shift(dates.at(-1)!, windowDays),
-      (ids) => db.claimed(book, account, ids)
+      (ids) => db.claimed(book, account, ids, source)
     );
     // Scheduled transactions may match within their split's tolerance.
     const schedules = db.schedulesOf(context.existing.map((t) => t.id));
@@ -320,6 +382,7 @@ export async function importFile({
       currency,
       batchId,
       accounts,
+      source,
       rows: stage.map((row) => ({
         date: row.date!,
         amount: row.amount!,
@@ -351,7 +414,8 @@ export async function importFile({
   const batch = {
     id: batchId,
     account,
-    filename,
+    source,
+    filename: label,
     created_at: now(),
     rows: rows.length,
     staged: count("staged"),
