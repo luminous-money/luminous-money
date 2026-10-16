@@ -7,7 +7,7 @@
  *   its first linked book (the Bridge asks apps to spread out), plus "Sync now".
  * - **Windows:** from the newest transaction synced so far, less 5 days (the Bridge's advice), to
  *   now, at most 90 days a request. What the overlap sends again is a duplicate by fingerprint.
- * - **History:** `backfill` walks 90-day windows back until two in a row come back empty.
+ * - **History:** `backfill` walks windows back until `QUIET_DAYS` of them in a row are empty.
  */
 import type { Row } from "@fava-beans/csv-import";
 
@@ -20,13 +20,18 @@ import { importRows } from "../imports.js";
 import type { LedgerPort } from "../ledger.js";
 import { fetchAccounts, type SfAccountSet, type SfTransaction } from "./client.js";
 import type { Sealer } from "./crypto.js";
+import { resumeAttempts } from "./attempts.js";
 import { holdingChanges } from "./holdings.js";
 import type { Connection, Link, SimplefinStore } from "./store.js";
 import type { UrlPolicy } from "./urls.js";
 
 export const DAY = 24 * 60 * 60;
-export const WINDOW_DAYS = 90;
+/** Days per request: the Bridge now recommends 45 ("may be capped", 2026-10-16), though its
+ * developer guide still says 90. */
+export const WINDOW_DAYS = 45;
 export const OVERLAP_DAYS = 5;
+/** History ends after this long with nothing in it (a quiet savings account can go months). */
+export const QUIET_DAYS = 180;
 
 export type SimplefinDeps = {
   db: AppDb;
@@ -72,9 +77,9 @@ export function localDate(seconds: number, timeZone: string | undefined): string
 }
 
 /**
- * Fetch an account's history as far back as the bank gives: 90-day windows back from where the
- * last backfill stopped (or now), until two windows in a row are empty. Stops when the budget
- * runs out; call again (tomorrow) to go on. Returns whether it's complete.
+ * Fetch an account's history as far back as the bank gives: windows back from where the last
+ * backfill stopped (or now), until `QUIET_DAYS` in a row are empty. Stops when the budget runs
+ * out; call again (tomorrow) to go on. Returns whether it's complete.
  */
 export async function backfill(
   deps: SimplefinDeps,
@@ -99,7 +104,7 @@ export async function backfill(
     const found = set.accounts.find((a) => a.id === accountId);
     const posted = (found?.transactions ?? []).filter((t) => !t.pending).length;
     empty = posted ? 0 : empty + 1;
-    const complete = empty >= 2 || !found;
+    const complete = empty * WINDOW_DAYS >= QUIET_DAYS || !found;
     deps.store.setHistory(connection.id, accountId, localDate(start, "UTC"), complete);
     if (complete) return true;
     end = start;
@@ -196,6 +201,9 @@ export function simplefinJob(deps: SimplefinDeps, now: () => Date = () => new Da
       deps.store.linkedConnections().map((c) => ({ at: c.sync_minute, zone: zoneOf(deps, c) })),
     run: async () => {
       const done: string[] = [];
+      // Link attempts that ran out of requests yesterday carry on (in the background).
+      const resumed = resumeAttempts(deps);
+      if (resumed) done.push(`${resumed} link attempt${resumed === 1 ? "" : "s"} resumed`);
       for (const connection of deps.store.linkedConnections()) {
         const zone = zoneOf(deps, connection);
         const at = now();

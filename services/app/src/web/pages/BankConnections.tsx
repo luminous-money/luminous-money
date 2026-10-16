@@ -7,11 +7,11 @@ import { displayName } from "../lib/accounts.js";
 import type {
   BankAccount,
   BankConnection,
+  LinkAttempt,
   LinkMode,
   LinkPreview,
   LinkRequest,
 } from "../lib/appApi.js";
-import { bankFeeds } from "../lib/appApi.js";
 import { formatMoney } from "../lib/decimal.js";
 import { formatReported, formatWhen, today } from "../lib/format.js";
 import {
@@ -20,7 +20,10 @@ import {
   useBankConnections,
   useConnectBank,
   useDisconnectBank,
-  useLinkBank,
+  useAttemptLink,
+  useBankAttempts,
+  useCancelLink,
+  useConfirmLink,
   useSyncBank,
   useUnlinkBank,
 } from "../lib/queries.js";
@@ -32,6 +35,7 @@ import {
  */
 export function BankConnections({ book }: { book: string }) {
   const connections = useBankConnections();
+  const attempts = useBankAttempts(book);
   return (
     <main className="stack">
       <header className="page-head">
@@ -47,7 +51,12 @@ export function BankConnections({ book }: { book: string }) {
       {connections.isPending && <p className="muted">Loading…</p>}
       {connections.error && <p className="card error">{explain(connections.error)}</p>}
       {connections.data?.map((c) => (
-        <ConnectionCard key={c.id} book={book} connection={c} />
+        <ConnectionCard
+          key={c.id}
+          book={book}
+          connection={c}
+          attempts={(attempts.data ?? []).filter((a) => a.connection_id === c.id)}
+        />
       ))}
       <Connect />
     </main>
@@ -92,7 +101,15 @@ function Connect() {
   );
 }
 
-function ConnectionCard({ book, connection }: { book: string; connection: BankConnection }) {
+function ConnectionCard({
+  book,
+  connection,
+  attempts,
+}: {
+  book: string;
+  connection: BankConnection;
+  attempts: LinkAttempt[];
+}) {
   const sync = useSyncBank();
   const disconnect = useDisconnectBank();
   const [linking, setLinking] = useState<string | null>(null);
@@ -111,7 +128,7 @@ function ConnectionCard({ book, connection }: { book: string; connection: BankCo
         {connection.requests_left} of {connection.requests_per_day} requests left today
       </p>
       {connection.errors.map((e, i) => (
-        <p key={i} className="small error" title={e.code}>
+        <p key={i} className={`small ${e.notice ? "muted" : "error"}`} title={e.code}>
           {e.explained}
         </p>
       ))}
@@ -128,6 +145,7 @@ function ConnectionCard({ book, connection }: { book: string; connection: BankCo
               book={book}
               connection={connection}
               account={a}
+              attempt={attempts.find((x) => x.account_id === a.account_id)}
               linking={linking === a.account_id}
               onLink={() => setLinking(linking === a.account_id ? null : a.account_id)}
               onDone={() => setLinking(null)}
@@ -163,6 +181,7 @@ function BankAccountRow({
   book,
   connection,
   account,
+  attempt,
   linking,
   onLink,
   onDone,
@@ -170,6 +189,7 @@ function BankAccountRow({
   book: string;
   connection: BankConnection;
   account: BankAccount;
+  attempt: LinkAttempt | undefined;
   linking: boolean;
   onLink: () => void;
   onDone: () => void;
@@ -198,7 +218,7 @@ function BankAccountRow({
             <span className="small muted block">Linked in {link.book_name ?? "another book"}</span>
           )}
         </span>
-        {!link && (
+        {!link && !attempt && (
           <button type="button" aria-expanded={linking} onClick={onLink}>
             Link…
           </button>
@@ -214,10 +234,58 @@ function BankAccountRow({
           </button>
         )}
       </div>
-      {linking && (
+      {attempt && !link && <AttemptPanel book={book} attempt={attempt} />}
+      {linking && !attempt && (
         <LinkForm book={book} connection={connection} account={account} onDone={onDone} />
       )}
     </>
+  );
+}
+
+/** A link being made: the bank's history coming in (you can leave the page), then what linking
+ * will do, to confirm. */
+function AttemptPanel({ book, attempt }: { book: string; attempt: LinkAttempt }) {
+  const confirm = useConfirmLink(book);
+  const cancel = useCancelLink(book);
+  const target = displayName({ name: attempt.account });
+  return (
+    <div className="link-form" aria-label={`Linking to ${target}`} role="group">
+      {attempt.state === "fetching" && (
+        <p className="small" role="status">
+          Getting the bank's history for {target}… This can take a few minutes: you can leave this
+          page and come back.
+        </p>
+      )}
+      {attempt.state === "waiting" && (
+        <p className="small" role="status">
+          Today's SimpleFIN requests ran out partway through the history. It carries on tomorrow
+          morning; come back then to confirm.
+        </p>
+      )}
+      {attempt.state === "failed" && <p className="small error">{attempt.error}</p>}
+      {attempt.state === "ready" && attempt.preview && (
+        <>
+          <p className="small">Ready to link to {target}:</p>
+          <PreviewSummary preview={attempt.preview} />
+        </>
+      )}
+      {confirm.error && <p className="error">{explain(confirm.error)}</p>}
+      <div className="actions">
+        <button type="button" disabled={cancel.isPending} onClick={() => cancel.mutate(attempt.id)}>
+          Cancel
+        </button>
+        {attempt.state === "ready" && (
+          <button
+            type="button"
+            className="primary"
+            disabled={confirm.isPending}
+            onClick={() => confirm.mutate(attempt.id)}
+          >
+            {confirm.isPending ? "Linking…" : "Link"}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -262,16 +330,13 @@ function LinkForm({
   onDone: () => void;
 }) {
   const accounts = useAccounts(book);
-  const link = useLinkBank(book);
+  const attempt = useAttemptLink(book);
   const [target, setTarget] = useState<"new" | "existing">("new");
   const [name, setName] = useState(suggestedName(account));
   const [existing, setExisting] = useState("");
   const [mode, setMode] = useState<Exclude<LinkMode, "new">>("reconcile");
   const [from, setFrom] = useState(today());
   const [typed, setTyped] = useState("");
-  const [preview, setPreview] = useState<LinkPreview | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [previewing, setPreviewing] = useState(false);
 
   const leaves = (accounts.data ?? []).filter((a) => a.kind === "leaf" && !a.implicit && !a.close);
   const chosenAccount =
@@ -289,27 +354,16 @@ function LinkForm({
   };
   const ready =
     !!chosenAccount && (target === "new" || mode !== "start-over" || typed === existing);
-  const reset = () => (setPreview(null), setError(null));
+  const reset = () => attempt.reset();
 
   return (
     <form
       className="editor link-form"
       aria-label={`Link ${account.name}`}
-      onSubmit={async (e) => {
+      onSubmit={(e) => {
         e.preventDefault();
-        setError(null);
-        if (!preview) {
-          setPreviewing(true);
-          try {
-            setPreview(await bankFeeds.preview(book, request));
-          } catch (err) {
-            setError(explain(err));
-          } finally {
-            setPreviewing(false);
-          }
-          return;
-        }
-        link.mutate(request, { onSuccess: onDone, onError: (err) => setError(explain(err)) });
+        // Recorded now, fetched in the background: the preview shows up here when it's ready.
+        attempt.mutate(request, { onSuccess: onDone });
       }}
     >
       <div className="segmented" role="radiogroup" aria-label="Link to">
@@ -376,26 +430,13 @@ function LinkForm({
           )}
         </>
       )}
-      {preview && <PreviewSummary preview={preview} />}
-      {error && <p className="error">{error}</p>}
+      {attempt.error && <p className="error">{explain(attempt.error)}</p>}
       <div className="actions">
         <button type="button" onClick={onDone}>
           Cancel
         </button>
-        <button
-          type="submit"
-          className={preview ? "primary" : ""}
-          disabled={
-            !ready || previewing || link.isPending || (!!preview && !preview.history_complete)
-          }
-        >
-          {previewing
-            ? "Fetching the bank's history…"
-            : preview
-              ? link.isPending
-                ? "Linking…"
-                : "Link"
-              : "Preview"}
+        <button type="submit" className="primary" disabled={!ready || attempt.isPending}>
+          Preview
         </button>
       </div>
     </form>

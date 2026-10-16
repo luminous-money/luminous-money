@@ -1,9 +1,12 @@
 M9: SimpleFIN: plan
 ==================================================================================================
 
-> **Status: building,** with [the answers](#answers-2026-10-15) (the questions below are
-> answered too). Real connections can run on the dev stack: its data is disposable, and a wipe
-> only means pasting the connection back in.
+> **Status: built (2026-10-16),** with unit, API and browser tests, following
+> [the answers](#answers-2026-10-15) and [the follow-ups](#follow-ups-from-trying-it-2026-10-16)
+> (all done in M9: background linking, 45-day windows, Bridge notices, the Fidelity look). Two
+> changes while building: a history ends after 180 quiet days (four 45-day windows) rather than
+> two empty windows, and the import after a reconcile is an ordinary batch, not part of the
+> reconcile's atomic write (if it fails, the next sync brings those rows in).
 
 ## Answers (2026-10-15)
 
@@ -315,7 +318,10 @@ Chase and a Fidelity card linked; PNC checking and the Fidelity investment accou
 - **Treat Bridge notices as notices.** That message came in `errors` and was shown as an error.
   Tell warnings apart from failures (by wording, or `x-api-message`), and don't count them as
   sync problems.
-- **The Fidelity look** (build step 2) is still to do, now that Fidelity is connected.
+- **The Fidelity look** (done): Fidelity sends holdings only with transactions, not with
+  balances-only requests, so the first fetch after connecting is a day's window. SPAXX is
+  priced at exactly 1 (counted as cash, as planned), and holdings have cost basis and
+  `created`. A Fidelity card came with currency `""`: an empty currency is read as USD.
 
 ## Out of scope
 

@@ -88,7 +88,10 @@ milestone starts.
       2026-10-15: open sign-up with no special accounts, Argon2id and breached-password checks,
       10-minute access tokens with rotating refresh, API tokens, email links (optional SMTP),
       account deletion, the operator's CLI, identities ready for OIDC.
-- [ ] **M9: SimpleFIN.** Bank feeds.
+- [x] **M9: SimpleFIN.** Bank feeds. Built 2026-10-16: connections (sealed), linking in the
+      background (new, reconcile with the bank as the source of truth, start over, from a
+      date), the daily sync, brokerages from holdings snapshots, "Reported …" balances, and
+      `@wymp/config-simple` in auth and app.
 - [ ] **M10: Chart of accounts.** The account tree with collapsible nodes and aggregate
       balances; add accounts; open one to edit it, including archiving it; delete accounts (which
       needs a substitute to move their transactions to).

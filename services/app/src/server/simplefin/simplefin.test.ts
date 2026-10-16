@@ -10,6 +10,7 @@ import { FakeLedger } from "../testing.js";
 import { claim, parseAccountSet, SimplefinProblem } from "./client.js";
 import { Sealer } from "./crypto.js";
 import { cashOf, positions } from "./holdings.js";
+import { attemptLink, confirmAttempt, idle, resumeAttempts } from "./attempts.js";
 import { plan } from "./link.js";
 import { DAILY_BUDGET, SimplefinStore } from "./store.js";
 import {
@@ -240,15 +241,15 @@ describe("fetching", () => {
     await expect(request(deps, connection, { balancesOnly: true })).rejects.toThrow(OutOfRequests);
   });
 
-  it("backfills 90-day windows until two in a row are empty", async () => {
+  it("backfills 45-day windows until 180 days in a row are empty", async () => {
     const { user, connection } = await connected([
       { id: "a", date: "2026-10-01", amount: "-10.00" },
       { id: "b", date: "2026-05-01", amount: "-20.00" },
     ]);
     expect(await backfill(deps, connection, "chk")).toBe(true);
     expect(deps.store.transactions(connection.id, "chk").map((t) => t.id)).toEqual(["b", "a"]);
-    // balances-only, then: Jul–Oct (a), Apr–Jul (b), Jan–Apr (empty), Oct–Jan (empty)
-    expect(((await control(`/control/users/${user}`)) as { requests: number }).requests).toBe(5);
+    // balances-only, then 45-day windows back: (a), two quiet ones, (b), then four quiet ones
+    expect(((await control(`/control/users/${user}`)) as { requests: number }).requests).toBe(9);
   });
 });
 
@@ -466,5 +467,90 @@ describe("brokerages", () => {
       ["Assets:Fidelity:VTI", "2", "VTI"],
       ["Assets:Fidelity:Cash", "-610.00", "USD"],
     ]);
+  });
+});
+
+describe("Bridge notices", () => {
+  it("are told apart from errors", () => {
+    const set = parseAccountSet({
+      errors: [
+        "Requested date range exceeds recommended range of 45 days. In the future, this may be capped.",
+        "Connection to PNC may need attention",
+      ],
+      "x-api-message": "Please update your app",
+      accounts: [],
+    });
+    expect(set.errors.map((e) => e.code)).toEqual(["notice", "gen.", "notice"]);
+  });
+});
+
+describe("linking in the background", () => {
+  const until = async (check: () => boolean) => {
+    for (let i = 0; i < 200 && !check(); i++) await new Promise((r) => setTimeout(r, 5));
+  };
+
+  it("records the attempt, fetches its history, then waits for confirming", async () => {
+    const { connection } = await connected(
+      [{ id: "a", date: "2026-09-01", amount: "-10.00" }],
+      "90.00"
+    );
+    const input = {
+      user: "u",
+      connection,
+      accountId: "chk",
+      book: "b",
+      account: CHECKING,
+      mode: "new" as const,
+    };
+
+    const attempt = await attemptLink(deps, input);
+    await until(idle);
+
+    const ready = deps.store.attempt("u", attempt.id)!;
+    expect(ready.state).toBe("ready");
+    expect(ready.preview).toMatchObject({ added: 1, opening: { amount: "100.00" } });
+    expect(ledger.accountList.some((a) => a.name === CHECKING)).toBe(false);
+    await confirmAttempt(deps, ready);
+    expect(balanceOf(CHECKING)).toBe(90);
+    expect(deps.store.attempt("u", attempt.id)).toBeUndefined();
+  });
+
+  it("refuses at once what it can check without fetching", async () => {
+    const { connection } = await connected([]);
+    ledger.addAccount(CHECKING);
+    const input = {
+      user: "u",
+      connection,
+      accountId: "chk",
+      book: "b",
+      account: CHECKING,
+      mode: "new" as const,
+    };
+    await expect(attemptLink(deps, input)).rejects.toThrow(/already exists/);
+    await expect(
+      attemptLink(deps, { ...input, account: "Assets:Nope", mode: "reconcile" })
+    ).rejects.toThrow(/no Assets:Nope/);
+  });
+
+  it("waits for tomorrow's requests when today's run out, then carries on", async () => {
+    const { connection } = await connected([{ id: "a", date: "2026-09-01", amount: "-10.00" }]);
+    db.db.prepare("UPDATE simplefin_connection SET requests = ?").run(DAILY_BUDGET);
+    const input = {
+      user: "u",
+      connection,
+      accountId: "chk",
+      book: "b",
+      account: CHECKING,
+      mode: "new" as const,
+    };
+
+    const attempt = await attemptLink(deps, input);
+    await until(idle);
+    expect(deps.store.attempt("u", attempt.id)!.state).toBe("waiting");
+
+    db.db.prepare("UPDATE simplefin_connection SET requests = 0").run(); // the next day
+    expect(resumeAttempts(deps)).toBe(1);
+    await until(idle);
+    expect(deps.store.attempt("u", attempt.id)!.state).toBe("ready");
   });
 });

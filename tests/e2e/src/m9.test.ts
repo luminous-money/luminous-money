@@ -28,9 +28,30 @@ async function bank(balance = "1900.00") {
     balance,
   });
   await fake(`/control/users/${user}/accounts/chk/transactions`, "POST", [
-    { id: "t1", posted: NOW - 40 * DAY, amount: "-25.00", description: "Coffee", memo: "POS CORNER CAFE", payee: "Corner Cafe" },
-    { id: "t2", posted: NOW - 20 * DAY, amount: "1000.00", description: "Payroll", memo: "ACME PAYROLL", payee: "Acme" },
-    { id: "t3", posted: NOW - 2 * DAY, amount: "-75.00", description: "Groceries", memo: "GREEN GROCER 0042", payee: "Green Grocer" },
+    {
+      id: "t1",
+      posted: NOW - 40 * DAY,
+      amount: "-25.00",
+      description: "Coffee",
+      memo: "POS CORNER CAFE",
+      payee: "Corner Cafe",
+    },
+    {
+      id: "t2",
+      posted: NOW - 20 * DAY,
+      amount: "1000.00",
+      description: "Payroll",
+      memo: "ACME PAYROLL",
+      payee: "Acme",
+    },
+    {
+      id: "t3",
+      posted: NOW - 2 * DAY,
+      amount: "-75.00",
+      description: "Groceries",
+      memo: "GREEN GROCER 0042",
+      payee: "Green Grocer",
+    },
   ]);
   return { user, setup_token };
 }
@@ -53,7 +74,12 @@ async function setUp() {
   return { me, book, post };
 }
 
-type Connection = { id: string; host: string; errors: { code: string; explained: string }[]; accounts: { account_id: string; link: unknown }[] };
+type Connection = {
+  id: string;
+  host: string;
+  errors: { code: string; explained: string }[];
+  accounts: { account_id: string; link: unknown }[];
+};
 
 describe("M9: bank feeds (SimpleFIN)", () => {
   before(stackIsUp);
@@ -67,7 +93,10 @@ describe("M9: bank feeds (SimpleFIN)", () => {
     assert.equal(connected.status, 201);
     const connection = JSON.parse(text) as Connection;
     assert.equal(connection.host, "simplefin-fake:8080");
-    assert.deepEqual(connection.accounts.map((a) => a.account_id), ["chk"]);
+    assert.deepEqual(
+      connection.accounts.map((a) => a.account_id),
+      ["chk"]
+    );
     assert.doesNotMatch(text, /@simplefin-fake/);
 
     const again = await post("/simplefin/connections", { setup_token });
@@ -80,8 +109,15 @@ describe("M9: bank feeds (SimpleFIN)", () => {
   it("links a new account that opens at the bank's balance, imports its history, and syncs without duplicates", async () => {
     const { me, book, post } = await setUp();
     const { setup_token } = await bank("1900.00");
-    const connection = (await (await post("/simplefin/connections", { setup_token })).json()) as Connection;
-    const link = { connection_id: connection.id, account_id: "chk", account: "Assets:Bank:Checking", mode: "new" };
+    const connection = (await (
+      await post("/simplefin/connections", { setup_token })
+    ).json()) as Connection;
+    const link = {
+      connection_id: connection.id,
+      account_id: "chk",
+      account: "Assets:Bank:Checking",
+      mode: "new",
+    };
 
     const preview = (await (await post(`/books/${book}/simplefin/links/preview`, link)).json()) as {
       added: number;
@@ -103,7 +139,9 @@ describe("M9: bank feeds (SimpleFIN)", () => {
     >;
     assert.equal(status["Assets:Bank:Checking"]!.reported.balance, "1900.00");
 
-    const synced = (await (await post(`/simplefin/connections/${connection.id}/sync`, {})).json()) as {
+    const synced = (await (
+      await post(`/simplefin/connections/${connection.id}/sync`, {})
+    ).json()) as {
       staged: number;
     };
     assert.equal(synced.staged, 0);
@@ -124,7 +162,8 @@ describe("M9: bank feeds (SimpleFIN)", () => {
       params: { path: { book_id: book } },
       body: { name: "Expenses:Food", kind: "leaf" },
     });
-    const day = (offset: number) => new Date((NOW + offset * DAY) * 1000).toISOString().slice(0, 10);
+    const day = (offset: number) =>
+      new Date((NOW + offset * DAY) * 1000).toISOString().slice(0, 10);
     const write = async (date: string, amount: string, narration: string) =>
       (
         await me.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
@@ -143,7 +182,9 @@ describe("M9: bank feeds (SimpleFIN)", () => {
     const coffee = await write(day(-40), "-25.00", "my coffee");
     const stray = await write(day(-10), "-12.00", "not at the bank");
     const { setup_token } = await bank("1900.00");
-    const connection = (await (await post("/simplefin/connections", { setup_token })).json()) as Connection;
+    const connection = (await (
+      await post("/simplefin/connections", { setup_token })
+    ).json()) as Connection;
     const link = { connection_id: connection.id, account_id: "chk", account, mode: "reconcile" };
 
     const preview = (await (await post(`/books/${book}/simplefin/links/preview`, link)).json()) as {
@@ -163,9 +204,11 @@ describe("M9: bank feeds (SimpleFIN)", () => {
     assert.equal((await get(coffee.id)).flag, "*");
     assert.equal((await get(coffee.id)).narration, "my coffee");
     assert.equal((await get(stray.id)).flag, "!");
-    const [summary] = (await me.ledger.GET("/api/ledger/v1/books/{book_id}/accounts/summary", {
-      params: { path: { book_id: book }, query: { account: [account] } },
-    })).data!;
+    const [summary] = (
+      await me.ledger.GET("/api/ledger/v1/books/{book_id}/accounts/summary", {
+        params: { path: { book_id: book }, query: { account: [account] } },
+      })
+    ).data!;
     // The bank's balance, plus the stray it doesn't know about.
     assert.deepEqual(summary!.balance, [{ number: "1888.00", currency: "USD" }]);
     const status = (await (await me.app(`/books/${book}/simplefin/status`)).json()) as Record<
@@ -178,7 +221,9 @@ describe("M9: bank feeds (SimpleFIN)", () => {
   it("shows the bank's errors in plain words", async () => {
     const { me, post } = await setUp();
     const { user, setup_token } = await bank();
-    const connection = (await (await post("/simplefin/connections", { setup_token })).json()) as Connection;
+    const connection = (await (
+      await post("/simplefin/connections", { setup_token })
+    ).json()) as Connection;
     await fake(`/control/users/${user}/errors`, "PUT", {
       shape: "v2",
       errors: [{ code: "con.auth", msg: "Fake Bank needs you to log in" }],

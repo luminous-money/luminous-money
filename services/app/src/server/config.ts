@@ -10,13 +10,7 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import {
-  configValue,
-  REQUIRED,
-  validate,
-  Validators,
-  type ConfigError,
-} from "@wymp/config-simple";
+import { configValue, REQUIRED, validate, Validators, type ConfigError } from "@wymp/config-simple";
 import * as dotenv from "dotenv";
 
 export const ENVS = ["production", "development", "test"] as const;

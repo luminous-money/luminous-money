@@ -13,9 +13,10 @@
 import type { Hono } from "hono";
 
 import type { ImportResult } from "../../shared/imports.js";
-import { claim, explainError, hostOf, SimplefinProblem, type SfError } from "./client.js";
+import { claim, explainError, hostOf, isNotice, SimplefinProblem, type SfError } from "./client.js";
 import { kindOf, LinkProblem, plan, type LinkMode } from "./link.js";
-import type { Connection, LinkKind } from "./store.js";
+import { attemptLink, confirmAttempt } from "./attempts.js";
+import type { Attempt, Connection, LinkKind } from "./store.js";
 import { DAILY_BUDGET } from "./store.js";
 import {
   cashAccountOf,
@@ -31,7 +32,12 @@ type Env = { Variables: { user: string } };
 const MODES: LinkMode[] = ["new", "reconcile", "start-over", "from-date"];
 
 const errorsOf = (errors: SfError[]) =>
-  errors.map((e) => ({ code: e.code, message: e.message, explained: explainError(e) }));
+  errors.map((e) => ({
+    code: e.code,
+    message: e.message,
+    explained: explainError(e),
+    notice: isNotice(e),
+  }));
 
 function failure(error: unknown): [{ detail: string }, 403 | 404 | 409 | 422 | 429 | 502] {
   if (error instanceof SimplefinProblem)
@@ -110,7 +116,8 @@ export function simplefinRoutes(
         hostOf(access),
         randomSyncMinute()
       );
-      await request(deps, connection, { balancesOnly: true });
+      // A day's window rather than balances only: holdings come only with transactions.
+      await request(deps, connection, { start: Math.floor(Date.now() / 1000) - 86400 });
       return c.json(await view(user, store.connection(user, connection.id)!), 201);
     } catch (error) {
       return c.json(...failure(error));
@@ -194,6 +201,58 @@ export function simplefinRoutes(
     } catch (error) {
       return c.json(...failure(error));
     }
+  });
+
+  // Link attempts: chosen now, fetched in the background, confirmed from their preview later.
+
+  const attemptView = (a: Attempt) => ({
+    id: a.id,
+    connection_id: a.connection_id,
+    account_id: a.account_id,
+    account: a.account,
+    mode: a.mode,
+    from: a.from_date,
+    state: a.state,
+    preview: a.preview,
+    error: a.error,
+    updated_at: a.updated_at,
+  });
+
+  api.get("/books/:book/simplefin/attempts", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    return c.json(store.attemptsIn(book).map(attemptView));
+  });
+
+  api.post("/books/:book/simplefin/attempts", async (c) => {
+    const { book } = c.req.param();
+    const user = c.get("user");
+    if (!(await owned(user, book))) return c.json({ detail: "not found" }, 404);
+    try {
+      return c.json(attemptView(await attemptLink(deps, await linkInput(c, user, book))), 202);
+    } catch (error) {
+      return c.json(...failure(error));
+    }
+  });
+
+  api.post("/books/:book/simplefin/attempts/:id/confirm", async (c) => {
+    const { book, id } = c.req.param();
+    const user = c.get("user");
+    const attempt = store.attempt(user, id);
+    if (!attempt || attempt.book_id !== book) return c.json({ detail: "not found" }, 404);
+    try {
+      return c.json({ link: await confirmAttempt(deps, attempt) }, 201);
+    } catch (error) {
+      return c.json(...failure(error));
+    }
+  });
+
+  api.delete("/books/:book/simplefin/attempts/:id", (c) => {
+    const { book, id } = c.req.param();
+    const attempt = store.attempt(c.get("user"), id);
+    if (!attempt || attempt.book_id !== book) return c.json({ detail: "not found" }, 404);
+    store.deleteAttempt(id);
+    return c.body(null, 204);
   });
 
   api.delete("/books/:book/simplefin/links/:id", async (c) => {

@@ -53,11 +53,18 @@ export type SfAccount = {
 };
 
 export type SfError = {
-  /** `gen.auth`, `con.auth`, `act.failed`, ...; `gen.` for the older plain-string errors. */
+  /** `gen.auth`, `con.auth`, `act.failed`, ...; `gen.` for the older plain-string errors, and
+   * `notice` for the Bridge's notices (advice about how the API is used, not failures). */
   code: string;
   message: string;
   account_id: string | null;
 };
+
+/** The Bridge's advice comes in the same list as its errors (e.g. "Requested date range
+ * exceeds recommended range of 45 days", 2026-10-16), or as `x-api-message`. */
+const NOTICE = /recommended|may be capped|in the future|deprecat/i;
+
+export const isNotice = (e: SfError) => e.code === "notice";
 
 export type SfAccountSet = { accounts: SfAccount[]; errors: SfError[] };
 
@@ -124,7 +131,8 @@ function parseAccount(raw: Record<string, unknown>): SfAccount {
   return {
     id: String(raw.id),
     name: String(raw.name ?? raw.id),
-    currency: String(raw.currency ?? "USD"),
+    // The Bridge sends some cards' currency as "" (2026-10-16).
+    currency: String(raw.currency || "USD"),
     balance: String(raw.balance ?? "0"),
     available_balance: str(raw["available-balance"]),
     balance_date: Number(raw["balance-date"] ?? 0),
@@ -164,10 +172,13 @@ export function parseAccountSet(body: unknown): SfAccountSet {
       account_id: str(e.account_id),
     })),
     ...(errlist.length ? [] : ((set.errors ?? []) as unknown[])).map((e) => ({
-      code: "gen.",
+      code: NOTICE.test(String(e)) ? "notice" : "gen.",
       message: String(e),
       account_id: null,
     })),
+    ...(set["x-api-message"]
+      ? [{ code: "notice", message: String(set["x-api-message"]), account_id: null }]
+      : []),
   ];
   return {
     accounts: ((set.accounts ?? []) as Record<string, unknown>[]).map(parseAccount),
@@ -210,6 +221,7 @@ export async function fetchAccounts(
 
 /** What an error means for the user, in plain words. */
 export function explainError(error: SfError): string {
+  if (isNotice(error)) return `SimpleFIN says: ${error.message}`;
   if (error.code === "gen.auth")
     return "SimpleFIN no longer accepts this connection: connect it again with a new setup token.";
   if (error.code.startsWith("con.auth"))

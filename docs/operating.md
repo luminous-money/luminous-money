@@ -27,8 +27,13 @@ same project name for every command after this.
 | `SMTP_URL`, `MAIL_FROM` | Email, for password resets and confirming addresses, e.g. `smtps://user:pass@smtp.example.com` and `fava-beans <books@example.com>`. Optional; without them, resets go through `reset-link` below. |
 | `AUTH_BREACHED_PASSWORDS` | `true` (default) checks new passwords against Have I Been Pwned. Only the first five characters of the password's SHA-1 leave the server. |
 | `AUTH_TEST_USERS` | Test stacks only. Never set it on a live stack: it lets anyone log in as any email. |
+| `SIMPLEFIN_ENCRYPTION_KEY` | **Required.** Seals stored bank-feed credentials. 32 random bytes, base64: `openssl rand -base64 32`. Keep it with your backups: without it, saved connections can't be opened (reconnect them with new setup tokens). |
+| `SIMPLEFIN_HOSTS` | The SimpleFIN servers setup tokens may point to, comma-separated. Default: the SimpleFIN Bridge's (`bridge.simplefin.org,beta-bridge.simplefin.org`). |
+| `APP_ENV` | Which settings file each service starts from (`services/*/.env/<APP_ENV>`). Leave it `production`. |
 
 `AUTH_JWT_SECRET` is gone: `auth` makes and keeps its own signing keys.
+
+`auth` and `app` check their settings when they start, and stop with a list of what's wrong.
 
 ## HTTPS
 

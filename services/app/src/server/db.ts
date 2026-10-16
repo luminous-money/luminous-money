@@ -233,6 +233,27 @@ export const MIGRATIONS: Migration[] = [
     ),
     "ALTER TABLE import_batch ADD COLUMN source TEXT NOT NULL DEFAULT 'csv'",
   ],
+  // 11: linking in the background (M9 follow-up). A link attempt is what the user chose; its
+  // history is fetched in the background, and its preview waits for them to confirm.
+  [
+    createTable(
+      "simplefin_attempt",
+      [
+        "id TEXT PRIMARY KEY",
+        "user_id TEXT NOT NULL",
+        "connection_id TEXT NOT NULL REFERENCES simplefin_connection(id) ON DELETE CASCADE",
+        "account_id TEXT NOT NULL",
+        "book_id TEXT NOT NULL",
+        "account TEXT NOT NULL",
+        "mode TEXT NOT NULL",
+        "from_date TEXT",
+        "state TEXT NOT NULL", // 'fetching' | 'waiting' (out of requests: tomorrow) | 'ready' | 'failed'
+        "preview TEXT", // JSON: LinkPreview, once ready
+        "error TEXT",
+      ],
+      ["UNIQUE (connection_id, account_id)"]
+    ),
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -774,6 +795,7 @@ export class AppDb {
         "DELETE FROM price_fetch WHERE book_id = ?",
         "DELETE FROM book_setting WHERE book_id = ?",
         "DELETE FROM simplefin_link WHERE book_id = ?",
+        "DELETE FROM simplefin_attempt WHERE book_id = ?",
       ])
         this.db.prepare(sql).run(book);
     });

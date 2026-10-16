@@ -92,7 +92,9 @@ export function createFakeSimplefin({ origin = "http://simplefin-fake:8080" } = 
 
   app.get("/simplefin/accounts", (c) => {
     const auth = c.req.header("authorization")?.match(/^Basic (.+)$/)?.[1];
-    const [name, password] = Buffer.from(auth ?? "", "base64").toString().split(":");
+    const [name, password] = Buffer.from(auth ?? "", "base64")
+      .toString()
+      .split(":");
     const user = name ? users.get(name) : undefined;
     if (!user || user.password !== password) return c.text("Forbidden", 403);
     user.requests += 1;
@@ -118,7 +120,8 @@ export function createFakeSimplefin({ origin = "http://simplefin-fake:8080" } = 
                   (t.pending ? q("pending") === "1" : true) &&
                   (t.pending || (t.posted >= start && t.posted < end))
               ),
-        holdings: a.holdings,
+        // As the Bridge does: holdings only come with transactions.
+        holdings: q("balances-only") === "1" ? [] : a.holdings,
       }));
     return c.json(
       user.shape === "v2"
@@ -131,7 +134,13 @@ export function createFakeSimplefin({ origin = "http://simplefin-fake:8080" } = 
 
   app.post("/control/users", (c) => {
     const user = `user${secret().slice(0, 8)}`;
-    users.set(user, { password: secret(), accounts: new Map(), errors: [], shape: "v1", requests: 0 });
+    users.set(user, {
+      password: secret(),
+      accounts: new Map(),
+      errors: [],
+      shape: "v1",
+      requests: 0,
+    });
     return c.json({ user, setup_token: setupToken(user) }, 201);
   });
 

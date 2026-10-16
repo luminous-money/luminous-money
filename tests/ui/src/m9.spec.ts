@@ -25,8 +25,22 @@ async function bank() {
     balance: "1234.56",
   });
   await fake(`/control/users/${user}/accounts/chk/transactions`, "POST", [
-    { id: "t1", posted: NOW - 30 * DAY, amount: "-25.00", description: "Coffee", memo: "POS CORNER CAFE", payee: "Corner Cafe" },
-    { id: "t2", posted: NOW - 3 * DAY, amount: "-75.00", description: "Groceries", memo: "GREEN GROCER 0042", payee: "Green Grocer" },
+    {
+      id: "t1",
+      posted: NOW - 30 * DAY,
+      amount: "-25.00",
+      description: "Coffee",
+      memo: "POS CORNER CAFE",
+      payee: "Corner Cafe",
+    },
+    {
+      id: "t2",
+      posted: NOW - 3 * DAY,
+      amount: "-75.00",
+      description: "Groceries",
+      memo: "GREEN GROCER 0042",
+      payee: "Green Grocer",
+    },
   ]);
   return setup_token!;
 }
@@ -35,7 +49,9 @@ async function connect(page: Page, book: string) {
   await page.goto(`/ui/books/${book}/connections`);
   await page.getByRole("textbox", { name: "Setup token" }).fill(await bank());
   await page.getByRole("button", { name: "Connect" }).click();
-  await expect(page.getByRole("region", { name: /Connection to/ })).toContainText("Everyday Checking");
+  await expect(page.getByRole("region", { name: /Connection to/ })).toContainText(
+    "Everyday Checking"
+  );
 }
 
 test("connect a bank, link a new account, and see what the bank reports", async ({ page }) => {
@@ -48,10 +64,12 @@ test("connect a bank, link a new account, and see what the bank reports", async 
     "Assets:Bank:Fake-Bank-Everyday-Checking"
   );
   await form.getByRole("button", { name: "Preview" }).click();
-  await expect(form.getByRole("region", { name: "What linking will do" })).toContainText(
+  // The history comes in the background; the preview fills in when it's here.
+  const linking = page.getByRole("group", { name: /Linking to/ });
+  await expect(linking.getByRole("region", { name: "What linking will do" })).toContainText(
     "Opening balance $1,334.56"
   );
-  await form.getByRole("button", { name: "Link", exact: true }).click();
+  await linking.getByRole("button", { name: "Link", exact: true }).click();
 
   await page.getByRole("link", { name: "Fake Bank Everyday Checking" }).click();
   await expect(page.getByRole("heading", { name: /Fake Bank Everyday Checking/ })).toBeVisible();
@@ -60,25 +78,47 @@ test("connect a bank, link a new account, and see what the bank reports", async 
 });
 
 test("reconciling marks what the bank doesn't know in review", async ({ page }) => {
-  const { book, account } = await setUpUser(page);
+  const { book, account, session } = await setUpUser(page);
   // setUpUser's account opened 2024-01-01 at 1,000.00; add a purchase the bank never saw.
-  await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+    params: { path: { book_id: book.id } },
+    body: { name: "Expenses:Food", kind: "leaf" },
+  });
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+    params: { path: { book_id: book.id } },
+    body: {
+      date: new Date((NOW - 10 * DAY) * 1000).toISOString().slice(0, 10),
+      flag: "*",
+      narration: "Cash I never spent",
+      postings: [
+        { account, units: { number: "-12.00", currency: "USD" } },
+        { account: "Expenses:Food" },
+      ],
+    },
+  });
   await connect(page, book.id);
 
   await page.getByRole("button", { name: "Link…" }).click();
   const form = page.getByRole("form", { name: "Link Everyday Checking" });
   await form.getByRole("radio", { name: "An account in this book" }).click();
-  await form.getByRole("combobox", { name: "Account" }).click();
+  await form.getByRole("button", { name: "Account: none" }).click();
+  await form.getByRole("combobox", { name: "Account" }).fill("PNC");
   await page.getByRole("option", { name: account }).click();
   await expect(form.getByRole("radio", { name: /Reconcile with the bank/ })).toBeChecked();
   await form.getByRole("button", { name: "Preview" }).click();
-  const summary = form.getByRole("region", { name: "What linking will do" });
+  const linking = page.getByRole("group", { name: /Linking to/ });
+  const summary = linking.getByRole("region", { name: "What linking will do" });
   await expect(summary).toContainText("0 match yours");
   await expect(summary).toContainText("2 are new");
+  await expect(summary).toContainText("1 of yours aren't at the bank");
   await expect(summary).toContainText("(was $1,000.00)");
-  await form.getByRole("button", { name: "Link", exact: true }).click();
+  await linking.getByRole("button", { name: "Link", exact: true }).click();
 
   await expect(page.getByText(/Linked to/)).toBeVisible();
   await page.goto(`/ui/books/${book.id}/review`);
-  await expect(page.getByText("GREEN GROCER 0042")).toBeVisible();
+  await expect(page.getByText("Green Grocer").first()).toBeVisible();
+  // Only the stray purchase is marked (its description is an input, so it's found by amount).
+  await expect(page.getByText("Not at the bank", { exact: true })).toHaveCount(1);
+  const stray = page.getByRole("listitem").filter({ hasText: "Not at the bank" });
+  await expect(stray).toContainText("12.00");
 });

@@ -499,6 +499,82 @@ How auth works (M8; the shape is M1's):
   within ±5 days, ranked by closeness in date. It identifies and ranks; nothing acts on matches
   yet.
 
+### Bank feeds: SimpleFIN (M9)
+
+[SimpleFIN](https://www.simplefin.org/protocol.html), usually through the SimpleFIN Bridge, is the
+bank feed. Its shapes are the Bridge's actual ones, which go beyond the spec: `payee`, `memo`
+and `holdings`, and errors either as coded `errlist` or as the older plain `errors`.
+
+- **Connections are the user's; links go into books.** One access URL usually covers every
+  institution connected at the Bridge, so it's stored once and fetched once, wherever its
+  accounts are linked. A link ties one bank account to one account in one book.
+- **The access URL is a credential:**
+  - it's sealed at rest (AES-256-GCM, `SIMPLEFIN_ENCRYPTION_KEY`, required at boot)
+  - it never reaches the browser
+  - it's only ever fetched over `https`, from allowlisted hosts (`SIMPLEFIN_HOSTS`), never a
+    private address, never following a redirect, since this may be a public server and a setup
+    token is a URL the user pastes
+- **Fetching and importing are separate.**
+  - Fetching is rationed. The Bridge allows about 24 requests a day; we stop at 20. It
+    recommends 45-day windows (its notice, 2026-10-16) and a 5-day overlap.
+  - What comes back fills a **mirror** of the bank's posted transactions (pending ones are
+    skipped: they change, and get new IDs when they post).
+  - Importing makes import batches from the mirror through the CSV pipeline (`importRows`),
+    so fingerprints (`id:sfin:<id>`), matching, categorization and review are the same.
+  - Rows are dated when the transaction happened (`transacted_at`, else posted), in the book's
+    time zone. The narration is the bank's raw text (`memo`); the payee is the Bridge's.
+- **Cross-source matching:** a transaction held by a CSV row may still be matched by a bank row
+  (and the other way round). The rule against claiming a held transaction is for rows of the
+  same stream.
+- **Linking: the bank is the source of truth.** Every link fetches the bank's whole history
+  first (as far as it goes: windows back until 180 days are empty). Call its first date S.
+  - **New:** the account opens on S − 1 at the reported balance less everything synced, so the
+    books agree with the bank from the start.
+  - **Reconcile** (an existing account; the default):
+    - Your transactions from S on are pending, except those matching the bank, which are
+      confirmed (yours kept: date, payee, splits).
+    - The opening balance becomes whatever makes the balance at S − 1 the bank's.
+    - The bank's unmatched transactions import.
+    - Yours the bank doesn't know stay pending, marked **Not at the bank** in review.
+  - **Start over** deletes the account's transactions first (the user's choice, never the
+    default). **From a date** reconciles nothing.
+  - The reconcile is one atomic ledger write (`/transactions/changes` takes versioned updates
+    too); the import after it is an ordinary batch.
+- **Linking happens in the background.** Some banks answer slowly (minutes per request), and a
+  long history is many windows.
+  - The choice is recorded as an **attempt**, and its history is fetched in the background.
+    Out of requests, it waits for the next morning.
+  - Its preview fills in when the history is in, and the user confirms when they come back.
+  - Attempts survive restarts.
+- **Syncing:** once each morning, at a random minute between 06:00 and 08:00 in the first linked
+  book's time zone (the Bridge asks apps to spread out), plus "Sync now".
+- **Brokerages** (seen with Fidelity, 2026-10-16):
+  - **Holdings come only with transactions,** not with balances-only requests.
+  - **Each sync's holdings are a snapshot.** It records that day's price per symbol. Where the
+    bank's shares differ from the books', it stages a buy or sale for review through M5's trade
+    booking, paired with the bank's matching cash transaction when there is one.
+  - **Money-market core positions** (priced at 1, like SPAXX) count as cash.
+  - **A new brokerage opens with one estimated lot per position,** at its cost basis: SimpleFIN
+    sends totals, not lots.
+- **What an account shows:** its balance is the books', as everywhere. A synced account adds
+  "Reported today 6:00am: $…", the bank's. The Bridge's errors are shown in plain words, and its
+  notices (advice like the 45-day one) are told apart from failures.
+
+### Configuration: `@wymp/config-simple`
+
+`auth` and `app` read every setting in one `src/config.ts`, through `@wymp/config-simple`,
+following its README:
+
+- **Checked at boot:** a missing or malformed setting stops the service with a list of what's
+  wrong.
+- **Only production-safe defaults** are in code; anything without one is `REQUIRED`.
+- **`APP_ENV`** (`production` by default, `development` or `test`) picks `.env/<APP_ENV>`, which
+  ships in the image. `.env/local` (not committed) overrides it, and real environment variables
+  override both.
+- **The e2e stack** sets `APP_ENV=test` and little else: its settings (test users, Mailpit, the
+  fake SimpleFIN server, a fixed key for its made-up data) live in `.env/test`.
+- **The ledger** (Python) keeps its two environment variables as they are.
+
 ### Books are independent
 
 A book is a self-contained set of accounts and transactions, and **the selected book is the

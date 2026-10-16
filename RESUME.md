@@ -6,12 +6,18 @@ _Updated 2026-10-15._ Keep this current: every finalized change set updates it (
 
 ## State
 
-**M1 through M8 are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M9 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
-(categorization), M5 (investments), M6 (multiple books) and M8 (auth) are described in their
-plans. The milestones ahead (M9–M15, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+(categorization), M5 (investments), M6 (multiple books), M8 (auth) and M9 (SimpleFIN) are described
+in their plans. The milestones ahead (M10–M19, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
+- **Bank feeds (M9):** Menu → Bank connections: paste a SimpleFIN Bridge setup token, then link
+  each bank account (new, or an existing one reconciled with the bank as the source of truth;
+  also "start over" and "from a date"). The history comes in the background; confirm from the
+  preview. New transactions arrive each morning (or "Sync now") into review. Synced accounts
+  show "Reported today 6:00am: $…"; yours the bank doesn't have are "Not at the bank" in
+  review. Brokerages (Fidelity) bring holdings, prices and position changes.
 - **Accounts (M8):** anyone creates one (name, email, a 15+ character password not known from
   breaches) and logs in on any number of devices; "Forgot password?" emails a reset link when
   the server has mail. **Your account:** name and email (confirmed by emailed link), password,
@@ -94,26 +100,18 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 133 tests, including the table lint
-    - auth: 20; app: 117; db: 10; csv-import: 22
+    - ledger: 134 tests, including the table lint
+    - auth: 20; app: 137; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 60 API tests and 67 browser tests (with Mailpit as the mail server)
+  - `pnpm e2e`: 64 API tests and 69 browser tests (with Mailpit and a fake SimpleFIN server)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps
 
-1. **Finish M9 (SimpleFIN):** it's built and on the dev stack, with unit tests passing (app:
-   131, including 14 for SimpleFIN), but **`pnpm test` and `pnpm e2e` haven't been run on it
-   yet**. The new suites (`tests/e2e/src/m9.test.ts`, `tests/ui/src/m9.spec.ts`) haven't run,
-   and `tests/ui/src/m9.spec.ts`'s second test doesn't check the "Not at the bank" pill yet.
-   Then the docs: design.md ("Bank feeds", "Configuration"), operating.md
-   (`SIMPLEFIN_ENCRYPTION_KEY`, `SIMPLEFIN_HOSTS`, `APP_ENV`), and PLAN.md. And the Fidelity
-   look (plan step 2), once a Fidelity account is connected.
-   Also [the M9 follow-ups](docs/milestones/m9-simplefin/PLAN.md#follow-ups-from-trying-it-2026-10-16):
-   PNC and Fidelity investments timed out linking (link in the background), and the Bridge
-   now wants 45-day windows.
+1. Answer the questions in [the M10 plan](docs/milestones/m10-chart-of-accounts/PLAN.md#questions)
+   (chart of accounts), then say `build M10`.
 2. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
 
 ## Gotchas
@@ -127,6 +125,8 @@ How it's put together:
 
 - **`pnpm up` is pnpm's own `update` command,** not the `up` script: it bumps dependencies. Use
   `pnpm run up` (foreground), or `docker buildx bake && docker compose up -d`.
+- **SimpleFIN's budget:** about 24 requests a day per connection at the Bridge; the app stops at
+  20 (UTC days). Linking a long history takes several; "Sync now" takes one or two.
 - **The dev stack needs `SIMPLEFIN_ENCRYPTION_KEY`** (app won't start without it): it's in the
   repo root's `.env` (gitignored), which Compose reads. Keep it: stored SimpleFIN connections
   can't be opened without it.

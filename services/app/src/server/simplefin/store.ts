@@ -48,6 +48,25 @@ export type AccountSnapshot = {
 
 export type LinkKind = "cash" | "brokerage";
 
+export type AttemptState = "fetching" | "waiting" | "ready" | "failed";
+
+/** A link the user chose, while its history is fetched; confirmed later from its preview. */
+export type Attempt = {
+  id: string;
+  user_id: string;
+  connection_id: string;
+  account_id: string;
+  book_id: string;
+  account: string;
+  mode: string;
+  from_date: string | null;
+  state: AttemptState;
+  preview: unknown;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Link = {
   id: string;
   user_id: string;
@@ -129,6 +148,7 @@ export class SimplefinStore {
   /** Forget everything of the user's (their account is being deleted). */
   forgetUser(user: string): void {
     transaction(this.db, () => {
+      this.db.prepare("DELETE FROM simplefin_attempt WHERE user_id = ?").run(user);
       this.db.prepare("DELETE FROM simplefin_link WHERE user_id = ?").run(user);
       this.db.prepare("DELETE FROM simplefin_connection WHERE user_id = ?").run(user);
     });
@@ -291,6 +311,94 @@ export class SimplefinStore {
       )
       .get(connectionId) as { posted: number | null };
     return r.posted ?? undefined;
+  }
+
+  // Link attempts
+
+  /** Record a link attempt, replacing any earlier one for the same bank account. */
+  addAttempt(
+    a: Pick<
+      Attempt,
+      "user_id" | "connection_id" | "account_id" | "book_id" | "account" | "mode" | "from_date"
+    >
+  ): Attempt {
+    const key = id();
+    const stamp = now();
+    transaction(this.db, () => {
+      this.db
+        .prepare("DELETE FROM simplefin_attempt WHERE connection_id = ? AND account_id = ?")
+        .run(a.connection_id, a.account_id);
+      this.db
+        .prepare(
+          `INSERT INTO simplefin_attempt (id, user_id, connection_id, account_id, book_id, account, mode, from_date, state, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'fetching', ?, ?)`
+        )
+        .run(
+          key,
+          a.user_id,
+          a.connection_id,
+          a.account_id,
+          a.book_id,
+          a.account,
+          a.mode,
+          a.from_date,
+          stamp,
+          stamp
+        );
+    });
+    return this.attempt(a.user_id, key)!;
+  }
+
+  private toAttempt(r: Omit<Attempt, "preview"> & { preview: string | null }): Attempt {
+    return { ...r, preview: r.preview ? (JSON.parse(r.preview) as unknown) : null };
+  }
+
+  attempt(user: string, attempt: string): Attempt | undefined {
+    const r = this.db
+      .prepare("SELECT * FROM simplefin_attempt WHERE id = ? AND user_id = ?")
+      .get(attempt, user) as (Omit<Attempt, "preview"> & { preview: string | null }) | undefined;
+    return r && this.toAttempt(r);
+  }
+
+  attemptsIn(book: string): Attempt[] {
+    return (
+      this.db
+        .prepare("SELECT * FROM simplefin_attempt WHERE book_id = ? ORDER BY created_at")
+        .all(book) as (Omit<Attempt, "preview"> & { preview: string | null })[]
+    ).map((r) => this.toAttempt(r));
+  }
+
+  /** Attempts still fetching (or waiting for tomorrow's requests). */
+  unfinishedAttempts(): Attempt[] {
+    return (
+      this.db
+        .prepare(
+          "SELECT * FROM simplefin_attempt WHERE state IN ('fetching', 'waiting') ORDER BY created_at"
+        )
+        .all() as (Omit<Attempt, "preview"> & { preview: string | null })[]
+    ).map((r) => this.toAttempt(r));
+  }
+
+  setAttempt(
+    id: string,
+    state: AttemptState,
+    details: { preview?: unknown; error?: string } = {}
+  ): void {
+    this.db
+      .prepare(
+        "UPDATE simplefin_attempt SET state = ?, preview = ?, error = ?, updated_at = ? WHERE id = ?"
+      )
+      .run(
+        state,
+        details.preview === undefined ? null : JSON.stringify(details.preview),
+        details.error ?? null,
+        now(),
+        id
+      );
+  }
+
+  deleteAttempt(id: string): void {
+    this.db.prepare("DELETE FROM simplefin_attempt WHERE id = ?").run(id);
   }
 
   // Links

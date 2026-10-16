@@ -3,7 +3,8 @@
 export type LinkMode = "new" | "reconcile" | "start-over" | "from-date";
 export type LinkKind = "cash" | "brokerage";
 
-export type BankError = { code: string; message: string; explained: string };
+/** A bank feed's error, or (`notice`) the Bridge's advice, which isn't a failure. */
+export type BankError = { code: string; message: string; explained: string; notice: boolean };
 
 export type BankAccount = {
   account_id: string;
@@ -51,6 +52,21 @@ export type LinkPreview = {
   deleted_elsewhere: number;
   opening: { date: string; amount: string; was: string | null } | null;
   starts_on: string;
+};
+
+/** A link the user chose, while the bank's history is fetched in the background. */
+export type LinkAttempt = {
+  id: string;
+  connection_id: string;
+  account_id: string;
+  account: string;
+  mode: LinkMode;
+  from: string | null;
+  /** `waiting`: today's requests ran out; it carries on with tomorrow morning's sync. */
+  state: "fetching" | "waiting" | "ready" | "failed";
+  preview: LinkPreview | null;
+  error: string | null;
+  updated_at: string;
 };
 
 /** A linked account's bank side. */

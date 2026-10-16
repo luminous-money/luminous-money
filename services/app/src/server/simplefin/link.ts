@@ -120,20 +120,53 @@ export const kindOf = (snapshot: AccountSnapshot): LinkKind =>
 const reportedCash = (snapshot: AccountSnapshot, kind: LinkKind) =>
   kind === "brokerage" ? cashOf(snapshot.balance, snapshot.holdings) : snapshot.balance;
 
+/** The checks that need no fetching, so a link attempt can be refused at once: the book and the
+ * bank account exist, neither side is linked yet, and the account is there (or, for a new
+ * one, isn't). Whether it's a brokerage waits for the history (holdings come with it). */
+export async function precheck(deps: SimplefinDeps, input: LinkInput): Promise<void> {
+  const { store } = deps;
+  const ledger = deps.ledgerFor(input.user);
+  const { connection, accountId, book, account, mode } = input;
+  if (!(await ledger.book(book))) throw new LinkProblem(404, "not found");
+  if (!store.account(connection.id, accountId))
+    throw new LinkProblem(404, "this connection has no such account");
+  if (store.links(connection.id).some((l) => l.account_id === accountId))
+    throw new LinkProblem(409, "this bank account is already linked");
+  if (store.linkTo(book, account)) throw new LinkProblem(409, `${account} is already linked`);
+  if (mode === "from-date" && !/^\d{4}-\d{2}-\d{2}$/.test(input.from ?? ""))
+    throw new LinkProblem(422, "choose the first date to bring in");
+  const names = new Set(
+    (await ledger.accounts(book)).filter((a) => !a.implicit).map((a) => a.name)
+  );
+  if (mode === "new" && (names.has(account) || names.has(`${account}:Cash`)))
+    throw new LinkProblem(409, `${account} already exists: reconcile with it, or start it over`);
+  if (mode !== "new" && !names.has(account) && !names.has(`${account}:Cash`))
+    throw new LinkProblem(422, `there's no ${account} in this book`);
+}
+
+/** What a link would do (`preview`), and doing it (`apply`). With `fetch` (the default), the
+ * bank's history is fetched first, as far as today's budget allows; without it, only what's
+ * already fetched is used (a background attempt fetches first, then plans). */
 export async function plan(
   deps: SimplefinDeps,
-  input: LinkInput
+  input: LinkInput,
+  { fetch = true } = {}
 ): Promise<{ preview: LinkPreview; apply: () => Promise<Link> }> {
   const { db, store } = deps;
   const ledger = deps.ledgerFor(input.user);
   const { connection, accountId, book, account, mode } = input;
   if (!(await ledger.book(book))) throw new LinkProblem(404, "not found");
-  const snapshot = store.account(connection.id, accountId);
-  if (!snapshot) throw new LinkProblem(404, "this connection has no such account");
+  if (!store.account(connection.id, accountId))
+    throw new LinkProblem(404, "this connection has no such account");
   if (store.links(connection.id).some((l) => l.account_id === accountId))
     throw new LinkProblem(409, "this bank account is already linked");
   if (store.linkTo(book, account)) throw new LinkProblem(409, `${account} is already linked`);
 
+  // The history first: holdings (and so whether it's a brokerage) come with transactions.
+  const complete = fetch
+    ? await backfill(deps, connection, accountId)
+    : !!store.account(connection.id, accountId)!.history_complete;
+  const snapshot = store.account(connection.id, accountId)!;
   const kind = kindOf(snapshot);
   const cash = cashAccountOf({ account, kind });
   const accounts = await ledger.accounts(book);
@@ -152,7 +185,6 @@ export async function plan(
   if (mode === "from-date" && !/^\d{4}-\d{2}-\d{2}$/.test(input.from ?? ""))
     throw new LinkProblem(422, "choose the first date to bring in");
 
-  const complete = await backfill(deps, connection, accountId);
   const zone = db.timeZone(book);
   const rows = rowsOf(store.transactions(connection.id, accountId), zone).sort((a, b) =>
     a.date!.localeCompare(b.date!)

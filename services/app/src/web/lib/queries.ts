@@ -791,5 +791,22 @@ export const useDisconnectBank = () => useBankChange(bankFeeds.disconnect);
 export const useSyncBank = () => useBankChange(bankFeeds.sync);
 export const useLinkBank = (book: string) =>
   useBankChange((link: LinkRequest) => bankFeeds.link(book, link));
+
+/** The book's link attempts; polled while any is still fetching the bank's history. */
+export function useBankAttempts(book: string) {
+  return useQuery({
+    queryKey: ["book", book, "bank-attempts"],
+    queryFn: () => bankFeeds.attempts(book),
+    refetchInterval: (query) =>
+      query.state.data?.some((a) => a.state === "fetching") ? 3000 : false,
+  });
+}
+
+export const useAttemptLink = (book: string) =>
+  useBankChange((link: LinkRequest) => bankFeeds.attempt(book, link));
+export const useConfirmLink = (book: string) =>
+  useBankChange((id: string) => bankFeeds.confirm(book, id));
+export const useCancelLink = (book: string) =>
+  useBankChange((id: string) => bankFeeds.cancel(book, id));
 export const useUnlinkBank = (book: string) =>
   useBankChange((id: string) => bankFeeds.unlink(book, id));

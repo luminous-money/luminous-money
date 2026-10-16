@@ -14,6 +14,7 @@ import type { Book } from "@fava-beans/ledger-client";
 import type {
   BankConnection,
   BankStatus,
+  LinkAttempt,
   LinkPreview,
   LinkRequest,
 } from "../../shared/bank-feeds.js";
@@ -33,6 +34,7 @@ export type {
   BankConnection,
   BankError,
   BankStatus,
+  LinkAttempt,
   LinkMode,
   LinkPreview,
   LinkRequest,
@@ -114,6 +116,20 @@ export const bankFeeds = {
     json(await apiFetch(`${base(book)}/simplefin/links`, post(link))),
   unlink: async (book: string, id: string): Promise<void> => {
     const response = await apiFetch(`${base(book)}/simplefin/links/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) await json(response);
+  },
+  attempts: async (book: string): Promise<LinkAttempt[]> =>
+    json(await apiFetch(`${base(book)}/simplefin/attempts`)),
+  attempt: async (book: string, link: LinkRequest): Promise<LinkAttempt> =>
+    json(await apiFetch(`${base(book)}/simplefin/attempts`, post(link))),
+  confirm: async (book: string, id: string): Promise<unknown> =>
+    json(
+      await apiFetch(`${base(book)}/simplefin/attempts/${encodeURIComponent(id)}/confirm`, post({}))
+    ),
+  cancel: async (book: string, id: string): Promise<void> => {
+    const response = await apiFetch(`${base(book)}/simplefin/attempts/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
     if (!response.ok) await json(response);

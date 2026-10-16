@@ -28,7 +28,7 @@ export function BankErrors({ status }: { status: BankStatus }) {
   return (
     <ul className="bank-errors" aria-label="Bank feed problems">
       {status.errors.map((e, i) => (
-        <li key={i} className="small error" title={e.code}>
+        <li key={i} className={`small ${e.notice ? "muted" : "error"}`} title={e.code}>
           {e.explained}{" "}
           {e.code.startsWith("con.auth") && (
             <a href="https://bridge.simplefin.org/" target="_blank" rel="noreferrer">

@@ -23,7 +23,8 @@ if (config.mail.smtpUrl) {
 
 if (config.testUsers)
   console.warn("AUTH_TEST_USERS is on: anyone can log in as any email. Test stacks only.");
-if (!services.breached) console.warn("AUTH_BREACHED_PASSWORDS is off: breached passwords are allowed.");
+if (!services.breached)
+  console.warn("AUTH_BREACHED_PASSWORDS is off: breached passwords are allowed.");
 
 const app = createApp({
   ...services,
