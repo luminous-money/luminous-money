@@ -1,240 +1,320 @@
 M9: SimpleFIN: plan
 ==================================================================================================
 
-> **Status: plan, waiting on [the questions](#questions).** Calls marked **Proposed** are open.
-> The brief is the milestone's line in [the plan](../../PLAN.md) ("bank feeds") and the goal of
-> syncing one or two real bank accounts. Real connections can run on the dev stack: its data is
-> disposable, and a wipe only means pasting the connection back in (see
-> [Credentials](#credentials)).
+> **Status: plan, revised with [the answers](#answers-2026-10-15),** and waiting on the
+> [remaining questions](#questions). Calls marked **Proposed** are open. Real connections can
+> run on the dev stack: its data is disposable, and a wipe only means pasting the connection back
+> in.
+
+## Answers (2026-10-15)
+
+1. **Pending transactions are skipped** until they post.
+2. **Dates are when it happened** (`transacted_at`), falling back to when it posted.
+3. **Connections are the user's,** and their accounts link into any of your books.
+4. **The encryption key is SimpleFIN's own variable, `SIMPLEFIN_ENCRYPTION_KEY`, and `app` won't
+   start without it.**
+   - All the TypeScript services move to `@wymp/config-simple`, with environment-specific files
+     as its README sets out (see [Configuration](#configuration)).
+5. **Linking an existing account asks how to start, every time,** including wiping it clean.
+   The default **reconciles with the bank as the source of truth** (see [Linking](#linking)).
+6. **Syncing:** once each morning, plus "Sync now", at most 20 requests a day.
+7. **The balance an account shows is the books'.** A synced account adds a smaller line under
+   it with the bank's: "Reported today 6:00 am: $13,234.56".
+8. **Brokerages link too, anchored on Fidelity** (see [Brokerages](#brokerages)).
 
 ## What M9 is
 
-- **Connect** a [SimpleFIN](https://www.simplefin.org/protocol.html) source (the SimpleFIN
-  Bridge, or any SimpleFIN server) by pasting a setup token.
-- **Link** its bank accounts to accounts in your books.
-- **Bring in new transactions every day**, through the same pipeline CSV imports use: skip
-  duplicates, match what's already in the books, categorize, stage for review.
-- **Show the bank's own balance and any errors** next to each linked account.
-
-Reconciliation against those balances (balance assertions, statements) is M13.
+- **Connect** a [SimpleFIN](https://www.simplefin.org/protocol.html) source (the SimpleFIN Bridge,
+  or any SimpleFIN server) by pasting a setup token.
+- **Link** its accounts to accounts in your books: bank accounts, cards and loans, and
+  brokerages with their holdings.
+- **Linking an account that already has history reconciles it with the bank.**
+- **From then on, new transactions arrive every morning,** through the pipeline CSV imports use:
+  duplicates skipped, matches found, categories proposed, then review.
+- **Each synced account shows what the bank reports,** and any connection errors.
 
 ## SimpleFIN, briefly
 
-- **Setup token:** the user gets one from the Bridge. It's the base64 of a **claim URL**.
-- **Claiming:** POSTing to the claim URL once returns an **access URL**:
-  `https://user:pass@host/path`. A 403 means the token was already claimed, possibly by
-  someone else, so tell the user.
-- **`GET <access URL>/accounts`** returns, for every account the user connected at the Bridge:
-  - **Fields:** `id`, `name`, `currency`, `balance`, `available-balance`, `balance-date`, and
-    the connection (`conn_id`, institution `name`).
-  - **Transactions:** `id` (unique within the account), `posted` (Unix time, 0 if pending),
-    `amount` (a decimal string; positive is money in), `description`, and optionally
-    `transacted_at` and `pending`.
-  - **Parameters:** `start-date`, `end-date`, `pending=1`, `account=`, `balances-only=1`.
-  - **`errlist`:** errors with codes:
-    - `gen.auth`: the access URL no longer works
-    - `con.auth`: the bank wants the user to log in again at the Bridge
-    - `act.*`: one account failed or is missing data
+- **A setup token** is the base64 of a **claim URL**. POSTing to it once returns an **access URL**
+  (`https://user:pass@host/path`); a 403 means it was already claimed.
+- **`GET <access URL>/accounts`** (`start-date`, `end-date`, `pending`, `account`,
+  `balances-only`) returns each account with:
+  - `id`, `name`, `currency`, `balance`, `available-balance`, `balance-date`, and its
+    institution
+  - **transactions:** `id`, `posted` (0 if pending), `amount` (positive is money in),
+    `description`, `transacted_at`, `pending`
+- **What the Bridge also sends, beyond the published spec,** seen in its demo data
+  (2026-10-15):
+  - **Transactions:** `payee` (a clean name), `memo` (the bank's raw text) and `mcc`.
+  - **Accounts:** `holdings`, each with `id`, `symbol`, `shares`, `cost_basis`, `market_value`,
+    `purchase_price`, `currency`, `description`, `created`.
+  - **The older shape:** `org` on each account and `errors` as plain strings, where the current
+    draft has `connections` and a coded `errlist` (`gen.auth`, `con.auth`, `act.*`). The client
+    reads both.
 - **The Bridge's rules for apps** ([developer guide](https://beta-bridge.simplefin.org/info/developers)):
   - at most **24 requests a day** per access URL, or it warns and then disables the token
   - **90 days per request**
   - updates are daily
   - randomize fetch times
   - overlap windows by about **5 days**
-  - **always show the errors to the user**
-- **Demo data:** the Bridge publishes a **demo setup token** with made-up accounts, for trying it
-  on the dev stack.
+  - **always show its errors to the user**
+- **A demo setup token** gives made-up accounts (checking, savings with an AAPL holding, an
+  empty one), for trying it on the dev stack.
 
 ## Decisions this plan makes
 
-### Connections belong to you; links go into books
+### Connections and links
 
-- **Proposed: a connection is the user's.** One access URL usually covers every bank you connected
-  at the Bridge, so it's stored once and fetched once, even when its accounts go into different
-  books (personal checking into one book, joint checking into the household book).
-  - It has to be fetched once to stay within 24 requests a day ([question 3](#questions)).
-- **A link** ties one SimpleFIN account to one leaf account in one of your books. Each side is
-  linked at most once.
-- **Bank connections page** (`/books/:book/connections`, in the menu), following M6's rule that
-  the selected book is the context:
-  - **Connections:** your connections, with institution, last sync, and errors.
-  - **Their accounts:** the bank's name, institution, balance and currency, and for each:
-    - linked to an account **in this book** (open it, or Unlink)
-    - linked in **another book** (named, not editable here)
-    - or **"Link…"**
-- **Linking** picks an existing account, or creates one with the account picker (full name,
-  autofill, as anywhere else).
-  - **Currencies must match.** The ledger account's currency has to be the bank's ISO code;
-    SimpleFIN's custom currencies (URLs) aren't supported.
-  - **Proposed: cash-like accounts only** (checking, savings, cards, loans). A brokerage's
-    transactions don't carry lots or prices, so linking one waits ([question 8](#questions)).
-- **Unlinking** stops syncing. Everything already brought in stays.
+- **A connection is the user's.** Its access URL usually covers every institution connected at
+  the Bridge, so it's stored once and fetched once, wherever its accounts are linked.
+- **A link** ties one SimpleFIN account to one account in one of your books (a leaf, or a
+  brokerage). Each side is linked at most once.
+- **Bank connections page** (`/books/:book/connections`, in the menu; the selected book is the
+  context):
+  - **Connections:** your connections, with institution, last sync and errors.
+  - **Their accounts:** the bank's name, institution and balance. Each is linked **here** (open
+    it, Unlink), linked **in another book** (named), or offers **"Link…"**.
+- **Currencies must match:** the ledger account's currency is the bank's ISO code. SimpleFIN's
+  custom (URL) currencies aren't supported.
+- **Unlinking** stops syncing. Everything brought in stays.
 - **Deleting a connection** removes its credential and links. To revoke it at the source too,
   revoke it at the Bridge; the page says so.
 
-### Where a link starts
+### Linking
 
-- **For an existing account,** proposed: sync from **the day after the account's last imported
-  row** (CSV or earlier sync), or from its opening balance's date if it has never imported. The
-  start can be changed when linking ([question 5](#questions)).
-- **For a new account,** choose "Start from" (default: 90 days ago; as far back as the bank
-  gives).
-  - The account opens with an **opening balance the day before**: the bank's balance minus the
-    posted transactions since then, so the books agree with the bank from the first sync.
-- **Backfill** fetches 90-day windows back to the start, at most four (a year) on the first day.
-  - If the start is further back, the rest comes over the next days, within the daily budget.
-- **Proposed: cross-source matching.** A transaction already brought in by a CSV row can still
-  be matched by a SimpleFIN row (and the other way round) as the same event.
-  - Today a transaction held by one import row can't be claimed by another; that rule exists to
-    stop two rows of the *same* stream claiming one transaction.
-  - So a link whose start overlaps old CSV imports finds them, instead of duplicating them.
+The bank is the source of truth for what happened in the account. Linking an account always asks
+how to start.
+
+- **A new account** (made with the account picker) gets everything the bank has.
+  - **History:** 90-day windows back until two in a row come back empty. Windows the budget can't
+    cover today come over the next days.
+  - **Opening balance:** the day before the earliest bank transaction. It's the reported balance
+    minus the sum of every synced transaction, so the books agree with the bank from the start.
+- **An existing account** offers three choices:
+  1. **Reconcile with the bank** (the default):
+     1. Fetch the bank's full history, as for a new account. Call its earliest date S.
+     2. **Mark every existing transaction from S on as pending (`!`).** Transactions before S are
+        left alone: the bank knows nothing about them.
+     3. **Match** the bank's transactions against those, with the usual matcher and assignment
+        (best pairs first; amounts within any schedule tolerance).
+     4. **Confirm every match** (`*`). The transaction keeps your date, payee, categories and
+        splits; the bank's row claims it.
+     5. **Stage the bank's unmatched transactions** as new (`!`, categorized), for review.
+     6. **Set the opening balance** so the account's balance at the end of S − 1 equals the bank's
+        then (the reported balance minus the sum of the synced transactions).
+        - The account's existing opening-balance transaction is changed if it's dated before S;
+          otherwise one is created on S − 1.
+        - With nothing before S, this is just "reported minus synced".
+
+     **What's left over:** your transactions from S on that the bank doesn't know stay pending,
+     marked **"Not at the bank"** in review, to keep or delete. Your work is kept wherever the
+     bank agrees with it, and the account's balance is the bank's.
+  2. **Start over:**
+     - Delete every transaction that posts to the account, then link as a new account.
+     - It's behind a typed confirmation, which also says how many of those transactions post to
+       other accounts too; those accounts lose their side.
+  3. **Only what's new:** sync from a date you choose (default: the day after the account's last
+     import), with no reconciling. The fingerprints and the matcher catch overlap.
+- **One atomic ledger write** does each reconcile or start-over, so it can't half-happen. The
+  ledger's `/transactions/changes` gains **versioned updates** (flags, and the opening balance)
+  next to its creates and deletes.
+- **A preview comes first:** before anything is written, a summary like "312 at the bank; 287
+  match yours; 25 new; 9 of yours not at the bank; opening balance $1,204.33 on 2025-07-17
+  (was $1,250.00)".
 
 ### Syncing
 
-- **Proposed: once a day, in the morning.**
-  - A random minute between 06:00 and 08:00 in the time zone of the connection's first linked
-    book, kept per connection, so the Bridge doesn't see everyone at once.
-  - Through M3's daily jobs.
-- **Also on demand:**
-  - **"Sync now"** on the connections page and on a linked account's page
-  - a sync right after linking
-- **Budget:** each connection keeps a count of today's requests and stops at **20** (under the
-  Bridge's 24). Backfill chunks count too.
-- **Windows:** each sync asks for `start-date` = the newest posted date synced so far minus 5
-  days, up to now.
-  - The overlap re-sends transactions already brought in; their fingerprints make them
-    duplicates.
-- **One request covers the whole connection** (all its linked accounts). Only accounts with a
-  link are imported; the rest just refresh their balances on the page.
-- **Each linked account's transactions** become one import batch, recorded like a CSV import:
-  - source `simplefin` and the institution's name
-  - each row's outcome: staged, matched, duplicate, before-opening
-  - the same results view, under the account's import history
+- **Daily:** a random minute between 06:00 and 08:00 in the time zone of the connection's first
+  linked book, kept per connection, through M3's daily jobs. Also **"Sync now"**, and a sync
+  right after linking.
+- **Budget:** each connection counts today's requests, and stops at **20**. Backfill windows
+  count too.
+- **Windows:** `start-date` is the newest posted date synced so far, minus 5 days. Transactions
+  the overlap sends again are duplicates by fingerprint.
+- **One request covers the whole connection.** Only linked accounts import; the rest just
+  refresh what the page shows.
+- **Each linked account's transactions become an import batch,** recorded as a CSV import is
+  (source `simplefin`, the institution's name) and shown in its import history.
 - **Rows:**
-  - **Date, proposed:** `transacted_at` when given, else `posted`, as a date in the book's time
-    zone ([question 2](#questions)). It's nearer what a hand-entered transaction would say, and
-    the matcher's ±5 days absorbs the rest.
-  - **Amount** as given. SimpleFIN signs are already "change to the account", like ours.
-  - **Description** as given; the categorizers propose payees, as for CSV.
-  - **Fingerprint** `id:sfin:<transaction id>`, so a transaction comes in once per account,
-    whatever its date or description does later.
-- **Proposed: posted transactions only** (SimpleFIN's default) ([question 1](#questions)).
-  - Pending transactions often change amount, or get a new ID when they post, so they'd make
-    duplicates to clean up.
-  - Waiting a day or two for them to post is the trade.
+  - **date:** `transacted_at`, else `posted`, as a date in the book's time zone
+  - **amount:** as given
+  - **narration:** `memo` (the bank's own text, like a CSV's), else `description`
+  - **payee:** the Bridge's `payee` when given, offered to the categorizers like a CSV's payee
+    column
+  - **fingerprint:** `id:sfin:<transaction id>`
+- **Pending transactions are skipped** (SimpleFIN's default).
+- **Cross-source matching:** a SimpleFIN row may claim a transaction that a CSV row already
+  holds, and the other way round. The rule against claiming a held transaction exists for rows of
+  the same stream; another stream seeing the same event isn't a conflict.
 
-### What the account shows
+### What a synced account shows
 
-- **The bank's balance** ("Bank: $1,234.56, as of Oct 15"), next to the books' balance. When
-  they differ, the difference is shown (pending transactions and timing explain most of it).
-  - Kept from each sync. Balance assertions and reconciling are M13.
-- **The last sync and any error** for the account or its connection.
-  - Errors use plain words: "Your bank wants you to log in again at SimpleFIN Bridge", with a
-    link to the Bridge. The code is kept for the record.
+- **Its balance, from the books, as everywhere.**
+- **Underneath, smaller:** "Reported today 6:00 am: $13,234.56" (or "yesterday …", or a date):
+  the bank's balance at its `balance-date`, in the book's time zone.
+  - It's on the account's page and its home card.
+  - For a brokerage, it's the reported total, holdings included.
+- **The last sync and any errors**, in plain words, with the code kept:
+  - "Your bank wants you to log in again at SimpleFIN Bridge" (with a link)
+  - "SimpleFIN no longer accepts this connection: connect it again"
 - **"Sync now".**
+- Reconciling the two balances (assertions, statements) is M13.
+
+### Brokerages
+
+Anchored on Fidelity: the first build slice looks at what the Bridge actually sends for a
+Fidelity account, locally (amounts redacted, nothing committed), and this section is adjusted
+to it.
+
+- **A brokerage links to a brokerage in the books:** an account with children, as in M5
+  (`<account>:Cash`, and `<account>:<SYMBOL>` per holding).
+- **Cash transactions sync like a bank account's into `<account>:Cash`:** deposits,
+  withdrawals, dividends, fees, and the cash side of buys and sells.
+- **Holdings are a daily snapshot.** The Bridge sends shares, cost basis and market value per
+  symbol, not lots or trades. Each sync compares the snapshot with the books' units per symbol.
+  - **Equal:** nothing to do. The snapshot's price (market value / shares) is recorded as that
+    day's price (source `simplefin`), alongside beanprice's.
+  - **Different:** a **position change** is staged for review, as a trade through M5's
+    machinery:
+    - **More shares:** a buy at the cost-basis increase.
+    - **Fewer:** a sale booked by the account's sale method (FIFO by default, as the 1099-B
+      does), with proceeds from the matching cash transaction if one is found (same day ± a few,
+      description naming the symbol), else at market value.
+    - The cash side pairs with that cash transaction when found.
+- **Linking a brokerage:**
+  - **Cash** reconciles (or starts over) as above.
+  - **Holdings** start as one **estimated** lot per symbol at the snapshot's cost basis, dated
+    the holding's `created` if given (else the link date). That's editable, and it's the best
+    SimpleFIN can say, since it doesn't send lots.
+  - **Proposed:** an existing brokerage with lots already recorded keeps them, and any
+    difference becomes a position change for review.
+- **Reinvested dividends** show up as a cash dividend plus a position change, which review can
+  turn into M5's "reinvested" dividend.
 
 ### Credentials
 
-- **The access URL is a password to your bank data.** It's kept encrypted at rest (AES-256-GCM)
-  in `app.sqlite`.
-  - It's never sent to the browser. The page shows the host, and when it was connected.
-- **The key, proposed:** `FAVA_BEANS_SECRET_KEY` (32 bytes, base64) when set, which keeps it out
-  of the data volume. If it isn't set, `app` makes `/data/app.key` on first use and warns that a
-  copy of the volume holds both lock and key ([question 4](#questions)).
-- **The setup token is used once** to claim, then dropped.
-- **No fetching arbitrary URLs from a server that may be public:**
-  - A claim or access URL must be `https`, to a host on `SIMPLEFIN_HOSTS` (default: the
-    SimpleFIN Bridge's hosts).
-  - It must not resolve to a private address.
-  - Test stacks allow the fake server's plain HTTP with `SIMPLEFIN_ALLOW_HTTP=true`.
-- **Deleting your account** (M8) also deletes your connections. `auth` calls a new `app` route
-  for your user-level data, after your books.
+- **The access URL is a password to your financial data.**
+  - It's encrypted at rest (AES-256-GCM) with `SIMPLEFIN_ENCRYPTION_KEY`, which must be 32 bytes,
+    base64. **Without it, `app` doesn't start.**
+  - Each value gets its own nonce, and records which key encrypted it, so the key can be rotated
+    later.
+- **It never reaches the browser.** The page shows the host and when it was connected. The setup
+  token is used once, then dropped.
+- **No fetching arbitrary URLs from what may be a public server:**
+  - claim and access URLs must be `https`
+  - to a host on `SIMPLEFIN_HOSTS` (default: the SimpleFIN Bridge's)
+  - and not resolve to a private address
+  - Test stacks allow the fake server's plain HTTP (`SIMPLEFIN_ALLOW_HTTP`).
+- **Deleting your account** (M8) deletes your connections too: `auth` calls a new `app` route
+  for your user-level data, after deleting your books.
+
+### Configuration
+
+- **`auth` and `app` read their settings through `@wymp/config-simple`,** set up as its README
+  describes:
+  - **One `src/config.ts` per service:** every setting with `configValue`, `REQUIRED` where
+    there's no production-safe default, validated (and so failing) at boot.
+  - **Per-environment files:** `APP_ENV` (`production`, `development` or `test`) picks
+    `.env/<APP_ENV>`, and `.env/local` (gitignored) overrides it. Real environment variables
+    win over both.
+- **Which file each stack uses:**
+  - **`.env/test`** has the e2e stack's settings, including a fixed SimpleFIN key for its fake
+    data. `compose.e2e.yaml` then sets `APP_ENV=test` and little else.
+  - **`.env/development`** is for running services on the host.
+  - **`.env/production`** holds only production-safe values; secrets come from the environment.
+- **`SIMPLEFIN_ENCRYPTION_KEY` is `REQUIRED` in production and development,** so the dev stack
+  needs one of its own in Compose's own `.env` (gitignored):
+  `SIMPLEFIN_ENCRYPTION_KEY=$(openssl rand -base64 32)`.
+- **Proposed: the ledger (Python) gets the same shape** in a small `config.py`:
+  - every setting in one place, required ones failing at boot
+  - `.env/<APP_ENV>` and `.env/local` loaded with `python-dotenv`
+
+  `@wymp/config-simple` is TypeScript-only ([question 4](#questions)).
 
 ### Test infrastructure
 
 - **A fake SimpleFIN server,** `tests/simplefin-fake`. It's a small Node service in the e2e stack,
-  as Mailpit is for mail.
+  as Mailpit is for mail, and follows the Bridge's actual shapes (including `payee`, `memo`,
+  `holdings`, and both error forms).
   - It implements claim (one use, then 403) and `/accounts` with Basic auth, dates, `pending`
     and `account`.
-  - Tests script it: add accounts and transactions, set balances, inject `errlist` errors, read
-    how many requests it got.
-- **Unit tests in `app`** run the sync against a fake source:
-  - windows and overlap
-  - fingerprints across overlapping windows
-  - the request budget
-  - cross-source matching
-  - the opening-balance arithmetic
-  - time-zone dates
-  - error mapping
-  - encryption round trips
-  - the URL checks
+  - Tests script it: add accounts, transactions and holdings; set balances; inject errors; count
+    requests.
+- **Unit tests in `app`:**
+  - windows and overlap, the budget
+  - reconcile end to end against fakes: pending marking, matching, confirming, staging, the
+    opening-balance arithmetic, what's left over
+  - start-over
+  - position changes
+  - cross-source matching, time-zone dates
+  - error mapping, encryption round trips, the URL checks, config validation
 - **e2e:**
-  - claim, link, sync, re-sync with overlap (no duplicates), an error shown, unlink
-  - the budget, and the SSRF refusals
-- **Browser tests:** connect with a token, link to a new account (opening balance right), Sync
-  now, see the bank balance and an error, unlink.
-- **By hand on the dev stack:** the Bridge's demo token, then your own.
+  - claim, link a new account, sync, re-sync with overlap (no duplicates)
+  - reconcile an account that has CSV history
+  - start over
+  - a brokerage's snapshot and a position change
+  - errors, unlink, the budget, the SSRF refusals
+  - `app` refusing to start without its key
+- **Browser tests:**
+  - connect with a token, link
+  - the reconcile preview, and confirming it
+  - "Not at the bank" in review
+  - the "Reported …" line, Sync now, errors
+- **By hand on the dev stack:** the demo token, then your banks and Fidelity.
 
 ## How it gets built
 
-1. **`app` storage:**
-   - migration 10:
-     - `simplefin_connection`: user, encrypted access URL, host, the sync time, today's request
-       count, the last sync and errors
-     - `simplefin_account`: the last-seen name, institution, currency, balances
-     - `simplefin_link`: connection and account to book and account; start, and synced
-       through
+1. **Configuration:**
+   - `@wymp/config-simple` in `auth` and `app` (`src/config.ts`, `.env/` files, `APP_ENV` in
+     Compose)
+   - the ledger's `config.py`
+2. **Look at Fidelity:** a throwaway local script dumps the shape of a real Fidelity account
+   (redacted, never committed). The brokerage section is adjusted to it.
+3. **Storage:**
+   - `app` migration 10:
+     - `simplefin_connection`: user, encrypted access URL, host, sync minute, today's request
+       count, last sync, errors
+     - `simplefin_account`: the last snapshot of each account, holdings included
+     - `simplefin_link`
      - `import_batch.source`
-   - the secret key and encryption
-2. **The client:**
-   - token decoding, claiming, fetching `/accounts`
-   - the URL checks
-   - parsing to rows, error mapping
-3. **The pipeline:**
+   - encryption
+4. **The client:** tokens, claiming, `/accounts` in both shapes, the URL checks, errors.
+5. **Ledger:** versioned updates in `/transactions/changes`, and setting an account's opening
+   balance within it.
+6. **The pipeline:**
    - `importFile` split into the CSV front end and a source-agnostic `importRows`
    - cross-source matching
    - SimpleFIN batches
-4. **Sync:**
-   - windows, backfill, the budget
-   - the daily job at each connection's minute, Sync now
-   - opening balances for new accounts
-5. **API routes:** connections (create from a token, list, delete, sync), links (create, delete),
-   and a linked account's bank status.
-6. **PWA:**
-   - the Bank connections page, linking with the account picker
-   - the bank balance and errors on the account page
-   - batches from SimpleFIN in import history
-7. **The fake server, tests, docs:**
-   - `tests/simplefin-fake` and its image
-   - unit, e2e and browser tests
-   - design.md ("Bank feeds"), operating.md (`FAVA_BEANS_SECRET_KEY`, `SIMPLEFIN_HOSTS`)
-   - PLAN.md, RESUME.md
+7. **Linking:** new-account history, reconcile (preview, then one write), start over, only
+   what's new.
+8. **Syncing:** daily job, Sync now, budget, windows.
+9. **Brokerages:** the snapshot, prices, position changes, estimated opening lots.
+10. **PWA:**
+    - Bank connections page, link dialog with the three choices and preview
+    - the "Reported …" line, errors, "Not at the bank" in review
+11. **Fake server, tests, docs:**
+    - design.md ("Bank feeds", "Configuration")
+    - operating.md (`SIMPLEFIN_ENCRYPTION_KEY`, `SIMPLEFIN_HOSTS`, `APP_ENV`)
+    - PLAN.md, RESUME.md
 
 ## Out of scope
 
-- Brokerage and investment accounts over SimpleFIN (holdings, lots).
-- Pending transactions (unless [question 1](#questions) says otherwise).
-- Balance assertions and reconciliation (M13).
-- Other aggregators (Plaid, GoCardless, ...). The pipeline stays source-agnostic, so each would
-  be a client and a page.
-- Sharing a connection with other users (M12 will decide how shared books link).
+- Pending transactions.
+- Balance assertions and reconciling statements (M13).
+- Other aggregators (Plaid, GoCardless, ...). The pipeline stays source-agnostic, so each is a
+  client and a page.
+- Sharing a connection with other users (M12).
+- Rotating the encryption key (the stored format allows it later).
 
 ## Questions
 
-1. **Pending transactions:** skip them until they post (proposed), or bring them in and
-   reconcile them when they post (new IDs and changed amounts make that guesswork)?
-2. **Which date:** when it happened (`transacted_at`, falling back to `posted`; proposed), or
-   always when it posted? Posted dates match statements; transaction dates match what you'd
-   enter by hand.
-3. **Connections:** yours, linkable into any of your books (proposed), or one connection per
-   book (simpler, but the same Bridge in two books would double the requests)?
-4. **The encryption key:** from `FAVA_BEANS_SECRET_KEY` with a generated key file as the
-   fallback (proposed), or require the variable (no SimpleFIN without it)?
-5. **Where an existing account's sync starts:** the day after its last import (proposed), with
-   cross-source matching catching any overlap, or ask every time?
-6. **When it syncs:** once each morning plus Sync now, capped at 20 requests a day (proposed),
-   or more often (up to the Bridge's 24, which it says it only refreshes daily anyway)?
-7. **The bank's balance on the account page,** with the difference from the books (proposed now;
-   reconciling in M13): useful, or noise until M13?
-8. **Brokerages:** leave them unlinkable for now (proposed), or link them for their cash and
-   balance only?
+1. **Start over and transfers:** wiping an account deletes whole transactions, so a transfer to
+   another account disappears from that account too (the confirmation counts them). Fine, or
+   should Start over keep transactions that also post to another *linked* account?
+2. **"Not at the bank":** your transactions from S on that the bank doesn't know stay pending for
+   you to keep or delete (proposed). Or delete them as part of reconciling?
+3. **Brokerage lots:** SimpleFIN sends per-symbol totals, not lots, so a new brokerage link
+   starts with one estimated lot per symbol (proposed). That's right for value and unrealized
+   gain, but sales' short- and long-term split stays approximate until you enter real lots. OK?
+4. **The ledger's configuration:** the same shape in Python (`config.py`, `.env/` files;
+   proposed), or leave the ledger's two variables as they are?
