@@ -111,6 +111,9 @@ How it's put together:
    Then the docs: design.md ("Bank feeds", "Configuration"), operating.md
    (`SIMPLEFIN_ENCRYPTION_KEY`, `SIMPLEFIN_HOSTS`, `APP_ENV`), and PLAN.md. And the Fidelity
    look (plan step 2), once a Fidelity account is connected.
+   Also [the M9 follow-ups](docs/milestones/m9-simplefin/PLAN.md#follow-ups-from-trying-it-2026-10-16):
+   PNC and Fidelity investments timed out linking (link in the background), and the Bridge
+   now wants 45-day windows.
 2. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
 
 ## Gotchas

@@ -186,5 +186,8 @@ Smaller improvements to pick up between milestones or at the end.
 - [ ] **Order-aware match assignment:** assign an import's rows to candidates over the whole
       network of matches, weighting order, so two identical coffees entered on the 5th and 7th
       pair with CSV rows on the 7th and 8th in order (M2 pairs by proximity, and review swaps).
+- [ ] **SimpleFIN links in the background:** record the link attempt, fetch history in the
+      background, and fill in the preview when it's ready (see the M9 plan's follow-ups, with
+      45-day windows and Bridge notices).
 - [ ] **Import file format management:** see, edit, rename and delete an account's saved CSV
       formats directly, rather than only replacing or adding to them when a file doesn't match.

@@ -298,6 +298,25 @@ to it.
     - operating.md (`SIMPLEFIN_ENCRYPTION_KEY`, `SIMPLEFIN_HOSTS`, `APP_ENV`)
     - PLAN.md, RESUME.md
 
+## Follow-ups (from trying it, 2026-10-16)
+
+Chase and a Fidelity card linked; PNC checking and the Fidelity investment accounts didn't
+(the preview timed out).
+
+- **Link in the background.** Record the link attempt (which bank account, the account to
+  create or link to, the mode) as soon as it's chosen, and fetch the history in the
+  background. The preview fills in when the history is in, so you can leave the page while it
+  works and come back to confirm. Today the preview fetches everything inside one request: up
+  to two minutes per Bridge request for PNC and Fidelity, several in a row.
+- **45-day windows.** The Bridge now says "Requested date range exceeds recommended range of 45
+  days. In the future, this may be capped." (2026-10-16), against its developer guide's 90.
+  Use 45, which means more requests per backfill against the daily budget. Spreading a long
+  backfill over days matters more.
+- **Treat Bridge notices as notices.** That message came in `errors` and was shown as an error.
+  Tell warnings apart from failures (by wording, or `x-api-message`), and don't count them as
+  sync problems.
+- **The Fidelity look** (build step 2) is still to do, now that Fidelity is connected.
+
 ## Out of scope
 
 - Pending transactions.
