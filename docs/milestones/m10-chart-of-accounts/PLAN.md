@@ -1,7 +1,11 @@
 M10: Chart of accounts: plan
 ==================================================================================================
 
-> **Status: plan, waiting on [the questions](#questions).** Calls marked **Proposed** are open.
+> **Status: built (2026-10-16),** with ledger, unit, API and browser tests, following
+> [the answers](#answers-2026-10-16), which override anything below that disagrees. Timing on a
+> five-year demo book: the tree in 46 ms, renaming an 882-split branch in 97 ms. One change: a
+> leaf's row opens its ledger, and an editor is one tap away from there ("Edit"); a node's name
+> opens its editor.
 > The brief is the milestone's line in [the plan](../../PLAN.md):
 > - **the account tree,** with collapsible nodes and aggregate balances
 > - **add** accounts
@@ -11,6 +15,17 @@ M10: Chart of accounts: plan
 The plan's older notes add moving accounts between parents and renaming. Renames and moves
 rewrite every directive that mentions the account, history included; that was decided as
 acceptable.
+
+## Answers (2026-10-16)
+
+1. **Archiving with money left in it** is allowed, with an optional closing transfer.
+2. **Deleting a node** offers two ways: move every split in its subtree to one replacement
+   account (an existing one, or a new one made there), or cancel and delete the accounts under
+   it one by one.
+3. **Substitutes can be any account type,** with a warning when the type differs.
+4. **Renaming onto an existing account is refused,** with "Merge into…" offered instead.
+5. **System accounts are protected.**
+6. **Node balances are one figure** in the operating currency, holdings at market value.
 
 ## What M10 is
 

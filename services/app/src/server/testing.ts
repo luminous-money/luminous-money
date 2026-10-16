@@ -109,6 +109,25 @@ export class FakeLedger implements LedgerPort {
     return this.accountList.at(-1)!;
   }
 
+  async renameAccount(_book: string, account: string, to: string) {
+    const found = this.accountList.find((a) => a.name === account)!;
+    found.name = to;
+    return found;
+  }
+
+  async archiveAccount(_book: string, account: string) {
+    return [account];
+  }
+
+  async unarchiveAccount(_book: string, account: string) {
+    return [account];
+  }
+
+  async deleteAccount(_book: string, account: string) {
+    this.accountList = this.accountList.filter((a) => a.name !== account);
+    return [account];
+  }
+
   prices: PriceIn[] = [];
   async addPrice(_book: string, price: PriceIn) {
     this.prices.push(price);

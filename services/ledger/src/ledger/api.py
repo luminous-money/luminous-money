@@ -25,7 +25,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from . import engine, investments, models
+from . import chart, engine, investments, models
 from .service import Ledger, NameTaken, NotFound
 from .store import Row, StaleVersion, Store
 
@@ -91,6 +91,10 @@ def create_app(ledger: Ledger) -> FastAPI:
     @app.exception_handler(StaleVersion)
     async def stale(_, exc: StaleVersion):
         return JSONResponse({"detail": str(exc), "updated_at": exc.current}, status_code=409)
+
+    @app.exception_handler(chart.AccountRefused)
+    async def account_refused(_, exc: chart.AccountRefused):
+        return JSONResponse({"detail": str(exc)}, status_code=422)
 
     @app.exception_handler(NameTaken)
     async def name_taken(_, exc: NameTaken):
@@ -166,6 +170,44 @@ def create_app(ledger: Ledger) -> FastAPI:
         return ledger.summary(book_id, account)
 
     # Investments (M5)
+
+    # The chart of accounts (M10)
+
+    @api.get("/books/{book_id}/accounts/tree")
+    def account_tree(book_id: OwnedBook) -> list[models.TreeAccount]:
+        """Every account, with its own balance, its subtree's, and the subtree's value."""
+        return chart.tree(ledger, book_id)
+
+    @api.post(
+        "/books/{book_id}/accounts/{account}/rename",
+        responses={409: {"description": "Stale version"}, 422: {"description": "Not allowed"}},
+    )
+    def rename_account(book_id: OwnedBook, account: str, r: models.AccountRename) -> models.Account:
+        """Rename or move an account and everything under it: every directive naming them is
+        rewritten, history included, in one write."""
+        return chart.rename(ledger, book_id, account, r.to, expected=r.updated_at)
+
+    @api.post("/books/{book_id}/accounts/{account}/archive", responses={422: {"description": "Not allowed"}})
+    def archive_account(book_id: OwnedBook, account: str, a: models.AccountArchive) -> list[str]:
+        """Close the account and every opened account under it (after an optional closing
+        transfer). Returns the accounts closed."""
+        return chart.archive(ledger, book_id, account, date=a.date, transfer_to=a.transfer_to, expected=a.updated_at)
+
+    @api.post("/books/{book_id}/accounts/{account}/unarchive")
+    def unarchive_account(book_id: OwnedBook, account: str) -> list[str]:
+        """Reopen an archived account and everything under it. Returns the accounts reopened."""
+        return chart.unarchive(ledger, book_id, account)
+
+    @api.delete(
+        "/books/{book_id}/accounts/{account}",
+        responses={409: {"description": "Stale version"}, 422: {"description": "Not allowed"}},
+    )
+    def delete_account(
+        book_id: OwnedBook, account: str, substitute: str | None = None, updated_at: str | None = None
+    ) -> list[str]:
+        """Delete the account and its subtree, moving every posting to `substitute` (needed if
+        there are any). Merging is this. Returns the accounts deleted."""
+        return chart.delete(ledger, book_id, account, substitute=substitute, expected=updated_at)
 
     @api.get("/books/{book_id}/accounts/{account}/holdings")
     def holdings(book_id: OwnedBook, account: str, on: datetime.date | None = None) -> models.Holdings:

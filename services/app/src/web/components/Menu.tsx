@@ -35,6 +35,7 @@ export function Menu() {
         <nav className="menu-panel" aria-label="Main">
           {home && item(home, "Home")}
           {home && item(`${home}/review`, "Review")}
+          {home && item(`${home}/accounts`, "Accounts")}
           {home && item(`${home}/schedules`, "Schedules")}
           {home && item(`${home}/rules`, "Rules")}
           {home && item(`${home}/commodities`, "Commodities")}

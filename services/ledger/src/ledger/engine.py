@@ -18,10 +18,11 @@ import re
 import uuid
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any
+from typing import Any, Callable
 
 import beanquery
 from beancount import loader
+from beancount.core import account as bc_account
 from beancount.core import amount as bc_amount
 from beancount.core import data
 from beancount.core.inventory import Inventory
@@ -387,8 +388,14 @@ def opened(text: str) -> str | None:
     return first[2] if len(first) > 2 and first[1] == "open" else None
 
 
-def reopened(text: str, *, booking: str | None, revalue_every: int | None) -> Directive:
-    """An `open` directive with its booking method and `revalue-every` set (None: removed)."""
+_KEEP = object()
+
+
+def reopened(
+    text: str, *, booking: str | None, revalue_every: int | None, display_name: object = _KEEP
+) -> Directive:
+    """An `open` directive with its booking method and `revalue-every` set (None: removed), and
+    its `display-name` set (None or "": removed; not given: kept)."""
     entries, errors, _ = parser.parse_string(text)
     if errors or len(entries) != 1 or not isinstance(entries[0], data.Open):
         raise ParseFailure(["not an open directive"])
@@ -396,7 +403,51 @@ def reopened(text: str, *, booking: str | None, revalue_every: int | None) -> Di
     meta = {k: v for k, v in entry.meta.items() if k != REVALUE_EVERY_KEY}
     if revalue_every:
         meta[REVALUE_EVERY_KEY] = Decimal(revalue_every)
+    if display_name is not _KEEP:
+        meta.pop(DISPLAY_NAME_KEY, None)
+        if display_name:
+            meta[DISPLAY_NAME_KEY] = str(display_name)
     return to_directive(entry._replace(meta=meta, booking=data.Booking[booking] if booking else None))
+
+
+def with_accounts(
+    text: str,
+    directive_id: str,
+    rename: Callable[[str], str],
+    *,
+    drop: Callable[[str], bool] = lambda _: False,
+) -> Directive | None:
+    """The directive with every account it names passed through `rename`: postings, `open` and
+    `close`, `balance`, `pad` (both accounts), `note`, `document`, and `custom` account values.
+    None if it's about an account `drop` says is going (its open, close, balance, pad, note or
+    document): those go with it. Unchanged directives come back as they were."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1:
+        raise ParseFailure([f"directive {directive_id} doesn't parse"])
+    entry = entries[0]
+    if isinstance(entry, data.Transaction):
+        entry = entry._replace(postings=[p._replace(account=rename(p.account)) for p in entry.postings])
+    elif isinstance(entry, (data.Open, data.Close, data.Balance, data.Note, data.Document)):
+        if drop(entry.account):
+            return None
+        entry = entry._replace(account=rename(entry.account))
+    elif isinstance(entry, data.Pad):
+        if drop(entry.account):
+            return None
+        entry = entry._replace(account=rename(entry.account), source_account=rename(entry.source_account))
+    elif isinstance(entry, data.Custom):
+        entry = entry._replace(
+            values=[
+                v._replace(value=rename(v.value)) if v.dtype == bc_account.TYPE else v
+                for v in entry.values
+            ]
+        )
+    return to_directive(entry, directive_id)
+
+
+def closed(name: str, date: datetime.date) -> Directive:
+    """A `close` directive for the account."""
+    return parse_one(f"{date.isoformat()} close {name}\n")
 
 
 def open_directive(

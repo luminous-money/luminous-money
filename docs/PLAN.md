@@ -92,9 +92,11 @@ milestone starts.
       background (new, reconcile with the bank as the source of truth, start over, from a
       date), the daily sync, brokerages from holdings snapshots, "Reported …" balances, and
       `@wymp/config-simple` in auth and app.
-- [ ] **M10: Chart of accounts.** The account tree with collapsible nodes and aggregate
+- [x] **M10: Chart of accounts.** The account tree with collapsible nodes and aggregate
       balances; add accounts; open one to edit it, including archiving it; delete accounts (which
-      needs a substitute to move their transactions to).
+      needs a substitute to move their transactions to). Built 2026-10-16: the tree (one read),
+      rename and move, display names, archive with a closing transfer, delete or merge into a
+      substitute, protected accounts, and `app`'s references following.
 - [ ] **M11: Budgets.**
 - [ ] **M12: Reports.** From basic to more complex.
 - [ ] **M13: Sharing books with other users.** Any user can be added to a book with read, write

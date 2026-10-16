@@ -138,6 +138,33 @@ export const bankFeeds = {
     json(await apiFetch(`${base(book)}/simplefin/status`)),
 };
 
+const accountPath = (book: string, account: string) =>
+  `${base(book)}/accounts/${encodeURIComponent(account)}`;
+
+/** Renaming, archiving and deleting accounts: through the app, so what it keeps by account name
+ * follows. */
+export const accountChanges = {
+  rename: async (book: string, account: string, to: string, updatedAt?: string): Promise<unknown> =>
+    json(
+      await apiFetch(`${accountPath(book, account)}/rename`, post({ to, updated_at: updatedAt }))
+    ),
+  archive: async (
+    book: string,
+    account: string,
+    archive: { date?: string; transfer_to?: string; updated_at?: string }
+  ): Promise<string[]> =>
+    json(await apiFetch(`${accountPath(book, account)}/archive`, post(archive))),
+  unarchive: async (book: string, account: string): Promise<string[]> =>
+    json(await apiFetch(`${accountPath(book, account)}/unarchive`, post({}))),
+  remove: async (book: string, account: string, substitute?: string): Promise<string[]> =>
+    json(
+      await apiFetch(
+        `${accountPath(book, account)}${substitute ? `?substitute=${encodeURIComponent(substitute)}` : ""}`,
+        { method: "DELETE" }
+      )
+    ),
+};
+
 export const appApi = {
   /** The user's books, oldest first, with their time zones. */
   books: async (): Promise<BookInfo[]> => json(await apiFetch("/api/app/v1/books")),

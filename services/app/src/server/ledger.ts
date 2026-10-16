@@ -49,6 +49,22 @@ export interface LedgerPort {
   /** A leaf by its full name (nodes on the way are made too), with any of AccountIn's extras:
    * an opening balance, opening holdings. */
   createAccount(book: string, name: string, extra?: Partial<AccountIn>): Promise<Account>;
+  /** Rename or move an account and everything under it (every directive naming them). */
+  renameAccount(book: string, account: string, to: string, updated_at?: string): Promise<Account>;
+  /** Close an account and its subtree (after an optional closing transfer); the names closed. */
+  archiveAccount(
+    book: string,
+    account: string,
+    archive: { date?: string; transfer_to?: string; updated_at?: string }
+  ): Promise<string[]>;
+  unarchiveAccount(book: string, account: string): Promise<string[]>;
+  /** Delete an account and its subtree, moving their splits to `substitute`; the names deleted. */
+  deleteAccount(
+    book: string,
+    account: string,
+    substitute?: string,
+    updated_at?: string
+  ): Promise<string[]>;
   /** An account's (or a brokerage's) holdings: units, cost basis, value per commodity. */
   holdings(book: string, account: string): Promise<Holdings>;
   /** Record a price (one per commodity and date: the same date replaces it). */
@@ -138,6 +154,36 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
         client.POST("/api/ledger/v1/books/{book_id}/accounts", {
           params: { path: { book_id: book } },
           body: { name, kind: "leaf", ...extra },
+        })
+      ),
+    renameAccount: (book, account, to, updated_at) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/accounts/{account}/rename", {
+          params: { path: { book_id: book, account } },
+          body: { to, updated_at: updated_at ?? null },
+        })
+      ),
+    archiveAccount: (book, account, a) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/accounts/{account}/archive", {
+          params: { path: { book_id: book, account } },
+          body: {
+            date: a.date ?? null,
+            transfer_to: a.transfer_to ?? null,
+            updated_at: a.updated_at ?? null,
+          },
+        })
+      ),
+    unarchiveAccount: (book, account) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/accounts/{account}/unarchive", {
+          params: { path: { book_id: book, account } },
+        })
+      ),
+    deleteAccount: (book, account, substitute, updated_at) =>
+      unwrap(
+        client.DELETE("/api/ledger/v1/books/{book_id}/accounts/{account}", {
+          params: { path: { book_id: book, account }, query: { substitute, updated_at } },
         })
       ),
     holdings: (book, account) =>

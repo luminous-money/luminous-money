@@ -104,6 +104,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/accounts/tree": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Account Tree
+     * @description Every account, with its own balance, its subtree's, and the subtree's value.
+     */
+    get: operations["account_tree_api_ledger_v1_books__book_id__accounts_tree_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/accounts/{account}": {
     parameters: {
       query?: never;
@@ -114,7 +134,12 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    delete?: never;
+    /**
+     * Delete Account
+     * @description Delete the account and its subtree, moving every posting to `substitute` (needed if
+     *     there are any). Merging is this. Returns the accounts deleted.
+     */
+    delete: operations["delete_account_api_ledger_v1_books__book_id__accounts__account__delete"];
     options?: never;
     head?: never;
     /**
@@ -122,6 +147,27 @@ export interface paths {
      * @description Change an account's settings: how its sales pick lots; whether it's a revalued asset.
      */
     patch: operations["set_account_api_ledger_v1_books__book_id__accounts__account__patch"];
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/archive": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Archive Account
+     * @description Close the account and every opened account under it (after an optional closing
+     *     transfer). Returns the accounts closed.
+     */
+    post: operations["archive_account_api_ledger_v1_books__book_id__accounts__account__archive_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/api/ledger/v1/books/{book_id}/accounts/{account}/holdings": {
@@ -156,6 +202,27 @@ export interface paths {
     get: operations["account_ledger_api_ledger_v1_books__book_id__accounts__account__ledger_get"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/rename": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Rename Account
+     * @description Rename or move an account and everything under it: every directive naming them is
+     *     rewritten, history included, in one write.
+     */
+    post: operations["rename_account_api_ledger_v1_books__book_id__accounts__account__rename_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -216,6 +283,26 @@ export interface paths {
      * @description What a trade would write: the transaction, and the lots a sale draws on.
      */
     post: operations["preview_trade_api_ledger_v1_books__book_id__accounts__account__trades_preview_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/unarchive": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Unarchive Account
+     * @description Reopen an archived account and everything under it. Returns the accounts reopened.
+     */
+    post: operations["unarchive_account_api_ledger_v1_books__book_id__accounts__account__unarchive_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -573,6 +660,21 @@ export interface components {
        */
       updated_at?: string | null;
     };
+    /** AccountArchive */
+    AccountArchive: {
+      /**
+       * Date
+       * @description When it closes; default today. No earlier than its last transaction.
+       */
+      date?: string | null;
+      /**
+       * Transfer To
+       * @description Move what's left in it here first (a closing transfer).
+       */
+      transfer_to?: string | null;
+      /** Updated At */
+      updated_at?: string | null;
+    };
     /** AccountIn */
     AccountIn: {
       /** Booking */
@@ -617,12 +719,30 @@ export interface components {
        */
       booking?: ("FIFO" | "LIFO" | "HIFO" | "STRICT" | "NONE") | null;
       /**
+       * Display Name
+       * @description A human name; None or "": the name's last part.
+       */
+      display_name?: string | null;
+      /**
        * Revalue Every
        * @description A revalued asset: days its value stays current; None: not one.
        */
       revalue_every?: number | null;
       /** Updated At */
       updated_at: string;
+    };
+    /** AccountRename */
+    AccountRename: {
+      /**
+       * To
+       * @description The new full name (same top-level account).
+       */
+      to: string;
+      /**
+       * Updated At
+       * @description The open directive's version read (implicit nodes have none).
+       */
+      updated_at?: string | null;
     };
     /**
      * AccountSummary
@@ -1474,6 +1594,88 @@ export interface components {
        */
       updated_at: string;
     };
+    /**
+     * TreeAccount
+     * @description An account in the chart of accounts, with its balances.
+     */
+    TreeAccount: {
+      /**
+       * Balance
+       * @description Its own balance (a node: none), pending included.
+       */
+      balance: components["schemas"]["Amount"][];
+      /**
+       * Booking
+       * @description How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); None: the book's default.
+       */
+      booking?: string | null;
+      /** Close */
+      close?: string | null;
+      /**
+       * Currencies
+       * @description Constraint from the open directive; empty means any.
+       */
+      currencies?: string[];
+      /**
+       * Display Name
+       * @description A human name, from `display-name` metadata if set.
+       */
+      display_name?: string | null;
+      /**
+       * Implicit
+       * @description Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.
+       * @default false
+       */
+      implicit: boolean;
+      /**
+       * Kind
+       * @description Leaf accounts hold transactions; node accounts hold sub-accounts.
+       * @enum {string}
+       */
+      kind: "leaf" | "node";
+      /** Name */
+      name: string;
+      /** Open */
+      open?: string | null;
+      /**
+       * Protected
+       * @description A top-level, system or brokerage-part account: it can't be renamed or deleted.
+       * @default false
+       */
+      protected: boolean;
+      /**
+       * Revalue Every
+       * @description A revalued asset (a house, a car): how many days its value stays current.
+       */
+      revalue_every?: number | null;
+      /**
+       * Splits
+       * @description How many splits its subtree has: what deleting it would move.
+       */
+      splits: number;
+      /**
+       * Total
+       * @description Its subtree's balance, itself included: one amount per currency.
+       */
+      total: components["schemas"]["Amount"][];
+      /**
+       * Type
+       * @description From the top-level account; None for an unrecognized root.
+       */
+      type: ("asset" | "liability" | "equity" | "income" | "expense") | null;
+      /**
+       * Unpriced
+       * @description Commodities in the subtree with no price, left out of `value`.
+       */
+      unpriced?: string[];
+      /**
+       * Updated At
+       * @description Its `open` directive's version; send it back to change settings.
+       */
+      updated_at?: string | null;
+      /** @description The subtree's value in the operating currency: everything that has a price. */
+      value: components["schemas"]["Amount"];
+    };
     /** ValidationError */
     ValidationError: {
       /** Context */
@@ -1828,6 +2030,77 @@ export interface operations {
       };
     };
   };
+  account_tree_api_ledger_v1_books__book_id__accounts_tree_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TreeAccount"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_account_api_ledger_v1_books__book_id__accounts__account__delete: {
+    parameters: {
+      query?: {
+        substitute?: string | null;
+        updated_at?: string | null;
+      };
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": string[];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   set_account_api_ledger_v1_books__book_id__accounts__account__patch: {
     parameters: {
       query?: never;
@@ -1868,6 +2141,40 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
+    };
+  };
+  archive_account_api_ledger_v1_books__book_id__accounts__account__archive_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AccountArchive"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": string[];
+        };
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };
@@ -1937,6 +2244,47 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
+    };
+  };
+  rename_account_api_ledger_v1_books__book_id__accounts__account__rename_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AccountRename"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Account"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };
@@ -2035,6 +2383,38 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["TradePreview"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  unarchive_account_api_ledger_v1_books__book_id__accounts__account__unarchive_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": string[];
         };
       };
       /** @description Validation Error */

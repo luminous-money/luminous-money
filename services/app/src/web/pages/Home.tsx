@@ -37,28 +37,30 @@ export function Home({ book }: { book: Book }) {
       )}
 
       <section className="stack" aria-label="Accounts">
-        {accounts.data?.map((account) => {
-          const last = imports.data?.[account.name];
-          return (
-            <Link
-              key={account.name}
-              href={`/books/${book.id}/accounts/${encodeURIComponent(account.name)}`}
-              className="card link account-card"
-            >
-              <div className="account-card-top">
-                <h2>{displayName(account)}</h2>
-                <span className="balance">{headline(account)}</span>
-              </div>
-              <AccountValueNote account={account} />
-              {bank.data?.[account.name] && (
-                <ReportedLine status={bank.data[account.name]!} type={account.type} />
-              )}
-              <p className="muted small">
-                {last ? `Last updated at: ${formatWhen(last)}` : "No imports yet"}
-              </p>
-            </Link>
-          );
-        })}
+        {accounts.data
+          ?.filter((account) => !account.close)
+          .map((account) => {
+            const last = imports.data?.[account.name];
+            return (
+              <Link
+                key={account.name}
+                href={`/books/${book.id}/accounts/${encodeURIComponent(account.name)}`}
+                className="card link account-card"
+              >
+                <div className="account-card-top">
+                  <h2>{displayName(account)}</h2>
+                  <span className="balance">{headline(account)}</span>
+                </div>
+                <AccountValueNote account={account} />
+                {bank.data?.[account.name] && (
+                  <ReportedLine status={bank.data[account.name]!} type={account.type} />
+                )}
+                <p className="muted small">
+                  {last ? `Last updated at: ${formatWhen(last)}` : "No imports yet"}
+                </p>
+              </Link>
+            );
+          })}
       </section>
 
       {accounts.data && accounts.data.length > 0 && (

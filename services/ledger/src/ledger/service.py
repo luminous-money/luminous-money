@@ -287,6 +287,7 @@ class Ledger:
             row.text,
             booking=changes.get("booking", account.booking),
             revalue_every=changes.get("revalue_every", account.revalue_every),
+            **({"display_name": changes["display_name"]} if "display_name" in changes else {}),
         )
         self._put(book_id, engine.parse_one(directive.text, row.id), patch.updated_at)
         return self._account(book_id, name)

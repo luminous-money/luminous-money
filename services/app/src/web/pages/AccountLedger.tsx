@@ -146,6 +146,12 @@ export function AccountLedger({ book, account }: { book: string; account: string
             <button type="button" onClick={selection.start}>
               Select
             </button>
+            <Link
+              href={`/books/${book}/accounts/${encodeURIComponent(account)}/edit`}
+              className="button"
+            >
+              Edit
+            </Link>
             {linked && (
               <button
                 type="button"

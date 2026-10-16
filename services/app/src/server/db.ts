@@ -780,6 +780,94 @@ export class AppDb {
     return new Map(rows.map(({ transaction_id, ...r }) => [transaction_id, toSchedule(r)]));
   }
 
+  /**
+   * Follow an account that's been renamed (or moved) in the ledger, with everything under it:
+   * stars, CSV profiles, import batches, schedules' templates, rules and proposals, bank links
+   * and link attempts. One transaction.
+   */
+  renameAccount(book: string, old: string, renamed: string): void {
+    const to = (name: string) =>
+      name === old || name.startsWith(`${old}:`) ? renamed + name.slice(old.length) : name;
+    transaction(this.db, () => this.followAccounts(book, to, () => false));
+  }
+
+  /**
+   * Follow accounts deleted in the ledger, their splits moved to `substitute`: what referred to
+   * them now refers to the substitute (import batches, so duplicates are still caught; CSV
+   * profiles, if the substitute has none; schedules, rules, proposals), and what was about
+   * them alone goes (stars, bank links and attempts). One transaction.
+   */
+  mergeAccounts(book: string, deleted: string[], substitute: string | null): void {
+    const gone = new Set(deleted);
+    const to = (name: string) => (gone.has(name) && substitute ? substitute : name);
+    transaction(this.db, () => {
+      const keepProfiles = substitute !== null && this.profiles(book, substitute).length === 0;
+      if (!keepProfiles)
+        for (const name of gone)
+          this.db
+            .prepare("DELETE FROM csv_profile WHERE book_id = ? AND account = ?")
+            .run(book, name);
+      this.followAccounts(book, to, (name) => gone.has(name));
+    });
+  }
+
+  private followAccounts(
+    book: string,
+    to: (name: string) => string,
+    drop: (name: string) => boolean
+  ): void {
+    const stamp = now();
+    // Columns holding one account name: dropped (if `drop` says) or renamed.
+    for (const [table, dropIt] of [
+      ["star", true],
+      ["simplefin_link", true],
+      ["simplefin_attempt", true],
+      ["csv_profile", false],
+      ["import_batch", false],
+      ["category_rule", false],
+    ] as const) {
+      const rows = this.db
+        .prepare(`SELECT rowid AS id, account FROM ${table} WHERE book_id = ?`)
+        .all(book) as { id: number; account: string }[];
+      for (const r of rows) {
+        if (dropIt && drop(r.account)) {
+          this.db.prepare(`DELETE FROM ${table} WHERE rowid = ?`).run(r.id);
+        } else if (to(r.account) !== r.account) {
+          this.db
+            .prepare(`UPDATE ${table} SET account = ?, updated_at = ? WHERE rowid = ?`)
+            .run(to(r.account), stamp, r.id);
+        }
+      }
+    }
+    // JSON columns: every `account` field in them.
+    const remap = (json: string | null) =>
+      json === null ? null : JSON.stringify(mapAccountFields(JSON.parse(json), to));
+    for (const [table, key, columns] of [
+      ["schedule", "id", ["template"]],
+      ["category_rule", "id", ["conditions"]],
+      ["proposal", "transaction_id", ["postings", "proposal"]],
+    ] as const) {
+      const rows = this.db
+        .prepare(`SELECT ${key} AS key, ${columns.join(", ")} FROM ${table} WHERE book_id = ?`)
+        .all(book) as Record<string, string | null>[];
+      for (const r of rows) {
+        const changed = columns.filter((c) => remap(r[c]!) !== r[c]);
+        if (!changed.length) continue;
+        this.db
+          .prepare(
+            `UPDATE ${table} SET ${changed.map((c) => `${c} = ?`).join(", ")}, updated_at = ? WHERE ${key} = ?`
+          )
+          .run(...changed.map((c) => remap(r[c]!)), stamp, r.key!);
+      }
+    }
+  }
+
+  /** Stop bank feeds into these accounts (archived ones). */
+  unlinkAccounts(book: string, accounts: string[]): void {
+    const remove = this.db.prepare("DELETE FROM simplefin_link WHERE book_id = ? AND account = ?");
+    transaction(this.db, () => accounts.forEach((a) => remove.run(book, a)));
+  }
+
   /** Forget everything kept here about a book: once the ledger has deleted it. */
   forgetBook(book: string): void {
     transaction(this.db, () => {
@@ -1027,4 +1115,17 @@ export class AppDb {
       )
       .all(book) as { categorizer: string; settled: number; accepted: number }[];
   }
+}
+
+/** `value` with every `account` field (at any depth) passed through `to`. */
+export function mapAccountFields(value: unknown, to: (name: string) => string): unknown {
+  if (Array.isArray(value)) return value.map((v) => mapAccountFields(v, to));
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [
+        k,
+        k === "account" && typeof v === "string" ? to(v) : mapAccountFields(v, to),
+      ])
+    );
+  return value;
 }

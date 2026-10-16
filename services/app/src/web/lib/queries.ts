@@ -30,6 +30,7 @@ import { useEffect, useRef } from "react";
 
 import type { AccountCreation } from "../components/AccountPicker.js";
 import {
+  accountChanges,
   appApi,
   bankFeeds,
   type LinkRequest,
@@ -810,3 +811,33 @@ export const useCancelLink = (book: string) =>
   useBankChange((id: string) => bankFeeds.cancel(book, id));
 export const useUnlinkBank = (book: string) =>
   useBankChange((id: string) => bankFeeds.unlink(book, id));
+
+// The chart of accounts
+
+export function useAccountTree(book: string) {
+  return useQuery({ queryKey: ["book", book, "tree"], queryFn: () => api.accountTree(book) });
+}
+
+/** A change to accounts: everything about the book may have moved. */
+function useChartChange<A, R>(book: string, fn: (args: A) => Promise<R>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+export const useRenameAccount = (book: string, account: string) =>
+  useChartChange(book, ({ to, updated_at }: { to: string; updated_at?: string }) =>
+    accountChanges.rename(book, account, to, updated_at)
+  );
+export const useArchiveAccount = (book: string, account: string) =>
+  useChartChange(book, (a: { date?: string; transfer_to?: string; updated_at?: string }) =>
+    accountChanges.archive(book, account, a)
+  );
+export const useUnarchiveAccount = (book: string, account: string) =>
+  useChartChange(book, () => accountChanges.unarchive(book, account));
+export const useRemoveAccount = (book: string, account: string) =>
+  useChartChange(book, (substitute: string | undefined) =>
+    accountChanges.remove(book, account, substitute)
+  );

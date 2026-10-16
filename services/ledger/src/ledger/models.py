@@ -157,6 +157,30 @@ class Account(Api):
     updated_at: str | None = Field(None, description="Its `open` directive's version; send it back to change settings.")
 
 
+class TreeAccount(Account):
+    """An account in the chart of accounts, with its balances."""
+
+    balance: list[Amount] = Field(description="Its own balance (a node: none), pending included.")
+    total: list[Amount] = Field(description="Its subtree's balance, itself included: one amount per currency.")
+    value: Amount = Field(description="The subtree's value in the operating currency: everything that has a price.")
+    unpriced: list[str] = Field(default_factory=list, description="Commodities in the subtree with no price, left out of `value`.")
+    splits: int = Field(description="How many splits its subtree has: what deleting it would move.")
+    protected: bool = Field(
+        False, description="A top-level, system or brokerage-part account: it can't be renamed or deleted."
+    )
+
+
+class AccountRename(Strict):
+    to: str = Field(description="The new full name (same top-level account).")
+    updated_at: Version | None = Field(None, description="The open directive's version read (implicit nodes have none).")
+
+
+class AccountArchive(Strict):
+    date: datetime.date | None = Field(None, description="When it closes; default today. No earlier than its last transaction.")
+    transfer_to: str | None = Field(None, description="Move what's left in it here first (a closing transfer).")
+    updated_at: Version | None = None
+
+
 class AccountSummary(Account):
     """An account with what a card or a ledger's header shows."""
 
@@ -297,6 +321,7 @@ class AccountPatch(Strict):
     """An account's settings to change; only those sent."""
 
     updated_at: str
+    display_name: str | None = Field(None, max_length=100, description="A human name; None or \"\": the name's last part.")
     booking: Booking | None = Field(
         None, description="FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by fava-beans); "
         "None: the book's default."

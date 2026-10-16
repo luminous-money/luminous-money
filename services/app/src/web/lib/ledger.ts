@@ -10,6 +10,7 @@ import {
   type PriceOut,
   type TradeIn,
   type TradePreview,
+  type components as Components,
   type Book,
   type components,
   type LedgerPage,
@@ -24,6 +25,8 @@ export const ledger = createLedgerClient({
   baseUrl: window.location.origin,
   fetch: (request) => apiFetch(request),
 });
+
+export type TreeAccount = Components["schemas"]["TreeAccount"];
 
 export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"], "updated_at">;
 export type AccountKind = components["schemas"]["AccountIn"]["kind"];
@@ -171,6 +174,12 @@ export const api = {
         params: { path: { book_id } },
         body,
       })
+    ),
+
+  /** The chart of accounts: every account, with its own and its subtree's balances. */
+  accountTree: (book_id: string): Promise<TreeAccount[]> =>
+    unwrap(
+      ledger.GET("/api/ledger/v1/books/{book_id}/accounts/tree", { params: { path: { book_id } } })
     ),
 
   accounts: (book_id: string): Promise<Account[]> =>

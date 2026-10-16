@@ -20,14 +20,17 @@ export function AddAccountForm({
   book,
   onAdded,
   submitLabel = "Add account",
+  under,
 }: {
   book: string;
   onAdded: (a: Account) => void;
   submitLabel?: string;
+  /** Start the name under this node ("Add under …" in the chart). */
+  under?: string;
 }) {
   const add = useAddAccount(book);
   const accounts = useAccounts(book);
-  const [name, setName] = useState("Assets:");
+  const [name, setName] = useState(under ? `${under}:` : "Assets:");
   const [balance, setBalance] = useState("");
   const [asOf, setAsOf] = useState(today());
   const [currency, setCurrency] = useState("USD");

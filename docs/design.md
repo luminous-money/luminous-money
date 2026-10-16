@@ -499,6 +499,38 @@ How auth works (M8; the shape is M1's):
   within ±5 days, ranked by closeness in date. It identifies and ranks; nothing acts on matches
   yet.
 
+### Chart of accounts (M10)
+
+- **The tree is one read** (`GET /accounts/tree`): every live posting's change, summed per
+  account as Decimals and rolled up through every ancestor, then valued in the operating
+  currency at the latest prices. Plain SQL plus Python, no Beancount load: 46 ms on a five-year
+  demo book. A node's figure is one number, its subtree's value (holdings at market).
+- **Renaming is moving:** the full name changes, and every directive naming the account or one
+  under it is rewritten in one atomic write (97 ms for an 882-split branch):
+  - postings, opens and closes
+  - balances, pads, notes, documents
+  - custom directives' account values
+
+  Renaming onto an existing account is refused, with merging offered instead. The top-level
+  account can't change (that would change the account's type).
+- **Deleting moves every split** of the account and its subtree to one substitute, so no other
+  account's balance changes, and drops the accounts' opens, closes, balances, pads, notes and
+  documents. Merging is the same operation. The substitute can be any type, with a warning when
+  it differs. For a node, the other way is to delete what's under it one by one.
+- **Archiving is Beancount's `close`,** on a date no earlier than the last transaction, with an
+  optional closing transfer of what's left. An archived account leaves pickers, home and imports,
+  and its bank feed stops. Unarchiving removes the close.
+- **Protected:**
+  - the top-level accounts
+  - the system accounts the code relies on (uncategorized, opening balances, unrealized and
+    capital gains, fees)
+  - a brokerage's parts (`:Cash` and holdings), which follow the brokerage
+- **`app` follows the ledger:** renames, merges and archives go through `app`, which changes the
+  ledger first and then, in one transaction, everything it keeps by account name:
+  - **renamed:** stars, CSV profiles, import batches, schedules, rules, proposals, bank links
+    and attempts
+  - **merged:** they move to the substitute; stars and links on the deleted account go
+
 ### Bank feeds: SimpleFIN (M9)
 
 [SimpleFIN](https://www.simplefin.org/protocol.html), usually through the SimpleFIN Bridge, is the

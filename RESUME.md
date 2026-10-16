@@ -6,12 +6,16 @@ _Updated 2026-10-15._ Keep this current: every finalized change set updates it (
 
 ## State
 
-**M1 through M9 are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M10 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
-(categorization), M5 (investments), M6 (multiple books), M8 (auth) and M9 (SimpleFIN) are described
-in their plans. The milestones ahead (M10–M19, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+(categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN) and M10 (chart of
+accounts) are described in their plans. The milestones ahead (M11–M19, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
+- **Accounts (M10):** Menu → Accounts: the tree by type, nodes collapsible, balances rolled up
+  (one figure each), Find, "Show archived", "+" to add under a node. An account's Edit (from
+  its ledger): rename or move, display name, settings, archive (with an optional closing
+  transfer), delete or merge into another account. System accounts are protected.
 - **Bank feeds (M9):** Menu → Bank connections: paste a SimpleFIN Bridge setup token, then link
   each bank account (new, or an existing one reconciled with the bank as the source of truth;
   also "start over" and "from a date"). The history comes in the background; confirm from the
@@ -100,18 +104,17 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 134 tests, including the table lint
-    - auth: 20; app: 137; db: 10; csv-import: 22
+    - ledger: 142 tests, including the table lint
+    - auth: 20; app: 139; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 64 API tests and 69 browser tests (with Mailpit and a fake SimpleFIN server)
+  - `pnpm e2e`: 68 API tests and 72 browser tests (with Mailpit and a fake SimpleFIN server)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps
 
-1. Answer the questions in [the M10 plan](docs/milestones/m10-chart-of-accounts/PLAN.md#questions)
-   (chart of accounts), then say `build M10`.
+1. Say `elaborate plan for M11` (budgets).
 2. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
 
 ## Gotchas
@@ -125,6 +128,9 @@ How it's put together:
 
 - **`pnpm up` is pnpm's own `update` command,** not the `up` script: it bumps dependencies. Use
   `pnpm run up` (foreground), or `docker buildx bake && docker compose up -d`.
+- **Account names are what `app` keys its data by.** Rename, archive and delete accounts through
+  `app` (`/api/app/v1/books/:book/accounts/:account/...`), not the ledger directly, or stars,
+  profiles, rules, schedules and bank links are left pointing at the old name.
 - **SimpleFIN's budget:** about 24 requests a day per connection at the Bridge; the app stops at
   20 (UTC days). Linking a long history takes several; "Sync now" takes one or two.
 - **The dev stack needs `SIMPLEFIN_ENCRYPTION_KEY`** (app won't start without it): it's in the

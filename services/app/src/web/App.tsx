@@ -7,6 +7,8 @@ import type { BookInfo } from "./lib/appApi.js";
 import { bookHome, rememberBook, startingBook, useBookInPath } from "./lib/books.js";
 import { useBooks, useMe, useSessionLifecycle, useTimeZoneBackfill } from "./lib/queries.js";
 import { Account } from "./pages/Account.js";
+import { AccountEditor } from "./pages/AccountEditor.js";
+import { ChartOfAccounts } from "./pages/ChartOfAccounts.js";
 import { BankConnections } from "./pages/BankConnections.js";
 import { ResetPassword, VerifyEmail } from "./pages/EmailLinks.js";
 import { AccountLedger } from "./pages/AccountLedger.js";
@@ -100,6 +102,14 @@ function Gate() {
           </Route>
           <Route path="/verify/:token">{({ token }) => <VerifyEmail token={token} />}</Route>
           <Route path="/books/:book">{() => <Home key={book!.id} book={book!} />}</Route>
+          <Route path="/books/:book/accounts">
+            {({ book: id }) => <ChartOfAccounts key={id} book={id} />}
+          </Route>
+          <Route path="/books/:book/accounts/:account/edit">
+            {({ book: id, account }) => (
+              <AccountEditor key={account} book={id} account={decodeURIComponent(account)} />
+            )}
+          </Route>
           <Route path="/books/:book/accounts/new">
             {() => <AddAccount key={book!.id} book={book!} />}
           </Route>

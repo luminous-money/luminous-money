@@ -130,6 +130,50 @@
         "title": "Account",
         "type": "object"
       },
+      "AccountArchive": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it closes; default today. No earlier than its last transaction.",
+            "title": "Date"
+          },
+          "transfer_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Move what's left in it here first (a closing transfer).",
+            "title": "Transfer To"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "title": "AccountArchive",
+        "type": "object"
+      },
       "AccountIn": {
         "additionalProperties": false,
         "properties": {
@@ -240,6 +284,19 @@
             "description": "FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by fava-beans); None: the book's default.",
             "title": "Booking"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A human name; None or \"\": the name's last part.",
+            "title": "Display Name"
+          },
           "revalue_every": {
             "anyOf": [
               {
@@ -262,6 +319,34 @@
           "updated_at"
         ],
         "title": "AccountPatch",
+        "type": "object"
+      },
+      "AccountRename": {
+        "additionalProperties": false,
+        "properties": {
+          "to": {
+            "description": "The new full name (same top-level account).",
+            "title": "To",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The open directive's version read (implicit nodes have none).",
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "to"
+        ],
+        "title": "AccountRename",
         "type": "object"
       },
       "AccountSummary": {
@@ -2510,6 +2595,179 @@
         "title": "TransactionUpdate",
         "type": "object"
       },
+      "TreeAccount": {
+        "description": "An account in the chart of accounts, with its balances.",
+        "properties": {
+          "balance": {
+            "description": "Its own balance (a node: none), pending included.",
+            "items": {
+              "$ref": "#/components/schemas/Amount"
+            },
+            "title": "Balance",
+            "type": "array"
+          },
+          "booking": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); None: the book's default.",
+            "title": "Booking"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "currencies": {
+            "description": "Constraint from the open directive; empty means any.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Currencies",
+            "type": "array"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A human name, from `display-name` metadata if set.",
+            "title": "Display Name"
+          },
+          "implicit": {
+            "default": false,
+            "description": "Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.",
+            "title": "Implicit",
+            "type": "boolean"
+          },
+          "kind": {
+            "description": "Leaf accounts hold transactions; node accounts hold sub-accounts.",
+            "enum": [
+              "leaf",
+              "node"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open"
+          },
+          "protected": {
+            "default": false,
+            "description": "A top-level, system or brokerage-part account: it can't be renamed or deleted.",
+            "title": "Protected",
+            "type": "boolean"
+          },
+          "revalue_every": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A revalued asset (a house, a car): how many days its value stays current.",
+            "title": "Revalue Every"
+          },
+          "splits": {
+            "description": "How many splits its subtree has: what deleting it would move.",
+            "title": "Splits",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Its subtree's balance, itself included: one amount per currency.",
+            "items": {
+              "$ref": "#/components/schemas/Amount"
+            },
+            "title": "Total",
+            "type": "array"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "asset",
+                  "liability",
+                  "equity",
+                  "income",
+                  "expense"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "From the top-level account; None for an unrecognized root.",
+            "title": "Type"
+          },
+          "unpriced": {
+            "description": "Commodities in the subtree with no price, left out of `value`.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Unpriced",
+            "type": "array"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its `open` directive's version; send it back to change settings.",
+            "title": "Updated At"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "The subtree's value in the operating currency: everything that has a price."
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "kind",
+          "balance",
+          "total",
+          "value",
+          "splits"
+        ],
+        "title": "TreeAccount",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -2972,7 +3230,130 @@
         "summary": "Account Summary"
       }
     },
+    "/api/ledger/v1/books/{book_id}/accounts/tree": {
+      "get": {
+        "description": "Every account, with its own balance, its subtree's, and the subtree's value.",
+        "operationId": "account_tree_api_ledger_v1_books__book_id__accounts_tree_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TreeAccount"
+                  },
+                  "title": "Response Account Tree Api Ledger V1 Books  Book Id  Accounts Tree Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Account Tree"
+      }
+    },
     "/api/ledger/v1/books/{book_id}/accounts/{account}": {
+      "delete": {
+        "description": "Delete the account and its subtree, moving every posting to `substitute` (needed if\nthere are any). Merging is this. Returns the accounts deleted.",
+        "operationId": "delete_account_api_ledger_v1_books__book_id__accounts__account__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "substitute",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Substitute"
+            }
+          },
+          {
+            "in": "query",
+            "name": "updated_at",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Updated At"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Account Api Ledger V1 Books  Book Id  Accounts  Account  Delete",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Delete Account"
+      },
       "patch": {
         "description": "Change an account's settings: how its sales pick lots; whether it's a revalued asset.",
         "operationId": "set_account_api_ledger_v1_books__book_id__accounts__account__patch",
@@ -3032,6 +3413,62 @@
           }
         },
         "summary": "Set Account"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/archive": {
+      "post": {
+        "description": "Close the account and every opened account under it (after an optional closing\ntransfer). Returns the accounts closed.",
+        "operationId": "archive_account_api_ledger_v1_books__book_id__accounts__account__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountArchive"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Archive Account Api Ledger V1 Books  Book Id  Accounts  Account  Archive Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Archive Account"
       }
     },
     "/api/ledger/v1/books/{book_id}/accounts/{account}/holdings": {
@@ -3174,6 +3611,61 @@
           }
         },
         "summary": "Account Ledger"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/rename": {
+      "post": {
+        "description": "Rename or move an account and everything under it: every directive naming them is\nrewritten, history included, in one write.",
+        "operationId": "rename_account_api_ledger_v1_books__book_id__accounts__account__rename_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountRename"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Rename Account"
       }
     },
     "/api/ledger/v1/books/{book_id}/accounts/{account}/revalue": {
@@ -3351,6 +3843,59 @@
           }
         },
         "summary": "Preview Trade"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/unarchive": {
+      "post": {
+        "description": "Reopen an archived account and everything under it. Returns the accounts reopened.",
+        "operationId": "unarchive_account_api_ledger_v1_books__book_id__accounts__account__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Unarchive Account Api Ledger V1 Books  Book Id  Accounts  Account  Unarchive Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Account"
       }
     },
     "/api/ledger/v1/books/{book_id}/commodities": {

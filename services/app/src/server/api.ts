@@ -421,6 +421,74 @@ export function createApi({
     return c.body(null, 204);
   });
 
+  // The chart of accounts (M10): renaming, archiving and deleting go through here, so what
+  // `app` keeps by account name follows the ledger (the ledger first, then `app`, in one
+  // transaction, as for deleting books).
+
+  const accountChange = async (
+    c: Context<Env>,
+    change: (ledger: LedgerPort, book: string, account: string) => Promise<Response>
+  ) => {
+    const { book } = c.req.param() as { book: string };
+    const account = c.req.param("account")!;
+    try {
+      return await change(ledgerFor(c.get("user")), book, account);
+    } catch (error) {
+      return c.json(...ledgerStatus(error));
+    }
+  };
+
+  api.post("/books/:book/accounts/:account/rename", (c) =>
+    accountChange(c, async (ledger, book, account) => {
+      const { to, updated_at } = (await c.req.json().catch(() => ({}))) as {
+        to?: unknown;
+        updated_at?: unknown;
+      };
+      if (typeof to !== "string") return c.json({ detail: "send the new name as `to`" }, 422);
+      const renamed = await ledger.renameAccount(
+        book,
+        account,
+        to,
+        typeof updated_at === "string" ? updated_at : undefined
+      );
+      db.renameAccount(book, account, to);
+      return c.json(renamed);
+    })
+  );
+
+  api.post("/books/:book/accounts/:account/archive", (c) =>
+    accountChange(c, async (ledger, book, account) => {
+      const body = (await c.req.json().catch(() => ({}))) as {
+        date?: string;
+        transfer_to?: string;
+        updated_at?: string;
+      };
+      const closed = await ledger.archiveAccount(book, account, body);
+      db.unlinkAccounts(book, [account, ...closed]); // an archived account's bank feed stops
+      return c.json(closed);
+    })
+  );
+
+  api.post("/books/:book/accounts/:account/unarchive", (c) =>
+    accountChange(c, async (ledger, book, account) =>
+      c.json(await ledger.unarchiveAccount(book, account))
+    )
+  );
+
+  api.delete("/books/:book/accounts/:account", (c) =>
+    accountChange(c, async (ledger, book, account) => {
+      const substitute = c.req.query("substitute") || undefined;
+      const deleted = await ledger.deleteAccount(
+        book,
+        account,
+        substitute,
+        c.req.query("updated_at") || undefined
+      );
+      db.mergeAccounts(book, deleted, substitute ?? null);
+      return c.json(deleted);
+    })
+  );
+
   // Book settings (kept in `app`): for now, the book's time zone, which decides "today" for
   // its schedules.
 

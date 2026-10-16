@@ -336,6 +336,40 @@ class Store:
             (book_id, commodity, limit),
         ).fetchall()
 
+    def account_amounts(self, book_id: str) -> list[sqlite3.Row]:
+        """Every live transaction posting's account, currency and change (`amount`, None where
+        only booking could say), for rolling balances up the tree in one read."""
+        return self._conn.execute(
+            """
+            SELECT p.account, p.amount_currency AS currency, p.amount FROM posting p
+            JOIN directive d ON d.id = p.directive_id
+            WHERE d.book_id = ? AND d.deleted = 0 AND d.kind = 'transaction'
+            """,
+            (book_id,),
+        ).fetchall()
+
+    def mentioning(self, book_id: str, account: str) -> list[Row]:
+        """Live directives whose text names `account` or an account under it (a superset: the
+        caller parses each to be sure)."""
+        pattern = account.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        rows = self._conn.execute(
+            "SELECT * FROM directive WHERE book_id = ? AND deleted = 0 AND text LIKE ? ESCAPE '\\'"
+            " ORDER BY date, ordinal",
+            (book_id, f"%{pattern}%"),
+        )
+        return [_row(r) for r in rows]
+
+    def last_posting(self, book_id: str, account: str) -> str | None:
+        """The date of the latest live transaction posting to `account` or under it."""
+        row = self._conn.execute(
+            """
+            SELECT MAX(d.date) FROM directive d JOIN posting p ON p.directive_id = d.id
+            WHERE d.book_id = ? AND d.deleted = 0 AND (p.account = ? OR p.account LIKE ?)
+            """,
+            (book_id, account, account + ":%"),
+        ).fetchone()
+        return row[0]
+
     def opening_dates(self, book_id: str, equity: str) -> dict[str, str]:
         """For each account, the date of its first live transaction against `equity`: its opening
         balance."""
