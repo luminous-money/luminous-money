@@ -165,7 +165,7 @@ how to start.
   - "Your bank wants you to log in again at SimpleFIN Bridge" (with a link)
   - "SimpleFIN no longer accepts this connection: connect it again"
 - **"Sync now".**
-- Reconciling the two balances (assertions, statements) is M13.
+- Reconciling the two balances (assertions, statements) is M14.
 
 ### Brokerages
 
@@ -320,10 +320,10 @@ Chase and a Fidelity card linked; PNC checking and the Fidelity investment accou
 ## Out of scope
 
 - Pending transactions.
-- Balance assertions and reconciling statements (M13).
+- Balance assertions and reconciling statements (M14).
 - Other aggregators (Plaid, GoCardless, ...). The pipeline stays source-agnostic, so each is a
   client and a page.
-- Sharing a connection with other users (M12).
+- Sharing a connection with other users (M13).
 - Rotating the encryption key (the stored format allows it later).
 
 ## Questions

@@ -43,7 +43,7 @@ So:
   updates entries instead of duplicating them.
 - **Reports are our own, not Fava's.** Fava was the original plan for desktop reporting, run
   read-only over exports. It was dropped (2026-10-09) because it didn't look useful for our
-  purposes; reports will be built on the generic ledger-graphs libraries (PLAN.md, M11).
+  purposes; reports will be built on the generic ledger-graphs libraries (PLAN.md, M12).
   Bringing Fava back would only take an image, a route, and a loop writing exports for it.
 
 **The engine spike is done and proved the approach** (see [`services/ledger`](services/ledger)):
@@ -396,7 +396,7 @@ How auth works (M8; the shape is M1's):
 - **Test stacks** (`AUTH_TEST_USERS=true`) let login take an email alone, so tests don't share
   state. It's off by default, and `pnpm e2e` turns it on.
 - **Books belong to users.** Every book has an owner, and a book endpoint answers only its owner:
-  anyone else gets 404, as if the book didn't exist. Sharing and permissions come in M12.
+  anyone else gets 404, as if the book didn't exist. Sharing and permissions come in M13.
 
 ### Books, starred accounts and balances (M1, M2)
 
@@ -406,7 +406,7 @@ How auth works (M8; the shape is M1's):
   or a credit card bought nothing a name and a star don't. Users create any account by its full
   name, anywhere the account rules allow; filing a card under assets is theirs to make.
 - **Starred accounts are the home page.** Stars are per user, kept in `app` (user, book,
-  account), since they're a preference rather than bookkeeping: shared books (M12) can show each
+  account), since they're a preference rather than bookkeeping: shared books (M13) can show each
   user their own, and exports stay free of them. Renaming accounts will have to carry them along,
   as it will CSV profiles.
 - **Display names:** `display-name` metadata if set, else the name's last segment with dashes as
@@ -791,7 +791,7 @@ case without hiding the general one.
 |---|---|---|
 | System of record | SQLite, behind an interface | One ledger database for all books. |
 | Accounting engine | Beancount v3 | Also the import/export and backup format. |
-| Reports | Our own, on the ledger-graphs libraries | Planned (PLAN.md, M11). Fava was dropped. |
+| Reports | Our own, on the ledger-graphs libraries | Planned (PLAN.md, M12). Fava was dropped. |
 | Mobile UI | PWA: React + Vite + `vite-plugin-pwa` | Served by `app` under `/ui`. |
 | App API server | Hono on Node | Small footprint for the Pi. |
 | Routing | Traefik | forwardAuth to `auth`, no plugins. |

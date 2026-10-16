@@ -67,7 +67,7 @@ M2 is four things:
 ### Starred accounts
 
 - **Stars are per user, kept in `app`'s database** (user, book, account). They're a preference,
-  not bookkeeping: once books are shared (M12), your home page and Jess's can differ, and exports
+  not bookkeeping: once books are shared (M13), your home page and Jess's can differ, and exports
   stay free of them. Renaming accounts (the chart of accounts) will have to carry stars along, as
   it will CSV profiles.
 - **Star and unstar** from an account's ledger (a star in its header). Accounts created from the
@@ -197,7 +197,7 @@ Five slices, in order, each committed on its own.
 
 ## Out of scope for M2
 
-- **Statements, due dates, credit limits and reconciling against a statement:** M13.
+- **Statements, due dates, credit limits and reconciling against a statement:** M14.
 - **Categorizing the merchant side of charges:** M4. Charges land uncategorized, as in M1.
 - **Scheduled card payments:** M3.
 - **Order-aware assignment** (the coffee miss above): Polish.

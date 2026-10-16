@@ -198,7 +198,7 @@ tests over synthetic descriptions (no real data in fixtures).
   receipts: later.
 - **Categorizing transactions that weren't staged** (re-categorizing history): the chart of
   accounts' job.
-- **Suggesting recurring transactions:** M14 (it can reuse the payee keys and context).
+- **Suggesting recurring transactions:** M15 (it can reuse the payee keys and context).
 
 ## Questions
 

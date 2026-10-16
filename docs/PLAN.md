@@ -89,13 +89,24 @@ milestone starts.
       10-minute access tokens with rotating refresh, API tokens, email links (optional SMTP),
       account deletion, the operator's CLI, identities ready for OIDC.
 - [ ] **M9: SimpleFIN.** Bank feeds.
-- [ ] **M10: Budgets.**
-- [ ] **M11: Reports.** From basic to more complex.
-- [ ] **M12: Sharing books with other users.** Any user can be added to a book with read, write
+- [ ] **M10: Chart of accounts.** The account tree with collapsible nodes and aggregate
+      balances; add accounts; open one to edit it, including archiving it; delete accounts (which
+      needs a substitute to move their transactions to).
+- [ ] **M11: Budgets.**
+- [ ] **M12: Reports.** From basic to more complex.
+- [ ] **M13: Sharing books with other users.** Any user can be added to a book with read, write
       or manage permissions. Every book has an owner.
-- [ ] **M13: Reconciliation.**
-- [ ] **M14: Suggested recurring transactions.** Nightly, analyze each account's last 14 months
+- [ ] **M14: Reconciliation.**
+- [ ] **M15: Suggested recurring transactions.** Nightly, analyze each account's last 14 months
       of transactions and identify ones that look recurring, to suggest as schedules (M3).
+- [ ] **M16: Receipt capture.** Take a picture of a receipt, and AI makes a transaction from it.
+- [ ] **M17: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
+      tag.
+- [ ] **M18: AI categorization.** Users set up an AI provider (one of those supported, with
+      their API key) and standing instructions for categorizing, e.g. "I like highly detailed,
+      deeply nested expense accounts. Accounts should always say WHAT, not WHY (tags say why, if
+      anything)". A new bulk action in review: "Categorize with AI".
+- [ ] **M19: Design polish.**
 
 ## Notes collected so far
 
@@ -123,8 +134,8 @@ elaborated.
   loans. The home screen lists them with their balances. (M2 replaces the explicit kind with
   per-user **starred accounts**; there are no account kinds.) Other places likely to treat them
   specially: the anchor side of imports, CSV and bank-feed imports, reconciliation and balance
-  assertions (M13), and net worth.
-- **Chart of accounts:**
+  assertions (M14), and net worth.
+- **Chart of accounts** (M10):
   - view the tree
   - create, edit, rename and close accounts
   - move accounts between parents
@@ -138,7 +149,7 @@ elaborated.
   - the resolver chain: `matcher`, then `rules`, with `external` as a configurable slot (Cati,
     eventually)
 - **Prices** (M5): `bean-price` on a schedule, and manual price entries for illiquid assets.
-- **Reports** (M11):
+- **Reports** (M12):
   - **Check what already exists before building anything.**
   - **If we build our own:** two independent libraries, `@luminous-money/ledger-graphs-api` (a
     plugin for a ledger's API that returns data sets) and `@luminous-money/ledger-graphs-ui` (a
@@ -147,7 +158,7 @@ elaborated.
     concept.
   - **At least:** expense and income pie charts with selectable account depth, number of slices,
     date bounds, and optional averaging per period.
-- **Budgeting** (M10):
+- **Budgeting** (M11):
   - a target budget on any account, for any period
   - no descendant may have a higher base budget than its ancestor (base amounts, before
     rollover)
@@ -186,8 +197,9 @@ Smaller improvements to pick up between milestones or at the end.
 - [ ] **Order-aware match assignment:** assign an import's rows to candidates over the whole
       network of matches, weighting order, so two identical coffees entered on the 5th and 7th
       pair with CSV rows on the 7th and 8th in order (M2 pairs by proximity, and review swaps).
-- [ ] **SimpleFIN links in the background:** record the link attempt, fetch history in the
-      background, and fill in the preview when it's ready (see the M9 plan's follow-ups, with
-      45-day windows and Bridge notices).
 - [ ] **Import file format management:** see, edit, rename and delete an account's saved CSV
       formats directly, rather than only replacing or adding to them when a file doesn't match.
+- [ ] **Review shows the book's ID at the top,** where its name belongs.
+- [ ] **Select all, and "select uncategorized",** in select mode.
+- [ ] **Review newest first.**
+- [ ] **Mobile usability,** across the app.

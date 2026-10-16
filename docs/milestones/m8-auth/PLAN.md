@@ -32,7 +32,7 @@ M8: Auth: plan
 
 Nothing changes in `ledger` or `app`: they keep trusting the `X-User-Id` Traefik sets after
 `auth` checks the request. Book ownership already holds (anyone else gets 404). Other people's
-permissions on your books are M12.
+permissions on your books are M13.
 
 ## What exists today
 
@@ -141,7 +141,7 @@ permissions on your books are M12.
   - **Forgot password:** sends a reset link (single use, 1 hour). The answer is the same
     whether or not the email has an account.
   - **Verification:** signing up or changing your email sends a verification link. Unverified
-    accounts work fully (verification will matter for sharing by email, M12); the account page
+    accounts work fully (verification will matter for sharing by email, M13); the account page
     shows a "verify your email" note.
 - **Without mail:** "Forgot password" says to ask whoever runs the server, who runs `reset-link`.
 - **Sending** uses `nodemailer`. The e2e stack runs **Mailpit** as a fake mail server, and tests
@@ -152,7 +152,7 @@ permissions on your books are M12.
 - **Delete account** (password required) deletes every book you own:
   - through `app`'s book deletion, so backups carry it and `app` forgets what it kept
   - then your sessions, tokens, identities and user
-- **Sharing (M12)** will have to decide what happens to books shared with others first.
+- **Sharing (M13)** will have to decide what happens to books shared with others first.
 
 ### The PWA
 

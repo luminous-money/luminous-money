@@ -9,7 +9,7 @@ _Updated 2026-10-15._ Keep this current: every finalized change set updates it (
 **M1 through M8 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books) and M8 (auth) are described in their
-plans. The milestones ahead (M9–M14, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+plans. The milestones ahead (M9–M15, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
 - **Accounts (M8):** anyone creates one (name, email, a 15+ character password not known from
