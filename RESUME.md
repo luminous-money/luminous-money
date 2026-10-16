@@ -107,9 +107,10 @@ How it's put together:
 1. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions)
    (email verification required or not, session lifetime, passkeys/2FA timing, which OIDC
    providers first).
-2. Say `elaborate plan for M9` (SimpleFIN): syncing bank accounts. The dev stack is fine for
-   real connections (its data is disposable); a separate live stack
-   ([docs/operating.md](docs/operating.md)) waits for hydration, when the data has to last.
+2. Answer the questions in [the M9 plan](docs/milestones/m9-simplefin/PLAN.md#questions)
+   (SimpleFIN), then say `build M9`. The dev stack is fine for real connections (its data is
+   disposable); a separate live stack ([docs/operating.md](docs/operating.md)) waits for
+   hydration, when the data has to last.
 
 ## Gotchas
 
