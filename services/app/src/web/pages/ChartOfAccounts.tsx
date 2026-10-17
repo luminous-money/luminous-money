@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { displayName, shown } from "../lib/accounts.js";
 import { formatMoney } from "../lib/decimal.js";
 import type { TreeAccount } from "../lib/ledger.js";
-import { explain, useAccountTree, useBankStatus, useStars } from "../lib/queries.js";
+import { explain, useAccountTree, useCanWrite, useBankStatus, useStars } from "../lib/queries.js";
 
 const ROOTS = ["Assets", "Liabilities", "Equity", "Income", "Expenses"];
 
@@ -54,6 +54,7 @@ function Figure({ account }: { account: TreeAccount }) {
  */
 export function ChartOfAccounts({ book }: { book: string }) {
   const tree = useAccountTree(book);
+  const canWrite = useCanWrite(book);
   const stars = useStars(book);
   const bank = useBankStatus(book);
   const { open, toggle } = useExpanded(book);
@@ -170,9 +171,11 @@ export function ChartOfAccounts({ book }: { book: string }) {
     <main>
       <header className="page-head chart-head">
         <h1>Accounts</h1>
-        <Link href={`/books/${book}/accounts/new`} className="button primary-link">
-          + Add
-        </Link>
+        {canWrite && (
+          <Link href={`/books/${book}/accounts/new`} className="button primary-link">
+            + Add
+          </Link>
+        )}
       </header>
       <input
         type="search"

@@ -7,7 +7,7 @@ import { Hono, type Context, type Next } from "hono";
 
 import type { CsvProfile } from "@fava-beans/csv-import";
 
-import type { AppDb } from "./db.js";
+import type { AppDb, Invite } from "./db.js";
 import { ImportProblem, importFile } from "./imports.js";
 import { fetchPrices } from "./prices.js";
 import { assignRow, confirmRow, MatchProblem, proposedMatches } from "./matches.js";
@@ -36,7 +36,7 @@ import type { Categorizer } from "./categorize/types.js";
 import { ruleProblem } from "./categorize/rules.js";
 import { applyRule, coveredBy, settle, suggestUnconfirmed } from "./categorize/service.js";
 import type { CategoryRuleIn, CategoryRulePatch } from "../shared/rules.js";
-import { LedgerError, type Book, type LedgerPort } from "./ledger.js";
+import { LedgerError, type Book, type LedgerPort, type Member } from "./ledger.js";
 import { simplefinRoutes } from "./simplefin/routes.js";
 import type { SimplefinDeps } from "./simplefin/sync.js";
 
@@ -78,12 +78,47 @@ export function createApi({
     const user = c.req.header("x-user-id");
     if (!user) return c.json({ detail: "not logged in" }, 401);
     c.set("user", user);
+    // Who they are, for the people they share books with (M13).
+    const name = c.req.header("x-user-name");
+    const email = c.req.header("x-user-email");
+    if (name && email) {
+      try {
+        db.rememberProfile({
+          user_id: user,
+          name: decodeURIComponent(name),
+          email: decodeURIComponent(email),
+        });
+      } catch {
+        // a malformed header: nothing to remember
+      }
+    }
     return next();
   };
   api.use("/books", caller);
   api.use("/books/*", caller);
   api.use("/simplefin/*", caller);
+  api.use("/invites/*", caller);
   api.use("/me", caller);
+
+  /** The caller's role in the book (owner, manage, write, read), or undefined if none. */
+  const roleIn = async (user: string, book: string) =>
+    (await ledgerFor(user).book(book))?.role ?? undefined;
+  const RANKS = ["read", "write", "manage", "owner"];
+  const atLeast = (role: string | undefined, need: string) =>
+    role !== undefined && RANKS.indexOf(role) >= RANKS.indexOf(need);
+
+  // Changing a book needs a member's write (M13); reading, any member's (each route checks).
+  // Stars are personal, so a reader may star too; members and invitations check their own
+  // (leaving is anyone's; the rest, a manager's).
+  api.use("/books/:book/*", async (c, next) => {
+    if (c.req.method === "GET" || c.req.method === "HEAD") return next();
+    if (/\/(stars|members|invites)(\/|$)/.test(c.req.path)) return next();
+    const role = await roleIn(c.get("user"), c.req.param("book")!);
+    if (!role) return c.json({ detail: "not found" }, 404);
+    if (!atLeast(role, "write"))
+      return c.json({ detail: "you can see this book, but not change it" }, 403);
+    return next();
+  });
 
   /** 404 unless the caller owns the book. */
   const owned = async (user: string, book: string) =>
@@ -491,8 +526,8 @@ export function createApi({
 
   const withSettings = (book: Book) => ({ ...book, time_zone: db.timeZone(book.id) ?? null });
   const ledgerStatus = (error: unknown) => {
-    if (error instanceof LedgerError && [404, 409, 422].includes(error.status))
-      return [{ detail: error.message }, error.status as 404 | 409 | 422] as const;
+    if (error instanceof LedgerError && [403, 404, 409, 422].includes(error.status))
+      return [{ detail: error.message }, error.status as 403 | 404 | 409 | 422] as const;
     throw error;
   };
 
@@ -615,7 +650,8 @@ export function createApi({
   /** Change some settings (`time_zone`, `week_start`), against `updated_at`. */
   api.patch("/books/:book/settings", async (c) => {
     const { book } = c.req.param();
-    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    if (!atLeast(await roleIn(c.get("user"), book), "manage"))
+      return c.json({ detail: "only a manager of the book can do that" }, 403);
     const body = (await c.req.json().catch(() => ({}))) as {
       updated_at?: unknown;
       time_zone?: unknown;
@@ -649,13 +685,158 @@ export function createApi({
 
   api.put("/books/:book/settings", async (c) => {
     const { book } = c.req.param();
-    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    if (!atLeast(await roleIn(c.get("user"), book), "manage"))
+      return c.json({ detail: "only a manager of the book can do that" }, 403);
     const body = (await c.req.json().catch(() => ({}))) as { time_zone?: unknown };
     const zone = body.time_zone;
     if (typeof zone !== "string" || !isTimeZone(zone))
       return c.json({ detail: "send a time zone, like America/Chicago" }, 422);
     db.setTimeZone(book, zone, c.get("user"));
     return c.json({ time_zone: zone });
+  });
+
+  // Sharing books (M13): members (kept by the ledger, with names from here) and invitations by
+  // link. Accepting one adds the caller acting as whoever invited them, so the ledger checks
+  // they still manage the book.
+
+  const withNames = (members: Member[]) => {
+    const profiles = db.userProfiles(members.map((m) => m.user_id));
+    return members.map((m) => ({
+      ...m,
+      name: profiles.get(m.user_id)?.name ?? null,
+      email: profiles.get(m.user_id)?.email ?? null,
+    }));
+  };
+  const inviteView = (i: Invite) => {
+    const by = db.userProfiles([i.invited_by]).get(i.invited_by);
+    return {
+      id: i.id,
+      role: i.role,
+      label: i.label,
+      invited_by: by?.name ?? null,
+      expires_at: i.expires_at,
+      created_at: i.created_at,
+    };
+  };
+  const ledgerProblem = (error: unknown) => {
+    if (error instanceof LedgerError && [403, 404, 409, 422].includes(error.status))
+      return [{ detail: error.message }, error.status as 403 | 404 | 409 | 422] as const;
+    throw error;
+  };
+
+  /** Who has the book (owner first), and, for managers, its open invitations. */
+  api.get("/books/:book/members", async (c) => {
+    const { book } = c.req.param();
+    const user = c.get("user");
+    const role = await roleIn(user, book);
+    if (!role) return c.json({ detail: "not found" }, 404);
+    const members = await ledgerFor(user).members(book);
+    return c.json({
+      role,
+      members: withNames(members),
+      invites: atLeast(role, "manage") ? db.openInvites(book).map(inviteView) : [],
+    });
+  });
+
+  /** Change a member's role (`{role, updated_at}`), as a manager. */
+  api.patch("/books/:book/members/:member", async (c) => {
+    const { book, member } = c.req.param();
+    const body = (await c.req.json().catch(() => ({}))) as { role?: unknown; updated_at?: unknown };
+    if (body.role !== "read" && body.role !== "write" && body.role !== "manage")
+      return c.json({ detail: "the role is read, write or manage" }, 422);
+    if (typeof body.updated_at !== "string")
+      return c.json({ detail: "send the updated_at you read" }, 422);
+    try {
+      const changed = await ledgerFor(c.get("user")).putMember(book, member, {
+        role: body.role,
+        updated_at: body.updated_at,
+      });
+      return c.json(withNames([changed])[0]);
+    } catch (error) {
+      return c.json(...ledgerProblem(error));
+    }
+  });
+
+  /** Take a member out (a manager), or leave (yourself). What acted as them in the book acts as
+   * its owner from then on, and their bank links into it go. */
+  api.delete("/books/:book/members/:member", async (c) => {
+    const { book, member } = c.req.param();
+    const ledger = ledgerFor(c.get("user"));
+    try {
+      const owner = (await ledger.members(book)).find((m) => m.role === "owner")?.user_id;
+      await ledger.removeMember(book, member);
+      if (owner) db.handOver(book, member, owner);
+      for (const link of simplefin?.store.linksIn(book) ?? [])
+        if (link.user_id === member) simplefin!.store.deleteLink(link.user_id, link.id);
+      return c.body(null, 204);
+    } catch (error) {
+      return c.json(...ledgerProblem(error));
+    }
+  });
+
+  /** Invite someone (`{role, label?}`), as a manager: the link's token, shown once. */
+  api.post("/books/:book/invites", async (c) => {
+    const { book } = c.req.param();
+    const user = c.get("user");
+    if (!atLeast(await roleIn(user, book), "manage"))
+      return c.json({ detail: "only a manager of the book can do that" }, 403);
+    const body = (await c.req.json().catch(() => ({}))) as { role?: unknown; label?: unknown };
+    if (body.role !== "read" && body.role !== "write" && body.role !== "manage")
+      return c.json({ detail: "the role is read, write or manage" }, 422);
+    const label =
+      typeof body.label === "string" && body.label.trim() ? body.label.trim().slice(0, 100) : null;
+    const { invite, token } = db.createInvite(book, body.role, user, label);
+    return c.json({ ...inviteView(invite), token }, 201);
+  });
+
+  /** Withdraw an invitation that hasn't been used, as a manager. */
+  api.delete("/books/:book/invites/:id", async (c) => {
+    const { book, id } = c.req.param();
+    if (!atLeast(await roleIn(c.get("user"), book), "manage"))
+      return c.json({ detail: "only a manager of the book can do that" }, 403);
+    return db.revokeInvite(book, id) ? c.body(null, 204) : c.json({ detail: "not found" }, 404);
+  });
+
+  /** What an invitation is for: the book, the role, who invited; whether it can still be used. */
+  api.get("/invites/:token", async (c) => {
+    const invite = db.inviteByToken(c.req.param("token"));
+    if (!invite) return c.json({ detail: "this invitation doesn't exist" }, 404);
+    const book = await ledgerFor(invite.invited_by).book(invite.book_id);
+    if (!book) return c.json({ detail: "this invitation's book is gone" }, 404);
+    const state = invite.accepted_by
+      ? "used"
+      : invite.expires_at <= new Date().toISOString()
+        ? "expired"
+        : "open";
+    return c.json({
+      ...inviteView(invite),
+      book: { id: book.id, name: book.name },
+      state,
+      member: (await roleIn(c.get("user"), invite.book_id)) !== undefined,
+    });
+  });
+
+  /** Accept an invitation: the caller becomes a member with its role (if they aren't one). */
+  api.post("/invites/:token/accept", async (c) => {
+    const user = c.get("user");
+    const invite = db.inviteByToken(c.req.param("token"));
+    if (!invite) return c.json({ detail: "this invitation doesn't exist" }, 404);
+    if ((await roleIn(user, invite.book_id)) !== undefined) return c.json({ book: invite.book_id });
+    if (invite.accepted_by) return c.json({ detail: "this invitation was already used" }, 409);
+    if (invite.expires_at <= new Date().toISOString())
+      return c.json({ detail: "this invitation has expired: ask for a new one" }, 409);
+    try {
+      await ledgerFor(invite.invited_by).putMember(invite.book_id, user, { role: invite.role });
+    } catch (error) {
+      if (error instanceof LedgerError && error.status === 403)
+        return c.json(
+          { detail: "whoever invited you can't add people to this book any more" },
+          409
+        );
+      return c.json(...ledgerProblem(error));
+    }
+    db.acceptInvite(invite.id, user);
+    return c.json({ book: invite.book_id });
   });
 
   // Prices: the last morning run, and fetching now

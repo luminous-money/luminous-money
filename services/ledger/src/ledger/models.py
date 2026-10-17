@@ -524,12 +524,31 @@ class Directive(Api):
     updated_at: str = Field(description="Changes on every write; send it back with edits.")
 
 
+Role = Literal["owner", "manage", "write", "read"]
+
+
 class Book(Api):
     id: str
     name: str = Field(description="The book's `option \"title\"`, or its ID if it has none.")
     currency: str = Field(description="Its operating currency (the first `operating_currency` option), or USD.")
+    owner_id: str | None
+    role: Role | None = Field(
+        description="The caller's: owner; or a member's, manage (who has access, the name), write (its "
+        "contents) or read."
+    )
     created_at: str
     updated_at: str
+
+
+class Member(Api):
+    user_id: str
+    role: Role
+    updated_at: str | None = Field(description="Its version; None for the owner, whose role doesn't change.")
+
+
+class MemberIn(Strict):
+    role: Literal["manage", "write", "read"]
+    updated_at: str | None = Field(None, description="Changing a member's role: the version read.")
 
 
 class BookIn(Strict):

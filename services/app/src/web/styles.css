@@ -2129,3 +2129,58 @@ main a.largest-row,
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* Sharing books (M13) */
+
+.readonly-note {
+  margin: -0.75rem 0 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, #d9a441 16%, var(--card));
+  color: var(--ink);
+}
+
+.shared-note {
+  flex-basis: 100%;
+  margin: -0.25rem 0 0;
+}
+
+.members {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+}
+
+.member {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 3.25rem;
+}
+
+.member + .member {
+  border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.member-who {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.member-name,
+.member-who .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member select {
+  width: auto;
+  font-size: 1rem;
+}
+
+.member .pill {
+  background: var(--line);
+  color: var(--muted);
+}

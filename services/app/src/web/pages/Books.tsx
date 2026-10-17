@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 
 import type { BookInfo } from "../lib/appApi.js";
 import { bookHome } from "../lib/books.js";
+import { ROLE_NAMES } from "./Sharing.js";
 import {
   browserTimeZone,
   explain,
@@ -11,7 +12,9 @@ import {
   useDeleteBook,
   useRenameBook,
   useBookSettings,
+  useMe,
   usePatchSettings,
+  useRemoveMember,
   useSetTimeZone,
   useTimeZone,
 } from "../lib/queries.js";
@@ -40,15 +43,22 @@ export function Books() {
 
 const exportHref = (book: string) => `/api/ledger/v1/books/${encodeURIComponent(book)}/export`;
 
+/** A book: open, export; for its managers, its settings, rename and share; for its owner,
+ * delete; for anyone else, leave. A book shared with you says so, and as what. */
 function BookCard({ book }: { book: BookInfo }) {
-  const [mode, setMode] = useState<"view" | "rename" | "delete">("view");
+  const [mode, setMode] = useState<"view" | "rename" | "delete" | "leave">("view");
+  const role = book.role ?? "owner";
+  const owner = role === "owner";
+  const manager = owner || role === "manage";
   if (mode === "rename") return <RenameBook book={book} onDone={() => setMode("view")} />;
   if (mode === "delete") return <DeleteBook book={book} onCancel={() => setMode("view")} />;
+  if (mode === "leave") return <LeaveBook book={book} onCancel={() => setMode("view")} />;
   return (
-    <div className="card book">
+    <div className="card book" role="group" aria-label={book.name}>
       <h3>{book.name}</h3>
-      <TimeZone book={book.id} />
-      <WeekStart book={book.id} />
+      {!owner && <p className="small muted shared-note">Shared with you · {ROLE_NAMES[role]}</p>}
+      {manager && <TimeZone book={book.id} />}
+      {manager && <WeekStart book={book.id} />}
       <div className="actions">
         <Link href={bookHome(book.id)} className="button">
           Open
@@ -56,11 +66,48 @@ function BookCard({ book }: { book: BookInfo }) {
         <a className="button" href={exportHref(book.id)} download>
           Export
         </a>
-        <button type="button" onClick={() => setMode("rename")}>
-          Rename
+        {manager && (
+          <button type="button" onClick={() => setMode("rename")}>
+            Rename
+          </button>
+        )}
+        <Link href={`/books/${encodeURIComponent(book.id)}/sharing`} className="button">
+          {manager ? "Share" : "Sharing"}
+        </Link>
+        {owner ? (
+          <button type="button" className="danger" onClick={() => setMode("delete")}>
+            Delete
+          </button>
+        ) : (
+          <button type="button" className="danger" onClick={() => setMode("leave")}>
+            Leave
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LeaveBook({ book, onCancel }: { book: BookInfo; onCancel: () => void }) {
+  const me = useMe();
+  const leave = useRemoveMember(book.id);
+  return (
+    <div className="card editor" aria-label={`Leave ${book.name}`}>
+      <p>
+        Leave <b>{book.name}</b>? You won't see it any more, unless you're invited again.
+      </p>
+      {leave.error && <p className="error">{explain(leave.error)}</p>}
+      <div className="actions">
+        <button type="button" onClick={onCancel}>
+          Cancel
         </button>
-        <button type="button" className="danger" onClick={() => setMode("delete")}>
-          Delete
+        <button
+          type="button"
+          className="danger"
+          disabled={!me.data || leave.isPending}
+          onClick={() => leave.mutate(me.data!.id)}
+        >
+          Leave
         </button>
       </div>
     </div>

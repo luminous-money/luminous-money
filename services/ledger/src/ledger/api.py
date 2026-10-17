@@ -58,14 +58,27 @@ def current_user(x_user_id: Annotated[str | None, Header(include_in_schema=False
 User = Annotated[str, Depends(current_user)]
 
 
-def owned_book(book_id: str, user: User, request: Request) -> str:
-    """The book in the path, if the caller owns it. Anyone else gets 404, as if it didn't exist."""
-    if not request.app.state.ledger.owns(book_id, user):
+def member_book(book_id: str, user: User, request: Request) -> str:
+    """The book in the path, if the caller may do what the request does: reading (GET) needs a
+    member's read; anything else, write (M13). Anyone not in the book gets 404, as if it didn't
+    exist; a member without the role, 403."""
+    ledger: Ledger = request.app.state.ledger
+    if ledger.role(book_id, user) is None:
         raise NotFound(book_id)
+    need = "read" if request.method in ("GET", "HEAD") else "write"
+    if not ledger.can(book_id, user, need):
+        raise HTTPException(403, "you can see this book, but not change it")
     return book_id
 
 
-OwnedBook = Annotated[str, Depends(owned_book)]
+MemberBook = Annotated[str, Depends(member_book)]
+
+
+def require(ledger: Ledger, book_id: str, user: str, need: str) -> None:
+    """Refuse (403) unless the caller has `need` in the book: manage, or owner."""
+    if not ledger.can(book_id, user, need):
+        what = "the owner" if need == "owner" else "a manager of the book"
+        raise HTTPException(403, f"only {what} can do that")
 
 
 def create_app(ledger: Ledger) -> FastAPI:
@@ -116,35 +129,66 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     @api.post("/books", status_code=201, responses={422: {"description": "Name taken, or text that doesn't parse"}})
     def create_named_book(book: models.BookIn, user: User) -> models.Book:
-        return ledger.create_book(name=book.name, owner_id=user, text=book.text)
+        created = ledger.create_book(name=book.name, owner_id=user, text=book.text)
+        return ledger.book(created.id, user)
 
     @api.put("/books/{book_id}", status_code=201)
     def create_book(book_id: str, user: User) -> models.Book:
-        return ledger.create_book(book_id, owner_id=user)
+        return ledger.book(ledger.create_book(book_id, owner_id=user).id, user)
 
     @api.get("/books/{book_id}")
-    def get_book(book_id: OwnedBook) -> models.Book:
-        return ledger.book(book_id)
+    def get_book(book_id: MemberBook, user: User) -> models.Book:
+        return ledger.book(book_id, user)
 
     @api.patch("/books/{book_id}", responses={409: {"description": "Stale version"}, 422: {"description": "Name taken"}})
-    def rename_book(book_id: OwnedBook, patch: models.BookPatch) -> models.Book:
-        return ledger.rename_book(book_id, patch.name, expected=patch.updated_at)
+    def rename_book(book_id: MemberBook, patch: models.BookPatch, user: User) -> models.Book:
+        """Rename the book (a manager)."""
+        require(ledger, book_id, user, "manage")
+        ledger.rename_book(book_id, patch.name, expected=patch.updated_at)
+        return ledger.book(book_id, user)
 
     @api.delete("/books/{book_id}", status_code=204, responses={409: {"description": "Stale version"}})
-    def delete_book(book_id: OwnedBook, updated_at: VersionParam) -> None:
-        """Delete the book and everything in it. Backups carry the deletion as tombstones."""
+    def delete_book(book_id: MemberBook, updated_at: VersionParam, user: User) -> None:
+        """Delete the book and everything in it (its owner). Backups carry the deletion as
+        tombstones."""
+        require(ledger, book_id, user, "owner")
         ledger.delete_book(book_id, expected=updated_at)
+
+    # Members (M13)
+
+    @api.get("/books/{book_id}/members")
+    def members(book_id: MemberBook) -> list[models.Member]:
+        """Who has the book: its owner, then its members, each with their role."""
+        return ledger.members(book_id)
+
+    @api.put("/books/{book_id}/members/{user_id}", responses={409: {"description": "Stale version"}})
+    def put_member(book_id: MemberBook, user_id: str, m: models.MemberIn, user: User) -> models.Member:
+        """Add a member, or change their role (a manager)."""
+        require(ledger, book_id, user, "manage")
+        return ledger.set_member(book_id, user_id, m)
+
+    @api.delete("/books/{book_id}/members/{user_id}", status_code=204)
+    def remove_member(book_id: str, user_id: str, user: User) -> None:
+        """Take a member out (a manager), or leave (yourself)."""
+        if ledger.role(book_id, user) is None:
+            raise NotFound(book_id)
+        if user_id != user:
+            require(ledger, book_id, user, "manage")
+        ledger.remove_member(book_id, user_id)
 
     @api.post("/books/{book_id}/import")
     def import_text(book_id: str, text: BeancountText, user: User) -> models.Applied:
         """Apply Beancount text. Creates the book, owned by the caller, if it doesn't exist."""
-        if ledger.store.book(book_id) is not None and not ledger.owns(book_id, user):  # or deleted
-            raise NotFound(book_id)
+        if ledger.store.book(book_id) is not None:  # or deleted
+            if ledger.role(book_id, user) is None:
+                raise NotFound(book_id)
+            if not ledger.can(book_id, user, "write"):
+                raise HTTPException(403, "you can see this book, but not change it")
         applied = ledger.apply_text(book_id, text, owner_id=user)
         return models.Applied(put=applied.put, deleted=applied.deleted)
 
     @api.get("/books/{book_id}/export", response_class=PlainTextResponse)
-    def export(book_id: OwnedBook) -> PlainTextResponse:
+    def export(book_id: MemberBook) -> PlainTextResponse:
         """The whole book as one Beancount file, named for downloading: the user's own copy of their
         data, which `/import` can restore. (`/backup` gives every book of the caller's, changed
         since a cursor, for scheduled backups.)"""
@@ -155,18 +199,18 @@ def create_app(ledger: Ledger) -> FastAPI:
         )
 
     @api.get("/books/{book_id}/accounts")
-    def accounts(book_id: OwnedBook) -> list[models.Account]:
+    def accounts(book_id: MemberBook) -> list[models.Account]:
         return ledger.accounts(book_id)
 
     @api.post("/books/{book_id}/accounts", status_code=201)
-    def create_account(book_id: OwnedBook, account: models.AccountIn) -> models.Account:
+    def create_account(book_id: MemberBook, account: models.AccountIn) -> models.Account:
         return ledger.create_account(book_id, account)
 
     # Account summaries and ledgers
 
     @api.get("/books/{book_id}/accounts/summary")
     def account_summary(
-        book_id: OwnedBook,
+        book_id: MemberBook,
         account: Annotated[list[str], Query(description="The accounts to summarize; repeat for more.")],
     ) -> list[models.AccountSummary]:
         """Accounts with their balances and opening-balance dates: what the home page's cards and a
@@ -178,20 +222,20 @@ def create_app(ledger: Ledger) -> FastAPI:
     # The chart of accounts (M10)
 
     @api.get("/books/{book_id}/accounts/tree")
-    def account_tree(book_id: OwnedBook) -> list[models.TreeAccount]:
+    def account_tree(book_id: MemberBook) -> list[models.TreeAccount]:
         """Every account, with its own balance, its subtree's, and the subtree's value."""
         return chart.tree(ledger, book_id)
 
     # Budgets (M11)
 
     @api.get("/books/{book_id}/budgets")
-    def list_budgets(book_id: OwnedBook) -> list[models.Budget]:
+    def list_budgets(book_id: MemberBook) -> list[models.Budget]:
         """Every version of every budget, by account, then start."""
         return [v.model() for v in budgets.versions(ledger, book_id)]
 
     @api.get("/books/{book_id}/budgets/status")
     def budget_status(
-        book_id: OwnedBook,
+        book_id: MemberBook,
         on: Annotated[datetime.date | None, Query(description="The day to measure on (the caller's today).")] = None,
         basis: Annotated[Literal["period", "month"], Query(description="Each its own period, or all per month.")] = "period",
     ) -> models.BudgetStatus:
@@ -202,7 +246,7 @@ def create_app(ledger: Ledger) -> FastAPI:
         "/books/{book_id}/budgets/{account}",
         responses={409: {"description": "Stale version"}, 422: {"description": "Not allowed"}},
     )
-    def put_budget(book_id: OwnedBook, account: str, b: models.BudgetIn) -> models.Budget | None:
+    def put_budget(book_id: MemberBook, account: str, b: models.BudgetIn) -> models.Budget | None:
         """Set the account's budget from `start` on (an amount of 0 ends it). Refused if it would
         be more than one above it, or less than one under it. None when ending it left nothing."""
         return budgets.put(ledger, book_id, account, b)
@@ -211,19 +255,19 @@ def create_app(ledger: Ledger) -> FastAPI:
         "/books/{book_id}/accounts/{account}/rename",
         responses={409: {"description": "Stale version"}, 422: {"description": "Not allowed"}},
     )
-    def rename_account(book_id: OwnedBook, account: str, r: models.AccountRename) -> models.Account:
+    def rename_account(book_id: MemberBook, account: str, r: models.AccountRename) -> models.Account:
         """Rename or move an account and everything under it: every directive naming them is
         rewritten, history included, in one write."""
         return chart.rename(ledger, book_id, account, r.to, expected=r.updated_at)
 
     @api.post("/books/{book_id}/accounts/{account}/archive", responses={422: {"description": "Not allowed"}})
-    def archive_account(book_id: OwnedBook, account: str, a: models.AccountArchive) -> list[str]:
+    def archive_account(book_id: MemberBook, account: str, a: models.AccountArchive) -> list[str]:
         """Close the account and every opened account under it (after an optional closing
         transfer). Returns the accounts closed."""
         return chart.archive(ledger, book_id, account, date=a.date, transfer_to=a.transfer_to, expected=a.updated_at)
 
     @api.post("/books/{book_id}/accounts/{account}/unarchive")
-    def unarchive_account(book_id: OwnedBook, account: str) -> list[str]:
+    def unarchive_account(book_id: MemberBook, account: str) -> list[str]:
         """Reopen an archived account and everything under it. Returns the accounts reopened."""
         return chart.unarchive(ledger, book_id, account)
 
@@ -232,68 +276,68 @@ def create_app(ledger: Ledger) -> FastAPI:
         responses={409: {"description": "Stale version"}, 422: {"description": "Not allowed"}},
     )
     def delete_account(
-        book_id: OwnedBook, account: str, substitute: str | None = None, updated_at: str | None = None
+        book_id: MemberBook, account: str, substitute: str | None = None, updated_at: str | None = None
     ) -> list[str]:
         """Delete the account and its subtree, moving every posting to `substitute` (needed if
         there are any). Merging is this. Returns the accounts deleted."""
         return chart.delete(ledger, book_id, account, substitute=substitute, expected=updated_at)
 
     @api.get("/books/{book_id}/accounts/{account}/holdings")
-    def holdings(book_id: OwnedBook, account: str, on: datetime.date | None = None) -> models.Holdings:
+    def holdings(book_id: MemberBook, account: str, on: datetime.date | None = None) -> models.Holdings:
         """What an account and everything under it holds: units, prices, value, cost basis, gains
         and lots per commodity."""
         return investments.holdings(ledger, book_id, account, on)
 
     @api.post("/books/{book_id}/accounts/{account}/revalue", status_code=201)
-    def revalue(book_id: OwnedBook, account: str, r: models.RevalueIn) -> models.Transaction:
+    def revalue(book_id: MemberBook, account: str, r: models.RevalueIn) -> models.Transaction:
         """Record a revalued asset's value on a date (against Income:Unrealized-Gains)."""
         directive = investments.revalue(ledger, book_id, account, r)
         return ledger.transaction(book_id, directive.id)
 
     @api.patch("/books/{book_id}/accounts/{account}", responses={409: {"description": "Stale version"}})
-    def set_account(book_id: OwnedBook, account: str, patch: models.AccountPatch) -> models.Account:
+    def set_account(book_id: MemberBook, account: str, patch: models.AccountPatch) -> models.Account:
         """Change an account's settings: how its sales pick lots; whether it's a revalued asset."""
         return ledger.set_account(book_id, account, patch)
 
     @api.post("/books/{book_id}/accounts/{account}/trades/preview")
-    def preview_trade(book_id: OwnedBook, account: str, t: models.TradeIn) -> models.TradePreview:
+    def preview_trade(book_id: MemberBook, account: str, t: models.TradeIn) -> models.TradePreview:
         """What a trade would write: the transaction, and the lots a sale draws on."""
         return investments.plan_trade(ledger, book_id, account, t)
 
     @api.post("/books/{book_id}/accounts/{account}/trades", status_code=201)
-    def trade(book_id: OwnedBook, account: str, t: models.TradeIn) -> models.Transaction:
+    def trade(book_id: MemberBook, account: str, t: models.TradeIn) -> models.Transaction:
         """Write a buy, sale or dividend, checked by booking first."""
         directive = investments.trade(ledger, book_id, account, t)
         return ledger.transaction(book_id, directive.id)
 
     @api.get("/books/{book_id}/prices")
-    def price_list(book_id: OwnedBook, commodity: str) -> list[models.PriceOut]:
+    def price_list(book_id: MemberBook, commodity: str) -> list[models.PriceOut]:
         """A commodity's prices, newest first."""
         return investments.price_list(ledger, book_id, commodity)
 
     @api.post("/books/{book_id}/prices", status_code=201)
-    def add_price(book_id: OwnedBook, price: models.PriceIn) -> models.PriceOut:
+    def add_price(book_id: MemberBook, price: models.PriceIn) -> models.PriceOut:
         """Record a price (replacing one for the same commodity, currency and date)."""
         return investments.add_price(ledger, book_id, price)
 
     @api.post("/books/{book_id}/prices/fetch")
-    def fetch_prices(book_id: OwnedBook) -> models.FetchResult:
+    def fetch_prices(book_id: MemberBook) -> models.FetchResult:
         """Fetch the latest prices of the commodities still held that name a source (beanprice)."""
         return investments.fetch_prices(ledger, book_id)
 
     @api.get("/books/{book_id}/commodities")
-    def commodity_list(book_id: OwnedBook) -> list[models.CommodityOut]:
+    def commodity_list(book_id: MemberBook) -> list[models.CommodityOut]:
         """Every commodity declared, held or priced, with its latest price."""
         return investments.commodity_list(ledger, book_id)
 
     @api.put("/books/{book_id}/commodities/{currency}", responses={409: {"description": "Stale version"}})
-    def set_commodity(book_id: OwnedBook, currency: str, c: models.CommodityIn) -> models.CommodityOut:
+    def set_commodity(book_id: MemberBook, currency: str, c: models.CommodityIn) -> models.CommodityOut:
         """Declare a commodity, or change its name, price source or staleness."""
         return investments.set_commodity(ledger, book_id, currency, c)
 
     @api.get("/books/{book_id}/accounts/{account}/ledger")
     def account_ledger(
-        book_id: OwnedBook,
+        book_id: MemberBook,
         account: str,
         cursor: Annotated[str | None, Query(description="The page just older than this row.")] = None,
         after: Annotated[str | None, Query(description="The page just newer than this row.")] = None,
@@ -306,7 +350,7 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     @api.get("/books/{book_id}/journal")
     def journal(
-        book_id: OwnedBook,
+        book_id: MemberBook,
         cursor: Annotated[str | None, Query(description="The page just older than this row.")] = None,
         after: Annotated[str | None, Query(description="The page just newer than this row.")] = None,
         date: Annotated[datetime.date | None, Query(description="The page starting on or before this date.")] = None,
@@ -321,13 +365,13 @@ def create_app(ledger: Ledger) -> FastAPI:
     # Transactions, as JSON
 
     @api.post("/books/{book_id}/transactions/batch", status_code=201)
-    def create_transactions(book_id: OwnedBook, batch: list[models.TransactionIn]) -> list[models.Transaction]:
+    def create_transactions(book_id: MemberBook, batch: list[models.TransactionIn]) -> list[models.Transaction]:
         """Create many transactions in one atomic write: all of them, or none."""
         created = ledger.create_transactions(book_id, batch)
         return [ledger.transaction(book_id, d.id) for d in created]
 
     @api.post("/books/{book_id}/transactions/changes", responses={409: {"description": "Stale version"}})
-    def apply_changes(book_id: OwnedBook, changes: models.TransactionChanges) -> list[models.Transaction]:
+    def apply_changes(book_id: MemberBook, changes: models.TransactionChanges) -> list[models.Transaction]:
         """Create, change (versioned patches) and delete transactions in one atomic write: all of
         it, or none. Returns the created ones."""
         created = ledger.apply_changes(book_id, changes)
@@ -335,7 +379,7 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     @api.get("/books/{book_id}/transactions/compact")
     def compact_transactions(
-        book_id: OwnedBook,
+        book_id: MemberBook,
         date_from: Annotated[datetime.date, Query(alias="from", description="The first date included.")],
     ) -> list[models.CompactTransaction]:
         """Every transaction from a date on, oldest first, with only payee, narration, whether it
@@ -344,47 +388,47 @@ def create_app(ledger: Ledger) -> FastAPI:
         return ledger.compact(book_id, date_from)
 
     @api.get("/books/{book_id}/transactions")
-    def list_transactions(book_id: OwnedBook, filters: Annotated[Filters, Depends()]) -> list[models.Transaction]:
+    def list_transactions(book_id: MemberBook, filters: Annotated[Filters, Depends()]) -> list[models.Transaction]:
         return ledger.transactions(book_id, **filters.values)
 
     @api.post("/books/{book_id}/transactions", status_code=201)
-    def create_transaction(book_id: OwnedBook, transaction: models.TransactionIn) -> models.Transaction:
+    def create_transaction(book_id: MemberBook, transaction: models.TransactionIn) -> models.Transaction:
         return ledger.transaction(book_id, ledger.create_transaction(book_id, transaction).id)
 
     @api.get("/books/{book_id}/transactions/{directive_id}")
-    def get_transaction(book_id: OwnedBook, directive_id: str) -> models.Transaction:
+    def get_transaction(book_id: MemberBook, directive_id: str) -> models.Transaction:
         return ledger.transaction(book_id, directive_id)
 
     @api.put("/books/{book_id}/transactions/{directive_id}", responses={409: {"description": "Stale version"}})
     def replace_transaction(
-        book_id: OwnedBook, directive_id: str, transaction: models.TransactionUpdate
+        book_id: MemberBook, directive_id: str, transaction: models.TransactionUpdate
     ) -> models.Transaction:
         body = models.TransactionIn.model_validate(transaction.model_dump(exclude={"updated_at"}))
         ledger.update_transaction(book_id, directive_id, body, expected=transaction.updated_at)
         return ledger.transaction(book_id, directive_id)
 
     @api.patch("/books/{book_id}/transactions/{directive_id}", responses={409: {"description": "Stale version"}})
-    def patch_transaction(book_id: OwnedBook, directive_id: str, patch: models.TransactionPatch) -> models.Transaction:
+    def patch_transaction(book_id: MemberBook, directive_id: str, patch: models.TransactionPatch) -> models.Transaction:
         ledger.patch_transaction(book_id, directive_id, patch)
         return ledger.transaction(book_id, directive_id)
 
     # Any directive, as Beancount text
 
     @api.get("/books/{book_id}/directives")
-    def list_directives(book_id: OwnedBook, filters: Annotated[Filters, Depends()]) -> list[models.Directive]:
+    def list_directives(book_id: MemberBook, filters: Annotated[Filters, Depends()]) -> list[models.Directive]:
         return [_row(r) for r in ledger.store.find(book_id, **filters.values)]
 
     @api.post("/books/{book_id}/directives", status_code=201)
-    def create_directive(book_id: OwnedBook, text: BeancountText) -> models.Directive:
+    def create_directive(book_id: MemberBook, text: BeancountText) -> models.Directive:
         return _row(ledger.get(book_id, ledger.create(book_id, text).id))
 
     @api.get("/books/{book_id}/directives/{directive_id}")
-    def get_directive(book_id: OwnedBook, directive_id: str) -> models.Directive:
+    def get_directive(book_id: MemberBook, directive_id: str) -> models.Directive:
         return _row(ledger.get(book_id, directive_id))
 
     @api.put("/books/{book_id}/directives/{directive_id}", responses={409: {"description": "Stale version"}})
     def update_directive(
-        book_id: OwnedBook, directive_id: str, text: BeancountText, updated_at: VersionParam
+        book_id: MemberBook, directive_id: str, text: BeancountText, updated_at: VersionParam
     ) -> models.Directive:
         ledger.update(book_id, directive_id, text, expected=updated_at)
         return _row(ledger.get(book_id, directive_id))
@@ -394,17 +438,17 @@ def create_app(ledger: Ledger) -> FastAPI:
         status_code=204,
         responses={409: {"description": "Stale version"}},
     )
-    def delete_directive(book_id: OwnedBook, directive_id: str, updated_at: VersionParam) -> None:
+    def delete_directive(book_id: MemberBook, directive_id: str, updated_at: VersionParam) -> None:
         ledger.delete(book_id, directive_id, expected=updated_at)
 
     # The engine
 
     @api.get("/books/{book_id}/problems")
-    def problems(book_id: OwnedBook) -> list[models.Problem]:
+    def problems(book_id: MemberBook) -> list[models.Problem]:
         return [models.Problem(message=p.message, directive_id=p.directive_id) for p in ledger.problems(book_id)]
 
     @api.post("/books/{book_id}/query")
-    def query(book_id: OwnedBook, bql: BeancountText) -> models.QueryResult:
+    def query(book_id: MemberBook, bql: BeancountText) -> models.QueryResult:
         columns, rows = ledger.query(book_id, bql)
         return models.QueryResult(columns=columns, rows=rows)
 

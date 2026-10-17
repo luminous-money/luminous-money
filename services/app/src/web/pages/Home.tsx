@@ -31,9 +31,11 @@ export function Home({ book }: { book: Book }) {
           <h1>{book.name}</h1>
           <p className="muted">Your accounts</p>
         </div>
-        <Link href={`${bookHome(book.id)}/import`} className="button primary-link">
-          Import transactions
-        </Link>
+        {book.role !== "read" && (
+          <Link href={`${bookHome(book.id)}/import`} className="button primary-link">
+            Import transactions
+          </Link>
+        )}
       </header>
 
       <SpendingThisMonth book={book.id} />

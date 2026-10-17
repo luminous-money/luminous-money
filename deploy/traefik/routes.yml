@@ -3,7 +3,8 @@
 #
 # Every API route except auth's own goes through the `session` middleware: Traefik asks auth's
 # verify endpoint first, refuses the request (401) if there's no valid session, and otherwise
-# forwards it with X-User-Id set from auth's answer (replacing anything the client sent).
+# forwards it with X-User-Id (and X-User-Name, X-User-Email) set from auth's answer (replacing anything
+# the client sent).
 http:
   routers:
     auth-api:
@@ -33,7 +34,7 @@ http:
     session:
       forwardAuth:
         address: http://auth:3000/api/auth/v1/verify
-        authResponseHeaders: [X-User-Id]
+        authResponseHeaders: [X-User-Id, X-User-Name, X-User-Email]
     to-ui:
       redirectRegex:
         regex: ^(https?://[^/]+)/$

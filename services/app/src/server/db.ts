@@ -1,5 +1,5 @@
 /** The app's own database: CSV profiles and import history. */
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import {
   after,
@@ -271,6 +271,28 @@ export const MIGRATIONS: Migration[] = [
     ]),
     "CREATE INDEX transfer_pair_transaction ON transfer_pair(book_id, transaction_id)",
   ],
+  // 14: sharing books (M13). Who each user is, as auth said on their last visit (for members'
+  // lists), and invitations to books: a link's token (only its hash), a role, who invited, and
+  // until when.
+  [
+    createTable("user_profile", [
+      "user_id TEXT PRIMARY KEY",
+      "name TEXT NOT NULL",
+      "email TEXT NOT NULL",
+    ]),
+    createTable("book_invite", [
+      "id TEXT PRIMARY KEY",
+      "book_id TEXT NOT NULL",
+      "token_hash TEXT NOT NULL UNIQUE",
+      "role TEXT NOT NULL", // 'read' | 'write' | 'manage'
+      "invited_by TEXT NOT NULL",
+      "label TEXT",
+      "expires_at TEXT NOT NULL",
+      "accepted_by TEXT",
+      "accepted_at TEXT",
+    ]),
+    "CREATE INDEX book_invite_book ON book_invite(book_id)",
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -372,6 +394,28 @@ const toPair = (r: PairRecord): TransferPair => ({
   originals: JSON.parse(r.originals) as PairedOriginal[],
   restored: r.restored ? (JSON.parse(r.restored) as string[]) : null,
 });
+
+export type Profile = { user_id: string; name: string; email: string };
+
+export type InviteRole = "read" | "write" | "manage";
+
+export type Invite = {
+  id: string;
+  book_id: string;
+  role: InviteRole;
+  invited_by: string;
+  label: string | null;
+  expires_at: string;
+  accepted_by: string | null;
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** How long an invitation's link works. */
+export const INVITE_DAYS = 14;
+
+const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
 
 export type BookSettings = {
   time_zone: string;
@@ -1028,8 +1072,111 @@ export class AppDb {
         "DELETE FROM simplefin_link WHERE book_id = ?",
         "DELETE FROM simplefin_attempt WHERE book_id = ?",
         "DELETE FROM transfer_pair WHERE book_id = ?",
+        "DELETE FROM book_invite WHERE book_id = ?",
       ])
         this.db.prepare(sql).run(book);
+    });
+  }
+
+  // Sharing books (M13)
+
+  /** Remember who a user is, as auth said (only writing when it changed). */
+  rememberProfile(profile: Profile): void {
+    const known = this.db
+      .prepare("SELECT name, email FROM user_profile WHERE user_id = ?")
+      .get(profile.user_id) as { name: string; email: string } | undefined;
+    if (known && known.name === profile.name && known.email === profile.email) return;
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO user_profile (user_id, name, email, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (user_id) DO UPDATE SET name = excluded.name, email = excluded.email,
+           updated_at = excluded.updated_at`
+      )
+      .run(profile.user_id, profile.name, profile.email, stamp, stamp);
+  }
+
+  userProfiles(users: string[]): Map<string, Profile> {
+    const rows = this.db
+      .prepare(
+        "SELECT user_id, name, email FROM user_profile WHERE user_id IN (SELECT value FROM json_each(?))"
+      )
+      .all(JSON.stringify(users)) as Profile[];
+    return new Map(rows.map((p) => [p.user_id, p]));
+  }
+
+  /** A new invitation to `book`, and its link's token (shown once: only its hash is kept). */
+  createInvite(
+    book: string,
+    role: InviteRole,
+    invitedBy: string,
+    label: string | null
+  ): { invite: Invite; token: string } {
+    const token = randomBytes(24).toString("base64url");
+    const stamp = now();
+    const expires = new Date(Date.now() + INVITE_DAYS * 864e5).toISOString();
+    const id = randomUUID();
+    this.db
+      .prepare(
+        `INSERT INTO book_invite (id, book_id, token_hash, role, invited_by, label, expires_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(id, book, tokenHash(token), role, invitedBy, label, expires, stamp, stamp);
+    return { invite: this.invite(id)!, token };
+  }
+
+  private invite(id: string): Invite | undefined {
+    return this.db.prepare("SELECT * FROM book_invite WHERE id = ?").get(id) as Invite | undefined;
+  }
+
+  /** The invitation a link's token is for, used or not. */
+  inviteByToken(token: string): Invite | undefined {
+    return this.db
+      .prepare("SELECT * FROM book_invite WHERE token_hash = ?")
+      .get(tokenHash(token)) as Invite | undefined;
+  }
+
+  /** A book's invitations still open: not used, not expired. */
+  openInvites(book: string): Invite[] {
+    return this.db
+      .prepare(
+        "SELECT * FROM book_invite WHERE book_id = ? AND accepted_by IS NULL AND expires_at > ? ORDER BY created_at"
+      )
+      .all(book, new Date().toISOString()) as Invite[];
+  }
+
+  acceptInvite(id: string, user: string): void {
+    const stamp = now();
+    this.db
+      .prepare(
+        "UPDATE book_invite SET accepted_by = ?, accepted_at = ?, updated_at = ? WHERE id = ?"
+      )
+      .run(user, stamp, stamp, id);
+  }
+
+  revokeInvite(book: string, id: string): boolean {
+    return (
+      this.db
+        .prepare("DELETE FROM book_invite WHERE book_id = ? AND id = ? AND accepted_by IS NULL")
+        .run(book, id).changes > 0
+    );
+  }
+
+  /** Someone left the book: what acted as them there acts as `owner` from now on (schedules,
+   * the price run). */
+  handOver(book: string, from: string, owner: string): void {
+    const stamp = now();
+    transaction(this.db, () => {
+      this.db
+        .prepare(
+          "UPDATE schedule SET user_id = ?, updated_at = ? WHERE book_id = ? AND user_id = ?"
+        )
+        .run(owner, stamp, book, from);
+      this.db
+        .prepare(
+          "UPDATE book_setting SET user_id = ?, updated_at = ? WHERE book_id = ? AND user_id = ?"
+        )
+        .run(owner, stamp, book, from);
     });
   }
 

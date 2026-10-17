@@ -16,6 +16,7 @@ import {
   type Book,
   type BudgetStatus,
   type LedgerPage,
+  type Member,
   type LedgerPort,
   type PriceIn,
   type TransactionEdit,
@@ -30,7 +31,15 @@ export class FakeLedger implements LedgerPort {
   private next = 1;
 
   addBook(id: string) {
-    this.books.set(id, { id, name: id, currency: "USD", created_at: "", updated_at: "" });
+    this.books.set(id, {
+      id,
+      name: id,
+      currency: "USD",
+      owner_id: "u",
+      role: "owner",
+      created_at: "",
+      updated_at: "",
+    });
   }
 
   addAccount(name: string, extra: Partial<Account> & { as_of?: string } = {}) {
@@ -263,6 +272,23 @@ export class FakeLedger implements LedgerPort {
   async fetchPrices() {
     this.fetched++;
     return { fetched: [], errors: {} };
+  }
+
+  /** The book's members besides its owner ("u"), by user. */
+  memberRoles = new Map<string, Member>();
+
+  async members(): Promise<Member[]> {
+    return [{ user_id: "u", role: "owner", updated_at: null }, ...this.memberRoles.values()];
+  }
+
+  async putMember(_book: string, user: string, member: { role: "read" | "write" | "manage" }) {
+    const made = { user_id: user, role: member.role, updated_at: `m${this.next++}` };
+    this.memberRoles.set(user, made);
+    return made;
+  }
+
+  async removeMember(_book: string, user: string) {
+    if (!this.memberRoles.delete(user)) throw new LedgerError(404, "not found");
   }
 
   /** Each account's own balance (from the transactions) as its total, without rolling up. */

@@ -642,6 +642,33 @@ same money in through another's, a day or so later. Both would sit in review, un
   SQL a page at a time (no running balance to accumulate), as account ledgers are. Home shows
   its first page in a window of its own; its title opens the Transactions page, paged and
   dated as an account's ledger is (one paging hook and its pieces, `components/Paged`).
+
+### Sharing books (M13)
+
+- **One owner, any number of members,** each with a role: **read** (sees everything), **write**
+  (changes the contents), **manage** (and who has it, its name and settings); the owner alone
+  deletes it. Members' stars stay their own.
+- **Membership is the ledger's** (`book_member`), since it's where every read and write is
+  checked: reading (GET) needs read, anything else write, members and the name manage, deleting
+  the owner. A non-member gets 404 (as if there were no such book), a member without the role
+  403. `Book` carries the caller's `role`, and the book list has shared books too. (A restored
+  backup is the books' text, without members.)
+- **`app` checks the same** before its own writes (one middleware: anything but a read needs
+  write; members and invitations check their own), so its routes can't do what the ledger would
+  refuse.
+- **Invitations are links** (`book_invite` in `app`: a token's hash, a role, who invited, an
+  optional label, 14 days, used once, revocable). Accepting one adds the caller **acting as the
+  inviter**, so the ledger checks the inviter still manages the book. No email is sent: the link
+  is copied or shared (the phone's share sheet). An invitation opens even for someone with no
+  book yet.
+- **Names:** auth's forwardAuth check passes on `X-User-Name` and `X-User-Email` (URI-encoded)
+  beside `X-User-Id`; `app` remembers each user's (`user_profile`) for members' lists.
+- **Leaving or being removed:** what acted as them in the book (schedules, the price run) acts as
+  the owner from then on, and their bank links into it (through their own SimpleFIN connection)
+  go.
+- **Read only in the PWA:** a notice under the masthead, and the main write entry points hidden
+  (importing, adding transactions or accounts, the ledger's actions, budgets' editing); anything
+  else is refused by the server, saying why.
 ### Bank feeds: SimpleFIN (M9)
 
 [SimpleFIN](https://www.simplefin.org/protocol.html), usually through the SimpleFIN Bridge, is the

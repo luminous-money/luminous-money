@@ -28,6 +28,7 @@ import {
   useStars,
   useBankStatus,
   useBudgetStatus,
+  useCanWrite,
   useSyncBank,
   useSummary,
   useUpcoming,
@@ -65,6 +66,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
   const selection = useSelection();
   const [note, setNote] = useState<string | null>(null);
   const upcoming = useUpcoming(book);
+  const canWrite = useCanWrite(book);
   const budget = useBudgetStatus(book).data?.lines.find((l) => l.account === account);
   const ahead = upcoming.data && info ? upcomingFor(upcoming.data, account, info.balance) : [];
   const starred = stars.data?.includes(account) ?? false;
@@ -125,7 +127,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
             {linked && <ReportedLine status={linked} type={info?.type} />}
             {linked && <BankErrors status={linked} />}
           </div>
-          {info?.kind === "leaf" && !info.implicit && !info.close && (
+          {canWrite && info?.kind === "leaf" && !info.implicit && !info.close && (
             <Link
               href={withBack(`/books/${book}/import?account=${encodeURIComponent(account)}`, here)}
               className="button"
@@ -139,7 +141,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
             <BudgetGlance line={budget} name={displayName(info ?? { name: account })} />
           </Link>
         )}
-        {!selection.selecting && (
+        {canWrite && !selection.selecting && (
           <div className="actions">
             <button type="button" disabled={suggest.isPending} onClick={() => suggest.mutate()}>
               {suggest.isPending ? "Suggesting…" : "Suggest categories"}
@@ -190,7 +192,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
           note={note}
           onDone={selection.stop}
         />
-      ) : (
+      ) : canWrite ? (
         <div className="ledger-add">
           <button
             type="button"
@@ -207,7 +209,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
             + Add transaction
           </button>
         </div>
-      )}
+      ) : null}
 
       <JumpToDate
         key={date ?? ""}

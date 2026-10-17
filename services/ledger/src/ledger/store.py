@@ -97,6 +97,48 @@ class Store:
         )
         return [r["id"] for r in rows]
 
+    def books_for(self, user_id: str) -> list[str]:
+        """The live books `user_id` owns or is a member of, oldest first."""
+        rows = self._conn.execute(
+            "SELECT id FROM book WHERE deleted = 0 AND (owner_id = ?"
+            " OR id IN (SELECT book_id FROM book_member WHERE user_id = ?)) ORDER BY created_at, id",
+            (user_id, user_id),
+        )
+        return [r["id"] for r in rows]
+
+    # Members (M13)
+
+    def member(self, book_id: str, user_id: str) -> sqlite3.Row | None:
+        """A member's row: user_id, role, updated_at."""
+        return self._conn.execute(
+            "SELECT user_id, role, updated_at FROM book_member WHERE book_id = ? AND user_id = ?",
+            (book_id, user_id),
+        ).fetchone()
+
+    def members(self, book_id: str) -> list[sqlite3.Row]:
+        """The book's members (not its owner), in the order they joined."""
+        return self._conn.execute(
+            "SELECT user_id, role, updated_at FROM book_member WHERE book_id = ? ORDER BY created_at, user_id",
+            (book_id,),
+        ).fetchall()
+
+    def put_member(self, book_id: str, user_id: str, role: str, expected: str | None = None) -> None:
+        """Add a member, or change their role against the version read (`expected`)."""
+        current = self.member(book_id, user_id)
+        if current is not None and expected is not None and current["updated_at"] != expected:
+            raise StaleVersion(f"{book_id}/{user_id}", current["updated_at"])
+        stamp = after(current["updated_at"] if current else None)
+        self._conn.execute(
+            "INSERT INTO book_member (book_id, user_id, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+            " ON CONFLICT (book_id, user_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at",
+            (book_id, user_id, role, stamp, stamp),
+        )
+
+    def remove_member(self, book_id: str, user_id: str) -> bool:
+        return self._conn.execute(
+            "DELETE FROM book_member WHERE book_id = ? AND user_id = ?", (book_id, user_id)
+        ).rowcount > 0
+
     def book(self, book_id: str) -> sqlite3.Row | None:
         """The book's row: id, header, owner_id, deleted, created_at, updated_at. Deleted books
         have one too: check `deleted`."""

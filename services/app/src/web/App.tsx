@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, Redirect, Route, Router, Switch } from "wouter";
+import { Link, Redirect, Route, Router, Switch, useLocation } from "wouter";
 
 import { BookSwitcher } from "./components/BookSwitcher.js";
 import { Menu } from "./components/Menu.js";
@@ -16,6 +16,8 @@ import { AddAccount } from "./pages/AddAccount.js";
 import { Books } from "./pages/Books.js";
 import { Budgets } from "./pages/Budgets.js";
 import { Reports } from "./pages/Reports.js";
+import { InvitationPage } from "./pages/Invitation.js";
+import { Sharing } from "./pages/Sharing.js";
 import { Transactions } from "./pages/Transactions.js";
 import { Home } from "./pages/Home.js";
 import { Import } from "./pages/Import.js";
@@ -50,11 +52,14 @@ function Gate() {
   const books = useBooks();
   const user = me.data?.id ?? "";
   const inPath = useBookInPath();
+  const [location] = useLocation();
+  // An invitation opens even before you have a book of your own (it may be your first).
+  const invitation = /^\/invite\/([^/?]+)/.exec(location)?.[1];
   const [settingUp, setSettingUp] = useState(false);
   const empty = books.data?.length === 0;
   useEffect(() => {
-    if (me.data && empty) setSettingUp(true);
-  }, [me.data, empty]);
+    if (me.data && empty && !invitation) setSettingUp(true);
+  }, [me.data, empty, invitation]);
   useTimeZoneBackfill(books.data);
   const book = books.data?.find((b) => b.id === inPath);
   useEffect(() => {
@@ -77,6 +82,14 @@ function Gate() {
     );
   }
   if (!books.data) return <Masthead />;
+  if (invitation && empty) {
+    return (
+      <>
+        <Masthead />
+        <InvitationPage token={decodeURIComponent(invitation)} />
+      </>
+    );
+  }
   if (empty || settingUp) {
     return (
       <>
@@ -90,6 +103,11 @@ function Gate() {
   return (
     <>
       <Masthead books={books.data} book={book ?? (inPath ? undefined : start)} />
+      {book?.role === "read" && (
+        <p className="readonly-note small" role="status">
+          You can see {book.name}, but not change it.
+        </p>
+      )}
       {inPath && !book ? (
         <NotFound />
       ) : (
@@ -104,6 +122,12 @@ function Gate() {
             <Account />
           </Route>
           <Route path="/verify/:token">{({ token }) => <VerifyEmail token={token} />}</Route>
+          <Route path="/invite/:token">
+            {({ token }) => <InvitationPage key={token} token={token} />}
+          </Route>
+          <Route path="/books/:book/sharing">
+            {({ book: id }) => <Sharing key={id} book={id} />}
+          </Route>
           <Route path="/books/:book">{() => <Home key={book!.id} book={book!} />}</Route>
           <Route path="/books/:book/accounts">
             {({ book: id }) => <ChartOfAccounts key={id} book={id} />}

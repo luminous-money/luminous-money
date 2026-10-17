@@ -61,6 +61,29 @@ export type {
 
 /** A book: the ledger's, with what the app keeps about it. */
 export type BookInfo = Book & { time_zone: string | null };
+/** Sharing (M13). */
+export type Role = "owner" | "manage" | "write" | "read";
+export type BookMember = {
+  user_id: string;
+  role: Role;
+  updated_at: string | null;
+  name: string | null;
+  email: string | null;
+};
+export type BookInvite = {
+  id: string;
+  role: Exclude<Role, "owner">;
+  label: string | null;
+  invited_by: string | null;
+  expires_at: string;
+  created_at: string;
+};
+export type Invitation = BookInvite & {
+  book: { id: string; name: string };
+  state: "open" | "used" | "expired";
+  member: boolean;
+};
+
 export type BreakdownOptions = {
   side: "expenses" | "income";
   depth: number;
@@ -247,6 +270,57 @@ export const appApi = {
     ),
 
   /** Import rows whose match is up for review. */
+  /** Sharing a book (M13): who has it, and invitations by link. */
+  sharing: {
+    members: async (
+      book: string
+    ): Promise<{ role: Role; members: BookMember[]; invites: BookInvite[] }> =>
+      json(await apiFetch(`${base(book)}/members`)),
+    setRole: async (
+      book: string,
+      user: string,
+      role: BookInvite["role"],
+      updatedAt: string
+    ): Promise<BookMember> =>
+      json(
+        await apiFetch(`${base(book)}/members/${encodeURIComponent(user)}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ role, updated_at: updatedAt }),
+        })
+      ),
+    remove: async (book: string, user: string): Promise<void> => {
+      const response = await apiFetch(`${base(book)}/members/${encodeURIComponent(user)}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) await json(response);
+    },
+    invite: async (
+      book: string,
+      role: BookInvite["role"],
+      label: string
+    ): Promise<BookInvite & { token: string }> =>
+      json(
+        await apiFetch(`${base(book)}/invites`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ role, label }),
+        })
+      ),
+    revoke: async (book: string, id: string): Promise<void> => {
+      const response = await apiFetch(`${base(book)}/invites/${id}`, { method: "DELETE" });
+      if (!response.ok) await json(response);
+    },
+    invitation: async (token: string): Promise<Invitation> =>
+      json(await apiFetch(`/api/app/v1/invites/${encodeURIComponent(token)}`)),
+    accept: async (token: string): Promise<{ book: string }> =>
+      json(
+        await apiFetch(`/api/app/v1/invites/${encodeURIComponent(token)}/accept`, {
+          method: "POST",
+        })
+      ),
+  },
+
   /** Reports (M12): datasets to draw, measured on `on` (the caller's today). */
   reports: {
     spending: async (book: string, on: string): Promise<SpendingThisMonth> =>

@@ -6,13 +6,17 @@ _Updated 2026-10-17._ Keep this current: every finalized change set updates it (
 
 ## State
 
-**M1 through M12 are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M13 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
-accounts), M11 (budgets) and M12 (reports) are described in their plans. The milestones ahead
-(M13–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+accounts), M11 (budgets), M12 (reports) and M13 (sharing books) are described in their plans. The
+milestones ahead (M14–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
+- **Sharing (M13):** Manage books → Share: invite someone by link (can view, edit or manage;
+  copy or share it), see who has the book, change roles, remove people, withdraw invitations.
+  Whoever opens the link and accepts gets the book (a shared one says "Shared with you · Can
+  edit"); anyone can Leave. A book you can only view says so, and its editing is hidden.
 - **Reports (M12):** home's "Spent this month" (the month's spending by day against the budget,
   and what 85% of months stay under), then recent transactions (every account's), whose title
   opens **Transactions** (the whole journal, paged, "Go to date"). **Reports** (menu): cash flow,
@@ -124,18 +128,21 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 156 tests, including the table lint
+    - ledger: 159 tests, including the table lint
     - auth: 20; app: 154; db: 10; csv-import: 22; ledger-graphs-api: 13
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 76 API tests and 84 browser tests (with Mailpit and a fake SimpleFIN server)
+  - `pnpm e2e`: 78 API tests and 85 browser tests (with Mailpit and a fake SimpleFIN server)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps
 
-1. **M13 (sharing books) is being built** ([plan](docs/milestones/m13-sharing-books/PLAN.md)).
-2. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
+1. **Answer the questions** in [the M13 plan](docs/milestones/m13-sharing-books/PLAN.md#questions)
+   (built on best guesses), and say whether to move the `ledger-graphs` libraries to a public
+   `luminous-money` monorepo and publish them (M12).
+2. **Then M14 (reconciliation):** say `elaborate plan for M14`.
+3. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
 
 ## Gotchas
 

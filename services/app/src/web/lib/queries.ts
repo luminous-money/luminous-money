@@ -35,7 +35,9 @@ import {
   bankFeeds,
   type LinkRequest,
   type BookInfo,
+  type BookInvite,
   type BreakdownOptions,
+  type Role,
   type CsvProfile,
   type CategoryRule,
   type CategoryRuleIn,
@@ -873,6 +875,68 @@ function useChartChange<A, R>(book: string, fn: (args: A) => Promise<R>) {
   return useMutation({
     mutationFn: fn,
     onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+// Sharing (M13)
+
+/** The caller's role in the book (owner, manage, write, read), from the book list. */
+export function useRole(book: string): Role | undefined {
+  return (useBooks().data?.find((b) => b.id === book)?.role ?? undefined) as Role | undefined;
+}
+
+/** Whether the caller may change the book (write or more). Unknown yet counts as yes, so
+ * nothing flickers away for the usual case. */
+export const useCanWrite = (book: string) => {
+  const role = useRole(book);
+  return role === undefined || role !== "read";
+};
+
+export function useMembers(book: string) {
+  return useQuery({
+    queryKey: [...keys.book(book), "members"],
+    queryFn: () => appApi.sharing.members(book),
+  });
+}
+
+/** A change to who has the book: the members, and the book list (roles, books left). */
+function useSharingChange<A, R>(book: string, fn: (args: A) => Promise<R>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: [...keys.book(book), "members"] });
+      void client.invalidateQueries({ queryKey: keys.books });
+    },
+  });
+}
+
+export const useSetRole = (book: string) =>
+  useSharingChange(book, (a: { user: string; role: BookInvite["role"]; updatedAt: string }) =>
+    appApi.sharing.setRole(book, a.user, a.role, a.updatedAt)
+  );
+export const useRemoveMember = (book: string) =>
+  useSharingChange(book, (user: string) => appApi.sharing.remove(book, user));
+export const useInvite = (book: string) =>
+  useSharingChange(book, (a: { role: BookInvite["role"]; label: string }) =>
+    appApi.sharing.invite(book, a.role, a.label)
+  );
+export const useRevokeInvite = (book: string) =>
+  useSharingChange(book, (id: string) => appApi.sharing.revoke(book, id));
+
+export function useInvitation(token: string) {
+  return useQuery({
+    queryKey: ["invitation", token],
+    queryFn: () => appApi.sharing.invitation(token),
+    retry: false,
+  });
+}
+
+export function useAcceptInvitation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (token: string) => appApi.sharing.accept(token),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.books }),
   });
 }
 

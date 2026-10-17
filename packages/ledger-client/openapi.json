@@ -649,6 +649,35 @@
             "title": "Name",
             "type": "string"
           },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "owner",
+                  "manage",
+                  "write",
+                  "read"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The caller's: owner; or a member's, manage (who has access, the name), write (its contents) or read.",
+            "title": "Role"
+          },
           "updated_at": {
             "title": "Updated At",
             "type": "string"
@@ -658,6 +687,8 @@
           "id",
           "name",
           "currency",
+          "owner_id",
+          "role",
           "created_at",
           "updated_at"
         ],
@@ -1980,6 +2011,74 @@
           "units"
         ],
         "title": "LotRef",
+        "type": "object"
+      },
+      "Member": {
+        "properties": {
+          "role": {
+            "enum": [
+              "owner",
+              "manage",
+              "write",
+              "read"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its version; None for the owner, whose role doesn't change.",
+            "title": "Updated At"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "role",
+          "updated_at"
+        ],
+        "title": "Member",
+        "type": "object"
+      },
+      "MemberIn": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "enum": [
+              "manage",
+              "write",
+              "read"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Changing a member's role: the version read.",
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "MemberIn",
         "type": "object"
       },
       "MetaDate": {
@@ -3354,7 +3453,7 @@
     },
     "/api/ledger/v1/books/{book_id}": {
       "delete": {
-        "description": "Delete the book and everything in it. Backups carry the deletion as tombstones.",
+        "description": "Delete the book and everything in it (its owner). Backups carry the deletion as\ntombstones.",
         "operationId": "delete_book_api_ledger_v1_books__book_id__delete",
         "parameters": [
           {
@@ -3436,6 +3535,7 @@
         "summary": "Get Book"
       },
       "patch": {
+        "description": "Rename the book (a manager).",
         "operationId": "rename_book_api_ledger_v1_books__book_id__patch",
         "parameters": [
           {
@@ -5196,6 +5296,152 @@
           }
         },
         "summary": "Journal"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/members": {
+      "get": {
+        "description": "Who has the book: its owner, then its members, each with their role.",
+        "operationId": "members_api_ledger_v1_books__book_id__members_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Member"
+                  },
+                  "title": "Response Members Api Ledger V1 Books  Book Id  Members Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Members"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/members/{user_id}": {
+      "delete": {
+        "description": "Take a member out (a manager), or leave (yourself).",
+        "operationId": "remove_member_api_ledger_v1_books__book_id__members__user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Member"
+      },
+      "put": {
+        "description": "Add a member, or change their role (a manager).",
+        "operationId": "put_member_api_ledger_v1_books__book_id__members__user_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Member"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Member"
       }
     },
     "/api/ledger/v1/books/{book_id}/prices": {

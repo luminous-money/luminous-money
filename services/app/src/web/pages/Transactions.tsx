@@ -4,7 +4,7 @@ import { JournalList } from "../components/JournalList.js";
 import { JumpToDate, MoreBelow, NewerRow, usePaging } from "../components/Paged.js";
 import { bookHome } from "../lib/books.js";
 import { useParam, withBack } from "../lib/navigation.js";
-import { explain, useJournal } from "../lib/queries.js";
+import { explain, useCanWrite, useJournal } from "../lib/queries.js";
 
 /**
  * Every account's transactions together, newest first, paged as an account's ledger is: 200 at
@@ -14,6 +14,7 @@ export function Transactions({ book }: { book: string }) {
   const [, navigate] = useLocation();
   const date = useParam("date")?.match(/^\d{4}-\d{2}-\d{2}$/)?.[0];
   const pages = useJournal(book, date);
+  const canWrite = useCanWrite(book);
   const { rows, list, end, loadNewer } = usePaging(pages);
   const base = `/books/${book}/transactions`;
   const here = date ? `${base}?date=${date}` : base;
@@ -26,15 +27,17 @@ export function Transactions({ book }: { book: string }) {
         <h1>Transactions</h1>
         <p className="muted">Every account's, newest first.</p>
       </header>
-      <div className="ledger-add">
-        <button
-          type="button"
-          className="primary"
-          onClick={() => navigate(withBack(`${base}/new`, here))}
-        >
-          + Add transaction
-        </button>
-      </div>
+      {canWrite && (
+        <div className="ledger-add">
+          <button
+            type="button"
+            className="primary"
+            onClick={() => navigate(withBack(`${base}/new`, here))}
+          >
+            + Add transaction
+          </button>
+        </div>
+      )}
       <JumpToDate
         key={date ?? ""}
         date={date}

@@ -475,6 +475,9 @@ export function createApp(services: Services) {
     const found = await caller(c);
     if (!found) return problem(c, "not logged in", 401);
     c.header("X-User-Id", found.user.id);
+    // Who they are, for others sharing a book with them (M13); URI-encoded, as headers are ASCII.
+    c.header("X-User-Name", encodeURIComponent(found.user.name));
+    c.header("X-User-Email", encodeURIComponent(found.user.email));
     return c.body(null, 200);
   });
 

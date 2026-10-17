@@ -1,8 +1,8 @@
 M13: Sharing books: plan
 ==================================================================================================
 
-> **Status: planned and being built (2026-10-17),** with best guesses where nothing was decided;
-> [the questions](#questions) wait for answers, and any of them can change what's built. The
+> **Status: built (2026-10-17),** with ledger, unit, API and browser tests, on the best guesses
+> below; [the questions](#questions) wait for answers, and any of them can change what's built. The
 > brief, from [the plan](../../PLAN.md): any user can be added to a book with read, write or
 > manage permissions; every book has an owner.
 

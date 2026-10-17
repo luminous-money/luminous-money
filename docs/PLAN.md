@@ -108,8 +108,10 @@ milestone starts.
       [Built](milestones/m12-reports/PLAN.md) 2026-10-17, with home's recent transactions and
       a Transactions page (every account's). Statements (P&L, balance sheet) later; moving the
       libraries to a public monorepo waits for a yes.
-- [ ] **M13: Sharing books with other users.** Any user can be added to a book with read, write
-      or manage permissions. Every book has an owner.
+- [x] **M13: Sharing books with other users.** Any user can be added to a book with read, write
+      or manage permissions. Every book has an owner. [Built](milestones/m13-sharing-books/PLAN.md)
+      2026-10-17: invitations by link, roles enforced by the ledger and `app`, leaving and
+      removing, read-only in the PWA.
 - [ ] **M14: Reconciliation.**
 - [ ] **M15: Sub-accounts of linked accounts.** Split a bank-linked account's money into
       sub-accounts, e.g. the $10,000 in a PNC checking account as $5,000 of padding and $5,000

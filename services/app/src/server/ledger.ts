@@ -25,6 +25,8 @@ export type TransactionEdit = components["schemas"]["TransactionEdit"];
 export type PriceIn = components["schemas"]["PriceIn"];
 export type TreeAccount = components["schemas"]["TreeAccount"];
 export type BudgetStatus = components["schemas"]["BudgetStatus"];
+export type Member = components["schemas"]["Member"];
+export type Role = NonNullable<Book["role"]>;
 
 export class LedgerError extends Error {
   constructor(
@@ -88,6 +90,16 @@ export interface LedgerPort {
   ): Promise<Transaction>;
   /** The book's unconfirmed (`!`) transactions. */
   unconfirmed(book: string): Promise<Transaction[]>;
+  /** Who has the book: its owner, then its members (M13). */
+  members(book: string): Promise<Member[]>;
+  /** Add a member, or change one's role (against the version read): the caller must manage. */
+  putMember(
+    book: string,
+    user: string,
+    member: { role: "read" | "write" | "manage"; updated_at?: string | null }
+  ): Promise<Member>;
+  /** Take a member out (a manager), or leave (the caller themselves). */
+  removeMember(book: string, user: string): Promise<void>;
   /** Every account with its balance and its subtree's (the chart of accounts). */
   accountTree(book: string): Promise<TreeAccount[]>;
   /** A commodity's prices, newest first. */
@@ -226,6 +238,33 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
           params: { path: { book_id: book, directive_id: id } },
         })
       ),
+    members: (book) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/members", {
+          params: { path: { book_id: book } },
+        })
+      ),
+    putMember: (book, user, member) =>
+      unwrap(
+        client.PUT("/api/ledger/v1/books/{book_id}/members/{user_id}", {
+          params: { path: { book_id: book, user_id: user } },
+          body: member,
+        })
+      ),
+    removeMember: async (book, user) => {
+      const { response, error } = await client.DELETE(
+        "/api/ledger/v1/books/{book_id}/members/{user_id}",
+        {
+          params: { path: { book_id: book, user_id: user } },
+        }
+      );
+      if (response.ok) return;
+      const detail = (error as { detail?: unknown } | undefined)?.detail;
+      throw new LedgerError(
+        response.status,
+        typeof detail === "string" ? detail : "couldn't remove"
+      );
+    },
     accountTree: (book) =>
       unwrap(
         client.GET("/api/ledger/v1/books/{book_id}/accounts/tree", {

@@ -174,6 +174,16 @@ MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
     # 7: budgets (M11). A transaction with `budget: FALSE` (a once-in-decades roof) still counts
     # everywhere but against budgets.
     ["ALTER TABLE directive ADD COLUMN budgeted INTEGER NOT NULL DEFAULT 1", _backfill_budgeted],
+    # 8: sharing books (M13). Besides its owner, a book has members, each with a role: read,
+    # write or manage.
+    [
+        create_table(
+            "book_member",
+            ["book_id TEXT NOT NULL REFERENCES book(id)", "user_id TEXT NOT NULL", "role TEXT NOT NULL"],
+            ["PRIMARY KEY (book_id, user_id)"],
+        ),
+        "CREATE INDEX book_member_user ON book_member(user_id)",
+    ],
 ]
 
 

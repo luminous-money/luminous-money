@@ -8,7 +8,7 @@ import { daysLeft } from "../lib/budgets.js";
 import { formatMoney } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
 import type { BudgetBasis, BudgetLine } from "../lib/ledger.js";
-import { explain, useAccountTree, useBudgetStatus } from "../lib/queries.js";
+import { explain, useAccountTree, useBudgetStatus, useCanWrite } from "../lib/queries.js";
 
 // Spending first: it's what most budgets are about.
 const ROOTS = ["Expenses", "Income", "Assets", "Liabilities", "Equity"];
@@ -28,6 +28,7 @@ export function Budgets({ book }: { book: string }) {
   // The editor works from each budget's own period, whatever's shown.
   const own = useBudgetStatus(book, "period");
   const tree = useAccountTree(book);
+  const canWrite = useCanWrite(book);
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [picked, setPicked] = useState("");
@@ -96,7 +97,7 @@ export function Budgets({ book }: { book: string }) {
           <div
             className="budget-main"
             style={{ "--depth": depth } as React.CSSProperties}
-            onClick={() => setEditing(open ? null : account)}
+            onClick={() => canWrite && setEditing(open ? null : account)}
           >
             <button
               type="button"
@@ -175,13 +176,15 @@ export function Budgets({ book }: { book: string }) {
     <main>
       <header className="page-head chart-head">
         <h1>Budgets</h1>
-        <button
-          type="button"
-          className="primary"
-          onClick={() => (setAdding(!adding), setPicked(""))}
-        >
-          {adding ? "Cancel" : "+ Add"}
-        </button>
+        {canWrite && (
+          <button
+            type="button"
+            className="primary"
+            onClick={() => (setAdding(!adding), setPicked(""))}
+          >
+            {adding ? "Cancel" : "+ Add"}
+          </button>
+        )}
       </header>
       {adding && (
         <section className="card editor" aria-label="Add a budget">

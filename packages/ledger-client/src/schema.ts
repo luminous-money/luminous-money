@@ -56,12 +56,16 @@ export interface paths {
     post?: never;
     /**
      * Delete Book
-     * @description Delete the book and everything in it. Backups carry the deletion as tombstones.
+     * @description Delete the book and everything in it (its owner). Backups carry the deletion as
+     *     tombstones.
      */
     delete: operations["delete_book_api_ledger_v1_books__book_id__delete"];
     options?: never;
     head?: never;
-    /** Rename Book */
+    /**
+     * Rename Book
+     * @description Rename the book (a manager).
+     */
     patch: operations["rename_book_api_ledger_v1_books__book_id__patch"];
     trace?: never;
   };
@@ -505,6 +509,50 @@ export interface paths {
     put?: never;
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/members": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Members
+     * @description Who has the book: its owner, then its members, each with their role.
+     */
+    get: operations["members_api_ledger_v1_books__book_id__members_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/members/{user_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Put Member
+     * @description Add a member, or change their role (a manager).
+     */
+    put: operations["put_member_api_ledger_v1_books__book_id__members__user_id__put"];
+    post?: never;
+    /**
+     * Remove Member
+     * @description Take a member out (a manager), or leave (yourself).
+     */
+    delete: operations["remove_member_api_ledger_v1_books__book_id__members__user_id__delete"];
     options?: never;
     head?: never;
     patch?: never;
@@ -960,6 +1008,13 @@ export interface components {
        * @description The book's `option "title"`, or its ID if it has none.
        */
       name: string;
+      /** Owner Id */
+      owner_id: string | null;
+      /**
+       * Role
+       * @description The caller's: owner; or a member's, manage (who has access, the name), write (its contents) or read.
+       */
+      role: ("owner" | "manage" | "write" | "read") | null;
       /** Updated At */
       updated_at: string;
     };
@@ -1478,6 +1533,34 @@ export interface components {
       date: string;
       /** Units */
       units: string;
+    };
+    /** Member */
+    Member: {
+      /**
+       * Role
+       * @enum {string}
+       */
+      role: "owner" | "manage" | "write" | "read";
+      /**
+       * Updated At
+       * @description Its version; None for the owner, whose role doesn't change.
+       */
+      updated_at: string | null;
+      /** User Id */
+      user_id: string;
+    };
+    /** MemberIn */
+    MemberIn: {
+      /**
+       * Role
+       * @enum {string}
+       */
+      role: "manage" | "write" | "read";
+      /**
+       * Updated At
+       * @description Changing a member's role: the version read.
+       */
+      updated_at?: string | null;
     };
     /** MetaDate */
     MetaDate: {
@@ -3181,6 +3264,110 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["JournalPage"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  members_api_ledger_v1_books__book_id__members_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Member"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  put_member_api_ledger_v1_books__book_id__members__user_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MemberIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Member"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  remove_member_api_ledger_v1_books__book_id__members__user_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {

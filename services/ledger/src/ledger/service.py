@@ -64,11 +64,14 @@ class Ledger:
 
     # Books
 
-    def books(self, owner_id: str | None = None) -> list[models.Book]:
-        """Every book, or just those `owner_id` owns, oldest first."""
-        return [self.book(book_id) for book_id in self.store.books(owner_id)]
+    def books(self, user_id: str | None = None) -> list[models.Book]:
+        """Every book, or those `user_id` owns or is a member of (with their role), oldest first."""
+        if user_id is None:
+            return [self.book(book_id) for book_id in self.store.books()]
+        return [self.book(book_id, user_id) for book_id in self.store.books_for(user_id)]
 
-    def book(self, book_id: str) -> models.Book:
+    def book(self, book_id: str, user_id: str | None = None) -> models.Book:
+        """The book, with `user_id`'s role in it if given."""
         row = self.store.book(book_id)
         if row is None or row["deleted"]:
             raise NotFound(book_id)
@@ -77,13 +80,57 @@ class Ledger:
             id=row["id"],
             name=engine.book_title(header) or row["id"],
             currency=investments.operating_currency(header),
+            owner_id=row["owner_id"],
+            role=self.role(book_id, user_id) if user_id else None,
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
 
     def owns(self, book_id: str, user_id: str) -> bool:
+        return self.role(book_id, user_id) == "owner"
+
+    # Sharing (M13)
+
+    ROLES = ("read", "write", "manage", "owner")
+
+    def role(self, book_id: str, user_id: str) -> str | None:
+        """What `user_id` may do in the book: owner, manage, write or read; None if nothing (or
+        if there's no such book)."""
         row = self.store.book(book_id)
-        return row is not None and not row["deleted"] and row["owner_id"] == user_id
+        if row is None or row["deleted"]:
+            return None
+        if row["owner_id"] == user_id:
+            return "owner"
+        member = self.store.member(book_id, user_id)
+        return member["role"] if member else None
+
+    def can(self, book_id: str, user_id: str, need: str) -> bool:
+        role = self.role(book_id, user_id)
+        return role is not None and self.ROLES.index(role) >= self.ROLES.index(need)
+
+    def members(self, book_id: str) -> list[models.Member]:
+        """The owner, then the members in the order they joined."""
+        row = self.store.book(book_id)
+        if row is None or row["deleted"]:
+            raise NotFound(book_id)
+        owner = [models.Member(user_id=row["owner_id"], role="owner", updated_at=None)] if row["owner_id"] else []
+        return owner + [models.Member(user_id=m["user_id"], role=m["role"], updated_at=m["updated_at"]) for m in self.store.members(book_id)]
+
+    def set_member(self, book_id: str, user_id: str, m: models.MemberIn) -> models.Member:
+        """Add a member, or change one's role (against the version read). The owner's is fixed."""
+        with self.store.transaction():
+            if self.role(book_id, user_id) == "owner":
+                raise ValueError("the owner's role can't change")
+            self.store.put_member(book_id, user_id, m.role, m.updated_at)
+        return next(x for x in self.members(book_id) if x.user_id == user_id)
+
+    def remove_member(self, book_id: str, user_id: str) -> None:
+        """Take a member out of the book (the owner can't be)."""
+        with self.store.transaction():
+            if self.role(book_id, user_id) == "owner":
+                raise ValueError("the owner can't leave their own book")
+            if not self.store.remove_member(book_id, user_id):
+                raise NotFound(user_id)
 
     def _check_name(self, name: str, owner_id: str | None, book_id: str | None = None) -> None:
         """Book names are unique per owner, ignoring case: the switcher shows names alone."""
