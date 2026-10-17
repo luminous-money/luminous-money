@@ -918,8 +918,8 @@ export const useSetRole = (book: string) =>
 export const useRemoveMember = (book: string) =>
   useSharingChange(book, (user: string) => appApi.sharing.remove(book, user));
 export const useInvite = (book: string) =>
-  useSharingChange(book, (a: { role: BookInvite["role"]; label: string }) =>
-    appApi.sharing.invite(book, a.role, a.label)
+  useSharingChange(book, (a: { role: BookInvite["role"]; email: string; label: string }) =>
+    appApi.sharing.invite(book, a)
   );
 export const useRevokeInvite = (book: string) =>
   useSharingChange(book, (id: string) => appApi.sharing.revoke(book, id));

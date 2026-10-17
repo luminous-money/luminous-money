@@ -46,8 +46,15 @@ describe("M13: sharing books", () => {
     assert.equal((await spend(partner, book)).status, 404); // not theirs yet
 
     const invite = (await (
-      await json(owner, `/books/${book}/invites`, "POST", { role: "write", label: "Partner" })
+      await json(owner, `/books/${book}/invites`, "POST", {
+        role: "write",
+        email: partner.email.toUpperCase(), // emails match whatever their case
+        label: "Partner",
+      })
     ).json()) as { token: string };
+    // It's for them: nobody else can use it.
+    const stranger = await newUser();
+    assert.equal((await json(stranger, `/invites/${invite.token}/accept`, "POST")).status, 403);
     const seen = (await (await json(partner, `/invites/${invite.token}`)).json()) as {
       book: { name: string };
       role: string;
@@ -59,8 +66,7 @@ describe("M13: sharing books", () => {
     const theirs = (await (await json(partner, "/books")).json()) as { id: string; role: string }[];
     assert.equal(theirs.find((b) => b.id === book)?.role, "write");
     assert.equal((await spend(partner, book)).status, 201);
-    // Used once: nobody else gets in with it.
-    const stranger = await newUser();
+    // Used once.
     assert.equal((await json(stranger, `/invites/${invite.token}/accept`, "POST")).status, 409);
 
     // The owner makes them a reader: they see, but can't change.
@@ -104,12 +110,18 @@ describe("M13: sharing books", () => {
     const created = await json(owner, "/books", "POST", { name: "Ours", time_zone: "UTC" });
     const book = (await created.json()) as { id: string; updated_at: string };
     const invite = (await (
-      await json(owner, `/books/${book.id}/invites`, "POST", { role: "manage" })
+      await json(owner, `/books/${book.id}/invites`, "POST", {
+        role: "manage",
+        email: manager.email,
+      })
     ).json()) as { token: string };
     await json(manager, `/invites/${invite.token}/accept`, "POST");
 
     const next = (await (
-      await json(manager, `/books/${book.id}/invites`, "POST", { role: "read" })
+      await json(manager, `/books/${book.id}/invites`, "POST", {
+        role: "read",
+        email: "sam@example.com",
+      })
     ).json()) as {
       id: string;
     };

@@ -6,6 +6,16 @@ M13: Sharing books: plan
 > brief, from [the plan](../../PLAN.md): any user can be added to a book with read, write or
 > manage permissions; every book has an owner.
 
+## Answers (2026-10-17)
+
+1. **Invitations by email:** yes, once there's an email system; not now.
+2. **Invitations name whose they are:** only the account with the invited email can accept one.
+   A link lasts **3 days**, and is used up once accepted. (Built.)
+3. **Transferring ownership:** not now.
+4. **Read-only members** may star accounts (stars are each user's own) and see reports. (As
+   built.)
+5. **Bank links go when their person leaves.** (As built.)
+
 ## What M13 is
 
 - **Every book has one owner** (who made it) and any number of **members**, each with a role:
@@ -15,8 +25,9 @@ M13: Sharing books: plan
   - **manage:** write, plus who has access (inviting, changing roles, removing) and the book's
     name and settings
   - **the owner:** manage, plus deleting the book
-- **Invite by link:** a manager picks a role (and, optionally, who it's for), and gets a link to
-  send however they like. Whoever opens it, logged in, and accepts becomes a member.
+- **Invite by link:** a manager picks a role and the person's email (and, optionally, their name),
+  and gets a link to send however they like. Opened by that account, logged in, and accepted,
+  it makes them a member.
 - **Leaving:** any member can leave a book; a manager can remove anyone but the owner.
 - **Shared books** sit beside your own in the book switcher and Manage books, marked as shared.
 
@@ -47,8 +58,10 @@ M13: Sharing books: plan
 
 ### Invitations and names, in `app`
 
-- **`book_invite`:** a random token (only its hash kept), the role, who invited, an optional
-  label ("Jess"), and an expiry (14 days); used once, revocable.
+- **`book_invite`:** a random token (only its hash kept), the role, who invited, the email it's
+  for, an optional name ("Jess"), and an expiry (3 days); used once, revocable. Only the account
+  with that email (as auth says it, any case) can accept it. Until accounts must verify their
+  email (M8's question 1), that trusts the email an account was made with.
 - **Accepting** (`POST /invites/:token/accept`): `app` adds the caller as a member acting as the
   inviter, so the ledger checks the inviter still manages the book.
 - **Names:** auth's check also passes on `X-User-Name` and `X-User-Email` (URI-encoded); `app`

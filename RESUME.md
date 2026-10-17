@@ -138,11 +138,11 @@ How it's put together:
 
 ## Next steps
 
-1. **Answer the questions** in [the M13 plan](docs/milestones/m13-sharing-books/PLAN.md#questions)
-   (built on best guesses), and say whether to move the `ledger-graphs` libraries to a public
-   `luminous-money` monorepo and publish them (M12).
-2. **Then M14 (reconciliation):** say `elaborate plan for M14`.
-3. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
+1. **M14 (reconciliation):** answer the questions in [its plan](docs/milestones/m14-reconciliation/PLAN.md#questions),
+   then say `build M14`.
+2. **Publishing `ledger-graphs`:** see "The ledger-graphs libraries" below.
+3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
+   ownership transfer, the rest of M8's auth questions).
 
 ## Gotchas
 

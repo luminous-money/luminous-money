@@ -8,20 +8,22 @@ test("a book is shared by link, and the person who accepts it can open it", asyn
   browser,
 }) => {
   const { book } = await setUpUser(page, { name: "Our house" });
-  await page.goto(`/ui/books/${book.id}/sharing`);
-  const invite = page.getByRole("region", { name: "Invite someone" });
-  await invite.getByRole("combobox", { name: "Their role" }).selectOption("write");
-  await invite.getByRole("textbox", { name: "Who it's for" }).fill("Jess");
-  await invite.getByRole("button", { name: "Make a link" }).click();
-  const link = await invite.getByRole("textbox", { name: "Invitation link" }).inputValue();
-  expect(link).toContain("/ui/invite/");
-
   const theirs = await browser.newContext({
     ...devices["Pixel 7"],
     baseURL: process.env.FAVA_BEANS_URL ?? "http://localhost:8080",
   });
   const partner = await theirs.newPage();
-  await logIn(partner);
+  const { email } = await logIn(partner);
+
+  await page.goto(`/ui/books/${book.id}/sharing`);
+  const invite = page.getByRole("region", { name: "Invite someone" });
+  await invite.getByRole("combobox", { name: "Their role" }).selectOption("write");
+  await invite.getByRole("textbox", { name: "Their email" }).fill(email);
+  await invite.getByRole("textbox", { name: "Their name" }).fill("Jess");
+  await invite.getByRole("button", { name: "Make a link" }).click();
+  const link = await invite.getByRole("textbox", { name: "Invitation link" }).inputValue();
+  expect(link).toContain("/ui/invite/");
+
   await partner.goto(new URL(link).pathname);
   await expect(partner.getByRole("region", { name: "Invitation" })).toContainText("Our house");
   await partner.getByRole("button", { name: "Accept" }).click();

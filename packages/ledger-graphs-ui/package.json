@@ -2,7 +2,7 @@
   "name": "@luminous-money/ledger-graphs-ui",
   "version": "0.1.0",
   "description": "React charts for @luminous-money/ledger-graphs-api's datasets, drawn with Apache ECharts: spending against a budget and a simulated month, cash flow, breakdowns, net worth.",
-  "license": "MIT",
+  "license": "ISC",
   "type": "module",
   "sideEffects": false,
   "main": "dist/index.js",

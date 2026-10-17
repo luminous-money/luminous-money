@@ -656,8 +656,9 @@ same money in through another's, a day or so later. Both would sit in review, un
 - **`app` checks the same** before its own writes (one middleware: anything but a read needs
   write; members and invitations check their own), so its routes can't do what the ledger would
   refuse.
-- **Invitations are links** (`book_invite` in `app`: a token's hash, a role, who invited, an
-  optional label, 14 days, used once, revocable). Accepting one adds the caller **acting as the
+- **Invitations are links for one person** (`book_invite` in `app`: a token's hash, a role, who
+  invited, the email it's for, an optional name, 3 days, used once, revocable). Only the account
+  with that email can accept one (until emails are verified, the one it was made with). Accepting one adds the caller **acting as the
   inviter**, so the ledger checks the inviter still manages the book. No email is sent: the link
   is copied or shared (the phone's share sheet). An invitation opens even for someone with no
   book yet.

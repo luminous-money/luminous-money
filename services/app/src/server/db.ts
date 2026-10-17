@@ -293,6 +293,9 @@ export const MIGRATIONS: Migration[] = [
     ]),
     "CREATE INDEX book_invite_book ON book_invite(book_id)",
   ],
+  // 15: invitations name whose they are (M13's answers): only the account with that email can
+  // accept one.
+  ["ALTER TABLE book_invite ADD COLUMN email TEXT"],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -404,6 +407,8 @@ export type Invite = {
   book_id: string;
   role: InviteRole;
   invited_by: string;
+  /** Who it's for: only the account with this email can accept it (null: before 15). */
+  email: string | null;
   label: string | null;
   expires_at: string;
   accepted_by: string | null;
@@ -412,8 +417,8 @@ export type Invite = {
   updated_at: string;
 };
 
-/** How long an invitation's link works. */
-export const INVITE_DAYS = 14;
+/** How long an invitation's link works (it's used up once accepted, too). */
+export const INVITE_DAYS = 3;
 
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
 
@@ -1110,6 +1115,7 @@ export class AppDb {
     book: string,
     role: InviteRole,
     invitedBy: string,
+    email: string,
     label: string | null
   ): { invite: Invite; token: string } {
     const token = randomBytes(24).toString("base64url");
@@ -1118,10 +1124,10 @@ export class AppDb {
     const id = randomUUID();
     this.db
       .prepare(
-        `INSERT INTO book_invite (id, book_id, token_hash, role, invited_by, label, expires_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO book_invite (id, book_id, token_hash, role, invited_by, email, label, expires_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(id, book, tokenHash(token), role, invitedBy, label, expires, stamp, stamp);
+      .run(id, book, tokenHash(token), role, invitedBy, email, label, expires, stamp, stamp);
     return { invite: this.invite(id)!, token };
   }
 

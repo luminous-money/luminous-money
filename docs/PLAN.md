@@ -112,7 +112,10 @@ milestone starts.
       or manage permissions. Every book has an owner. [Built](milestones/m13-sharing-books/PLAN.md)
       2026-10-17: invitations by link, roles enforced by the ledger and `app`, leaving and
       removing, read-only in the PWA.
-- [ ] **M14: Reconciliation.**
+- [ ] **M14: Reconciliation.** Agree an account with the bank's statement (or feed): tick off its
+      transactions to the statement's balance, then keep it as a balance assertion and marks on
+      the postings; bank-fed accounts checked daily, with where they went off.
+      [Planned](milestones/m14-reconciliation/PLAN.md) 2026-10-17.
 - [ ] **M15: Sub-accounts of linked accounts.** Split a bank-linked account's money into
       sub-accounts, e.g. the $10,000 in a PNC checking account as $5,000 of padding and $5,000
       for general use, while the bank feed keeps it in step with the bank.
@@ -205,6 +208,15 @@ elaborated.
   - Can a resolver return a partial answer (e.g. a match with a suggested split)?
   - Should high-confidence matches ever auto-confirm, or does everything go through review?
 - **Cutover:** deferred until hydration.
+
+## Later (noted, not pressing)
+
+- **Email, once there's an email system:** invitations sent by email (M13), and accounts
+  required to verify their email (M8's question 1).
+- **Transferring a book's ownership** to a manager (M13).
+- **Auth (M8's other questions):** session lifetime (proposed: 60 days unused, a year at most),
+  passkeys and two-factor (a milestone of their own), and which OIDC providers first (Google,
+  Apple, GitHub, or any OIDC issuer).
 
 ## Polish
 

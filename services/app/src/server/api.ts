@@ -712,12 +712,17 @@ export function createApi({
     return {
       id: i.id,
       role: i.role,
+      email: i.email,
       label: i.label,
       invited_by: by?.name ?? null,
       expires_at: i.expires_at,
       created_at: i.created_at,
     };
   };
+  /** Whether an invitation is for the caller: their account's email is the one it names. */
+  const forCaller = (invite: Invite, user: string) =>
+    !invite.email ||
+    db.userProfiles([user]).get(user)?.email.toLowerCase() === invite.email.toLowerCase();
   const ledgerProblem = (error: unknown) => {
     if (error instanceof LedgerError && [403, 404, 409, 422].includes(error.status))
       return [{ detail: error.message }, error.status as 403 | 404 | 409 | 422] as const;
@@ -774,18 +779,26 @@ export function createApi({
     }
   });
 
-  /** Invite someone (`{role, label?}`), as a manager: the link's token, shown once. */
+  /** Invite someone (`{email, role, label?}`), as a manager: the link's token, shown once. Only
+   * the account with that email can accept it. */
   api.post("/books/:book/invites", async (c) => {
     const { book } = c.req.param();
     const user = c.get("user");
     if (!atLeast(await roleIn(user, book), "manage"))
       return c.json({ detail: "only a manager of the book can do that" }, 403);
-    const body = (await c.req.json().catch(() => ({}))) as { role?: unknown; label?: unknown };
+    const body = (await c.req.json().catch(() => ({}))) as {
+      role?: unknown;
+      label?: unknown;
+      email?: unknown;
+    };
     if (body.role !== "read" && body.role !== "write" && body.role !== "manage")
       return c.json({ detail: "the role is read, write or manage" }, 422);
+    const email = typeof body.email === "string" ? body.email.trim() : "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return c.json({ detail: "enter the email address of the account it's for" }, 422);
     const label =
       typeof body.label === "string" && body.label.trim() ? body.label.trim().slice(0, 100) : null;
-    const { invite, token } = db.createInvite(book, body.role, user, label);
+    const { invite, token } = db.createInvite(book, body.role, user, email, label);
     return c.json({ ...inviteView(invite), token }, 201);
   });
 
@@ -813,6 +826,7 @@ export function createApi({
       book: { id: book.id, name: book.name },
       state,
       member: (await roleIn(c.get("user"), invite.book_id)) !== undefined,
+      for_you: forCaller(invite, c.get("user")),
     });
   });
 
@@ -823,6 +837,11 @@ export function createApi({
     if (!invite) return c.json({ detail: "this invitation doesn't exist" }, 404);
     if ((await roleIn(user, invite.book_id)) !== undefined) return c.json({ book: invite.book_id });
     if (invite.accepted_by) return c.json({ detail: "this invitation was already used" }, 409);
+    if (!forCaller(invite, user))
+      return c.json(
+        { detail: `this invitation is for ${invite.email}: log in as them to accept it` },
+        403
+      );
     if (invite.expires_at <= new Date().toISOString())
       return c.json({ detail: "this invitation has expired: ask for a new one" }, 409);
     try {

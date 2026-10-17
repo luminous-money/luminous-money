@@ -73,6 +73,8 @@ export type BookMember = {
 export type BookInvite = {
   id: string;
   role: Exclude<Role, "owner">;
+  /** Whose it is: only the account with this email can accept it. */
+  email: string | null;
   label: string | null;
   invited_by: string | null;
   expires_at: string;
@@ -82,6 +84,8 @@ export type Invitation = BookInvite & {
   book: { id: string; name: string };
   state: "open" | "used" | "expired";
   member: boolean;
+  /** Whether it names the caller's email. */
+  for_you: boolean;
 };
 
 export type BreakdownOptions = {
@@ -297,14 +301,13 @@ export const appApi = {
     },
     invite: async (
       book: string,
-      role: BookInvite["role"],
-      label: string
+      invite: { role: BookInvite["role"]; email: string; label: string }
     ): Promise<BookInvite & { token: string }> =>
       json(
         await apiFetch(`${base(book)}/invites`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ role, label }),
+          body: JSON.stringify(invite),
         })
       ),
     revoke: async (book: string, id: string): Promise<void> => {

@@ -33,6 +33,8 @@ export function InvitationPage({ token }: { token: string }) {
             <p className="small">
               You have this book already. <Link href={bookHome(i.book.id)}>Open it</Link>
             </p>
+          ) : !i.for_you ? (
+            <p className="small error">It's for {i.email}: log in as them to accept it.</p>
           ) : i.state !== "open" ? (
             <p className="small error">
               {i.state === "used"

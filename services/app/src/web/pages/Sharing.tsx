@@ -119,6 +119,7 @@ export function Sharing({ book }: { book: string }) {
 function InviteForm({ book }: { book: string }) {
   const invite = useInvite(book);
   const [role, setRole] = useState<BookInvite["role"]>("write");
+  const [email, setEmail] = useState("");
   const [label, setLabel] = useState("");
   const [copied, setCopied] = useState(false);
   const link = invite.data && `${window.location.origin}/ui/invite/${invite.data.token}`;
@@ -128,8 +129,8 @@ function InviteForm({ book }: { book: string }) {
       {link ? (
         <>
           <p className="small">
-            Send this link to {invite.data!.label ?? "them"}. It works once, for 14 days, for
-            whoever opens it first.
+            Send this link to {invite.data!.label ?? invite.data!.email}. It works for the account
+            with that email, once, for 3 days.
           </p>
           <input
             readOnly
@@ -138,7 +139,10 @@ function InviteForm({ book }: { book: string }) {
             onFocus={(e) => e.currentTarget.select()}
           />
           <div className="actions">
-            <button type="button" onClick={() => (invite.reset(), setLabel(""), setCopied(false))}>
+            <button
+              type="button"
+              onClick={() => (invite.reset(), setEmail(""), setLabel(""), setCopied(false))}
+            >
               Another
             </button>
             {"share" in navigator && (
@@ -163,7 +167,7 @@ function InviteForm({ book }: { book: string }) {
           className="editor"
           onSubmit={(e) => {
             e.preventDefault();
-            invite.mutate({ role, label });
+            invite.mutate({ role, email, label });
           }}
         >
           <label>
@@ -181,12 +185,25 @@ function InviteForm({ book }: { book: string }) {
             </select>
           </label>
           <label>
-            Who it's for (optional)
+            Their email
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="jess@example.com"
+              aria-label="Their email"
+              autoComplete="off"
+            />
+            <span className="small muted">Only their account can accept it.</span>
+          </label>
+          <label>
+            Their name (optional)
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Jess"
-              aria-label="Who it's for"
+              aria-label="Their name"
             />
           </label>
           {invite.error && <p className="error">{explain(invite.error)}</p>}
@@ -210,8 +227,9 @@ function OpenInvites({ book, invites }: { book: string; invites: BookInvite[] })
         {invites.map((i) => (
           <li key={i.id} className="member">
             <span className="member-who">
-              <span className="member-name">{i.label ?? "Anyone with the link"}</span>
+              <span className="member-name">{i.label ?? i.email ?? "Anyone with the link"}</span>
               <span className="small muted">
+                {i.label && i.email ? `${i.email} · ` : ""}
                 {ROLE_NAMES[i.role]} · until {i.expires_at.slice(0, 10)}
               </span>
             </span>
