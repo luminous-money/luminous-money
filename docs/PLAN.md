@@ -102,7 +102,11 @@ milestone starts.
       the rest its "Other"; none is higher than one above it. Shown on a Budgets page, an
       account's ledger and home, as filled lines. [Built](milestones/m11-budgets/PLAN.md)
       2026-10-17, with "Exclude from budget" on transactions and the book's week start.
-- [ ] **M12: Reports.** From basic to more complex.
+- [ ] **M12: Reports.** From basic to more complex: home's "Spent this month" (against the budget
+      and a simulated month), cash flow, expense and income breakdowns, largest transactions,
+      net worth, and account statistics, on our own `ledger-graphs` libraries with ECharts.
+      [Planned](milestones/m12-reports/PLAN.md) 2026-10-17. Statements (P&L, balance sheet)
+      later.
 - [ ] **M13: Sharing books with other users.** Any user can be added to a book with read, write
       or manage permissions. Every book has an owner.
 - [ ] **M14: Reconciliation.**
@@ -216,5 +220,7 @@ Smaller improvements to pick up between milestones or at the end.
       another within 7 days, both imported, become one transfer, with "Reject" to restore the
       two.
 - [ ] **Mobile usability,** across the app.
+- [ ] **Tapping a report's bar or slice opens its transactions** (that month's, or that
+      category's).
 - [x] **Go to a date in an account's ledger:** a partial view from that date back, loading
       newer pages above ("Load more") and older ones as you scroll.
