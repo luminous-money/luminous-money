@@ -27,6 +27,11 @@ export const ledger = createLedgerClient({
 });
 
 export type TreeAccount = Components["schemas"]["TreeAccount"];
+export type Budget = Components["schemas"]["Budget"];
+export type BudgetIn = Components["schemas"]["BudgetIn"];
+export type BudgetLine = Components["schemas"]["BudgetLine"];
+export type BudgetStatus = Components["schemas"]["BudgetStatus"];
+export type BudgetBasis = BudgetStatus["basis"];
 
 export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"], "updated_at">;
 export type AccountKind = components["schemas"]["AccountIn"]["kind"];
@@ -180,6 +185,23 @@ export const api = {
     ),
 
   /** The chart of accounts: every account, with its own and its subtree's balances. */
+  /** Every budget in force on `on`, measured over its period (or all per month). */
+  budgetStatus: (book_id: string, on: string, basis: BudgetBasis): Promise<BudgetStatus> =>
+    unwrap(
+      ledger.GET("/api/ledger/v1/books/{book_id}/budgets/status", {
+        params: { path: { book_id }, query: { on, basis } },
+      })
+    ),
+
+  /** Set an account's budget from `start` on (0 ends it); null when that left none. */
+  setBudget: (book_id: string, account: string, body: BudgetIn): Promise<Budget | null> =>
+    unwrap(
+      ledger.PUT("/api/ledger/v1/books/{book_id}/budgets/{account}", {
+        params: { path: { book_id, account } },
+        body,
+      })
+    ),
+
   accountTree: (book_id: string): Promise<TreeAccount[]> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/accounts/tree", { params: { path: { book_id } } })

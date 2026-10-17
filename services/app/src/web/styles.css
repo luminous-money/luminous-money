@@ -1074,7 +1074,7 @@ a.primary-link {
 
 /* Plain links */
 
-main a:not(.button):not(.card):not(.back):not(.menu-item):not(.chart-leaf) {
+main a:not(.button):not(.card):not(.back):not(.menu-item):not(.chart-leaf):not(.budget-link) {
   color: var(--green);
   font-weight: 600;
 }
@@ -1734,4 +1734,146 @@ button.chart-more {
 .ledger-more button.plain {
   min-height: 2.75rem;
   padding: 0 0.5rem;
+}
+
+/* Budgets (M11): a filled line per budget. A limit fills toward its end (amber near it, red
+   past it); a goal fills toward being reached (green once it is). */
+
+.budget-bar {
+  display: block;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.budget-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+}
+
+.budget-bar.near > span {
+  background: #d9a441;
+}
+
+.budget-bar.over > span {
+  background: var(--bad);
+}
+
+.budget-bar.goal > span {
+  background: color-mix(in srgb, var(--good) 55%, var(--line));
+}
+
+.budget-bar.goal.reached > span {
+  background: var(--good);
+}
+
+.budget-row {
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.chart-section > ul > li > .budget-row {
+  border-top: 0;
+  background: color-mix(in srgb, var(--green-soft) 14%, transparent);
+}
+
+.budget-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.3rem;
+  align-content: center;
+  min-height: 3rem;
+  padding: 0.55rem 0 0.55rem calc(0.8rem + var(--depth, 0) * 1rem);
+  cursor: pointer;
+}
+
+.budget-row.other .budget-main {
+  cursor: default;
+}
+
+button.budget-toggle,
+.budget-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.budget-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.budget-row.unbudgeted .budget-name,
+.budget-row.other .budget-name {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.budget-figures {
+  flex: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.budget-detail {
+  display: block;
+}
+
+.budget-edit {
+  padding: 0.25rem 1.1rem 1rem;
+  border-top: 1px dashed var(--line);
+}
+
+.budget-custom {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.budget-custom label {
+  flex: 1;
+}
+
+.budget-basis {
+  margin-bottom: 0.75rem;
+}
+
+a.budget-link {
+  display: block;
+  margin-top: 0.75rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.budget-glance {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.budget-glance p {
+  margin: 0;
+}
+
+.budget-home {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
 }

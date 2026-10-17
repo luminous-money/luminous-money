@@ -174,12 +174,28 @@ class Store:
             stamp = after(existing["updated_at"] if existing else None)
             self._conn.execute(
                 "INSERT INTO directive"
-                " (id, book_id, date, kind, flag, ordinal, text, deleted, seq, payee, narration, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)"
+                " (id, book_id, date, kind, flag, ordinal, text, deleted, seq, payee, narration, budgeted,"
+                " created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)"
                 " ON CONFLICT (id) DO UPDATE SET date = excluded.date, kind = excluded.kind,"
                 " flag = excluded.flag, text = excluded.text, deleted = 0, seq = excluded.seq,"
-                " payee = excluded.payee, narration = excluded.narration, updated_at = excluded.updated_at",
-                (d.id, book_id, d.date.isoformat(), d.kind, d.flag, ordinal, d.text, seq, d.payee, d.narration, stamp, stamp),
+                " payee = excluded.payee, narration = excluded.narration, budgeted = excluded.budgeted,"
+                " updated_at = excluded.updated_at",
+                (
+                    d.id,
+                    book_id,
+                    d.date.isoformat(),
+                    d.kind,
+                    d.flag,
+                    ordinal,
+                    d.text,
+                    seq,
+                    d.payee,
+                    d.narration,
+                    int(d.budgeted),
+                    stamp,
+                    stamp,
+                ),
             )
             self._conn.execute("DELETE FROM posting WHERE directive_id = ?", (d.id,))
             self._conn.executemany(
@@ -346,6 +362,20 @@ class Store:
             WHERE d.book_id = ? AND d.deleted = 0 AND d.kind = 'transaction'
             """,
             (book_id,),
+        ).fetchall()
+
+    def flow(self, book_id: str, account: str, date_from: str, date_to: str) -> list[sqlite3.Row]:
+        """Every live transaction posting to `account` or under it dated in [from, to), but those
+        kept out of budgets: its transaction's flag, and its currency and change (`amount`, None
+        where only booking could say). Budgets (M11) sum them."""
+        return self._conn.execute(
+            """
+            SELECT d.flag, p.amount_currency AS currency, p.amount FROM posting p
+            JOIN directive d ON d.id = p.directive_id
+            WHERE d.book_id = ? AND d.deleted = 0 AND d.kind = 'transaction' AND d.budgeted = 1
+              AND d.date >= ? AND d.date < ? AND (p.account = ? OR p.account LIKE ?)
+            """,
+            (book_id, date_from, date_to, account, account + ":%"),
         ).fetchall()
 
     def mentioning(self, book_id: str, account: str) -> list[Row]:

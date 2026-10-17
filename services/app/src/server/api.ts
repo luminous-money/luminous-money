@@ -489,13 +489,48 @@ export function createApi({
     })
   );
 
-  // Book settings (kept in `app`): for now, the book's time zone, which decides "today" for
-  // its schedules.
+  // Book settings (kept in `app`): the book's time zone, which decides "today" for its
+  // schedules, and the day its weeks start (where weekly budgets start by default).
 
   api.get("/books/:book/settings", async (c) => {
     const { book } = c.req.param();
     if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
-    return c.json({ time_zone: db.timeZone(book) ?? null });
+    return c.json(db.settings(book) ?? { time_zone: null, week_start: 1, updated_at: null });
+  });
+
+  /** Change some settings (`time_zone`, `week_start`), against `updated_at`. */
+  api.patch("/books/:book/settings", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as {
+      updated_at?: unknown;
+      time_zone?: unknown;
+      week_start?: unknown;
+    };
+    if (typeof body.updated_at !== "string")
+      return c.json({ detail: "send the updated_at you read" }, 422);
+    const changes: { time_zone?: string; week_start?: number } = {};
+    if (body.time_zone !== undefined) {
+      if (typeof body.time_zone !== "string" || !isTimeZone(body.time_zone))
+        return c.json({ detail: "send a time zone, like America/Chicago" }, 422);
+      changes.time_zone = body.time_zone;
+    }
+    if (body.week_start !== undefined) {
+      if (
+        !Number.isInteger(body.week_start) ||
+        (body.week_start as number) < 0 ||
+        (body.week_start as number) > 6
+      )
+        return c.json({ detail: "week_start is 0 (Sunday) to 6 (Saturday)" }, 422);
+      changes.week_start = body.week_start as number;
+    }
+    if (!db.settings(book)) return c.json({ detail: "set the book's time zone first" }, 409);
+    try {
+      return c.json(db.patchSettings(book, body.updated_at, changes));
+    } catch (error) {
+      if (error instanceof StaleVersion) return c.json({ detail: error.message }, 409);
+      throw error;
+    }
   });
 
   api.put("/books/:book/settings", async (c) => {

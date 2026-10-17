@@ -20,12 +20,12 @@ from __future__ import annotations
 import datetime
 import os
 import re
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from . import chart, engine, investments, models
+from . import budgets, chart, engine, investments, models
 from .service import Ledger, NameTaken, NotFound
 from .store import Row, StaleVersion, Store
 
@@ -94,6 +94,10 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     @app.exception_handler(chart.AccountRefused)
     async def account_refused(_, exc: chart.AccountRefused):
+        return JSONResponse({"detail": str(exc)}, status_code=422)
+
+    @app.exception_handler(budgets.BudgetRefused)
+    async def budget_refused(_, exc: budgets.BudgetRefused):
         return JSONResponse({"detail": str(exc)}, status_code=422)
 
     @app.exception_handler(NameTaken)
@@ -177,6 +181,31 @@ def create_app(ledger: Ledger) -> FastAPI:
     def account_tree(book_id: OwnedBook) -> list[models.TreeAccount]:
         """Every account, with its own balance, its subtree's, and the subtree's value."""
         return chart.tree(ledger, book_id)
+
+    # Budgets (M11)
+
+    @api.get("/books/{book_id}/budgets")
+    def list_budgets(book_id: OwnedBook) -> list[models.Budget]:
+        """Every version of every budget, by account, then start."""
+        return [v.model() for v in budgets.versions(ledger, book_id)]
+
+    @api.get("/books/{book_id}/budgets/status")
+    def budget_status(
+        book_id: OwnedBook,
+        on: Annotated[datetime.date | None, Query(description="The day to measure on (the caller's today).")] = None,
+        basis: Annotated[Literal["period", "month"], Query(description="Each its own period, or all per month.")] = "period",
+    ) -> models.BudgetStatus:
+        """Every budget in force, measured over its current period, with what's left."""
+        return budgets.status(ledger, book_id, on or datetime.date.today(), basis)
+
+    @api.put(
+        "/books/{book_id}/budgets/{account}",
+        responses={409: {"description": "Stale version"}, 422: {"description": "Not allowed"}},
+    )
+    def put_budget(book_id: OwnedBook, account: str, b: models.BudgetIn) -> models.Budget | None:
+        """Set the account's budget from `start` on (an amount of 0 ends it). Refused if it would
+        be more than one above it, or less than one under it. None when ending it left nothing."""
+        return budgets.put(ledger, book_id, account, b)
 
     @api.post(
         "/books/{book_id}/accounts/{account}/rename",

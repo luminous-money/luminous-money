@@ -8,7 +8,8 @@ and deleting accounts.
   or one under it, in one atomic write: postings, opens and closes, balances, pads, notes,
   documents, custom values.
 - **Deleting** moves every posting of the account and its subtree to a substitute, then drops the
-  accounts' opens, closes, balances, pads, notes and documents, in one write. Merging is the same.
+  accounts' opens, closes, balances, pads, notes, documents and budgets, in one write. Merging is
+  the same.
 - **Archiving** closes the account (and every opened account under it) on a date no earlier than
   its last transaction, optionally after a closing transfer of what's left in it.
 - **Protected:** the top-level accounts, the system accounts the code relies on, and a

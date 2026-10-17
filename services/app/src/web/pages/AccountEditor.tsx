@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 
 import { AccountPicker } from "../components/AccountPicker.js";
 import { AccountSettings } from "../components/AccountSettings.js";
+import { BudgetForm, BudgetGlance } from "../components/Budget.js";
 import { NewAccountField } from "../components/NewAccountField.js";
 import { displayName, shown, TYPE_LABELS } from "../lib/accounts.js";
 import { formatMoney } from "../lib/decimal.js";
@@ -13,6 +14,7 @@ import {
   useAccountCreation,
   useAccountTree,
   useArchiveAccount,
+  useBudgetStatus,
   useRemoveAccount,
   useRenameAccount,
   useSetAccount,
@@ -76,11 +78,12 @@ export function AccountEditor({ book, account }: { book: string; account: string
         </Link>
       )}
       {isRoot ? (
-        <p className="card small muted">A top-level account: it can't be changed.</p>
+        <p className="card small muted">A top-level account: its name can't be changed.</p>
       ) : (
         <Names book={book} account={found} accounts={tree.data!} />
       )}
       {settings && <Settings book={book} account={account} />}
+      {!found.close && found.type && <BudgetCard book={book} account={found} />}
       {found.close && <Unarchive book={book} account={found} />}
       {!isRoot && (!found.close || !found.protected) && (
         <div className="card disclosures">
@@ -200,6 +203,26 @@ function Settings({ book, account }: { book: string; account: string }) {
   const summary = useSummary(book, [account]);
   const info = summary.data?.[0];
   return info ? <AccountSettings book={book} account={info} /> : null;
+}
+
+/** Its budget: how it's going this period, and setting it. */
+function BudgetCard({ book, account }: { book: string; account: TreeAccount }) {
+  const status = useBudgetStatus(book);
+  const line = status.data?.lines.find((l) => l.account === account.name);
+  return (
+    <section className="card editor" aria-label="Budget">
+      <h2 className="section-title">Budget</h2>
+      {line && <BudgetGlance line={line} name={displayName(account)} />}
+      {status.data && (
+        <BudgetForm
+          key={line?.version.updated_at ?? "none"}
+          book={book}
+          account={account.name}
+          line={line}
+        />
+      )}
+    </section>
+  );
 }
 
 const leafNames = (accounts: TreeAccount[], except: string) =>

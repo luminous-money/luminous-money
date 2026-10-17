@@ -48,7 +48,7 @@ test("picking a category offers it to similar unconfirmed transactions in the ac
   page,
 }) => {
   await withUnconfirmed(page, ["TEA HOUSE #1", "TEA HOUSE #2", "TEA HOUSE #3", "SOMEWHERE ELSE"]);
-  const first = page.getByRole("article").first();
+  const first = page.getByRole("article", { name: /TEA HOUSE #1/ });
 
   await first.getByRole("button", { name: /^Category:/ }).click();
   await page.getByRole("combobox", { name: "Category" }).fill("tea");

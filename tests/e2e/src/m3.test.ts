@@ -221,8 +221,10 @@ describe("schedules", () => {
     );
     assert.equal((await json("PUT", "/settings", { time_zone: "America/Chicago" })).status, 200);
     assert.equal((await json("PUT", "/settings", { time_zone: "Mars/Olympus" })).status, 422);
-    assert.deepEqual(await (await json("GET", "/settings")).json(), {
-      time_zone: "America/Chicago",
-    });
+    const { time_zone, week_start } = (await (await json("GET", "/settings")).json()) as {
+      time_zone: string;
+      week_start: number;
+    };
+    assert.deepEqual({ time_zone, week_start }, { time_zone: "America/Chicago", week_start: 1 });
   });
 });

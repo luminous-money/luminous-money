@@ -2,6 +2,7 @@ import type { Transaction } from "@fava-beans/ledger-client";
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 
+import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { SplitsFieldset, useSplits } from "../components/Splits.js";
 import { postable } from "../lib/accounts.js";
 import { today } from "../lib/format.js";
@@ -90,6 +91,7 @@ function Editor({
   const [date, setDate] = useState(t.date);
   const [payee, setPayee] = useState(t.payee ?? "");
   const [narration, setNarration] = useState(t.narration);
+  const [meta, setMeta] = useState(t.meta);
   const fallbackCurrency = useMemo(() => currencyOf(t), [t]);
   const splits = useSplits(t.postings, fallbackCurrency);
   const { postings, balance, uncategorized } = splits;
@@ -101,9 +103,9 @@ function Editor({
   const submit = async (flag: string, then?: string) => {
     setMessage(null);
     try {
-      const changes = { date, flag, payee: payee.trim() || null, narration, postings };
+      const changes = { date, flag, payee: payee.trim() || null, narration, postings, meta };
       if (isNew) {
-        await add.mutateAsync({ ...changes, tags: [], links: [], meta: {} });
+        await add.mutateAsync({ ...changes, tags: [], links: [] });
         return navigate(back);
       }
       await edit.mutateAsync(changes);
@@ -119,7 +121,7 @@ function Editor({
       {!isNew && (
         <p className="status-line">
           <span className={`pill ${staged ? "staged" : "confirmed"}`}>
-            {staged ? "Staged" : "Confirmed"}
+            {staged ? "Unconfirmed" : "Confirmed"}
           </span>
           <Link
             href={withBack(
@@ -146,6 +148,7 @@ function Editor({
       </label>
 
       <SplitsFieldset splits={splits} accounts={names} create={create} />
+      <ExcludeFromBudget meta={meta} onChange={setMeta} />
 
       {message && <p className={message.kind === "error" ? "error" : "ok"}>{message.text}</p>}
 

@@ -52,6 +52,12 @@ export type {
 
 /** A book: the ledger's, with what the app keeps about it. */
 export type BookInfo = Book & { time_zone: string | null };
+export type BookSettings = {
+  time_zone: string | null;
+  /** 0 Sunday to 6 Saturday. */
+  week_start: number;
+  updated_at: string | null;
+};
 
 /** A price run's result: the ledger's, with when it ran. */
 export type PriceFetch = {
@@ -283,6 +289,23 @@ export const appApi = {
   /** Transaction ID to schedule ID, for every transaction a schedule staged. */
   scheduled: async (book: string): Promise<Record<string, string>> =>
     json(await apiFetch(`${base(book)}/schedules/occurrences`)),
+
+  /** The book's settings: its time zone and the day its weeks start (0 Sunday). */
+  settings: async (book: string): Promise<BookSettings> =>
+    json(await apiFetch(`${base(book)}/settings`)),
+
+  /** Change some of the book's settings, against the version read. */
+  patchSettings: async (
+    book: string,
+    patch: { updated_at: string; time_zone?: string; week_start?: number }
+  ): Promise<BookSettings> =>
+    json(
+      await apiFetch(`${base(book)}/settings`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(patch),
+      })
+    ),
 
   /** The book's time zone (IANA), or null if it was never set. */
   timeZone: async (book: string): Promise<string | null> =>

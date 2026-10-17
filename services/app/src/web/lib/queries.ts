@@ -43,8 +43,16 @@ import {
   type ScheduleIn,
   type SchedulePatch,
 } from "./appApi.js";
+import { today } from "./format.js";
 import type { CategoryRulePatch } from "../../shared/rules.js";
-import { api, ApiError, type LedgerPageAt, type TransactionChanges } from "./ledger.js";
+import {
+  api,
+  ApiError,
+  type BudgetBasis,
+  type BudgetIn,
+  type LedgerPageAt,
+  type TransactionChanges,
+} from "./ledger.js";
 import {
   account,
   authConfig,
@@ -408,7 +416,7 @@ export function useMatches(book: string) {
 
 /**
  * What review shows: unconfirmed transactions, plus transactions with a proposed match (which may
- * be confirmed already, like one entered by hand), oldest first, each with its matches.
+ * be confirmed already, like one entered by hand), newest first, each with its matches.
  */
 export function useReviewQueue(book: string) {
   const queue = useQueue(book);
@@ -426,8 +434,10 @@ export function useReviewQueue(book: string) {
   const loading = queue.isPending || matches.isPending || fetched.some((q) => q.isPending);
   const items = loading
     ? undefined
-    : [...(queue.data ?? []), ...fetched.flatMap((q) => (q.data ? [q.data] : []))]
-        .sort((a, b) => a.date.localeCompare(b.date))
+    : // The queue comes oldest first: reversed, the latest entered of a day comes first too.
+      [...(queue.data ?? []), ...fetched.flatMap((q) => (q.data ? [q.data] : []))]
+        .reverse()
+        .sort((a, b) => b.date.localeCompare(a.date))
         .map((transaction) => ({
           transaction,
           matches: matches.data!.filter((m) => m.transaction_id === transaction.id),
@@ -831,6 +841,38 @@ function useChartChange<A, R>(book: string, fn: (args: A) => Promise<R>) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: fn,
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+// Budgets (M11)
+
+/** Every budget in force today: each over its own period, or all per month. */
+export function useBudgetStatus(book: string, basis: BudgetBasis = "period") {
+  const on = today();
+  return useQuery({
+    queryKey: [...keys.book(book), "budgets", basis, on],
+    queryFn: () => api.budgetStatus(book, on, basis),
+  });
+}
+
+/** Set (or, with 0, end) an account's budget from a period on. */
+export const useSetBudget = (book: string, account: string) =>
+  useChartChange(book, (b: BudgetIn) => api.setBudget(book, account, b));
+
+/** The book's settings: its time zone, and the day its weeks start. */
+export function useBookSettings(book: string) {
+  return useQuery({
+    queryKey: [...keys.book(book), "settings"],
+    queryFn: () => appApi.settings(book),
+  });
+}
+
+export function usePatchSettings(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: Parameters<typeof appApi.patchSettings>[1]) =>
+      appApi.patchSettings(book, patch),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
   });
 }

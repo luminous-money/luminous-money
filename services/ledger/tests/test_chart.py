@@ -111,7 +111,7 @@ def test_deleting_moves_every_split_to_the_substitute_and_drops_the_rest(book):
     assert "Expenses:Food" not in accounts and "Expenses:Food" not in export
     assert accounts["Expenses:Fun"].total[0].number == "54.50"
     assert accounts["Assets:Bank:Checking"].total == before
-    assert 'custom "budget" Expenses:Fun' in export  # moved, not dropped
+    assert 'custom "budget"' not in export  # a budget is the account's own: it goes with it
     assert book.problems(BOOK) == []
 
 

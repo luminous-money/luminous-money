@@ -57,6 +57,18 @@ def _backfill_derived_columns(conn: sqlite3.Connection) -> None:
             )
 
 
+def _backfill_budgeted(conn: sqlite3.Connection) -> None:
+    """Fill in migration 7's column for transactions written before it."""
+    from . import engine
+
+    rows = conn.execute(
+        "SELECT id, text FROM directive WHERE deleted = 0 AND kind = 'transaction' AND text LIKE '%budget:%'"
+    ).fetchall()
+    for row in rows:
+        directive = engine.parse_one(row[1], row[0])
+        conn.execute("UPDATE directive SET budgeted = ? WHERE id = ?", (int(directive.budgeted), row[0]))
+
+
 def _backfill_prices(conn: sqlite3.Connection) -> None:
     """Fill in migration 4's price table from the price directives written before it."""
     from . import engine
@@ -159,6 +171,9 @@ MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
     # 6: deleting books (M6). A deleted book keeps its row (and its directives' tombstones), so
     # incremental backups can carry the deletion; nothing else sees it.
     ["ALTER TABLE book ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"],
+    # 7: budgets (M11). A transaction with `budget: FALSE` (a once-in-decades roof) still counts
+    # everywhere but against budgets.
+    ["ALTER TABLE directive ADD COLUMN budgeted INTEGER NOT NULL DEFAULT 1", _backfill_budgeted],
 ]
 
 

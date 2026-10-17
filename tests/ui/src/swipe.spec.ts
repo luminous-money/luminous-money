@@ -25,6 +25,7 @@ async function swipe(
   fraction: number,
   { from, slow }: { from?: Locator; slow?: boolean } = {}
 ) {
+  await card.scrollIntoViewIfNeeded();
   const box = (await card.boundingBox())!;
   const start = from
     ? (await from.boundingBox())!
@@ -63,7 +64,7 @@ test("swiping right on an item that isn't ready springs back", async ({ page }) 
   await swipe(page, coffee, 0.8);
 
   await expect(queue(page)).toHaveCount(3);
-  await expect(queue(page).first()).toContainText("Corner Cafe");
+  await expect(queue(page).last()).toContainText("Corner Cafe"); // where it was: the oldest
   await expect.poll(async () => (await coffee.boundingBox())!.x).toBe(before);
   await expect(coffee.locator(".category")).toHaveClass(/nudge/); // points at what's missing
   expect((await stored(seeded.book, seeded.ids["Corner Cafe"]!)).flag).toBe("!");
@@ -167,15 +168,15 @@ test("a touch swipe on the description field doesn't focus it", async ({ page })
 
 test("the cards below slide up after a confirm or a skip, by button too", async ({ page }) => {
   const top = async (payee: string) => (await item(page, payee).boundingBox())!.y;
-  const first = await top("Corner Cafe");
+  const first = await top("Costco");
   const second = await top("Grocer");
 
-  await item(page, "Corner Cafe").getByRole("button", { name: "Skip" }).click();
+  await item(page, "Costco").getByRole("button", { name: "Skip" }).click();
   await expect.poll(() => top("Grocer")).toBe(first);
-  await expect(queue(page).last()).toContainText("Corner Cafe");
+  await expect(queue(page).last()).toContainText("Costco");
 
   await item(page, "Grocer").getByRole("button", { name: "Confirm" }).click();
-  await expect.poll(() => top("Costco")).toBe(first);
+  await expect.poll(() => top("Corner Cafe")).toBe(first);
   await expect(queue(page)).toHaveCount(2);
   expect(second).toBeGreaterThan(first);
 });

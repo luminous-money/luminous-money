@@ -78,3 +78,17 @@ describe("forgetting a deleted book", () => {
     }
   });
 });
+
+describe("book settings", () => {
+  it("start their weeks on Monday, and change only against the version read", () => {
+    db.setTimeZone("b", "America/Chicago", "u");
+    const read = db.settings("b")!;
+    expect(read.week_start).toBe(1);
+
+    const changed = db.patchSettings("b", read.updated_at, { week_start: 0 });
+
+    expect(changed).toMatchObject({ time_zone: "America/Chicago", week_start: 0 });
+    expect(db.settings("b")).toEqual(changed);
+    expect(() => db.patchSettings("b", read.updated_at, { week_start: 6 })).toThrow(/changed/);
+  });
+});

@@ -10,6 +10,8 @@ import {
   useCreateBook,
   useDeleteBook,
   useRenameBook,
+  useBookSettings,
+  usePatchSettings,
   useSetTimeZone,
   useTimeZone,
 } from "../lib/queries.js";
@@ -46,6 +48,7 @@ function BookCard({ book }: { book: BookInfo }) {
     <div className="card book">
       <h3>{book.name}</h3>
       <TimeZone book={book.id} />
+      <WeekStart book={book.id} />
       <div className="actions">
         <Link href={bookHome(book.id)} className="button">
           Open
@@ -232,6 +235,35 @@ function TimeZone({ book }: { book: string }) {
           </option>
         ))}
       </select>
+    </label>
+  );
+}
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** The day the book's weeks start: where weekly budgets' periods start by default. */
+function WeekStart({ book }: { book: string }) {
+  const settings = useBookSettings(book);
+  const patch = usePatchSettings(book);
+  const updatedAt = settings.data?.updated_at;
+  return (
+    <label className="time-zone small">
+      Weeks start on
+      <select
+        aria-label="Weeks start on"
+        value={settings.data?.week_start ?? 1}
+        disabled={!updatedAt || patch.isPending}
+        onChange={(e) =>
+          patch.mutate({ updated_at: updatedAt!, week_start: Number(e.target.value) })
+        }
+      >
+        {WEEKDAYS.map((day, i) => (
+          <option key={day} value={i}>
+            {day}
+          </option>
+        ))}
+      </select>
+      {patch.error && <span className="error">{explain(patch.error)}</span>}
     </label>
   );
 }

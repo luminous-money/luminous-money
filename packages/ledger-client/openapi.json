@@ -707,6 +707,305 @@
         "title": "BookPatch",
         "type": "object"
       },
+      "Budget": {
+        "description": "One version of an account's budget: an amount per period, from `start` until its next version.",
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "every": {
+            "title": "Every",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "year"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "account",
+          "start",
+          "amount",
+          "every",
+          "unit",
+          "updated_at"
+        ],
+        "title": "Budget",
+        "type": "object"
+      },
+      "BudgetIn": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "description": "Per period, in the operating currency. 0 ends the budget from `start`.",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "every": {
+            "default": 1,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Every",
+            "type": "integer"
+          },
+          "start": {
+            "description": "Its first period's first day, where its periods count from. The account's version starting then is replaced.",
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "year"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When a version starts on `start` already: the `updated_at` read (409 when stale).",
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "start",
+          "amount",
+          "unit"
+        ],
+        "title": "BudgetIn",
+        "type": "object"
+      },
+      "BudgetLine": {
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "Per period, or per month with `basis=month`."
+          },
+          "kind": {
+            "description": "An expense budget is a limit; any other, a goal.",
+            "enum": [
+              "limit",
+              "goal"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "left": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "other": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetOther"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When budgets under it take some of it."
+          },
+          "other_currencies": {
+            "description": "Flows in other currencies, which don't count.",
+            "items": {
+              "$ref": "#/components/schemas/Amount"
+            },
+            "title": "Other Currencies",
+            "type": "array"
+          },
+          "period_end": {
+            "description": "The day after the period's last.",
+            "format": "date",
+            "title": "Period End",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "problems": {
+            "description": "More than a budget over it (after a move), or over-allocated.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "spent": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "The account's flow over the period, its subtree and unconfirmed transactions included, as it reads: spent, earned, put in or paid down."
+          },
+          "type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "asset",
+                  "liability",
+                  "equity",
+                  "income",
+                  "expense"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "unconfirmed": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "The part of `spent` not yet confirmed."
+          },
+          "version": {
+            "$ref": "#/components/schemas/Budget",
+            "description": "The version in force."
+          }
+        },
+        "required": [
+          "account",
+          "type",
+          "kind",
+          "version",
+          "period_start",
+          "period_end",
+          "budget",
+          "spent",
+          "unconfirmed",
+          "left",
+          "other_currencies",
+          "other",
+          "problems"
+        ],
+        "title": "BudgetLine",
+        "type": "object"
+      },
+      "BudgetOther": {
+        "description": "What a budgeted node keeps for itself: its budget less the budgets under it, and its flow less theirs.",
+        "properties": {
+          "budget": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "left": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "spent": {
+            "$ref": "#/components/schemas/Amount"
+          }
+        },
+        "required": [
+          "budget",
+          "spent",
+          "left"
+        ],
+        "title": "BudgetOther",
+        "type": "object"
+      },
+      "BudgetStatus": {
+        "properties": {
+          "basis": {
+            "enum": [
+              "period",
+              "month"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "lines": {
+            "description": "Every budget in force, by account.",
+            "items": {
+              "$ref": "#/components/schemas/BudgetLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "on": {
+            "format": "date",
+            "title": "On",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "on",
+          "basis",
+          "lines",
+          "summary"
+        ],
+        "title": "BudgetStatus",
+        "type": "object"
+      },
+      "BudgetSummary": {
+        "description": "The highest-level expense budgets, per month, against this calendar month's spending under them.",
+        "properties": {
+          "budget": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "month_start": {
+            "format": "date",
+            "title": "Month Start",
+            "type": "string"
+          },
+          "spent": {
+            "$ref": "#/components/schemas/Amount"
+          }
+        },
+        "required": [
+          "month_start",
+          "budget",
+          "spent"
+        ],
+        "title": "BudgetSummary",
+        "type": "object"
+      },
       "CommodityIn": {
         "additionalProperties": false,
         "properties": {
@@ -3948,6 +4247,188 @@
           }
         },
         "summary": "Unarchive Account"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/budgets": {
+      "get": {
+        "description": "Every version of every budget, by account, then start.",
+        "operationId": "list_budgets_api_ledger_v1_books__book_id__budgets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Budget"
+                  },
+                  "title": "Response List Budgets Api Ledger V1 Books  Book Id  Budgets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Budgets"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/budgets/status": {
+      "get": {
+        "description": "Every budget in force, measured over its current period, with what's left.",
+        "operationId": "budget_status_api_ledger_v1_books__book_id__budgets_status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The day to measure on (the caller's today).",
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The day to measure on (the caller's today).",
+              "title": "On"
+            }
+          },
+          {
+            "description": "Each its own period, or all per month.",
+            "in": "query",
+            "name": "basis",
+            "required": false,
+            "schema": {
+              "default": "period",
+              "description": "Each its own period, or all per month.",
+              "enum": [
+                "period",
+                "month"
+              ],
+              "title": "Basis",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Budget Status"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/budgets/{account}": {
+      "put": {
+        "description": "Set the account's budget from `start` on (an amount of 0 ends it). Refused if it would\nbe more than one above it, or less than one under it. None when ending it left nothing.",
+        "operationId": "put_budget_api_ledger_v1_books__book_id__budgets__account__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Budget"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Put Budget Api Ledger V1 Books  Book Id  Budgets  Account  Put"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Put Budget"
       }
     },
     "/api/ledger/v1/books/{book_id}/commodities": {

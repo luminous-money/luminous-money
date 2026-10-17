@@ -1,8 +1,20 @@
 M11: Budgets: plan
 ==================================================================================================
 
-> **Status: planned (2026-10-17),** from [the answers](#answers-2026-10-17), with a few
-> [questions](#questions) left. The brief, from the planning notes in [the plan](../../PLAN.md):
+> **Status: built (2026-10-17),** with ledger, unit, API and browser tests, following [the
+> answers](#answers-2026-10-17) and [the answers to the questions](#answers-to-the-questions-2026-10-17),
+> which override anything below that disagrees. Differences from the plan:
+> - **Status is computed in the ledger** (`GET /budgets/status`), not in `app`: exact Decimal
+>   restating, one home for period math, and "today" passed by the caller. So there's no
+>   `accounts/flows` endpoint yet (reports can add one) and no `DELETE /budgets` (ending a
+>   budget with nothing before it removes it).
+> - **"Other" is "Other".**
+> - **Archiving rests an account's budgets** rather than writing an end to them, so unarchiving
+>   brings them back.
+> - **Added: "Exclude from budget"** on a transaction (`budget: FALSE`), in review and the
+>   transaction's page.
+>
+> The brief, from the planning notes in [the plan](../../PLAN.md):
 > - a target budget on **any account**, for **any period**
 > - no account may have a higher **base** budget than an account above it
 > - ~~each target can roll over from period to period, or not~~: dropped (answer 8)
@@ -11,8 +23,8 @@ M11: Budgets: plan
 
 1. **A budget is how much you're allowed to spend** in a category: a target, not envelopes.
    **A node's budget can be split across the accounts under it, all of it or some of it; the
-   rest is that node's "Unallocated".** For example, Expenses at $10,500 a month and
-   Expenses:Housing at $5,000 leave $5,500 in Expenses' Unallocated. This works at every level.
+   rest is that node's "Other".** For example, Expenses at $10,500 a month and
+   Expenses:Housing at $5,000 leave $5,500 in Expenses' Other. This works at every level.
 2. **Every type can have one,** measuring the account's flow in the period as it reads: spent
    (expenses), earned (income), put in (an asset such as savings), paid down (a liability).
 3. **One set of budgets per book.**
@@ -44,7 +56,7 @@ M11: Budgets: plan
 - **Set a budget on any account:** an amount, a period, and when it starts.
 - **See how each is going** this period: what's gone against it (unconfirmed shown apart), what's
   left, and the days left, as a filled line.
-- **Split a node's budget** across the accounts under it, the rest shown as its Unallocated.
+- **Split a node's budget** across the accounts under it, the rest shown as its Other.
 - **The rule:** no account's budget is higher than an account's above it.
 
 ## What exists today
@@ -86,16 +98,16 @@ M11: Budgets: plan
 - **Per year, for comparing:** a day is 1/365.25 of a year, a week 7/365.25, a month 1/12. The
   rule and the per-month view use it.
 
-### The rule, and Unallocated
+### The rule, and Other
 
 - **Base amounts, per year:** a budget can't be higher than the budget of any account above it.
   It's checked on every write, against every version in force from its start on, and refused
   (422) naming the account it would exceed.
-- **Unallocated:** a node with a budget, and budgets on accounts under it (the nearest ones down
-  each branch), gets an **Unallocated** row:
+- **Other:** a node with a budget, and budgets on accounts under it (the nearest ones down
+  each branch), gets an **Other** row:
   - its budget: the node's, less theirs (restated in the node's period)
   - what's gone against it: the node's flow, less theirs, over the node's period
-  - when theirs add up to more than the node's, Unallocated is negative and marked
+  - when theirs add up to more than the node's, Other is negative and marked
     "over-allocated" (answer 4)
 - **Moving an account** (M10's rename) can break the rule; it's allowed, and the Budgets page
   flags the account ([question 4](#questions)).
@@ -148,7 +160,7 @@ M11: Budgets: plan
   - its budget in force, its period's dates and the days left
   - spent (confirmed and unconfirmed), left, over
   - limit or goal
-  - its Unallocated, if it has one
+  - its Other, if it has one
   - problems: higher than an account above it (after a move), over-allocated
 - **With `basis=month`,** every amount is restated per month and measured over this calendar
   month.
@@ -162,7 +174,7 @@ M11: Budgets: plan
   reached.
 - **Budgets page** (Menu → Budgets, `/books/:book/budgets`):
   - one card, a section per type (Expenses first), like the chart of accounts
-  - only budgeted accounts and the accounts above them, as a tree; Unallocated as a row under
+  - only budgeted accounts and the accounts above them, as a tree; Other as a row under
     its node
   - a budgeted row: its name, "$312 of $400", the bar, and "$88 left · 12 days"; unconfirmed
     as "incl. $40 unconfirmed"
@@ -187,7 +199,7 @@ M11: Budgets: plan
    - tests
 2. **Shared:** periods from the schedules' rule (the current period on a date), and per-year
    factors.
-3. **`app`:** `budgets/status`, with Unallocated, problems, the per-month basis and the home
+3. **`app`:** `budgets/status`, with Other, problems, the per-month basis and the home
    summary; the fake ledger gets budgets and flows; tests.
 4. **PWA:**
    - the bar component
@@ -196,10 +208,10 @@ M11: Budgets: plan
 5. **Tests:**
    - **ledger:** versions, the rule across periods, flows with refunds, transfers and
      unconfirmed
-   - **app:** status, Unallocated, per month, problems
-   - **API e2e:** set budgets on a node and a child, see Unallocated; a refused child; a merge
+   - **app:** status, Other, per month, problems
+   - **API e2e:** set budgets on a node and a child, see Other; a refused child; a merge
      drops budgets
-   - **browser:** add a budget, see the bar move with a transaction, Unallocated, per month,
+   - **browser:** add a budget, see the bar move with a transaction, Other, per month,
      the ledger line, home's bar
 6. **Docs:** design.md ("Budgets"), PLAN.md, RESUME.md.
 
@@ -208,8 +220,20 @@ M11: Budgets: plan
 - Rollover (answer 8).
 - Past periods and budget charts: reports (M12).
 - Alerts.
-- Filtering budgets by tag (tags are M17).
+- Filtering budgets by tag (tags are M18).
 - More than one set of budgets per book.
+
+## Answers to the questions (2026-10-17)
+
+0. **"Unallocated" is called "Other"**, which is clearer.
+1. **Limits and goals:** yes, since it's simple.
+2. **Home's bar:** expense budgets only.
+3. **Deleting or merging a budgeted account:** drop its budgets.
+4. **A move that breaks the rule:** allow it, and flag it.
+5. **Weekly budgets' default start:** a book setting.
+6. **Added: "Exclude from budget"** on transactions, in review and the transaction's page: a
+   once-in-decades expense (a roof) is categorized and counts in reports, but not against the
+   month's budget.
 
 ## Questions
 

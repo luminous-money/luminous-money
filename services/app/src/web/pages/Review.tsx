@@ -4,6 +4,7 @@ import { Link } from "wouter";
 
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
 import { SelectBar } from "../components/SelectBar.js";
+import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { Swipeable, type SwipeHandle } from "../components/Swipeable.js";
 import { postable, preferredRoots, shortName } from "../lib/accounts.js";
 import { add, formatMoney, isNegative, isZero, negate } from "../lib/decimal.js";
@@ -221,6 +222,9 @@ function QueueItem({
   const [narration, setNarration] = useState(t.narration);
   const [nudge, setNudge] = useState(0);
   useEffect(() => setNarration(t.narration), [t.narration]);
+  // Shown as changed right away, like the description, while the edit saves.
+  const [meta, setMeta] = useState(t.meta);
+  useEffect(() => setMeta(t.meta), [t.meta]);
 
   const view = useMemo(() => simple(t), [t]);
   const detail = `/books/${book}/transactions/${t.id}`;
@@ -369,6 +373,11 @@ function QueueItem({
               ))}
             </ul>
           )}
+
+          <ExcludeFromBudget
+            meta={meta}
+            onChange={(changed) => (setMeta(changed), void save({ meta: changed }))}
+          />
 
           {notAtBank && !scheduled && matches.length === 0 && (
             <p className="small">

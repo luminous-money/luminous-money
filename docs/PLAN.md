@@ -97,28 +97,28 @@ milestone starts.
       needs a substitute to move their transactions to). Built 2026-10-16: the tree (one read),
       rename and move, display names, archive with a closing transfer, delete or merge into a
       substitute, protected accounts, and `app`'s references following.
-- [ ] **M11: Budgets.** A budget on any account, for any period: how much you're allowed to
+- [x] **M11: Budgets.** A budget on any account, for any period: how much you're allowed to
       spend (or aim to earn or save). A node's budget can be split across the accounts under it,
-      the rest its "Unallocated"; none is higher than one above it. Shown on a Budgets page, an
-      account's ledger and home, as filled lines. [Planned](milestones/m11-budgets/PLAN.md)
-      2026-10-17.
+      the rest its "Other"; none is higher than one above it. Shown on a Budgets page, an
+      account's ledger and home, as filled lines. [Built](milestones/m11-budgets/PLAN.md)
+      2026-10-17, with "Exclude from budget" on transactions and the book's week start.
 - [ ] **M12: Reports.** From basic to more complex.
 - [ ] **M13: Sharing books with other users.** Any user can be added to a book with read, write
       or manage permissions. Every book has an owner.
 - [ ] **M14: Reconciliation.**
-- [ ] **M15: Suggested recurring transactions.** Nightly, analyze each account's last 14 months
+- [ ] **M15: Sub-accounts of linked accounts.** Split a bank-linked account's money into
+      sub-accounts, e.g. the $10,000 in a PNC checking account as $5,000 of padding and $5,000
+      for general use, while the bank feed keeps it in step with the bank.
+- [ ] **M16: Suggested recurring transactions.** Nightly, analyze each account's last 14 months
       of transactions and identify ones that look recurring, to suggest as schedules (M3).
-- [ ] **M16: Receipt capture.** Take a picture of a receipt, and AI makes a transaction from it.
-- [ ] **M17: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
+- [ ] **M17: Receipt capture.** Take a picture of a receipt, and AI makes a transaction from it.
+- [ ] **M18: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
       tag.
-- [ ] **M18: AI categorization.** Users set up an AI provider (one of those supported, with
+- [ ] **M19: AI categorization.** Users set up an AI provider (one of those supported, with
       their API key) and standing instructions for categorizing, e.g. "I like highly detailed,
       deeply nested expense accounts. Accounts should always say WHAT, not WHY (tags say why, if
       anything)". A new bulk action in review: "Categorize with AI".
-- [ ] **M19: Design polish.**
-- [ ] **M20: Sub-accounts of linked accounts.** Split a bank-linked account's money into
-      sub-accounts, e.g. the $10,000 in a PNC checking account as $5,000 of padding and $5,000
-      for general use, while the bank feed keeps it in step with the bank.
+- [ ] **M20: Design polish.**
 
 ## Notes collected so far
 
@@ -211,7 +211,7 @@ Smaller improvements to pick up between milestones or at the end.
       formats directly, rather than only replacing or adding to them when a file doesn't match.
 - [ ] **Review shows the book's ID at the top,** where its name belongs.
 - [ ] **Select all, and "select uncategorized",** in select mode.
-- [ ] **Review newest first.**
+- [x] **Review newest first** (2026-10-17), the latest entered of a day first too.
 - [ ] **Mobile usability,** across the app.
 - [x] **Go to a date in an account's ledger:** a partial view from that date back, loading
       newer pages above ("Load more") and older ones as you scroll.

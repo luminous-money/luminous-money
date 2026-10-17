@@ -17,20 +17,25 @@ async function openQueue(page: Page) {
   await expect(queue(page)).toHaveCount(3);
 }
 
+test("the queue is newest first", async ({ page }) => {
+  await openQueue(page);
+  await expect(queue(page)).toContainText(["Costco", "Grocer", "Corner Cafe"]);
+});
+
 test("skip moves an item to the end without changing it", async ({ page }) => {
   await openQueue(page);
-  await expect(queue(page).first()).toContainText("Corner Cafe");
+  await expect(queue(page).first()).toContainText("Costco");
 
-  await item(page, "Corner Cafe").getByRole("button", { name: "Skip" }).click();
+  await item(page, "Costco").getByRole("button", { name: "Skip" }).click();
 
   await expect(queue(page).first()).toContainText("Grocer");
-  await expect(queue(page).last()).toContainText("Corner Cafe");
-  const coffee = await stored(seeded.book, seeded.ids["Corner Cafe"]!);
-  expect(coffee.flag).toBe("!");
-  expect(coffee.postings[1]?.account).toBe("Expenses:Uncategorized");
+  await expect(queue(page).last()).toContainText("Costco");
+  const costco = await stored(seeded.book, seeded.ids["Costco"]!);
+  expect(costco.flag).toBe("!");
+  expect(costco.postings[1]?.account).toBe("Expenses:Uncategorized");
 
   await page.reload();
-  await expect(queue(page).last()).toContainText("Corner Cafe");
+  await expect(queue(page).last()).toContainText("Costco");
 });
 
 test("an uncategorized item can be confirmed only once it has a category", async ({ page }) => {

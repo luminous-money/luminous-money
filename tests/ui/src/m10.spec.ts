@@ -36,7 +36,7 @@ test("a node opens its editor, where its display name is set", async ({ page }) 
   await expect(page.getByText("Expense account").first()).toBeVisible(); // not flagged as taken
 
   await page.getByRole("textbox", { name: "Display name" }).fill("Eating");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("form", { name: "Name" }).getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name: "Eating" })).toBeVisible();
   await page.goto(`/ui/books/${book.id}/accounts`);
   await expect(

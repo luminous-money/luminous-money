@@ -1,17 +1,25 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-15._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-17._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
 
-**M1 through M10 are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M11 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
-(categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN) and M10 (chart of
-accounts) are described in their plans. The milestones ahead (M11–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+(categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
+accounts) and M11 (budgets) are described in their plans. The milestones ahead (M12–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
+- **Budgets (M11):** Menu → Budgets: one card by type, each budgeted account (and those above
+  it) with a filled line, "$88 left · 12 days left", and what's unconfirmed; a budgeted node
+  with budgets under it shows its Other. Tap a row to set or change its budget (amount, period:
+  weekly to yearly or every N of a unit, applies from); "+ Add" for any account; "Per month"
+  restates them all. The account's ledger shows its budget line; its editor has a Budget card;
+  home shows this month against the top-level expense budgets. "Exclude from budget" on a
+  transaction (review, or its page) keeps it out of budgets only. Manage books sets the day
+  weeks start.
 - **Accounts (M10):** Menu → Accounts: one card, the tree by type, tap a node to open or close
   it, balances rolled up (one figure each), Find, "Show archived". A node's › opens its editor
   (with "Add an account under it"); a leaf opens its ledger, whose Edit opens the same editor:
@@ -38,7 +46,8 @@ What a user can do now:
   - **Manage books:** create a book (empty, or from a Beancount file such as an export), open,
     rename, export, set the time zone, and delete (type the name; Export offered). Names are
     unique per user.
-- **Menu:** the book's Home, Review, Schedules, Rules and Commodities; Manage books; Log out.
+- **Menu:** the book's Home, Review, Accounts, Budgets, Schedules, Rules, Commodities and Bank
+  connections; Manage books; Your account; Log out.
 - **Schedules:** a transaction plus a rule (every N days/weeks/months/years, days of the month,
   weekends moved or kept, an optional end), made new or with "Repeat…" on any transaction.
   - Due occurrences are staged (at startup, after saves, and daily after midnight in the book's
@@ -106,19 +115,20 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 143 tests, including the table lint
-    - auth: 20; app: 139; db: 10; csv-import: 22
+    - ledger: 155 tests, including the table lint
+    - auth: 20; app: 144; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 68 API tests and 75 browser tests (with Mailpit and a fake SimpleFIN server)
+  - `pnpm e2e`: 72 API tests and 80 browser tests (with Mailpit and a fake SimpleFIN server)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps
 
-1. Answer the questions in [the M11 plan](docs/milestones/m11-budgets/PLAN.md#questions), then
-   say `build M11` (budgets).
-2. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
+1. Pairing transfers in review (a withdrawal and a deposit in two accounts within 7 days, made
+   one transaction, with "Reject" to restore the two): being built.
+2. Spec M12 (reports) together.
+3. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
 
 ## Gotchas
 

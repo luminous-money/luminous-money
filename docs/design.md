@@ -549,6 +549,48 @@ How auth works (M8; the shape is M1's):
     and attempts
   - **merged:** they move to the substitute; stars and links on the deleted account go
 
+
+### Budgets (M11)
+
+A budget is how much an account may take in a period (a **limit**, for expenses) or should
+bring in (a **goal**, for income, assets such as savings, and liabilities being paid down).
+
+- **Kept in the ledger as `custom "budget"` directives,** Fava's format, so exports, backups
+  and M10's rename carry them:
+  - each is a **version** from its date until the account's next one, and its periods count
+    from that date; a change is a new version from the period it starts in, so earlier periods
+    keep the budget they had
+  - `every: N` metadata for periods of more than one unit; `quarterly` for three months
+  - a top-level account is written as a string (`"Expenses"`): Beancount's account token needs
+    two parts
+  - 0 ends a budget; ending one with nothing before it removes it outright
+- **Periods** are every N days, weeks, months or years from the start, as schedules' are (M3),
+  months on the start's day clamped to short months.
+- **The rule:** no budget is higher, per year, than one on an account above it (a weekly $150
+  under a monthly $600 is about $7,826 a year against $7,200: refused). Every write is checked,
+  both ways, on every day from its start on where a version changes. A move (M10) that breaks
+  it is allowed, and the Budgets page flags it.
+- **Other:** a budgeted node with budgets under it (the nearest down each branch) keeps the rest
+  as its Other: its budget less theirs (restated in its period), and its flow less theirs over
+  its period. When theirs add up to more, Other is negative and flagged.
+- **What counts:** the account's flow over the period, its subtree included, read as the
+  account reads (spent, earned, put in, paid down). Refunds take spending back; transfers inside
+  the subtree cancel out. **Unconfirmed transactions count**, shown apart. Only the operating
+  currency counts; other currencies are listed.
+- **Excluded transactions:** `budget: FALSE` on a transaction (a roof, once in twenty years)
+  keeps it out of budgets while it's categorized and counts everywhere else, reports included.
+  The ledger derives a `budgeted` column from it, so budget sums stay one indexed query.
+- **Status is the ledger's** (`GET /budgets/status?on=&basis=`), not `app`'s as first planned:
+  restating budgets across periods (weekly as per month) is exact with Decimals there, the
+  period math lives in one place, and the caller passes "today", so no time zone is needed.
+  4 ms for 8 budgets on a five-year demo book (1,967 transactions).
+- **Per month** restates every budget per month and measures this calendar month; home's one
+  bar is the highest-level expense budgets (no budget above them) on that basis.
+- **Archived accounts' budgets rest** (they're not shown while it's archived, and come back
+  when it's unarchived). **Deleting or merging an account drops its budgets:** they're its own,
+  so they don't move to the substitute.
+- **A book's weeks start** on a day kept in `app`'s book settings (Monday unless set; a
+  versioned `PATCH /settings`), where a new weekly budget starts by default.
 ### Bank feeds: SimpleFIN (M9)
 
 [SimpleFIN](https://www.simplefin.org/protocol.html), usually through the SimpleFIN Bridge, is the

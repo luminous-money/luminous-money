@@ -40,6 +40,7 @@ KIND_KEY = "kind"
 DISPLAY_NAME_KEY = "display-name"
 # A revalued asset (a house, a car): how many days its value stays current (M5).
 REVALUE_EVERY_KEY = "revalue-every"
+BUDGET_KEY = "budget"  # on a transaction: FALSE keeps it out of budgets (M11)
 NODE = "node"
 ROOT_OPTIONS = (
     ("name_assets", "asset"),
@@ -86,6 +87,7 @@ class Directive:
     payee: str | None = None  # transactions only
     narration: str | None = None  # transactions only
     price: tuple[str, Decimal, str] | None = None  # price directives only: commodity, number, currency
+    budgeted: bool = True  # transactions only: False with `budget: FALSE`, kept out of budgets (M11)
 
 
 @dataclass(frozen=True)
@@ -192,6 +194,7 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
         payee=getattr(entry, "payee", None),
         narration=getattr(entry, "narration", None),
         price=(entry.currency, entry.amount.number, entry.amount.currency) if isinstance(entry, data.Price) else None,
+        budgeted=not (isinstance(entry, data.Transaction) and entry.meta.get(BUDGET_KEY) is False),
     )
 
 
@@ -419,8 +422,8 @@ def with_accounts(
 ) -> Directive | None:
     """The directive with every account it names passed through `rename`: postings, `open` and
     `close`, `balance`, `pad` (both accounts), `note`, `document`, and `custom` account values.
-    None if it's about an account `drop` says is going (its open, close, balance, pad, note or
-    document): those go with it. Unchanged directives come back as they were."""
+    None if it's about an account `drop` says is going (its open, close, balance, pad, note,
+    document or budget): those go with it. Unchanged directives come back as they were."""
     entries, errors, _ = parser.parse_string(text)
     if errors or len(entries) != 1:
         raise ParseFailure([f"directive {directive_id} doesn't parse"])
@@ -436,6 +439,10 @@ def with_accounts(
             return None
         entry = entry._replace(account=rename(entry.account), source_account=rename(entry.source_account))
     elif isinstance(entry, data.Custom):
+        # A budget is the account's own (M11): it doesn't move to a substitute.
+        if entry.type == "budget" and entry.values and isinstance(entry.values[0].value, str):
+            if drop(entry.values[0].value):
+                return None
         entry = entry._replace(
             values=[
                 v._replace(value=rename(v.value)) if v.dtype == bc_account.TYPE else v

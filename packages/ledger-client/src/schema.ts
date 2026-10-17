@@ -309,6 +309,67 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/budgets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Budgets
+     * @description Every version of every budget, by account, then start.
+     */
+    get: operations["list_budgets_api_ledger_v1_books__book_id__budgets_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/budgets/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Budget Status
+     * @description Every budget in force, measured over its current period, with what's left.
+     */
+    get: operations["budget_status_api_ledger_v1_books__book_id__budgets_status_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/budgets/{account}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Put Budget
+     * @description Set the account's budget from `start` on (an amount of 0 ends it). Refused if it would
+     *     be more than one above it, or less than one under it. None when ending it left nothing.
+     */
+    put: operations["put_budget_api_ledger_v1_books__book_id__budgets__account__put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/commodities": {
     parameters: {
       query?: never;
@@ -897,6 +958,146 @@ export interface components {
        * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
        */
       updated_at: string;
+    };
+    /**
+     * Budget
+     * @description One version of an account's budget: an amount per period, from `start` until its next version.
+     */
+    Budget: {
+      /** Account */
+      account: string;
+      amount: components["schemas"]["Amount"];
+      /** Every */
+      every: number;
+      /** Id */
+      id: string;
+      /**
+       * Start
+       * Format: date
+       */
+      start: string;
+      /**
+       * Unit
+       * @enum {string}
+       */
+      unit: "day" | "week" | "month" | "year";
+      /** Updated At */
+      updated_at: string;
+    };
+    /** BudgetIn */
+    BudgetIn: {
+      /**
+       * Amount
+       * @description Per period, in the operating currency. 0 ends the budget from `start`.
+       */
+      amount: string;
+      /**
+       * Every
+       * @default 1
+       */
+      every: number;
+      /**
+       * Start
+       * Format: date
+       * @description Its first period's first day, where its periods count from. The account's version starting then is replaced.
+       */
+      start: string;
+      /**
+       * Unit
+       * @enum {string}
+       */
+      unit: "day" | "week" | "month" | "year";
+      /**
+       * Updated At
+       * @description When a version starts on `start` already: the `updated_at` read (409 when stale).
+       */
+      updated_at?: string | null;
+    };
+    /** BudgetLine */
+    BudgetLine: {
+      /** Account */
+      account: string;
+      /** @description Per period, or per month with `basis=month`. */
+      budget: components["schemas"]["Amount"];
+      /**
+       * Kind
+       * @description An expense budget is a limit; any other, a goal.
+       * @enum {string}
+       */
+      kind: "limit" | "goal";
+      left: components["schemas"]["Amount"];
+      /** @description When budgets under it take some of it. */
+      other: components["schemas"]["BudgetOther"] | null;
+      /**
+       * Other Currencies
+       * @description Flows in other currencies, which don't count.
+       */
+      other_currencies: components["schemas"]["Amount"][];
+      /**
+       * Period End
+       * Format: date
+       * @description The day after the period's last.
+       */
+      period_end: string;
+      /**
+       * Period Start
+       * Format: date
+       */
+      period_start: string;
+      /**
+       * Problems
+       * @description More than a budget over it (after a move), or over-allocated.
+       */
+      problems: string[];
+      /** @description The account's flow over the period, its subtree and unconfirmed transactions included, as it reads: spent, earned, put in or paid down. */
+      spent: components["schemas"]["Amount"];
+      /** Type */
+      type: ("asset" | "liability" | "equity" | "income" | "expense") | null;
+      /** @description The part of `spent` not yet confirmed. */
+      unconfirmed: components["schemas"]["Amount"];
+      /** @description The version in force. */
+      version: components["schemas"]["Budget"];
+    };
+    /**
+     * BudgetOther
+     * @description What a budgeted node keeps for itself: its budget less the budgets under it, and its flow less theirs.
+     */
+    BudgetOther: {
+      budget: components["schemas"]["Amount"];
+      left: components["schemas"]["Amount"];
+      spent: components["schemas"]["Amount"];
+    };
+    /** BudgetStatus */
+    BudgetStatus: {
+      /**
+       * Basis
+       * @enum {string}
+       */
+      basis: "period" | "month";
+      /**
+       * Lines
+       * @description Every budget in force, by account.
+       */
+      lines: components["schemas"]["BudgetLine"][];
+      /**
+       * On
+       * Format: date
+       */
+      on: string;
+      summary: components["schemas"]["BudgetSummary"] | null;
+    };
+    /**
+     * BudgetSummary
+     * @description The highest-level expense budgets, per month, against this calendar month's spending under them.
+     */
+    BudgetSummary: {
+      budget: components["schemas"]["Amount"];
+      /**
+       * Month Start
+       * Format: date
+       */
+      month_start: string;
+      spent: components["schemas"]["Amount"];
     };
     /** CommodityIn */
     CommodityIn: {
@@ -2435,6 +2636,114 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
+    };
+  };
+  list_budgets_api_ledger_v1_books__book_id__budgets_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Budget"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  budget_status_api_ledger_v1_books__book_id__budgets_status_get: {
+    parameters: {
+      query?: {
+        /** @description The day to measure on (the caller's today). */
+        on?: string | null;
+        /** @description Each its own period, or all per month. */
+        basis?: "period" | "month";
+      };
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BudgetStatus"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  put_budget_api_ledger_v1_books__book_id__budgets__account__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BudgetIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Budget"] | null;
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

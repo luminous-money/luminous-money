@@ -7,6 +7,7 @@ import { bookHome } from "../lib/books.js";
 import { useParam, withBack } from "../lib/navigation.js";
 import { AccountValueNote, headline } from "../components/AccountValue.js";
 import { BankErrors, ReportedLine } from "../components/BankStatus.js";
+import { BudgetGlance } from "../components/Budget.js";
 import { HoldingsPanel } from "../components/Holdings.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { postable } from "../lib/accounts.js";
@@ -24,6 +25,7 @@ import {
   useSetStar,
   useStars,
   useBankStatus,
+  useBudgetStatus,
   useSyncBank,
   useSummary,
   useUpcoming,
@@ -60,6 +62,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
   const selection = useSelection();
   const [note, setNote] = useState<string | null>(null);
   const upcoming = useUpcoming(book);
+  const budget = useBudgetStatus(book).data?.lines.find((l) => l.account === account);
   const ahead = upcoming.data && info ? upcomingFor(upcoming.data, account, info.balance) : [];
   const starred = stars.data?.includes(account) ?? false;
   const type = info?.type;
@@ -157,6 +160,11 @@ export function AccountLedger({ book, account }: { book: string; account: string
             </Link>
           )}
         </div>
+        {budget && (
+          <Link href={`/books/${book}/budgets`} className="budget-link" aria-label="Budget">
+            <BudgetGlance line={budget} name={displayName(info ?? { name: account })} />
+          </Link>
+        )}
         {!selection.selecting && (
           <div className="actions">
             <button type="button" disabled={suggest.isPending} onClick={() => suggest.mutate()}>

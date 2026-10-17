@@ -397,6 +397,78 @@ class LedgerPage(Api):
     )
 
 
+# Budgets (M11)
+
+BudgetUnit = Literal["day", "week", "month", "year"]
+
+
+class BudgetIn(Strict):
+    start: datetime.date = Field(
+        description="Its first period's first day, where its periods count from. The account's version starting "
+        "then is replaced."
+    )
+    amount: DecimalStr = Field(description="Per period, in the operating currency. 0 ends the budget from `start`.")
+    every: int = Field(1, ge=1, le=1000)
+    unit: BudgetUnit
+    updated_at: str | None = Field(
+        None, description="When a version starts on `start` already: the `updated_at` read (409 when stale)."
+    )
+
+
+class Budget(Api):
+    """One version of an account's budget: an amount per period, from `start` until its next version."""
+
+    id: str
+    account: str
+    start: datetime.date
+    amount: Amount
+    every: int
+    unit: BudgetUnit
+    updated_at: str
+
+
+class BudgetOther(Api):
+    """What a budgeted node keeps for itself: its budget less the budgets under it, and its flow less theirs."""
+
+    budget: Amount
+    spent: Amount
+    left: Amount
+
+
+class BudgetLine(Api):
+    account: str
+    type: AccountType | None
+    kind: Literal["limit", "goal"] = Field(description="An expense budget is a limit; any other, a goal.")
+    version: Budget = Field(description="The version in force.")
+    period_start: datetime.date
+    period_end: datetime.date = Field(description="The day after the period's last.")
+    budget: Amount = Field(description="Per period, or per month with `basis=month`.")
+    spent: Amount = Field(
+        description="The account's flow over the period, its subtree and unconfirmed transactions included, as "
+        "it reads: spent, earned, put in or paid down."
+    )
+    unconfirmed: Amount = Field(description="The part of `spent` not yet confirmed.")
+    left: Amount
+    other_currencies: list[Amount] = Field(description="Flows in other currencies, which don't count.")
+    other: BudgetOther | None = Field(description="When budgets under it take some of it.")
+    problems: list[str] = Field(description="More than a budget over it (after a move), or over-allocated.")
+
+
+class BudgetSummary(Api):
+    """The highest-level expense budgets, per month, against this calendar month's spending under them."""
+
+    month_start: datetime.date
+    budget: Amount
+    spent: Amount
+
+
+class BudgetStatus(Api):
+    on: datetime.date
+    basis: Literal["period", "month"]
+    lines: list[BudgetLine] = Field(description="Every budget in force, by account.")
+    summary: BudgetSummary | None
+
+
 class AccountIn(Strict):
     name: str = Field(
         description="The fully qualified name. Its root sets the type. Its nearest existing ancestor must be a "

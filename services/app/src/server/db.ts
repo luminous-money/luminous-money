@@ -254,6 +254,9 @@ export const MIGRATIONS: Migration[] = [
       ["UNIQUE (connection_id, account_id)"]
     ),
   ],
+  // 12: budgets (M11). A book's weeks start on a day (0 Sunday to 6 Saturday; Monday unless
+  // set), where a new weekly budget's periods start by default.
+  ["ALTER TABLE book_setting ADD COLUMN week_start INTEGER NOT NULL DEFAULT 1"],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -324,6 +327,13 @@ const toRule = (r: RuleRecord): CategoryRule => ({
 
 /** An edit based on a version that has moved on. */
 export class StaleVersion extends Error {}
+
+export type BookSettings = {
+  time_zone: string;
+  /** 0 Sunday to 6 Saturday. */
+  week_start: number;
+  updated_at: string;
+};
 
 type ScheduleRecord = Omit<StoredSchedule, "rule" | "template" | "paused" | "auto_confirm"> & {
   rule: string;
@@ -908,6 +918,35 @@ export class AppDb {
            updated_at = excluded.updated_at`
       )
       .run(book, timeZone, user, stamp, stamp);
+  }
+
+  /** The book's settings, versioned: its time zone and the day its weeks start. Undefined until
+   * a time zone is set (every book gets one on creation). */
+  settings(book: string): BookSettings | undefined {
+    return this.db
+      .prepare("SELECT time_zone, week_start, updated_at FROM book_setting WHERE book_id = ?")
+      .get(book) as BookSettings | undefined;
+  }
+
+  /** Change some of the book's settings, against the version read. */
+  patchSettings(
+    book: string,
+    expected: string,
+    changes: Partial<Pick<BookSettings, "time_zone" | "week_start">>
+  ): BookSettings {
+    return transaction(this.db, () => {
+      const current = this.settings(book);
+      if (!current) throw new Error(`no settings for ${book}`);
+      if (current.updated_at !== expected)
+        throw new StaleVersion("the book's settings changed since they were read");
+      const next = { ...current, ...changes, updated_at: after(current.updated_at) };
+      this.db
+        .prepare(
+          "UPDATE book_setting SET time_zone = ?, week_start = ?, updated_at = ? WHERE book_id = ?"
+        )
+        .run(next.time_zone, next.week_start, next.updated_at, book);
+      return next;
+    });
   }
 
   /** Books whose prices the morning run fetches: those with a time zone and an owner. */
