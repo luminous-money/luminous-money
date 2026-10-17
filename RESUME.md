@@ -154,7 +154,10 @@ How it's put together:
 
 1. **M14's questions** (best guesses built): [its plan](docs/milestones/m14-reconciliation/PLAN.md#questions)
    (moving dates on Finish, the 14 days after a statement, automatic reconciliation's date).
-2. **M15 (sub-accounts of linked accounts):** plan it, on M14's divided accounts.
+2. **M15 (sub-accounts of linked accounts):** answer the questions in
+   [its plan](docs/milestones/m15-sub-accounts-of-linked-accounts/PLAN.md#questions), then say
+   `build M15`. (M18, suggested recurring transactions, moved after tagging: M16 is now receipt
+   capture, M17 tagging.)
 3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
 

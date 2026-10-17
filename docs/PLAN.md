@@ -124,11 +124,15 @@ milestone starts.
       for general use, while the bank feed keeps it in step with the bank. Builds on M14's
       **divided accounts** (a node that's one real account, its sub-accounts dividing it):
       linking one to a bank, and where the feed's transactions land among its parts.
-- [ ] **M16: Suggested recurring transactions.** Nightly, analyze each account's last 14 months
-      of transactions and identify ones that look recurring, to suggest as schedules (M3).
-- [ ] **M17: Receipt capture.** Take a picture of a receipt, and AI makes a transaction from it.
-- [ ] **M18: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
+      [Planned](milestones/m15-sub-accounts-of-linked-accounts/PLAN.md) 2026-10-17: a main part
+      new money lands in, Divide (and Undivide) for an account you already have, the parts on
+      screen with Move money, and choosing a transaction's part.
+- [ ] **M16: Receipt capture.** Take a picture of a receipt, and AI makes a transaction from it.
+- [ ] **M17: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
       tag.
+- [ ] **M18: Suggested recurring transactions.** Nightly, analyze each account's last 14 months
+      of transactions and identify ones that look recurring, to suggest as schedules (M3).
+      (Moved after tagging, 2026-10-17.)
 - [ ] **M19: AI categorization.** Users set up an AI provider (one of those supported, with
       their API key) and standing instructions for categorizing, e.g. "I like highly detailed,
       deeply nested expense accounts. Accounts should always say WHAT, not WHY (tags say why, if
