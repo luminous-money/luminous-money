@@ -240,20 +240,6 @@ export function AccountLedger({ book, account }: { book: string; account: string
         </p>
       )}
 
-      {ledger.hasPreviousPage && (
-        <div className="ledger-more">
-          <span className="muted small">Newer transactions above</span>
-          <button
-            type="button"
-            className="plain"
-            disabled={ledger.isFetchingPreviousPage}
-            onClick={loadNewer}
-          >
-            {ledger.isFetchingPreviousPage ? "Loading…" : "Load more"}
-          </button>
-        </div>
-      )}
-
       {ahead.length > 0 && !selection.selecting && !ledger.hasPreviousPage && (
         <ol className="ledger upcoming-rows" aria-label="Upcoming">
           {ahead.map((row) => (
@@ -289,6 +275,20 @@ export function AccountLedger({ book, account }: { book: string; account: string
       )}
 
       <ol className="ledger" aria-label="Transactions" ref={list}>
+        {ledger.hasPreviousPage && (
+          // The card's top row, but not a transaction.
+          <li className="ledger-more" role="none">
+            <span className="muted small">Newer transactions above</span>
+            <button
+              type="button"
+              className="plain"
+              disabled={ledger.isFetchingPreviousPage}
+              onClick={loadNewer}
+            >
+              {ledger.isFetchingPreviousPage ? "Loading…" : "Load more"}
+            </button>
+          </li>
+        )}
         {rows.map((row) => (
           <li key={row.id} data-row={row.id}>
             <button
