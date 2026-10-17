@@ -1,4 +1,5 @@
 /** Bank feeds (SimpleFIN) as the app API shows them: shared by the server and the PWA. */
+import type { BankComparison } from "./reconcile.js";
 
 export type LinkMode = "new" | "reconcile" | "start-over" | "from-date";
 export type LinkKind = "cash" | "brokerage";
@@ -80,4 +81,6 @@ export type BankStatus = {
   last_sync_at: string | null;
   not_at_bank: string[];
   errors: BankError[];
+  /** The books against the bank (M14); null for a brokerage. */
+  comparison: BankComparison | null;
 };

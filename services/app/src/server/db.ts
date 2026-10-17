@@ -22,7 +22,10 @@ import type {
 import type { FetchResult, TransactionIn } from "@fava-beans/ledger-client";
 
 import type { CategoryRule, CategoryRuleIn, RuleConditions } from "../shared/rules.js";
+import type { ReconcileDraft } from "../shared/reconcile.js";
 import type { Occurrence, Rule, TransactionTemplate } from "../shared/schedule.js";
+
+export type { ReconcileDraft };
 
 export const MIGRATIONS: Migration[] = [
   [
@@ -296,6 +299,25 @@ export const MIGRATIONS: Migration[] = [
   // 15: invitations name whose they are (M13's answers): only the account with that email can
   // accept one.
   ["ALTER TABLE book_invite ADD COLUMN email TEXT"],
+  // 16: reconciliation (M14). A reconciliation in progress, saved for later (one per account,
+  // the book's members share it), and each imported file's last balance and date, if it has a
+  // balance column: what the books should say then, and Reconcile's prefill.
+  [
+    createTable(
+      "reconcile_draft",
+      [
+        "book_id TEXT NOT NULL",
+        "account TEXT NOT NULL",
+        "statement_date TEXT",
+        "balance TEXT", // as the statement says, stored sign
+        "ticked TEXT NOT NULL", // JSON: transaction IDs
+        "user_id TEXT NOT NULL", // who saved it last
+      ],
+      ["PRIMARY KEY (book_id, account)"]
+    ),
+    "ALTER TABLE import_batch ADD COLUMN end_date TEXT",
+    "ALTER TABLE import_batch ADD COLUMN end_balance TEXT",
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -578,8 +600,8 @@ export class AppDb {
     transaction(this.db, () => {
       this.db
         .prepare(
-          `INSERT INTO import_batch (id, book_id, account, user_id, source, filename, rows, staged, matched, duplicates, skipped, unreadable, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO import_batch (id, book_id, account, user_id, source, filename, rows, staged, matched, duplicates, skipped, unreadable, end_date, end_balance, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           batch.id,
@@ -594,6 +616,8 @@ export class AppDb {
           batch.duplicates,
           batch.skipped,
           batch.unreadable,
+          batch.end_date ?? null,
+          batch.end_balance ?? null,
           batch.created_at,
           stamp
         );
@@ -960,6 +984,94 @@ export class AppDb {
     return new Set(found.map((r) => r.transaction_id));
   }
 
+  /** Which of `transactions` a row of the imports into `account`, or an account under it, holds
+   * (staged or matched): from a file or the bank (M14: they start ticked when reconciling). */
+  importedInto(book: string, account: string, transactions: string[]): Set<string> {
+    if (!transactions.length) return new Set();
+    const found = this.db
+      .prepare(
+        `SELECT r.transaction_id FROM import_row r JOIN import_batch b ON b.id = r.batch_id
+         WHERE b.book_id = ? AND (b.account = ? OR b.account LIKE ? || ':%')
+           AND r.outcome IN ('staged', 'matched')
+           AND r.transaction_id IN (SELECT value FROM json_each(?))`
+      )
+      .all(book, account, account, JSON.stringify(transactions)) as { transaction_id: string }[];
+    return new Set(found.map((r) => r.transaction_id));
+  }
+
+  /** Whether any row imported into the account has a match waiting in review. */
+  matchesWaiting(book: string, account: string): boolean {
+    return !!this.db
+      .prepare(
+        `SELECT 1 FROM import_row r JOIN import_batch b ON b.id = r.batch_id
+         WHERE b.book_id = ? AND b.account = ? AND r.match = 'proposed' LIMIT 1`
+      )
+      .get(book, account);
+  }
+
+  /** The latest imported file's last balance into the account, if it had a balance column. */
+  lastFileBalance(book: string, account: string): { date: string; balance: string } | undefined {
+    return this.db
+      .prepare(
+        `SELECT end_date AS date, end_balance AS balance FROM import_batch
+         WHERE book_id = ? AND account = ? AND end_date IS NOT NULL
+         ORDER BY end_date DESC, created_at DESC LIMIT 1`
+      )
+      .get(book, account) as { date: string; balance: string } | undefined;
+  }
+
+  // Reconciliation (M14)
+
+  draft(book: string, account: string): ReconcileDraft | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT account, statement_date, balance, ticked, user_id, updated_at FROM reconcile_draft
+         WHERE book_id = ? AND account = ?`
+      )
+      .get(book, account) as (Omit<ReconcileDraft, "ticked"> & { ticked: string }) | undefined;
+    return row && { ...row, ticked: JSON.parse(row.ticked) as string[] };
+  }
+
+  /** Save a reconciliation for later, against the version read (none: there wasn't one). */
+  saveDraft(
+    book: string,
+    draft: Omit<ReconcileDraft, "updated_at">,
+    expected: string | null
+  ): ReconcileDraft {
+    return transaction(this.db, () => {
+      const current = this.draft(book, draft.account);
+      if ((current?.updated_at ?? null) !== expected)
+        throw new StaleVersion("someone saved this reconciliation since you opened it");
+      const stamp = after(current?.updated_at);
+      this.db
+        .prepare(
+          `INSERT INTO reconcile_draft
+             (book_id, account, statement_date, balance, ticked, user_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (book_id, account) DO UPDATE SET statement_date = excluded.statement_date,
+             balance = excluded.balance, ticked = excluded.ticked, user_id = excluded.user_id,
+             updated_at = excluded.updated_at`
+        )
+        .run(
+          book,
+          draft.account,
+          draft.statement_date,
+          draft.balance,
+          JSON.stringify(draft.ticked),
+          draft.user_id,
+          stamp,
+          stamp
+        );
+      return this.draft(book, draft.account)!;
+    });
+  }
+
+  discardDraft(book: string, account: string): void {
+    this.db
+      .prepare("DELETE FROM reconcile_draft WHERE book_id = ? AND account = ?")
+      .run(book, account);
+  }
+
   /** For each of `transactions` a schedule staged, the schedule. */
   schedulesOf(transactions: string[]): Map<string, StoredSchedule> {
     if (!transactions.length) return new Map();
@@ -1014,6 +1126,7 @@ export class AppDb {
       ["star", true],
       ["simplefin_link", true],
       ["simplefin_attempt", true],
+      ["reconcile_draft", true],
       ["csv_profile", false],
       ["import_batch", false],
       ["category_rule", false],
@@ -1078,6 +1191,7 @@ export class AppDb {
         "DELETE FROM simplefin_attempt WHERE book_id = ?",
         "DELETE FROM transfer_pair WHERE book_id = ?",
         "DELETE FROM book_invite WHERE book_id = ?",
+        "DELETE FROM reconcile_draft WHERE book_id = ?",
       ])
         this.db.prepare(sql).run(book);
     });

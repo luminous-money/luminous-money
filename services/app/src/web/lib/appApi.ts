@@ -21,6 +21,7 @@ import type {
 
 import { ApiError } from "./ledger.js";
 import type { PairedTransfer } from "../../shared/transfers.js";
+import type { ReconcileDraft, ReconcileView, Reconciled } from "../../shared/reconcile.js";
 import type {
   Breakdown,
   CashFlow,
@@ -48,6 +49,13 @@ export type {
   LinkPreview,
   LinkRequest,
 } from "../../shared/bank-feeds.js";
+export type {
+  BankComparison,
+  ReconcileDraft,
+  ReconcileItem,
+  ReconcileView,
+  Reconciled,
+} from "../../shared/reconcile.js";
 export type {
   ProposalSummary,
   CsvProfile,
@@ -206,6 +214,19 @@ export const accountChanges = {
     json(await apiFetch(`${accountPath(book, account)}/archive`, post(archive))),
   unarchive: async (book: string, account: string): Promise<string[]> =>
     json(await apiFetch(`${accountPath(book, account)}/unarchive`, post({}))),
+  /** Make it a divided account (one real account its sub-accounts divide), or not. */
+  divided: async (
+    book: string,
+    account: string,
+    divided: boolean,
+    updatedAt: string | null
+  ): Promise<unknown> =>
+    json(
+      await apiFetch(
+        `${accountPath(book, account)}/divided`,
+        post({ divided, updated_at: updatedAt })
+      )
+    ),
   remove: async (book: string, account: string, substitute?: string): Promise<string[]> =>
     json(
       await apiFetch(
@@ -213,6 +234,47 @@ export const accountChanges = {
         { method: "DELETE" }
       )
     ),
+};
+
+/** Reconciling an account (M14): the screen's view, saving for later, finishing. */
+export const reconciling = {
+  view: async (book: string, account: string, through?: string): Promise<ReconcileView> =>
+    json(
+      await apiFetch(
+        `${base(book)}/reconcile/${encodeURIComponent(account)}${through ? `?through=${through}` : ""}`
+      )
+    ),
+  saveDraft: async (
+    book: string,
+    account: string,
+    draft: {
+      statement_date: string | null;
+      balance: string | null;
+      ticked: string[];
+      updated_at: string | null;
+    }
+  ): Promise<ReconcileDraft> =>
+    json(
+      await apiFetch(
+        `${base(book)}/reconcile/${encodeURIComponent(account)}/draft`,
+        post(draft, "PUT")
+      )
+    ),
+  discardDraft: async (book: string, account: string): Promise<void> => {
+    const response = await apiFetch(
+      `${base(book)}/reconcile/${encodeURIComponent(account)}/draft`,
+      {
+        method: "DELETE",
+      }
+    );
+    if (!response.ok) await json(response);
+  },
+  finish: async (
+    book: string,
+    account: string,
+    statement: { statement_date: string; balance: string; transactions: string[] }
+  ): Promise<Reconciled> =>
+    json(await apiFetch(`${base(book)}/reconcile/${encodeURIComponent(account)}`, post(statement))),
 };
 
 export const appApi = {

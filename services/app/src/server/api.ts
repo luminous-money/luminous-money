@@ -20,6 +20,7 @@ import {
   spendingReport,
   typicalReport,
 } from "./reports.js";
+import { finish, ReconcileProblem, reconcileView, saveDraft } from "./reconcile.js";
 import { pairAfterImport, pairedTransfers, rejectTransfer, TransferProblem } from "./transfers.js";
 import { UPCOMING_DAYS, type ScheduleIn, type SchedulePatch } from "../shared/schedule.js";
 import { StaleVersion } from "./db.js";
@@ -637,6 +638,121 @@ export function createApi({
       return c.json(deleted);
     })
   );
+
+  /** Make an account a divided account (M14: one real account its sub-accounts divide), or not:
+   * `{divided, updated_at}`. Refused while an account under it is linked to a bank on its own. */
+  api.post("/books/:book/accounts/:account/divided", (c) =>
+    accountChange(c, async (ledger, book, account) => {
+      const body = (await c.req.json().catch(() => ({}))) as {
+        divided?: unknown;
+        updated_at?: unknown;
+      };
+      if (typeof body.divided !== "boolean")
+        return c.json({ detail: "send `divided`: true or false" }, 422);
+      const linked = simplefin?.store
+        .linksIn(book)
+        .find((l) => l.account.startsWith(`${account}:`));
+      if (body.divided && linked)
+        return c.json(
+          { detail: `${linked.account} is linked to a bank on its own: unlink it first` },
+          409
+        );
+      return c.json(
+        await ledger.setAccount(book, account, {
+          divided: body.divided,
+          updated_at: typeof body.updated_at === "string" ? body.updated_at : "",
+        })
+      );
+    })
+  );
+
+  // Reconciliation (M14): the Reconcile screen's view (with what starts ticked and any draft),
+  // saving it for later, and finishing. History and undo are the ledger's own.
+
+  const reconcileDeps = (c: Context<Env>, book: string) => ({
+    db,
+    ledger: ledgerFor(c.get("user")),
+    store: simplefin?.store,
+    book,
+  });
+  const reconcileError = (c: Context<Env>, error: unknown) => {
+    if (error instanceof ReconcileProblem) return c.json({ detail: error.message }, error.status);
+    return c.json(...ledgerStatus(error));
+  };
+
+  api.get("/books/:book/reconcile/:account", async (c) => {
+    const { book, account } = c.req.param();
+    const through = c.req.query("through");
+    try {
+      return c.json(
+        await reconcileView(
+          reconcileDeps(c, book),
+          account,
+          through && /^\d{4}-\d{2}-\d{2}$/.test(through) ? through : undefined
+        )
+      );
+    } catch (error) {
+      return reconcileError(c, error);
+    }
+  });
+
+  /** Save for later: `{statement_date, balance, ticked, updated_at}` (the draft's version read;
+   * null when there wasn't one). */
+  api.put("/books/:book/reconcile/:account/draft", async (c) => {
+    const { book, account } = c.req.param();
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const text = (v: unknown) => (typeof v === "string" && v ? v : null);
+    if (!Array.isArray(body.ticked) || !body.ticked.every((t) => typeof t === "string"))
+      return c.json({ detail: "send what's ticked, as transaction IDs" }, 422);
+    try {
+      return c.json(
+        saveDraft(
+          db,
+          book,
+          c.get("user"),
+          {
+            account,
+            statement_date: text(body.statement_date),
+            balance: text(body.balance),
+            ticked: body.ticked as string[],
+          },
+          text(body.updated_at)
+        )
+      );
+    } catch (error) {
+      return reconcileError(c, error);
+    }
+  });
+
+  api.delete("/books/:book/reconcile/:account/draft", (c) => {
+    const { book, account } = c.req.param();
+    db.discardDraft(book, account);
+    return c.body(null, 204);
+  });
+
+  /** Finish: `{statement_date, balance, transactions}`; refused (422) unless it balances. */
+  api.post("/books/:book/reconcile/:account", async (c) => {
+    const { book, account } = c.req.param();
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    if (
+      typeof body.statement_date !== "string" ||
+      typeof body.balance !== "string" ||
+      !Array.isArray(body.transactions)
+    )
+      return c.json({ detail: "send the statement's date and balance, and what's ticked" }, 422);
+    try {
+      return c.json(
+        await finish(reconcileDeps(c, book), account, {
+          statement_date: body.statement_date,
+          balance: body.balance,
+          transactions: body.transactions as string[],
+        }),
+        201
+      );
+    } catch (error) {
+      return reconcileError(c, error);
+    }
+  });
 
   // Book settings (kept in `app`): the book's time zone, which decides "today" for its
   // schedules, and the day its weeks start (where weekly budgets start by default).

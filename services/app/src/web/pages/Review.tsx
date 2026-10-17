@@ -123,6 +123,8 @@ export function Review({ book }: { book: string }) {
       {selection.selecting && (
         <SelectBar
           count={chosen.length}
+          shown={ordered.length}
+          onSelectAll={() => selection.selectAll(ordered.map((i) => i.transaction.id))}
           accounts={accounts.data ? postable(accounts.data, today()) : []}
           create={create}
           onCategorize={categorizeChosen}

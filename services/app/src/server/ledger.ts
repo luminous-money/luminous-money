@@ -7,6 +7,7 @@ import {
   createLedgerClient,
   type Account,
   type AccountIn,
+  type AccountPatch,
   type components,
   type AccountSummary,
   type CompactTransaction,
@@ -27,6 +28,11 @@ export type TreeAccount = components["schemas"]["TreeAccount"];
 export type BudgetStatus = components["schemas"]["BudgetStatus"];
 export type Member = components["schemas"]["Member"];
 export type Role = NonNullable<Book["role"]>;
+export type ReconcileState = components["schemas"]["ReconcileState"];
+export type ReconcileIn = components["schemas"]["ReconcileIn"];
+export type Reconciled = components["schemas"]["Reconciled"];
+export type Reconciliations = components["schemas"]["Reconciliations"];
+export type DayBalances = components["schemas"]["DayBalances"];
 
 export class LedgerError extends Error {
   constructor(
@@ -108,6 +114,16 @@ export interface LedgerPort {
   budgetStatus(book: string, on: string, basis: "period" | "month"): Promise<BudgetStatus>;
   /** Fetch the latest prices of commodities still held that name a source. */
   fetchPrices(book: string): Promise<FetchResult>;
+  /** Change an account's settings (only those given), against its version. */
+  setAccount(book: string, account: string, patch: AccountPatch): Promise<Account>;
+  /** What reconciling an account needs, with transactions to 14 days past `through` (M14). */
+  reconciliation(book: string, account: string, through?: string): Promise<ReconcileState>;
+  /** Reconcile an account with a statement: refused (422) unless it balances. */
+  reconcile(book: string, account: string, r: ReconcileIn): Promise<Reconciled>;
+  /** The account's reconciliations and balance checks, newest first. */
+  reconciliations(book: string, account: string): Promise<Reconciliations>;
+  /** An account's balance at the end of each day it changed in [from, to]. */
+  dayBalances(book: string, account: string, from: string, to: string): Promise<DayBalances>;
   /** Create, change and delete (with the versions read) in one write, or not at all. Returns
    * the created transactions. */
   applyChanges(
@@ -313,6 +329,38 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
         client.POST("/api/ledger/v1/books/{book_id}/transactions/changes", {
           params: { path: { book_id: book } },
           body: { ...changes, update: changes.update ?? [] },
+        })
+      ),
+    setAccount: (book, account, patch) =>
+      unwrap(
+        client.PATCH("/api/ledger/v1/books/{book_id}/accounts/{account}", {
+          params: { path: { book_id: book, account } },
+          body: patch,
+        })
+      ),
+    reconciliation: (book, account, through) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliation", {
+          params: { path: { book_id: book, account }, query: { through } },
+        })
+      ),
+    reconcile: (book, account, r) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliations", {
+          params: { path: { book_id: book, account } },
+          body: r,
+        })
+      ),
+    reconciliations: (book, account) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliations", {
+          params: { path: { book_id: book, account } },
+        })
+      ),
+    dayBalances: (book, account, from, to) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/balances", {
+          params: { path: { book_id: book, account }, query: { from, to } },
         })
       ),
     createTransactions: (book, transactions) =>

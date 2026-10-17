@@ -113,13 +113,17 @@ milestone starts.
       or manage permissions. Every book has an owner. [Built](milestones/m13-sharing-books/PLAN.md)
       2026-10-17: invitations by link, roles enforced by the ledger and `app`, leaving and
       removing, read-only in the PWA.
-- [ ] **M14: Reconciliation.** Agree an account with the bank's statement (or feed): tick off its
+- [x] **M14: Reconciliation.** Agree an account with the bank's statement (or feed): tick off its
       transactions to the statement's balance, then keep it as a balance assertion and marks on
       the postings; bank-fed accounts checked daily, with where they went off.
-      [Planned](milestones/m14-reconciliation/PLAN.md) 2026-10-17.
+      [Built](milestones/m14-reconciliation/PLAN.md) 2026-10-17: Reconcile (save for later,
+      Finish once it balances, Undo), ✓ in ledgers and their filter (with Select all), divided
+      accounts, bank-fed accounts reconciled automatically, imported files' balances checked.
 - [ ] **M15: Sub-accounts of linked accounts.** Split a bank-linked account's money into
       sub-accounts, e.g. the $10,000 in a PNC checking account as $5,000 of padding and $5,000
-      for general use, while the bank feed keeps it in step with the bank.
+      for general use, while the bank feed keeps it in step with the bank. Builds on M14's
+      **divided accounts** (a node that's one real account, its sub-accounts dividing it):
+      linking one to a bank, and where the feed's transactions land among its parts.
 - [ ] **M16: Suggested recurring transactions.** Nightly, analyze each account's last 14 months
       of transactions and identify ones that look recurring, to suggest as schedules (M3).
 - [ ] **M17: Receipt capture.** Take a picture of a receipt, and AI makes a transaction from it.

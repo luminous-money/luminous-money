@@ -242,8 +242,9 @@ class Store:
             self._conn.execute("DELETE FROM posting WHERE directive_id = ?", (d.id,))
             self._conn.executemany(
                 "INSERT INTO posting"
-                " (directive_id, idx, account, number, currency, amount, amount_currency, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " (directive_id, idx, account, number, currency, amount, amount_currency, reconciled,"
+                " created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     (
                         d.id,
@@ -253,6 +254,7 @@ class Store:
                         p.currency,
                         None if p.amount is None else str(p.amount),
                         p.amount_currency,
+                        p.reconciled.isoformat() if p.reconciled else None,
                         stamp,
                         stamp,
                     )
@@ -326,9 +328,10 @@ class Store:
         """Every live transaction posting to `account` or an account under it, oldest first: what
         its ledger and balance are made of. Each row has the transaction's id, date, ordinal,
         flag, payee, narration, updated_at, its number of splits, the accounts outside the subtree
-        it posts to (comma-separated), and the subtree's amounts in it (`amounts`, as "number
-        currency" pairs, with "?" for an amount only booking could say). For a leaf, the subtree
-        is just the account."""
+        it posts to (comma-separated), the subtree's amounts in it (`amounts`, as "number
+        currency" pairs, with "?" for an amount only booking could say), and how many of the
+        subtree's postings in it aren't reconciled (`unreconciled`) and the latest mark of those
+        that are (`reconciled`). For a leaf, the subtree is just the account."""
         mine = "(%s.account = :account OR %s.account LIKE :under)"
         return self._conn.execute(
             f"""
@@ -337,7 +340,11 @@ class Store:
                    (SELECT GROUP_CONCAT(DISTINCT o.account) FROM posting o
                      WHERE o.directive_id = d.id AND NOT {mine % ("o", "o")}) AS others,
                    (SELECT GROUP_CONCAT(COALESCE(a.amount || ' ' || a.amount_currency, '?'), ';') FROM posting a
-                     WHERE a.directive_id = d.id AND {mine % ("a", "a")}) AS amounts
+                     WHERE a.directive_id = d.id AND {mine % ("a", "a")}) AS amounts,
+                   (SELECT COUNT(*) FROM posting r WHERE r.directive_id = d.id AND {mine % ("r", "r")}
+                     AND r.reconciled IS NULL) AS unreconciled,
+                   (SELECT MAX(r.reconciled) FROM posting r WHERE r.directive_id = d.id
+                     AND {mine % ("r", "r")}) AS reconciled
             FROM directive d
             WHERE d.book_id = :book AND d.deleted = 0 AND d.kind = 'transaction'
               AND d.id IN (SELECT directive_id FROM posting p WHERE {mine % ("p", "p")})
@@ -366,7 +373,7 @@ class Store:
         return self._conn.execute(
             """
             SELECT d.id, d.date, d.flag, d.payee, d.narration, d.budgeted, p.idx, p.account, p.amount,
-                   p.amount_currency
+                   p.amount_currency, p.reconciled
             FROM directive d JOIN posting p ON p.directive_id = d.id
             WHERE d.book_id = ? AND d.deleted = 0 AND d.kind = 'transaction' AND d.date >= ?
             ORDER BY d.date, d.ordinal, p.idx
@@ -415,12 +422,26 @@ class Store:
         older_than: tuple[str, int] | None = None,
         newer_than: tuple[str, int] | None = None,
         through: str | None = None,
+        reconciled: tuple[bool, list[str]] | None = None,
         limit: int,
     ) -> list[sqlite3.Row]:
         """Live transactions, a keyset page: newest first, older than a row's key (date,
         ordinal) and dated `through` or earlier if given; or, `newer_than` a key, the closest
-        newer ones first (oldest first)."""
+        newer ones first (oldest first). With `reconciled` (wanted, and the roots whose postings
+        reconcile), only those whose postings under the roots are all reconciled, or those with
+        one that isn't."""
         where, args = ["book_id = ?", "deleted = 0", "kind = 'transaction'"], [book_id]
+        if reconciled is not None:
+            wanted, roots = reconciled
+            under = " OR ".join(["p.account LIKE ?"] * len(roots)) or "0"
+            open_ = f"EXISTS (SELECT 1 FROM posting p WHERE p.directive_id = directive.id AND ({under}) AND p.reconciled IS NULL)"
+            if wanted:
+                any_ = f"EXISTS (SELECT 1 FROM posting p WHERE p.directive_id = directive.id AND ({under}))"
+                where.append(f"{any_} AND NOT {open_}")
+                args += [f"{r}:%" for r in roots] * 2
+            else:
+                where.append(open_)
+                args += [f"{r}:%" for r in roots]
         for key, op in ((older_than, "<"), (newer_than, ">")):
             if key is not None:
                 where.append(f"(date {op} ? OR (date = ? AND ordinal {op} ?))")
@@ -436,10 +457,11 @@ class Store:
         ).fetchall()
 
     def postings_of(self, directive_ids: list[str]) -> list[sqlite3.Row]:
-        """The postings of these directives, in order: directive_id, account, amount, currency."""
+        """The postings of these directives, in order: directive_id, account, amount, currency,
+        reconciled."""
         marks = ",".join("?" * len(directive_ids))
         return self._conn.execute(
-            f"SELECT directive_id, account, amount, amount_currency FROM posting"
+            f"SELECT directive_id, account, amount, amount_currency, reconciled FROM posting"
             f" WHERE directive_id IN ({marks}) ORDER BY directive_id, idx",
             directive_ids,
         ).fetchall()
@@ -456,6 +478,23 @@ class Store:
               AND d.date >= ? AND d.date < ? AND (p.account = ? OR p.account LIKE ?)
             """,
             (book_id, date_from, date_to, account, account + ":%"),
+        ).fetchall()
+
+    def scope_postings(self, book_id: str, account: str) -> list[sqlite3.Row]:
+        """Every posting of every live transaction that posts to `account` or under it, oldest
+        first (by transaction, then posting): the transaction's id, date, ordinal, flag, payee,
+        narration and updated_at; the posting's idx, account, amount, currency and reconciled
+        mark. What reconciling an account works from (M14)."""
+        return self._conn.execute(
+            """
+            SELECT d.id, d.date, d.ordinal, d.flag, d.payee, d.narration, d.updated_at,
+                   p.idx, p.account, p.amount, p.amount_currency, p.reconciled
+            FROM directive d JOIN posting p ON p.directive_id = d.id
+            WHERE d.book_id = :book AND d.deleted = 0 AND d.kind = 'transaction'
+              AND d.id IN (SELECT directive_id FROM posting WHERE account = :account OR account LIKE :under)
+            ORDER BY d.date, d.ordinal, p.idx
+            """,
+            {"book": book_id, "account": account, "under": f"{account}:%"},
         ).fetchall()
 
     def mentioning(self, book_id: str, account: str) -> list[Row]:

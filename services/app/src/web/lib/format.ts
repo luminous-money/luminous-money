@@ -8,6 +8,17 @@ export function formatWhen(stamp: string): string {
   );
 }
 
+/** An ISO date as a short day: "Sep 30", with the year if it isn't this one. */
+export function formatDay(iso: string, now = new Date()): string {
+  const [year, month, day] = iso.split("-").map(Number) as [number, number, number];
+  const date = new Date(year, month - 1, day);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(year === now.getFullYear() ? {} : { year: "numeric" }),
+  }).format(date);
+}
+
 /** Today, as an ISO date in local time. */
 export function today(): string {
   const now = new Date();

@@ -1,8 +1,12 @@
 import { Link } from "wouter";
 
+import type { Account } from "@fava-beans/ledger-client";
+
+import type { FileBalanceCheck } from "../../shared/imports.js";
 import type { Candidate, ImportResult, Outcome } from "../lib/appApi.js";
-import { shortName } from "../lib/accounts.js";
-import { formatMoney } from "../lib/decimal.js";
+import { shortName, shown } from "../lib/accounts.js";
+import { add, formatMoney, isZero, negate } from "../lib/decimal.js";
+import { formatDay } from "../lib/format.js";
 
 const OUTCOMES: Record<Outcome, string> = {
   staged: "Imported",
@@ -15,15 +19,30 @@ const OUTCOMES: Record<Outcome, string> = {
 const describe = (c: Candidate | undefined) =>
   c ? `${c.payee ?? c.narration ?? "(no description)"} · ${c.date}` : "a transaction";
 
+/** Whether the books agree with the file's last balance (M14). */
+function BalanceCheck({ check, type }: { check: FileBalanceCheck; type?: Account["type"] }) {
+  const money = (n: string) => formatMoney(shown(n, type), check.currency);
+  const agree = isZero(add(check.file, negate(check.books)));
+  return (
+    <p className={`small ${agree ? "muted" : "error"}`}>
+      The file ends at {money(check.file)} on {formatDay(check.date)}:{" "}
+      {agree ? "the books agree." : `the books say ${money(check.books)}.`}
+    </p>
+  );
+}
+
 /** What an import did: counts, then every row with its outcome and any possible matches. */
 export function ImportResults({
   result,
   book,
   currency,
+  type,
 }: {
   result: ImportResult;
   book: string;
   currency: string;
+  /** The account's, to show balances as it reads (a card's as owed). */
+  type?: Account["type"];
 }) {
   const { batch, rows } = result;
   return (
@@ -39,6 +58,7 @@ export function ImportResults({
           {batch.skipped > 0 && ` · ${batch.skipped} before the opening balance`}
           {batch.unreadable > 0 && ` · ${batch.unreadable} couldn't be read`}
         </p>
+        {result.balance_check && <BalanceCheck check={result.balance_check} type={type} />}
         <div className="actions">
           <Link
             href={`/books/${book}/accounts/${encodeURIComponent(batch.account)}`}

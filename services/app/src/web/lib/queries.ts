@@ -33,6 +33,7 @@ import {
   accountChanges,
   appApi,
   bankFeeds,
+  reconciling,
   type LinkRequest,
   type BookInfo,
   type BookInvite,
@@ -350,12 +351,25 @@ export function useLastImports(book: string | undefined) {
  * `date` back (a partial view). Pages load older below (`fetchNextPage`) and newer above
  * (`fetchPreviousPage`), until the whole ledger is loaded.
  */
-export const useAccountLedger = (book: string, account: string, date?: string) =>
-  usePages(keys.ledger(book, account), (at) => api.accountLedger(book, account, at), date);
+export const useAccountLedger = (
+  book: string,
+  account: string,
+  date?: string,
+  reconciled?: boolean
+) =>
+  usePages(
+    [...keys.ledger(book, account), reconciled ?? null],
+    (at) => api.accountLedger(book, account, at, reconciled),
+    date
+  );
 
 /** The book's journal: every account's transactions, newest first, paged as a ledger is. */
-export const useJournal = (book: string, date?: string) =>
-  usePages([...keys.book(book), "journal"], (at) => api.journal(book, at), date);
+export const useJournal = (book: string, date?: string, reconciled?: boolean) =>
+  usePages(
+    [...keys.book(book), "journal", reconciled ?? null],
+    (at) => api.journal(book, at, reconciled),
+    date
+  );
 
 /** Keyset pages loading either way: older below (`fetchNextPage`), newer above
  * (`fetchPreviousPage`), from the newest or from `date` back. */
@@ -1011,6 +1025,69 @@ export function usePatchSettings(book: string) {
   return useMutation({
     mutationFn: (patch: Parameters<typeof appApi.patchSettings>[1]) =>
       appApi.patchSettings(book, patch),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+export const useSetDivided = (book: string, account: string) =>
+  useChartChange(book, ({ divided, updated_at }: { divided: boolean; updated_at: string | null }) =>
+    accountChanges.divided(book, account, divided, updated_at)
+  );
+
+// Reconciliation (M14)
+
+const reconcileKey = (book: string, account: string) =>
+  ["book", book, "reconcile", account] as const;
+
+/** The Reconcile screen's view: the list runs to 14 days past `through`. */
+export function useReconcileView(book: string, account: string, through?: string) {
+  return useQuery({
+    queryKey: [...reconcileKey(book, account), through ?? null],
+    queryFn: () => reconciling.view(book, account, through),
+    placeholderData: (previous) => previous, // keep the list while the date changes
+  });
+}
+
+/** The account's reconciliations, newest first: what it's reconciled through, and any broken. */
+export function useReconciliations(book: string, account: string, enabled = true) {
+  return useQuery({
+    queryKey: ["book", book, "reconciliations", account],
+    queryFn: () => api.reconciliations(book, account),
+    enabled,
+  });
+}
+
+export function useSaveReconcileDraft(book: string, account: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (draft: Parameters<typeof reconciling.saveDraft>[2]) =>
+      reconciling.saveDraft(book, account, draft),
+    onSettled: () => client.invalidateQueries({ queryKey: reconcileKey(book, account) }),
+  });
+}
+
+export function useDiscardReconcileDraft(book: string, account: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => reconciling.discardDraft(book, account),
+    onSuccess: () => client.invalidateQueries({ queryKey: reconcileKey(book, account) }),
+  });
+}
+
+/** Finishing, or undoing the latest: either changes ledgers, balances and review. */
+export function useFinishReconcile(book: string, account: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (statement: Parameters<typeof reconciling.finish>[2]) =>
+      reconciling.finish(book, account, statement),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+export function useUndoReconciliation(book: string, account: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (statementDate: string) => api.undoReconciliation(book, account, statementDate),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
   });
 }

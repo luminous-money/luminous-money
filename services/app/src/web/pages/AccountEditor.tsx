@@ -5,6 +5,7 @@ import { AccountPicker } from "../components/AccountPicker.js";
 import { AccountSettings } from "../components/AccountSettings.js";
 import { BudgetForm, BudgetGlance } from "../components/Budget.js";
 import { NewAccountField } from "../components/NewAccountField.js";
+import { partOf } from "../../shared/divided.js";
 import { displayName, shown, TYPE_LABELS } from "../lib/accounts.js";
 import { formatMoney } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
@@ -18,6 +19,7 @@ import {
   useRemoveAccount,
   useRenameAccount,
   useSetAccount,
+  useSetDivided,
   useSummary,
   useUnarchiveAccount,
 } from "../lib/queries.js";
@@ -83,6 +85,12 @@ export function AccountEditor({ book, account }: { book: string; account: string
         <Names book={book} account={found} accounts={tree.data!} />
       )}
       {settings && <Settings book={book} account={account} />}
+      {!isRoot &&
+        !found.close &&
+        (found.type === "asset" || found.type === "liability") &&
+        (found.kind === "node" || partOf(tree.data!, found.name)) && (
+          <Divided book={book} account={found} accounts={tree.data!} />
+        )}
       {!found.close && found.type && <BudgetCard book={book} account={found} />}
       {found.close && <Unarchive book={book} account={found} />}
       {!isRoot && (!found.close || !found.protected) && (
@@ -203,6 +211,79 @@ function Settings({ book, account }: { book: string; account: string }) {
   const summary = useSummary(book, [account]);
   const info = summary.data?.[0];
   return info ? <AccountSettings book={book} account={info} /> : null;
+}
+
+/**
+ * Whether an asset or liability node is a divided account (M14): one real account (at a bank,
+ * say) that the accounts under it divide. It's reconciled and linked as one; they aren't on
+ * their own. An account under one says so.
+ */
+function Divided({
+  book,
+  account,
+  accounts,
+}: {
+  book: string;
+  account: TreeAccount;
+  accounts: TreeAccount[];
+}) {
+  const set = useSetDivided(book, account.name);
+  // Shown as chosen at once, and put back if the ledger refuses it.
+  const [divided, setDivided] = useState(account.divided);
+  const whole = partOf(accounts, account.name);
+  const below = accounts.find((a) => a.divided && a.name.startsWith(`${account.name}:`));
+  const href = (name: string) => `/books/${book}/accounts/${encodeURIComponent(name)}`;
+  return (
+    <section className="card editor" aria-label="Divided account">
+      <h2 className="section-title">Divided account</h2>
+      {whole ? (
+        <p className="small muted">
+          Part of{" "}
+          <Link href={`${href(whole)}/edit`}>
+            {displayName(accounts.find((a) => a.name === whole) ?? { name: whole })}
+          </Link>
+          , a divided account: it's reconciled and linked to a bank with it, not on its own.
+        </p>
+      ) : (
+        <>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={divided}
+              disabled={set.isPending || !!below}
+              onChange={(e) => {
+                const to = e.target.checked;
+                setDivided(to);
+                set.mutate(
+                  { divided: to, updated_at: account.updated_at ?? null },
+                  { onError: () => setDivided(!to) }
+                );
+              }}
+            />
+            One real account, divided
+          </label>
+          <p className="small muted">
+            For an account at a bank (say) that you divide into the accounts under it: it's
+            reconciled and linked to the bank as one, and they aren't on their own.
+          </p>
+          {below && (
+            <p className="small muted">{displayName(below)}, under it, is divided already.</p>
+          )}
+          {divided && (
+            <div className="actions">
+              <Link href={href(account.name)} className="button">
+                Ledger
+              </Link>
+              <Link href={`${href(account.name)}/reconcile`} className="button">
+                Reconcile
+              </Link>
+            </div>
+          )}
+        </>
+      )}
+      {set.error && <p className="error">{explain(set.error)}</p>}
+    </section>
+  );
 }
 
 /** Its budget: how it's going this period, and setting it. */

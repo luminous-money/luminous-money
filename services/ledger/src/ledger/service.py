@@ -264,13 +264,14 @@ class Ledger:
         return self._put(book_id, self._postable(book_id, engine.parse_one(text, directive_id)), expected)
 
     def create_transaction(self, book_id: str, t: models.TransactionIn) -> engine.Directive:
-        return self._insert(book_id, self._postable(book_id, engine.transaction_directive(t)))
+        return self._insert(book_id, self._postable(book_id, engine.transaction_directive(_marked(t))))
 
     def update_transaction(
         self, book_id: str, directive_id: str, t: models.TransactionIn, *, expected: str | None = None
     ) -> engine.Directive:
         if self.get(book_id, directive_id).kind != "transaction":
             raise ValueError(f"directive {directive_id} is not a transaction")
+        t = _marked(t, self.transaction(book_id, directive_id))
         return self._put(book_id, self._postable(book_id, engine.transaction_directive(t, directive_id)), expected)
 
     def patch_transaction(self, book_id: str, directive_id: str, patch: models.TransactionPatch) -> engine.Directive:
@@ -340,20 +341,57 @@ class Ledger:
 
     def set_account(self, book_id: str, name: str, patch: models.AccountPatch) -> models.Account:
         """Change an account's settings (only those given), against its version: how its sales
-        pick lots, and whether it's a revalued asset (and how often)."""
-        account = next((a for a in self.accounts(book_id) if a.name == name and not a.implicit), None)
-        if account is None:
+        pick lots, whether it's a revalued asset (and how often), its display name, and whether
+        it's a divided account (an implicit node is opened for that)."""
+        changes = patch.model_dump(exclude_unset=True, exclude={"updated_at"})
+        accounts = {a.name: a for a in self.accounts(book_id)}
+        opened_now = False
+        if changes.get("divided"):
+            self._check_divided(accounts, name)
+            if accounts[name].implicit:  # it needs an `open` to hold the setting (no version to check)
+                self.create_account(book_id, models.AccountIn(name=name, kind="node"))
+                accounts = {a.name: a for a in self.accounts(book_id)}
+                opened_now = True
+        account = accounts.get(name)
+        if account is None or account.implicit:
             raise NotFound(name)
         row = next(r for r in self.store.find(book_id, kind="open", limit=None) if engine.opened(r.text) == name)
-        changes = patch.model_dump(exclude_unset=True, exclude={"updated_at"})
         directive = engine.reopened(
             row.text,
             booking=changes.get("booking", account.booking),
             revalue_every=changes.get("revalue_every", account.revalue_every),
             **({"display_name": changes["display_name"]} if "display_name" in changes else {}),
+            **(
+                {"divided": changes["divided"]}
+                if "divided" in changes
+                else {}
+            ),
         )
-        self._put(book_id, engine.parse_one(directive.text, row.id), patch.updated_at)
+        self._put(book_id, engine.parse_one(directive.text, row.id), None if opened_now else patch.updated_at)
         return self._account(book_id, name)
+
+    # The kinds of account reconciled (M14), by root.
+    RECONCILED_TYPES = ("asset", "liability")
+
+    def reconciling_roots(self, header: list[str]) -> list[str]:
+        """The top-level accounts whose accounts are reconciled: assets and liabilities."""
+        return [root for root, type_ in engine.root_types(header).items() if type_ in self.RECONCILED_TYPES]
+
+    def _check_divided(self, accounts: dict[str, models.Account], name: str) -> None:
+        """Only an asset or liability node is divided, and not one with a divided account above
+        or below it: an account is part of one real account at most."""
+        account = accounts.get(name)
+        if account is None:
+            raise NotFound(name)
+        if account.kind != "node" or account.type not in self.RECONCILED_TYPES or ":" not in name:
+            raise engine.ParseFailure(["only an asset or liability account with sub-accounts can be divided"])
+        parts = name.split(":")
+        for other in [":".join(parts[:i]) for i in range(1, len(parts))]:
+            if other in accounts and accounts[other].divided:
+                raise engine.ParseFailure([f"it's part of {other}, a divided account"])
+        for other in accounts.values():
+            if other.name.startswith(name + ":") and other.divided:
+                raise engine.ParseFailure([f"{other.name}, under it, is a divided account already"])
 
     def create_account(self, book_id: str, a: models.AccountIn) -> models.Account:
         """Open an account by its fully qualified name. Its root sets the type.
@@ -473,7 +511,7 @@ class Ledger:
             amount = (
                 models.Amount(number=r["amount"], currency=r["amount_currency"]) if r["amount"] is not None else None
             )
-            out[-1].postings.append(models.CompactPosting(account=r["account"], amount=amount))
+            out[-1].postings.append(models.CompactPosting(account=r["account"], amount=amount, reconciled=r["reconciled"]))
         return out
 
     def summary(self, book_id: str, names: list[str]) -> list[models.AccountSummary]:
@@ -526,6 +564,7 @@ class Ledger:
         after: str | None = None,
         date: datetime.date | None = None,
         limit: int = 200,
+        reconciled: bool | None = None,
     ) -> models.LedgerPage:
         """One account's ledger: its transactions newest first, with running balances.
 
@@ -535,7 +574,8 @@ class Ledger:
         or before it. Each page names the cursors either side of it, so pages can be loaded
         outward from any one until the whole ledger is. Running balances accumulate from the
         oldest transaction, unconfirmed ones included; after an amount only booking could work
-        out, they're unknown (None).
+        out, they're unknown (None). With `reconciled`, only the rows that are (or aren't): the
+        balances stay the account's.
         """
         rows = []
         totals: dict[str, Decimal] | None = {}
@@ -572,11 +612,14 @@ class Ledger:
                         balances=[_amount((n, c)) for c, n in sorted((totals or {}).items()) if n != 0],
                         counterpart=others[0] if entry["splits"] == 2 and len(others) == 1 else None,
                         splits=entry["splits"],
+                        reconciled=entry["reconciled"] if not entry["unreconciled"] else None,
                         updated_at=entry["updated_at"],
                     ),
                 )
             )
         rows.reverse()
+        if reconciled is not None:
+            rows = [r for r in rows if (r[1].reconciled is not None) == reconciled]
         if after:  # the `limit` rows just newer, so up to the row it names
             end = sum(1 for r in rows if r[0] > _ledger_key(after))
             top = max(end - limit, 0)
@@ -604,24 +647,28 @@ class Ledger:
         after: str | None = None,
         date: datetime.date | None = None,
         limit: int = 200,
+        reconciled: bool | None = None,
     ) -> models.JournalPage:
         """Every transaction in the book, newest first, in keyset pages as an account's ledger
         has them (`cursor`: older than a row; `after`: just newer; `date`: from it back), read
-        with plain SQL a page at a time."""
-        self._header(book_id)
-        store = self.store
+        with plain SQL a page at a time. With `reconciled`, only those whose asset and liability
+        postings all are, or those with one that isn't."""
+        roots = self.reconciling_roots(self._header(book_id))
+        filtered = None if reconciled is None else (reconciled, roots)
+
+        def page_of(**where):
+            return self.store.journal(book_id, reconciled=filtered, **where)
 
         def key(row) -> tuple[str, int]:
             return row["date"], row["ordinal"]
 
         if after:
-            newer = store.journal(book_id, newer_than=_ledger_key(after), limit=limit + 1)
+            newer = page_of(newer_than=_ledger_key(after), limit=limit + 1)
             page = list(reversed(newer[:limit]))
             more_newer = len(newer) > limit
-            more_older = bool(page) and bool(store.journal(book_id, older_than=key(page[-1]), limit=1))
+            more_older = bool(page) and bool(page_of(older_than=key(page[-1]), limit=1))
         else:
-            older = store.journal(
-                book_id,
+            older = page_of(
                 older_than=_ledger_key(cursor) if cursor else None,
                 through=date.isoformat() if date else None,
                 limit=limit + 1,
@@ -631,13 +678,20 @@ class Ledger:
             if not (cursor or date):
                 more_newer = False  # the full view starts at the newest
             elif page:
-                more_newer = bool(store.journal(book_id, newer_than=key(page[0]), limit=1))
+                more_newer = bool(page_of(newer_than=key(page[0]), limit=1))
             else:  # nothing on or before it: all there is, if anything, is newer
-                more_newer = bool(store.journal(book_id, limit=1))
+                more_newer = bool(page_of(limit=1))
         postings: dict[str, list[models.CompactPosting]] = {}
-        for p in store.postings_of([r["id"] for r in page]) if page else []:
+        for p in self.store.postings_of([r["id"] for r in page]) if page else []:
             amount = models.Amount(number=p["amount"], currency=p["amount_currency"]) if p["amount"] is not None else None
-            postings.setdefault(p["directive_id"], []).append(models.CompactPosting(account=p["account"], amount=amount))
+            postings.setdefault(p["directive_id"], []).append(
+                models.CompactPosting(account=p["account"], amount=amount, reconciled=p["reconciled"])
+            )
+
+        def is_reconciled(mine: list[models.CompactPosting]) -> bool | None:
+            reconciling = [p for p in mine if p.account.split(":")[0] in roots]
+            return all(p.reconciled for p in reconciling) if reconciling else None
+
         return models.JournalPage(
             rows=[
                 models.JournalRow(
@@ -648,6 +702,7 @@ class Ledger:
                     narration=r["narration"],
                     budgeted=bool(r["budgeted"]),
                     postings=postings.get(r["id"], []),
+                    reconciled=is_reconciled(postings.get(r["id"], [])),
                     updated_at=r["updated_at"],
                 )
                 for r in page
@@ -660,7 +715,7 @@ class Ledger:
         """Create many transactions in one atomic write: all of them, or none."""
         self._header(book_id)
         kinds = self._kinds(book_id)
-        directives = [self._postable(book_id, engine.transaction_directive(t), kinds) for t in batch]
+        directives = [self._postable(book_id, engine.transaction_directive(_marked(t)), kinds) for t in batch]
         with self.store.transaction():
             self._write(book_id, directives)
         return directives
@@ -671,7 +726,7 @@ class Ledger:
         Returns the created transactions."""
         self._header(book_id)
         kinds = self._kinds(book_id)
-        created = [self._postable(book_id, engine.transaction_directive(t), kinds) for t in changes.create]
+        created = [self._postable(book_id, engine.transaction_directive(_marked(t)), kinds) for t in changes.create]
         with self.store.transaction():
             for d in [*changes.update, *changes.delete]:
                 row = self.store.get(book_id, d.id)
@@ -679,7 +734,13 @@ class Ledger:
                     raise NotFound(d.id)
                 self.store.check_version(book_id, d.id, d.updated_at)
             updated = [
-                self._postable(book_id, engine.transaction_directive(self._patched(book_id, u.id, u), u.id), kinds)
+                self._postable(
+                    book_id,
+                    engine.transaction_directive(
+                        _marked(self._patched(book_id, u.id, u), self.transaction(book_id, u.id)), u.id
+                    ),
+                    kinds,
+                )
                 for u in changes.update
             ]
             self._write(book_id, created + updated)
@@ -750,6 +811,24 @@ class Ledger:
 
     def query(self, book_id: str, bql: str) -> tuple[list[str], list[list]]:
         return engine.query(self.load(book_id), bql)
+
+
+def _marked(t: models.TransactionIn, current: models.TransactionIn | None = None) -> models.TransactionIn:
+    """`t` with its postings' reconciled marks as they are in `current`, whatever it says itself:
+    marks belong to reconciliations (M14), so an edit keeps them, and a new transaction has none.
+    A posting keeps its mark while it stays in the same account (the nth posting to an account
+    takes the nth's mark)."""
+    held: dict[str, list] = {}
+    for p in current.postings if current else []:
+        held.setdefault(p.account, []).append(p.meta.get(engine.RECONCILED_KEY))
+    postings = []
+    for p in t.postings:
+        meta = {k: v for k, v in p.meta.items() if k != engine.RECONCILED_KEY}
+        mark = held[p.account].pop(0) if held.get(p.account) else None
+        if mark is not None:
+            meta[engine.RECONCILED_KEY] = mark
+        postings.append(p.model_copy(update={"meta": meta}))
+    return t.model_copy(update={"postings": postings})
 
 
 def _amount(value: tuple[Decimal, str] | None) -> models.Amount | None:

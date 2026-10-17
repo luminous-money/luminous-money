@@ -12,6 +12,8 @@ export function useSelection() {
     toggle: (id: string) =>
       setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])),
     clear: () => setSelected([]),
+    /** Select exactly these: what's shown (a filtered list's rows, not the whole set's). */
+    selectAll: (ids: string[]) => setSelected(ids),
     start: () => (setSelecting(true), setSelected([])),
     stop: () => (setSelecting(false), setSelected([])),
   };

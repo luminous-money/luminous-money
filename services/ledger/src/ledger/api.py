@@ -25,12 +25,15 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from . import budgets, chart, engine, investments, models
+from . import budgets, chart, engine, investments, models, reconcile
 from .service import Ledger, NameTaken, NotFound
 from .store import Row, StaleVersion, Store
 
 BeancountText = Annotated[str, Body(media_type="text/plain")]
 VersionParam = Annotated[str, Query(description="The `updated_at` this edit was based on.")]
+ReconciledParam = Annotated[
+    bool | None, Query(description="Only reconciled transactions (true), or only those not (false).")
+]
 
 class Filters:
     """Query parameters shared by the list endpoints."""
@@ -111,6 +114,10 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     @app.exception_handler(budgets.BudgetRefused)
     async def budget_refused(_, exc: budgets.BudgetRefused):
+        return JSONResponse({"detail": str(exc)}, status_code=422)
+
+    @app.exception_handler(reconcile.ReconcileRefused)
+    async def reconcile_refused(_, exc: reconcile.ReconcileRefused):
         return JSONResponse({"detail": str(exc)}, status_code=422)
 
     @app.exception_handler(NameTaken)
@@ -343,10 +350,13 @@ def create_app(ledger: Ledger) -> FastAPI:
         after: Annotated[str | None, Query(description="The page just newer than this row.")] = None,
         date: Annotated[datetime.date | None, Query(description="The page starting on or before this date.")] = None,
         limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+        reconciled: ReconciledParam = None,
     ) -> models.LedgerPage:
         if sum(x is not None for x in (cursor, after, date)) > 1:
             raise HTTPException(422, "pass one of cursor, after and date")
-        return ledger.account_ledger(book_id, account, cursor=cursor, after=after, date=date, limit=limit)
+        return ledger.account_ledger(
+            book_id, account, cursor=cursor, after=after, date=date, limit=limit, reconciled=reconciled
+        )
 
     @api.get("/books/{book_id}/journal")
     def journal(
@@ -355,12 +365,64 @@ def create_app(ledger: Ledger) -> FastAPI:
         after: Annotated[str | None, Query(description="The page just newer than this row.")] = None,
         date: Annotated[datetime.date | None, Query(description="The page starting on or before this date.")] = None,
         limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+        reconciled: ReconciledParam = None,
     ) -> models.JournalPage:
         """Every transaction in the book (every account's), newest first, paged as an account's
         ledger is."""
         if sum(x is not None for x in (cursor, after, date)) > 1:
             raise HTTPException(422, "pass one of cursor, after and date")
-        return ledger.journal(book_id, cursor=cursor, after=after, date=date, limit=limit)
+        return ledger.journal(book_id, cursor=cursor, after=after, date=date, limit=limit, reconciled=reconciled)
+
+    # Reconciliation (M14)
+
+    @api.get("/books/{book_id}/accounts/{account}/reconciliation", responses={422: {"description": "Not reconciled itself"}})
+    def reconciliation(
+        book_id: MemberBook,
+        account: str,
+        through: Annotated[
+            datetime.date | None, Query(description="The statement's date: transactions to 14 days after it.")
+        ] = None,
+    ) -> models.ReconcileState:
+        """What reconciling the account needs: what's reconciled so far, the last statement, and
+        the unreconciled transactions, oldest first."""
+        return reconcile.state(ledger, book_id, account, through)
+
+    @api.post(
+        "/books/{book_id}/accounts/{account}/reconciliations",
+        status_code=201,
+        responses={422: {"description": "It doesn't balance, or isn't allowed"}},
+    )
+    def reconcile_account(book_id: MemberBook, account: str, r: models.ReconcileIn) -> models.Reconciled:
+        """Reconcile the account with a statement, in one write: the ticked transactions (and
+        transfers within it) marked, unconfirmed ones confirmed, dates moved to agree with the
+        statement, its balance written. Refused unless it balances."""
+        return reconcile.reconcile(ledger, book_id, account, r)
+
+    @api.get("/books/{book_id}/accounts/{account}/reconciliations")
+    def reconciliations(book_id: MemberBook, account: str) -> models.Reconciliations:
+        """The account's reconciliations (and balance checks from imported books), newest first,
+        each against the books."""
+        return reconcile.history(ledger, book_id, account)
+
+    @api.delete(
+        "/books/{book_id}/accounts/{account}/reconciliations/{statement_date}",
+        status_code=204,
+        responses={422: {"description": "Not the latest"}},
+    )
+    def undo_reconciliation(book_id: MemberBook, account: str, statement_date: datetime.date) -> None:
+        """Undo the account's latest reconciliation: its marks and balance go."""
+        reconcile.undo(ledger, book_id, account, statement_date)
+
+    @api.get("/books/{book_id}/accounts/{account}/balances")
+    def day_balances(
+        book_id: MemberBook,
+        account: str,
+        date_from: Annotated[datetime.date, Query(alias="from")],
+        date_to: Annotated[datetime.date, Query(alias="to")],
+    ) -> models.DayBalances:
+        """The account's (and its subtree's) balance at the end of each day it changed, in its
+        currency, and at the end of the day before `from`."""
+        return reconcile.day_balances(ledger, book_id, account, date_from, date_to)
 
     # Transactions, as JSON
 

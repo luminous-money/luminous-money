@@ -5,8 +5,8 @@ import { Link, useLocation } from "wouter";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
 import { SplitsFieldset, useSplits } from "../components/Splits.js";
-import { postable } from "../lib/accounts.js";
-import { today } from "../lib/format.js";
+import { displayName, postable } from "../lib/accounts.js";
+import { formatDay, today } from "../lib/format.js";
 import { useBack, useParam, withBack } from "../lib/navigation.js";
 import {
   explain,
@@ -17,6 +17,22 @@ import {
   useTransaction,
 } from "../lib/queries.js";
 import { simple } from "../lib/split.js";
+
+/** Its postings' reconciliations (M14): which account's statement, of which day. */
+function reconciliations(t: Transaction): { account: string; date: string }[] {
+  return t.postings.flatMap((p) => {
+    const mark = p.meta?.reconciled;
+    return mark && typeof mark === "object" && "date" in mark
+      ? [{ account: p.account, date: mark.date }]
+      : [];
+  });
+}
+
+/** What a split amounts to, to tell whether an edit changes any. */
+const gist = (postings: Transaction["postings"]) =>
+  JSON.stringify(
+    postings.map((p) => [p.account, p.units?.number ?? null, p.units?.currency ?? null])
+  );
 
 function currencyOf(t: Transaction): string {
   return simple(t)?.currency ?? t.postings.find((p) => p.units)?.units?.currency ?? "USD";
@@ -100,9 +116,16 @@ function Editor({
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
   const names = accounts.data ? postable(accounts.data, date) : [];
   const staged = t.flag === "!";
+  // Reconciled: saving a change to its date or splits asks first (it can break the statement).
+  const reconciled = isNew ? [] : reconciliations(t);
+  const [confirming, setConfirming] = useState(false);
+  const changesReconciled =
+    reconciled.length > 0 && (date !== t.date || gist(postings) !== gist(t.postings));
 
   const submit = async (flag: string, then?: string) => {
     setMessage(null);
+    if (changesReconciled && !confirming) return setConfirming(true);
+    setConfirming(false);
     try {
       const changes = { date, flag, payee: payee.trim() || null, narration, postings, meta };
       if (isNew) {
@@ -137,6 +160,22 @@ function Editor({
 
       {!isNew && <PairedTransfer book={book} transaction={t} onRejected={() => navigate(back)} />}
 
+      {reconciled.length > 0 && (
+        <p className="card small reconciled-note">
+          <span className="reconciled-mark" aria-hidden="true">
+            ✓
+          </span>{" "}
+          Reconciled with{" "}
+          {reconciled
+            .map((r) => {
+              const found = accounts.data?.find((a) => a.name === r.account);
+              return `${displayName(found ?? { name: r.account })}'s ${formatDay(r.date)} statement`;
+            })
+            .join(" and ")}
+          : changing its date or amounts can put that out of balance.
+        </p>
+      )}
+
       <label>
         Date
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
@@ -154,6 +193,21 @@ function Editor({
       <ExcludeFromBudget meta={meta} onChange={setMeta} />
 
       {message && <p className={message.kind === "error" ? "error" : "ok"}>{message.text}</p>}
+      {confirming && (
+        <div className="card confirm-row" role="alertdialog" aria-label="Reconciled">
+          <p className="small">
+            It's reconciled: this change can put the statement out of balance. Save anyway?
+          </p>
+          <div className="actions">
+            <button type="button" onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+            <button type="button" className="primary" onClick={() => void submit(t.flag)}>
+              Save anyway
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="actions pinned">
         <Link href={back} className="button">

@@ -11,10 +11,16 @@ import type {
   TransactionIn,
 } from "@fava-beans/ledger-client";
 
+import { add, isZero, negate } from "../shared/decimal.js";
 import {
   LedgerError,
   type Book,
   type BudgetStatus,
+  type DayBalances,
+  type ReconcileIn,
+  type ReconcileState,
+  type Reconciled,
+  type Reconciliations,
   type LedgerPage,
   type Member,
   type LedgerPort,
@@ -328,6 +334,130 @@ export class FakeLedger implements LedgerPort {
 
   async unconfirmed() {
     return this.transactions.filter((t) => t.flag === "!");
+  }
+
+  // Reconciliation, for a leaf in USD: marks on postings, a statement per account.
+  statements = new Map<string, { date: string; balance: string }[]>();
+  private posting(t: Transaction, account: string) {
+    return t.postings.find((p) => p.account === account);
+  }
+  private sum(account: string, keep: (t: Transaction) => boolean) {
+    return this.transactions
+      .filter((t) => keep(t) && this.posting(t, account)?.units)
+      .reduce((total, t) => add(total, this.posting(t, account)!.units!.number), "0");
+  }
+
+  async setAccount(_book: string, account: string, patch: { divided?: boolean | null }) {
+    const found = this.accountList.find((a) => a.name === account);
+    if (!found) throw new LedgerError(404, "not found");
+    if (patch.divided !== undefined) found.divided = !!patch.divided;
+    return found;
+  }
+
+  async reconciliation(_book: string, account: string, through?: string): Promise<ReconcileState> {
+    const until = through
+      ? new Date(Date.parse(`${through}T00:00:00Z`) + 14 * 864e5).toISOString().slice(0, 10)
+      : "9999-12-31";
+    const open = this.transactions.filter((t) => {
+      const p = this.posting(t, account);
+      return p && !p.meta?.reconciled && t.date <= until;
+    });
+    return {
+      account,
+      currency: "USD",
+      reconciled_balance: {
+        number: this.sum(account, (t) => !!this.posting(t, account)?.meta?.reconciled),
+        currency: "USD",
+      },
+      last: this.statements.get(account)?.at(-1)?.date ?? null,
+      transactions: open
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((t) => ({
+          id: t.id,
+          date: t.date,
+          flag: t.flag,
+          payee: t.payee ?? null,
+          narration: t.narration ?? null,
+          amount: this.posting(t, account)!.units ?? { number: "0", currency: "USD" },
+          counterpart: t.postings.find((p) => p.account !== account)?.account ?? null,
+          opening: t.postings.some((p) => p.account === "Equity:Opening-Balances"),
+          updated_at: t.updated_at,
+        })),
+      internal: 0,
+    };
+  }
+
+  async reconcile(book: string, account: string, r: ReconcileIn): Promise<Reconciled> {
+    const state = await this.reconciliation(book, account, r.statement_date);
+    const ticked = state.transactions.filter((t) => r.transactions.includes(t.id));
+    const reached = ticked.reduce(
+      (total, t) => add(total, t.amount.number),
+      state.reconciled_balance.number
+    );
+    if (!isZero(add(reached, negate(r.balance)))) throw new LedgerError(422, "it doesn't balance");
+    const confirmed: string[] = [];
+    for (const item of ticked) {
+      const t = await this.transaction(book, item.id);
+      if (t.flag === "!") confirmed.push(t.id);
+      t.flag = "*";
+      const p = this.posting(t, account)!;
+      p.meta = { ...p.meta, reconciled: { date: r.statement_date } };
+      t.updated_at = `v${this.next++}`;
+    }
+    const list = this.statements.get(account) ?? [];
+    list.push({ date: r.statement_date, balance: r.balance });
+    this.statements.set(account, list);
+    return {
+      reconciliation: {
+        id: `b${this.next++}`,
+        account,
+        statement_date: r.statement_date,
+        balance: { number: r.balance, currency: "USD" },
+        statement: true,
+        transactions: ticked.length,
+        off_by: null,
+        updated_at: "v1",
+      },
+      confirmed,
+      moved: [],
+    };
+  }
+
+  async reconciliations(_book: string, account: string): Promise<Reconciliations> {
+    return {
+      account,
+      reconciliations: [...(this.statements.get(account) ?? [])].reverse().map((s, i) => ({
+        id: `b${i}`,
+        account,
+        statement_date: s.date,
+        balance: { number: s.balance, currency: "USD" },
+        statement: true,
+        transactions: 0,
+        off_by: null,
+        updated_at: "v1",
+      })),
+    };
+  }
+
+  async dayBalances(
+    _book: string,
+    account: string,
+    from: string,
+    to: string
+  ): Promise<DayBalances> {
+    const days = [
+      ...new Set(
+        this.transactions
+          .filter((t) => this.posting(t, account) && t.date >= from && t.date <= to)
+          .map((t) => t.date)
+      ),
+    ].sort();
+    return {
+      account,
+      currency: "USD",
+      before: this.sum(account, (t) => t.date < from),
+      days: days.map((date) => ({ date, balance: this.sum(account, (t) => t.date <= date) })),
+    };
   }
 
   async applyChanges(

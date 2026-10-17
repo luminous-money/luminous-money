@@ -4,13 +4,16 @@ import { Link, useLocation } from "wouter";
 import { displayName, shortName, shown } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";
 import { bookHome } from "../lib/books.js";
-import { useParam, withBack } from "../lib/navigation.js";
+import { withBack } from "../lib/navigation.js";
 import { AccountValueNote, headline } from "../components/AccountValue.js";
 import { BankErrors, ReportedLine } from "../components/BankStatus.js";
 import { BudgetGlance } from "../components/Budget.js";
 import { TypicalPeriods } from "../components/TypicalPeriods.js";
 import { HoldingsPanel } from "../components/Holdings.js";
 import { JumpToDate, MoreBelow, NewerRow, usePaging } from "../components/Paged.js";
+import { LedgerFilter, useLedgerView } from "../components/LedgerFilter.js";
+import { ReconcileStatus } from "../components/ReconcileStatus.js";
+import { reconciledItself } from "../../shared/divided.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { postable } from "../lib/accounts.js";
 import { today } from "../lib/format.js";
@@ -45,11 +48,14 @@ import { upcomingFor } from "../lib/upcoming.js";
  * are shown as the account reads (a card's balance is what's owed); colors follow the stored
  * sign, the effect on net worth. Transactions a schedule staged are marked ↻, and its
  * occurrences coming in the next UPCOMING_DAYS (16) days show above, grayed, with the projected balance.
+ * Reconciled ones are marked ✓ (M14); the filter beside "Go to date" shows only those, or only
+ * the rest (`?reconciled=`), and Reconcile is in the header for an account reconciled itself.
  */
 export function AccountLedger({ book, account }: { book: string; account: string }) {
   const [, navigate] = useLocation();
-  const date = useParam("date")?.match(/^\d{4}-\d{2}-\d{2}$/)?.[0];
-  const ledger = useAccountLedger(book, account, date);
+  const base = `/books/${book}/accounts/${encodeURIComponent(account)}`;
+  const { date, reconciled, here, href } = useLedgerView(base);
+  const ledger = useAccountLedger(book, account, date, reconciled);
   const summary = useSummary(book, [account]);
   const info = summary.data?.[0];
   const stars = useStars(book);
@@ -72,8 +78,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
   const starred = stars.data?.includes(account) ?? false;
   const type = info?.type;
   const { rows, list, end, loadNewer } = usePaging(ledger);
-  const base = `/books/${book}/accounts/${encodeURIComponent(account)}`;
-  const here = date ? `${base}?date=${date}` : base;
+  const reconcilable = !!accounts.data && reconciledItself(accounts.data, account);
 
   const open = (id: string) => navigate(withBack(`/books/${book}/transactions/${id}`, here));
   const chosen = rows.filter((r) => selection.has(r.id));
@@ -126,6 +131,9 @@ export function AccountLedger({ book, account }: { book: string; account: string
             {info && <AccountValueNote account={info} />}
             {linked && <ReportedLine status={linked} type={info?.type} />}
             {linked && <BankErrors status={linked} />}
+            {accounts.data && (
+              <ReconcileStatus book={book} account={account} accounts={accounts.data} />
+            )}
           </div>
           {canWrite && info?.kind === "leaf" && !info.implicit && !info.close && (
             <Link
@@ -149,6 +157,11 @@ export function AccountLedger({ book, account }: { book: string; account: string
             <button type="button" onClick={selection.start}>
               Select
             </button>
+            {reconcilable && (
+              <Link href={withBack(`${base}/reconcile`, here)} className="button">
+                Reconcile
+              </Link>
+            )}
             <Link
               href={`/books/${book}/accounts/${encodeURIComponent(account)}/edit`}
               className="button"
@@ -183,6 +196,8 @@ export function AccountLedger({ book, account }: { book: string; account: string
       {selection.selecting ? (
         <SelectBar
           count={chosen.length}
+          shown={rows.length}
+          onSelectAll={() => selection.selectAll(rows.map((r) => r.id))}
           accounts={accounts.data ? postable(accounts.data, today()) : []}
           create={create}
           onCategorize={categorizeChosen}
@@ -211,53 +226,66 @@ export function AccountLedger({ book, account }: { book: string; account: string
         </div>
       ) : null}
 
-      <JumpToDate
-        key={date ?? ""}
-        date={date}
-        onGo={(to) => navigate(to ? `${base}?date=${to}` : base)}
-      />
+      <div className="ledger-tools">
+        <JumpToDate
+          key={date ?? ""}
+          date={date}
+          onGo={(to) => navigate(href({ date: to, reconciled }))}
+        />
+        <LedgerFilter
+          reconciled={reconciled}
+          onChange={(to) => navigate(href({ date, reconciled: to }))}
+        />
+      </div>
 
       {ledger.isPending && <p className="muted">Loading…</p>}
       {ledger.error && <p className="card error">{explain(ledger.error)}</p>}
       {ledger.data && rows.length === 0 && (
         <p className="card muted">
-          {date ? `Nothing on or before ${date}.` : "No transactions yet."}
+          {reconciled !== undefined
+            ? `No ${reconciled ? "reconciled" : "unreconciled"} transactions${date ? ` on or before ${date}` : ""}.`
+            : date
+              ? `Nothing on or before ${date}.`
+              : "No transactions yet."}
         </p>
       )}
 
-      {ahead.length > 0 && !selection.selecting && !ledger.hasPreviousPage && (
-        <ol className="ledger upcoming-rows" aria-label="Upcoming">
-          {ahead.map((row) => (
-            <li key={row.key}>
-              <button
-                type="button"
-                className="ledger-row"
-                onClick={() =>
-                  navigate(withBack(`/books/${book}/schedules/${row.schedule_id}`, here))
-                }
-              >
-                <span className="ledger-date">{row.date}</span>
-                <span className="ledger-what">
-                  <span className="ledger-payee">{row.label}</span>
-                  <span className="ledger-account muted">↻ upcoming</span>
-                </span>
-                <span className="ledger-numbers">
-                  <span className="amount">
-                    {row.amount
-                      ? formatMoney(shown(row.amount.number, type), row.amount.currency)
-                      : "?"}
+      {ahead.length > 0 &&
+        !selection.selecting &&
+        !ledger.hasPreviousPage &&
+        reconciled === undefined && (
+          <ol className="ledger upcoming-rows" aria-label="Upcoming">
+            {ahead.map((row) => (
+              <li key={row.key}>
+                <button
+                  type="button"
+                  className="ledger-row"
+                  onClick={() =>
+                    navigate(withBack(`/books/${book}/schedules/${row.schedule_id}`, here))
+                  }
+                >
+                  <span className="ledger-date">{row.date}</span>
+                  <span className="ledger-what">
+                    <span className="ledger-payee">{row.label}</span>
+                    <span className="ledger-account muted">↻ upcoming</span>
                   </span>
-                  <span className="muted small">
-                    {row.balance
-                      ? `projected ${formatMoney(shown(row.balance.number, type), row.balance.currency)}`
-                      : ""}
+                  <span className="ledger-numbers">
+                    <span className="amount">
+                      {row.amount
+                        ? formatMoney(shown(row.amount.number, type), row.amount.currency)
+                        : "?"}
+                    </span>
+                    <span className="muted small">
+                      {row.balance
+                        ? `projected ${formatMoney(shown(row.balance.number, type), row.balance.currency)}`
+                        : ""}
+                    </span>
                   </span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ol>
-      )}
+                </button>
+              </li>
+            ))}
+          </ol>
+        )}
 
       <ol className="ledger" aria-label="Transactions" ref={list}>
         <NewerRow pages={ledger} onLoad={loadNewer} />
@@ -287,6 +315,16 @@ export function AccountLedger({ book, account }: { book: string; account: string
                   {row.payee ?? row.narration ?? "(no description)"}
                 </span>
                 <span className="ledger-account muted">
+                  {row.reconciled && (
+                    <span
+                      className="reconciled-mark"
+                      role="img"
+                      aria-label="Reconciled"
+                      title={`Reconciled with the ${row.reconciled} statement`}
+                    >
+                      ✓{" "}
+                    </span>
+                  )}
                   {row.counterpart ? shortName(row.counterpart) : "<multiple>"}
                   {row.flag === "!" && " · unconfirmed"}
                 </span>

@@ -154,6 +154,11 @@ class Account(Api):
     revalue_every: int | None = Field(
         None, description="A revalued asset (a house, a car): how many days its value stays current."
     )
+    divided: bool = Field(
+        False,
+        description="A divided account: a node that's one real account (at a bank, say), its sub-accounts dividing "
+        "what's in it. It's reconciled and linked as one; they can't be themselves.",
+    )
     updated_at: str | None = Field(None, description="Its `open` directive's version; send it back to change settings.")
 
 
@@ -327,6 +332,11 @@ class AccountPatch(Strict):
         "None: the book's default."
     )
     revalue_every: int | None = Field(None, ge=1, description="A revalued asset: days its value stays current; None: not one.")
+    divided: bool | None = Field(
+        None,
+        description="An asset or liability node: make it a divided account, one real account its sub-accounts "
+        "divide (they can't be reconciled, linked or divided themselves).",
+    )
 
 
 class OpeningHolding(Strict):
@@ -350,6 +360,7 @@ class OpeningBalance(Strict):
 class CompactPosting(Api):
     account: str
     amount: Amount | None = Field(description="The posting's change to its account; None if only booking could say.")
+    reconciled: datetime.date | None = Field(None, description="The statement it was reconciled with (M14).")
 
 
 class CompactTransaction(Api):
@@ -387,6 +398,9 @@ class LedgerRow(Api):
     )
     counterpart: str | None = Field(description="The other split's account, for a two-split transaction; None for more.")
     splits: int
+    reconciled: datetime.date | None = Field(
+        None, description="Once all its postings in the account are reconciled: the (latest) statement's date."
+    )
     updated_at: str
 
 
@@ -480,6 +494,9 @@ class JournalRow(Api):
     narration: str | None
     budgeted: bool
     postings: list[CompactPosting]
+    reconciled: bool | None = Field(
+        None, description="Whether its asset and liability postings are all reconciled; None when it has none."
+    )
     updated_at: str
 
 
@@ -489,6 +506,86 @@ class JournalPage(Api):
     prev_cursor: str | None = Field(
         description="Pass as `after` for the page before (newer); None when this page starts at the newest."
     )
+
+
+# Reconciliation (M14)
+
+
+class ReconcileItem(Api):
+    """An unreconciled transaction, as reconciling an account lists it."""
+
+    id: str
+    date: datetime.date
+    flag: str
+    payee: str | None
+    narration: str | None
+    amount: Amount = Field(description="Its unreconciled change to the account (and those under it), as stored.")
+    counterpart: str | None = Field(description="The account on its other side, if just one.")
+    opening: bool = Field(description="An opening balance: it came from a statement too.")
+    updated_at: str
+
+
+class ReconcileState(Api):
+    """What reconciling an account needs."""
+
+    account: str
+    currency: str = Field(description="What it's reconciled in: its currency, else the book's.")
+    reconciled_balance: Amount = Field(description="What's reconciled so far: the starting balance.")
+    last: datetime.date | None = Field(description="The last statement's date; the next must be later.")
+    transactions: list[ReconcileItem] = Field(
+        description="Unreconciled, oldest first: to `through` and the days after it (all, without it)."
+    )
+    internal: int = Field(description="Transfers between its sub-accounts, to `through`, that reconcile themselves.")
+
+
+class ReconcileIn(Strict):
+    statement_date: datetime.date
+    balance: DecimalStr = Field(description="The statement's ending balance, as stored (negative on a liability).")
+    transactions: list[str] = Field(description="The unreconciled transactions on the statement.")
+    automatic: bool = Field(
+        False,
+        description="Reconciled with the bank's balance after a sync. It replaces the latest reconciliation if "
+        "that was automatic too and in the same month, so there's one a month.",
+    )
+
+
+class Reconciliation(Api):
+    """A balance check on the account: a reconciliation's (with a statement), or one from an imported book."""
+
+    id: str
+    account: str
+    statement_date: datetime.date = Field(description="The day it holds at the end of (the directive's date, less a day).")
+    balance: Amount
+    statement: bool = Field(description="A reconciliation (else a balance check from an imported book).")
+    automatic: bool = Field(False, description="Reconciled with the bank's balance after a sync.")
+    transactions: int = Field(description="How many transactions it reconciled.")
+    off_by: Amount | None = Field(description="The statement less the books, when they don't agree.")
+    updated_at: str
+
+
+class Reconciled(Api):
+    reconciliation: Reconciliation
+    confirmed: list[str] = Field(description="Unconfirmed transactions confirmed with it.")
+    moved: list[str] = Field(description="Transactions whose date moved to agree with the statement.")
+
+
+class Reconciliations(Api):
+    account: str
+    reconciliations: list[Reconciliation] = Field(description="Newest first.")
+
+
+class DayBalance(Api):
+    date: datetime.date
+    balance: DecimalStr
+
+
+class DayBalances(Api):
+    """An account's (and its subtree's) balance at the end of each day it changed."""
+
+    account: str
+    currency: str
+    before: DecimalStr = Field(description="At the end of the day before `from`.")
+    days: list[DayBalance]
 
 
 class AccountIn(Strict):

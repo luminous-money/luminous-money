@@ -12,6 +12,7 @@ import { ChartOfAccounts } from "./pages/ChartOfAccounts.js";
 import { BankConnections } from "./pages/BankConnections.js";
 import { ResetPassword, VerifyEmail } from "./pages/EmailLinks.js";
 import { AccountLedger } from "./pages/AccountLedger.js";
+import { Reconcile } from "./pages/Reconcile.js";
 import { AddAccount } from "./pages/AddAccount.js";
 import { Books } from "./pages/Books.js";
 import { Budgets } from "./pages/Budgets.js";
@@ -152,6 +153,11 @@ function Gate() {
           <Route path="/books/:book/accounts/:account/trade">
             {({ book: id, account }) => (
               <TradePage key={account} book={id} account={decodeURIComponent(account)} />
+            )}
+          </Route>
+          <Route path="/books/:book/accounts/:account/reconcile">
+            {({ book: id, account }) => (
+              <Reconcile key={account} book={id} account={decodeURIComponent(account)} />
             )}
           </Route>
           <Route path="/books/:book/accounts/:account">

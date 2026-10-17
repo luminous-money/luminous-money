@@ -5,10 +5,12 @@ import { formatMoney } from "../lib/decimal.js";
 import { accountsLabel, movement } from "../lib/journal.js";
 import type { JournalRow } from "../lib/ledger.js";
 import { withBack } from "../lib/navigation.js";
+import type { Selection } from "../lib/selection.js";
 
 /**
  * Transactions from every account, as a ledger's rows: the date, who, where the money went
- * (from → to), and how much. Tapping one opens it, coming back to `here`.
+ * (from → to), how much, and ✓ once reconciled. Tapping one opens it, coming back to `here`;
+ * in Select mode, it's selected instead.
  */
 export function JournalList({
   book,
@@ -17,6 +19,7 @@ export function JournalList({
   list,
   top,
   label = "Transactions",
+  selection,
 }: {
   book: string;
   rows: JournalRow[];
@@ -25,6 +28,7 @@ export function JournalList({
   /** A row before the transactions (Load more). */
   top?: React.ReactNode;
   label?: string;
+  selection?: Selection;
 }) {
   const [, navigate] = useLocation();
   return (
@@ -36,8 +40,15 @@ export function JournalList({
           <li key={row.id} data-row={row.id}>
             <button
               type="button"
-              className={`ledger-row${row.flag === "!" ? " unconfirmed" : ""}`}
-              onClick={() => navigate(withBack(`/books/${book}/transactions/${row.id}`, here))}
+              className={`ledger-row${row.flag === "!" ? " unconfirmed" : ""}${selection?.has(row.id) ? " selected" : ""}`}
+              onClick={() =>
+                selection?.selecting
+                  ? selection.toggle(row.id)
+                  : navigate(withBack(`/books/${book}/transactions/${row.id}`, here))
+              }
+              {...(selection?.selecting
+                ? { role: "checkbox", "aria-checked": selection.has(row.id) }
+                : {})}
             >
               <span className="ledger-date">{row.date}</span>
               <span className="ledger-what">
@@ -45,6 +56,11 @@ export function JournalList({
                   {row.payee ?? row.narration ?? "(no description)"}
                 </span>
                 <span className="ledger-account muted">
+                  {row.reconciled && (
+                    <span className="reconciled-mark" role="img" aria-label="Reconciled">
+                      ✓{" "}
+                    </span>
+                  )}
                   {moved.from.length ? accountsLabel(moved.from) : "?"} →{" "}
                   {moved.to.length ? accountsLabel(moved.to) : "?"}
                   {row.flag === "!" && " · unconfirmed"}

@@ -174,6 +174,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/balances": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Day Balances
+     * @description The account's (and its subtree's) balance at the end of each day it changed, in its
+     *     currency, and at the end of the day before `from`.
+     */
+    get: operations["day_balances_api_ledger_v1_books__book_id__accounts__account__balances_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/accounts/{account}/holdings": {
     parameters: {
       query?: never;
@@ -207,6 +228,74 @@ export interface paths {
     put?: never;
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliation": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Reconciliation
+     * @description What reconciling the account needs: what's reconciled so far, the last statement, and
+     *     the unreconciled transactions, oldest first.
+     */
+    get: operations["reconciliation_api_ledger_v1_books__book_id__accounts__account__reconciliation_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Reconciliations
+     * @description The account's reconciliations (and balance checks from imported books), newest first,
+     *     each against the books.
+     */
+    get: operations["reconciliations_api_ledger_v1_books__book_id__accounts__account__reconciliations_get"];
+    put?: never;
+    /**
+     * Reconcile Account
+     * @description Reconcile the account with a statement, in one write: the ticked transactions (and
+     *     transfers within it) marked, unconfirmed ones confirmed, dates moved to agree with the
+     *     statement, its balance written. Refused unless it balances.
+     */
+    post: operations["reconcile_account_api_ledger_v1_books__book_id__accounts__account__reconciliations_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliations/{statement_date}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Undo Reconciliation
+     * @description Undo the account's latest reconciliation: its marks and balance go.
+     */
+    delete: operations["undo_reconciliation_api_ledger_v1_books__book_id__accounts__account__reconciliations__statement_date__delete"];
     options?: never;
     head?: never;
     patch?: never;
@@ -760,6 +849,12 @@ export interface components {
        */
       display_name?: string | null;
       /**
+       * Divided
+       * @description A divided account: a node that's one real account (at a bank, say), its sub-accounts dividing what's in it. It's reconciled and linked as one; they can't be themselves.
+       * @default false
+       */
+      divided: boolean;
+      /**
        * Implicit
        * @description Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.
        * @default false
@@ -855,6 +950,11 @@ export interface components {
        */
       display_name?: string | null;
       /**
+       * Divided
+       * @description An asset or liability node: make it a divided account, one real account its sub-accounts divide (they can't be reconciled, linked or divided themselves).
+       */
+      divided?: boolean | null;
+      /**
        * Revalue Every
        * @description A revalued asset: days its value stays current; None: not one.
        */
@@ -907,6 +1007,12 @@ export interface components {
        * @description A human name, from `display-name` metadata if set.
        */
       display_name?: string | null;
+      /**
+       * Divided
+       * @description A divided account: a node that's one real account (at a bank, say), its sub-accounts dividing what's in it. It's reconciled and linked as one; they can't be themselves.
+       * @default false
+       */
+      divided: boolean;
       /** @description Unrealized gain (or loss) on holdings with a cost basis. */
       gain?: components["schemas"]["Amount"] | null;
       /**
@@ -1232,6 +1338,11 @@ export interface components {
       account: string;
       /** @description The posting's change to its account; None if only booking could say. */
       amount: components["schemas"]["Amount"] | null;
+      /**
+       * Reconciled
+       * @description The statement it was reconciled with (M14).
+       */
+      reconciled?: string | null;
     };
     /**
      * CompactTransaction
@@ -1281,6 +1392,33 @@ export interface components {
        * @description Total cost, as in `{{...}}`.
        */
       total?: string | null;
+    };
+    /** DayBalance */
+    DayBalance: {
+      /** Balance */
+      balance: string;
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+    };
+    /**
+     * DayBalances
+     * @description An account's (and its subtree's) balance at the end of each day it changed.
+     */
+    DayBalances: {
+      /** Account */
+      account: string;
+      /**
+       * Before
+       * @description At the end of the day before `from`.
+       */
+      before: string;
+      /** Currency */
+      currency: string;
+      /** Days */
+      days: components["schemas"]["DayBalance"][];
     };
     /** Deletion */
     Deletion: {
@@ -1443,6 +1581,11 @@ export interface components {
       payee: string | null;
       /** Postings */
       postings: components["schemas"]["CompactPosting"][];
+      /**
+       * Reconciled
+       * @description Whether its asset and liability postings are all reconciled; None when it has none.
+       */
+      reconciled?: boolean | null;
       /** Updated At */
       updated_at: string;
     };
@@ -1501,6 +1644,11 @@ export interface components {
       narration: string | null;
       /** Payee */
       payee: string | null;
+      /**
+       * Reconciled
+       * @description Once all its postings in the account are reconciled: the (latest) statement's date.
+       */
+      reconciled?: string | null;
       /** Splits */
       splits: number;
       /** Updated At */
@@ -1670,6 +1818,154 @@ export interface components {
       columns: string[];
       /** Rows */
       rows: unknown[][];
+    };
+    /** ReconcileIn */
+    ReconcileIn: {
+      /**
+       * Automatic
+       * @description Reconciled with the bank's balance after a sync. It replaces the latest reconciliation if that was automatic too and in the same month, so there's one a month.
+       * @default false
+       */
+      automatic: boolean;
+      /**
+       * Balance
+       * @description The statement's ending balance, as stored (negative on a liability).
+       */
+      balance: string;
+      /**
+       * Statement Date
+       * Format: date
+       */
+      statement_date: string;
+      /**
+       * Transactions
+       * @description The unreconciled transactions on the statement.
+       */
+      transactions: string[];
+    };
+    /**
+     * ReconcileItem
+     * @description An unreconciled transaction, as reconciling an account lists it.
+     */
+    ReconcileItem: {
+      /** @description Its unreconciled change to the account (and those under it), as stored. */
+      amount: components["schemas"]["Amount"];
+      /**
+       * Counterpart
+       * @description The account on its other side, if just one.
+       */
+      counterpart: string | null;
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Flag */
+      flag: string;
+      /** Id */
+      id: string;
+      /** Narration */
+      narration: string | null;
+      /**
+       * Opening
+       * @description An opening balance: it came from a statement too.
+       */
+      opening: boolean;
+      /** Payee */
+      payee: string | null;
+      /** Updated At */
+      updated_at: string;
+    };
+    /**
+     * ReconcileState
+     * @description What reconciling an account needs.
+     */
+    ReconcileState: {
+      /** Account */
+      account: string;
+      /**
+       * Currency
+       * @description What it's reconciled in: its currency, else the book's.
+       */
+      currency: string;
+      /**
+       * Internal
+       * @description Transfers between its sub-accounts, to `through`, that reconcile themselves.
+       */
+      internal: number;
+      /**
+       * Last
+       * @description The last statement's date; the next must be later.
+       */
+      last: string | null;
+      /** @description What's reconciled so far: the starting balance. */
+      reconciled_balance: components["schemas"]["Amount"];
+      /**
+       * Transactions
+       * @description Unreconciled, oldest first: to `through` and the days after it (all, without it).
+       */
+      transactions: components["schemas"]["ReconcileItem"][];
+    };
+    /** Reconciled */
+    Reconciled: {
+      /**
+       * Confirmed
+       * @description Unconfirmed transactions confirmed with it.
+       */
+      confirmed: string[];
+      /**
+       * Moved
+       * @description Transactions whose date moved to agree with the statement.
+       */
+      moved: string[];
+      reconciliation: components["schemas"]["Reconciliation"];
+    };
+    /**
+     * Reconciliation
+     * @description A balance check on the account: a reconciliation's (with a statement), or one from an imported book.
+     */
+    Reconciliation: {
+      /** Account */
+      account: string;
+      /**
+       * Automatic
+       * @description Reconciled with the bank's balance after a sync.
+       * @default false
+       */
+      automatic: boolean;
+      balance: components["schemas"]["Amount"];
+      /** Id */
+      id: string;
+      /** @description The statement less the books, when they don't agree. */
+      off_by: components["schemas"]["Amount"] | null;
+      /**
+       * Statement
+       * @description A reconciliation (else a balance check from an imported book).
+       */
+      statement: boolean;
+      /**
+       * Statement Date
+       * Format: date
+       * @description The day it holds at the end of (the directive's date, less a day).
+       */
+      statement_date: string;
+      /**
+       * Transactions
+       * @description How many transactions it reconciled.
+       */
+      transactions: number;
+      /** Updated At */
+      updated_at: string;
+    };
+    /** Reconciliations */
+    Reconciliations: {
+      /** Account */
+      account: string;
+      /**
+       * Reconciliations
+       * @description Newest first.
+       */
+      reconciliations: components["schemas"]["Reconciliation"][];
     };
     /**
      * RevalueIn
@@ -1986,6 +2282,12 @@ export interface components {
        * @description A human name, from `display-name` metadata if set.
        */
       display_name?: string | null;
+      /**
+       * Divided
+       * @description A divided account: a node that's one real account (at a bank, say), its sub-accounts dividing what's in it. It's reconciled and linked as one; they can't be themselves.
+       * @default false
+       */
+      divided: boolean;
       /**
        * Implicit
        * @description Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.
@@ -2543,6 +2845,41 @@ export interface operations {
       };
     };
   };
+  day_balances_api_ledger_v1_books__book_id__accounts__account__balances_get: {
+    parameters: {
+      query: {
+        from: string;
+        to: string;
+      };
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DayBalances"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   holdings_api_ledger_v1_books__book_id__accounts__account__holdings_get: {
     parameters: {
       query?: {
@@ -2587,6 +2924,8 @@ export interface operations {
         /** @description The page starting on or before this date. */
         date?: string | null;
         limit?: number;
+        /** @description Only reconciled transactions (true), or only those not (false). */
+        reconciled?: boolean | null;
       };
       header?: never;
       path: {
@@ -2614,6 +2953,134 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
+    };
+  };
+  reconciliation_api_ledger_v1_books__book_id__accounts__account__reconciliation_get: {
+    parameters: {
+      query?: {
+        /** @description The statement's date: transactions to 14 days after it. */
+        through?: string | null;
+      };
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReconcileState"];
+        };
+      };
+      /** @description Not reconciled itself */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  reconciliations_api_ledger_v1_books__book_id__accounts__account__reconciliations_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Reconciliations"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  reconcile_account_api_ledger_v1_books__book_id__accounts__account__reconciliations_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ReconcileIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Reconciled"];
+        };
+      };
+      /** @description It doesn't balance, or isn't allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  undo_reconciliation_api_ledger_v1_books__book_id__accounts__account__reconciliations__statement_date__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        statement_date: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not the latest */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };
@@ -3247,6 +3714,8 @@ export interface operations {
         /** @description The page starting on or before this date. */
         date?: string | null;
         limit?: number;
+        /** @description Only reconciled transactions (true), or only those not (false). */
+        reconciled?: boolean | null;
       };
       header?: never;
       path: {

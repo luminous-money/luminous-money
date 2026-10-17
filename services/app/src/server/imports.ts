@@ -30,6 +30,7 @@ import type {
   Outcome,
   ProposalSummary,
 } from "../shared/imports.js";
+import { add, isZero, negate } from "../shared/decimal.js";
 import { categorize, stagedPostings } from "./categorize/chain.js";
 import { buildRequest } from "./categorize/context.js";
 import type { Categorizer, Chosen, Decision } from "./categorize/types.js";
@@ -411,6 +412,7 @@ export async function importRows({
     proposal: proposals.get(row.line) ?? null,
   }));
   const count = (outcome: Outcome) => outcomes.filter((o) => o === outcome).length;
+  const end = lastBalance(rows, target.type === "liability");
   const batch = {
     id: batchId,
     account,
@@ -423,10 +425,69 @@ export async function importRows({
     duplicates: count("duplicate"),
     skipped: count("before-opening"),
     unreadable: count("unreadable"),
+    end_date: end?.date ?? null,
+    end_balance: end?.balance ?? null,
   };
   db.saveImport(
     { ...batch, book_id: book, user_id: userId },
     results.map((r, i) => ({ ...r, fingerprint: prints[i] ?? null }))
   );
-  return { batch, rows: results };
+  const balance_check = end
+    ? await fileBalanceCheck(ledger, book, account, end, currency).catch(() => null)
+    : null;
+  return { batch, rows: results, balance_check };
+}
+
+/**
+ * A file's last balance and its day (M14), from its balance column: the balance after the last
+ * row of its latest day, as stored (negative on a liability). Files list newest or oldest
+ * first (the dates say which, unless they're all one day), and show a card's balance as owed or
+ * as stored: the running balance says which (each balance is the one before it, plus or minus
+ * its amount). A file too short to say is taken in date order, a liability's as owed.
+ */
+export function lastBalance(
+  rows: Row[],
+  liability: boolean
+): { date: string; balance: string } | null {
+  const read = rows.filter((r) => !r.error && r.date && r.amount !== null && r.balance !== null);
+  if (!read.length) return null;
+  // newer - older - change: zero when the change is the row's
+  const fits = (older: Row, newer: Row, inverted: boolean) =>
+    isZero(
+      add(
+        add(newer.balance!, negate(older.balance!)),
+        inverted ? newer.amount! : negate(newer.amount!)
+      )
+    );
+  // Dates say which way a file runs, when they differ; else the running balance does.
+  const byDate = read[0]!.date !== read.at(-1)!.date;
+  let best = { newestFirst: read[0]!.date! > read.at(-1)!.date!, inverted: liability, fits: 0 };
+  for (const newestFirst of byDate ? [best.newestFirst] : [false, true])
+    for (const inverted of [false, true]) {
+      let count = 0;
+      for (let i = 1; i < read.length; i++) {
+        const [older, newer] = newestFirst ? [read[i]!, read[i - 1]!] : [read[i - 1]!, read[i]!];
+        if (fits(older, newer, inverted)) count++;
+      }
+      if (count > best.fits) best = { newestFirst, inverted, fits: count };
+    }
+  const final = best.newestFirst ? read[0]! : read.at(-1)!;
+  return { date: final.date!, balance: best.inverted ? negate(final.balance!) : final.balance! };
+}
+
+/** Whether the books agree with a file's last balance, at the end of its day. */
+async function fileBalanceCheck(
+  ledger: LedgerPort,
+  book: string,
+  account: string,
+  end: { date: string; balance: string },
+  currency: string
+) {
+  const days = await ledger.dayBalances(book, account, end.date, end.date);
+  return {
+    date: end.date,
+    file: end.balance,
+    books: days.days.at(-1)?.balance ?? days.before,
+    currency,
+  };
 }

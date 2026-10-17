@@ -6,13 +6,27 @@ _Updated 2026-10-17._ Keep this current: every finalized change set updates it (
 
 ## State
 
-**M1 through M13 are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M14 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
-accounts), M11 (budgets), M12 (reports) and M13 (sharing books) are described in their plans. The
-milestones ahead (M14–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+accounts), M11 (budgets), M12 (reports), M13 (sharing books) and M14 (reconciliation) are
+described in their plans. The milestones ahead (M15–M20, then Polish) are in
+[docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
+- **Reconciliation (M14):** an asset or liability account's page has **Reconcile**: the
+  statement's date and ending balance (prefilled from the bank, or the last imported file's
+  balance column), its unreconciled transactions to tick (imported ones and the opening balance
+  start ticked), and the difference pinned below. **Finish** once it's zero (ticked unconfirmed
+  ones are confirmed, dates moved to agree with the statement); **Save for later** keeps it for
+  any device; past statements with **Undo** on the latest. Ledgers mark reconciled transactions
+  ✓ and say "Reconciled through …" or "Off by … since …"; every ledger (and Transactions) has a
+  **filter** (Reconciliation: all, reconciled, not), and Select mode's **Select all** takes
+  what's shown. Editing a reconciled transaction asks first. A **divided account** (the editor:
+  an asset or liability node that's one real account its sub-accounts divide) reconciles as one.
+  Bank-fed accounts say "Matches the bank ✓" or "Off from the bank by … since …", and reconcile
+  themselves after a sync once everything's confirmed and agrees. An imported file with a
+  balance column says whether the books agree with it.
 - **Sharing (M13):** Manage books → Share: invite someone by link (can view, edit or manage;
   copy or share it), see who has the book, change roles, remove people, withdraw invitations.
   Whoever opens the link and accepts gets the book (a shared one says "Shared with you · Can
@@ -128,19 +142,20 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 159 tests, including the table lint
-    - auth: 20; app: 154; db: 10; csv-import: 22
+    - ledger: 169 tests, including the table lint
+    - auth: 20; app: 160; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 78 API tests and 85 browser tests (with Mailpit and a fake SimpleFIN server)
+  - `pnpm e2e`: 81 API tests and 87 browser tests (with Mailpit and a fake SimpleFIN server)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps
 
-1. **M14 (reconciliation):** answer the questions in [its plan](docs/milestones/m14-reconciliation/PLAN.md#questions),
-   then say `build M14`.
-2. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
+1. **M14's questions** (best guesses built): [its plan](docs/milestones/m14-reconciliation/PLAN.md#questions)
+   (moving dates on Finish, the 14 days after a statement, automatic reconciliation's date).
+2. **M15 (sub-accounts of linked accounts):** plan it, on M14's divided accounts.
+3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
 
 ## The ledger-graphs libraries
@@ -157,6 +172,9 @@ How it's put together:
 
 ## Gotchas
 
+- **Reconciliation's marks belong to reconciling:** the ledger keeps a posting's `reconciled:`
+  through JSON edits and strips it from new transactions (`service._marked`). Write marks only
+  through `reconcile.py`.
 - **Loans and withheld taxes:** how to record them is in [docs/loans-and-taxes.md](docs/loans-and-taxes.md).
 - **The first browser tests of a cold e2e stack** can time out waiting for review to load (seen
   once, 2026-10-17: three of accounts.spec, passing on a rerun).
@@ -188,11 +206,18 @@ How it's put together:
 - **The host's Node may be older than the images' (24).** `auth`'s unit tests need Node 24
   (built-in Argon2id); `pnpm test` runs them in Docker, or run
   `docker run --rm -v "$PWD":"$PWD" -w "$PWD/services/auth" node:24-slim npx vitest run`.
-- **`pnpm e2e:local` needs `AUTH_TEST_USERS=true`** on the running stack, so each test can log in
-  a user of its own: `AUTH_TEST_USERS=true docker compose up -d`. (`pnpm e2e` sets it for its
-  throwaway stack.) It also leaves test users and books behind; to clean up, run
-  `docker compose down -v && docker compose up -d`, sign up again, and `pnpm seed` with a new
-  API token.
+- **The dev stack has no test logins:** compose doesn't pass `AUTH_TEST_USERS` through, and
+  only `APP_ENV=test` turns it on. To poke at the UI (or take screenshots) without touching the
+  dev stack's data, start the e2e stack under its own project, `docker compose -p
+  fava-beans-e2e -f compose.yaml -f compose.e2e.yaml up -d traefik auth ledger app mailpit
+  simplefin-fake`, and run Playwright (the `mcr.microsoft.com/playwright:v1.63.0-noble` image)
+  on its network, `fava-beans-e2e_default`, at `http://traefik`. `pnpm e2e` tears it down.
+- **A mutation's per-call `onSuccess` doesn't run if its component unmounted first,** and a
+  hook-level `onSuccess` that returns an invalidation is awaited before it: a form keyed on
+  what that refetch changes is gone by then. Await `mutateAsync` instead (Reconcile's Finish,
+  the account editor's names).
+- **An effect must return a function or nothing:** `useEffect(() => cond && set(x))` returns
+  `false`, which React later calls as a cleanup ("l is not a function" in production).
 - **`pnpm seed` skips a book that already exists,** because the demo gets new IDs on every run
   and importing twice would duplicate everything. Pass another book ID for a fresh one.
 - **Databases from before a service's migrations are refused** with a message to recreate them

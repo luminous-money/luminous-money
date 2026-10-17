@@ -1,9 +1,37 @@
 M14: Reconciliation: plan
 ==================================================================================================
 
-> **Status: planned (2026-10-17),** with [questions](#questions) at the end; proposals are marked
-> where a question could change them. The brief, from [the plan](../../PLAN.md): reconciliation
-> (added 2026-10-12, "as another milestone at the end").
+> **Status: built (2026-10-17),** with ledger, unit, API and browser tests, on the answers and
+> the best guesses marked _(guess)_, which [the questions](#questions) at the end confirm. The
+> brief, from [the plan](../../PLAN.md): reconciliation (added 2026-10-12, "as another milestone
+> at the end").
+
+## Answers (2026-10-17)
+
+1. **A difference that won't come to zero:** Finish is refused until it balances; "Save for
+   later" keeps the work.
+2. **Reconciled transactions:** warn before editing one, and allow it.
+3. **Bank-fed accounts reconcile automatically** after each sync, when everything the bank sent
+   is confirmed and the balances agree.
+4. **Which accounts:** assets and liabilities.
+5. **Cadence:** whenever you like, no nudges.
+6. **Ticking an unconfirmed transaction** confirms it when the reconciliation finishes.
+7. **What's ticked so far** is kept on the server, so reconciling can move between devices.
+
+Also asked for:
+
+- **Reconciliations are kept as Beancount,** so they're part of an export.
+- **Imported transactions start ticked** (from a file or the bank), but nothing's reconciled until
+  Finish.
+- **"Reconcile includes sub-accounts":** an account setting. With it, the account and everything
+  under it reconcile as one account; its sub-accounts can't be reconciled (or take the setting)
+  themselves. Transfers between its sub-accounts aren't money moving, so they reconcile
+  themselves. **Refined** (thinking of M15) into an account mode, a **divided account**: a node
+  that's one real account (at a bank, say), the accounts under it dividing what's in it. It's
+  reconciled and linked as one; its sub-accounts can't be reconciled, linked to a bank, or
+  divided themselves.
+- **A filter on every ledger,** its first option "Reconciliation: reconciled or not". Select
+  all selects only what the filter shows.
 
 ## What reconciliation is
 
@@ -16,104 +44,136 @@ Matching (M2) already agrees transactions one at a time as files come in; reconc
 the *balance*, which is what catches a missed, doubled or mistyped transaction that matching
 can't see.
 
-## What exists today
-
-- **Matching** (M2): an imported row matches a transaction already in the books, or is staged
-  as a new one; review confirms it.
-- **Bank feeds** (M9): each linked account's reported balance and its date, a mirror of the
-  bank's posted transactions, "Not at the bank" in review, and the bank as the source of truth
-  when an account is first linked (reconcile mode).
-- **CSV profiles** can read a balance column, but nothing uses it.
-- **The ledger** stores `balance` directives (from imported books) and validates them with every
-  load (`problems`), but nothing shows those problems.
-- **Postings** can carry metadata and a flag (the API has both).
-
-## Decisions this plan makes
+## Decisions
 
 ### Kept in the books
 
 - **A reconciliation** is an account, a statement date, the statement's ending balance, and the
-  postings it covers. It's written as Beancount, so exports carry it and Beancount itself checks
-  it from then on:
+  postings it covers, written as Beancount (exports carry it; Beancount checks it on every load):
   - a **`balance` directive** dated the day after the statement (Beancount checks balances at
-    the start of a day), with `statement: 2026-09-30` metadata
+    the start of a day), with `statement: 2026-09-30` metadata. On an account that includes its
+    sub-accounts, Beancount's balance is the whole subtree's, which is what's wanted.
   - **`reconciled: 2026-09-30`** metadata on each posting it covers (on the posting, not the
-    transaction: a transfer's two sides reconcile with two different statements)
-- **The starting balance** is the last reconciliation's ending one, or zero before the first.
-- **Undoing** the latest reconciliation removes its balance directive and its marks, in one write.
+    transaction: a transfer's two sides reconcile with two different statements).
+- **A divided account:** `divided: TRUE` on the node's `open` directive. Only an asset or
+  liability node is divided, and not one with a divided account above or below it (an account
+  is part of one real account at most), nor one with a bank link under it.
+- **Marks belong to reconciliations.** Editing a transaction keeps its postings' marks (a posting
+  keeps its mark while it stays in the same account); only reconciling and undoing change them.
+  New transactions arrive unreconciled. (Text imports and restores keep what the text says.)
+- **The starting balance** is what's reconciled so far: the sum of the scope's reconciled
+  postings. Normally that's the last statement's balance; after an edit breaks one, the two
+  differ, and the account says by how much.
+- **Undoing** the latest reconciliation removes its balance directive and its marks, in one
+  write. (What finishing confirmed or moved stays.)
+
+### Dates agree with the statement _(guess)_
+
+Beancount checks a balance against every posting dated up to the statement, so the books' dates
+have to agree with it: a transaction on the statement is dated on or before its date, and one
+that isn't, after it. Imported transactions carry the bank's dates, so they already do; one
+entered by hand may not (a check written on the 28th that cleared on the 2nd). So:
+
+- The list shows the account's unreconciled transactions up to the statement date, and those of
+  the **14 days after it** ("Dated after the statement"), any of which may have cleared in time.
+- **Finishing moves** each ticked transaction dated after the statement to the statement's date,
+  and each unticked one dated on or before it to the day after. The Finish line says how many
+  it moves, before it's tapped.
+- A move that would break another account's reconciliation (a transfer reconciled on its other
+  side) is refused, with which.
 
 ### Reconciling an account
 
-From an account's page (an asset or liability), **Reconcile**:
+**Reconcile** is on an asset or liability account's page: a leaf, or a divided account. A
+sub-account of a divided account says "Part of PNC, a divided account", linking there.
 
-1. **The statement:** its date and ending balance. Prefilled from the bank feed's reported balance
-   and date when the account is linked, or from the last imported file's balance column; else
-   blank.
-2. **The transactions:** every unreconciled posting of the account dated up to the statement,
-   oldest first, each to tick off as it appears on the statement. Those the bank sent (held by an
-   import row) start ticked.
-3. **The arithmetic,** always on screen: the starting balance, plus what's ticked, against the
-   statement; the difference, and "Finish" once it's zero.
-4. **Finishing** writes the reconciliation in one atomic write. A ticked transaction that was
-   still unconfirmed is confirmed with it (the bank has it) ([question 6](#questions)).
-5. **When it won't come to zero:** "Finish anyway" adds an adjustment transaction for the
-   difference, to `Expenses:Reconciliation-Adjustments` (or Income for the other way)
-   ([question 1](#questions)).
-
-What's ticked so far is kept on the device until it's finished or cancelled
-([question 7](#questions)).
+1. **The statement:** its date and ending balance, as the account reads (a card's balance is
+   what's owed). Prefilled from the bank feed's balance (a linked account) or the last imported
+   file's last balance (a balance column), else blank.
+2. **The transactions:** every unreconciled transaction in it, oldest first, each to tick off as
+   it appears on the statement. **Imported ones start ticked** (from a file or the bank), and so
+   does the opening balance (it came from a statement). Transfers within a divided account
+   aren't listed: a line says how many reconcile themselves.
+3. **The arithmetic,** pinned on screen: starting balance, plus what's ticked, against the
+   statement; the difference.
+4. **Finish** is enabled once the difference is zero: one atomic write. Ticked unconfirmed
+   transactions are confirmed with it.
+5. **Save for later** keeps the statement and what's ticked, on the server (one draft per
+   account, shared by the book's members; versioned). Opening Reconcile again picks it up;
+   **Discard** drops it.
 
 ### Afterwards
 
-- **The ledger** marks reconciled transactions ✓, and the account's page says "Reconciled through
-  September 30", with its history (each statement, its balance, how many transactions) and Undo
-  for the latest.
-- **Editing a reconciled transaction** warns first ("reconciled with September 30's statement:
-  changing it breaks that"), but is allowed ([question 2](#questions)). If the change breaks the
-  balance, the account says so (below).
-- **Broken balances show:** the ledger's own validation of every balance assertion (from
-  reconciliations, and from imported books) appears on the account's page: "Off by $12.40 since
-  September 30's statement", with a link to the transactions around it.
+- **Ledgers** mark reconciled transactions ✓. The account's page says "Reconciled through
+  September 30". The Reconcile page lists past statements (date, balance, how many transactions)
+  with **Undo** on the latest.
+- **Editing a reconciled transaction** says so up front ("Reconciled with Checking's September
+  30 statement"), and saving a change asks "Save anyway?".
+- **Broken balances show:** every balance check on the account (its reconciliations', and any
+  from an imported book) is compared with the books by SQL; one that doesn't hold shows on the
+  account's page: "Off by $12.40 since September 30's statement".
 
-### Bank-fed accounts: checked every day
+### The filter
 
-- **In balance, or not:** a linked account's page (and Bank connections) compare the books'
-  balance at the bank's balance date with what the bank reports: "Matches the bank ✓", or "Off by
-  $12.40".
-- **Where it went off:** the bank's day-end balances are backed out from its reported balance and
-  the mirrored transactions; the first day the books' and the bank's differ is shown, with what's
-  on only one side near it.
-- **Reconciling to the bank:** one tap, prefilled with the reported balance and its date, and
-  everything the bank sent ticked ([question 3](#questions): automatic instead?).
+- A **filter button** (a funnel) beside "Go to date" on every ledger (an account's, and
+  Transactions). Its first option is **Reconciliation: All · Reconciled · Not reconciled**; the
+  button shows when one is on, and the choice is in the URL (`?reconciled=yes|no`), so Back keeps it.
+- Filtering is the server's, so pages stay full and running balances stay true (they're the
+  account's, not the filtered rows').
+- In Transactions, a transaction is reconciled when its asset and liability postings all are,
+  and not reconciled when any of them isn't (one with none is neither).
+- **Select all** (Select mode, here and in review) selects what's shown: the filtered rows loaded
+  so far. Transactions gains Select mode (Confirm) for it.
+
+### Bank-fed accounts
+
+- **Compared every day:** a linked account's page compares the bank's balance with the books' on
+  the bank's balance date: "Matches the bank ✓", or "Off by $12.40 since September 12". Where it
+  went off comes from the bank's day-end balances, backed out from its reported balance and the
+  mirrored transactions (dated as imports date them), against the books' day by day.
+- **Reconciled automatically** after each sync, through the day before the bank's balance date,
+  to the bank's day-end balance then, when: the account is linked itself (not a brokerage), every unreconciled transaction through
+  that day is confirmed, none of its imported rows has a match waiting in review, no draft is in
+  progress, and the books agree with the bank. Otherwise it waits for the next sync.
 
 ### Imported files with a balance column
 
-- After importing, the results say whether the books agree with the file's last balance: "The
-  file ends at $4,212.18 on October 3; the books say $4,199.78."
+- The results say whether the books agree with the file's last balance: "The file ends at
+  $4,212.18 on October 3: the books agree" (or "say $4,199.78"). The batch keeps that last balance
+  and date, for Reconcile's prefill.
 
 ### The API
 
 - **Ledger:**
-  - `GET /books/{b}/accounts/{a}/reconciliation?through=`: what reconciling needs: the last
-    reconciliation (date, balance), and the unreconciled postings up to the date
-  - `POST /books/{b}/accounts/{a}/reconciliations`: `{statement_date, balance, postings,
-    adjustment?}`, one atomic write; refused (422) if it doesn't come to the balance without an
-    adjustment
-  - `GET /books/{b}/accounts/{a}/reconciliations`: the history; `DELETE …/{statement_date}`: undo
-    the latest
-  - an account's balance on a date (`summary?on=`), and the book's balance problems by account
-- **`app`:** the bank comparison (day-end balances from the mirror), the import's balance check,
-  and the reconcile screen's prefill.
+  - `PATCH /books/{b}/accounts/{a}` takes `divided`; `Account` says it.
+  - `GET /books/{b}/accounts/{a}/reconciliation?through=`: what reconciling needs (scope,
+    currency, the reconciled balance, the last statement, the unreconciled transactions to 14
+    days past `through`).
+  - `POST /books/{b}/accounts/{a}/reconciliations` `{statement_date, balance, transactions}`: one
+    atomic write; 422 unless it balances.
+  - `GET /books/{b}/accounts/{a}/reconciliations` (history, and broken balance checks), and
+    `DELETE …/reconciliations/{statement_date}` (the latest).
+  - `GET /books/{b}/accounts/{a}/balances?from=&to=`: day-end balances, for the bank comparison
+    and the import check.
+  - `reconciled=true|false` on the account ledger and the journal; each row says whether it's
+    reconciled.
+- **`app`:** `POST /books/:book/accounts/:account/divided` (refused with a bank link under it;
+  linking refuses a part of a divided account); `GET|PUT|DELETE /books/:book/reconcile/:account[/draft]` (the screen's view, with
+  prefill, what starts ticked and the draft; saving and dropping the draft) and `POST
+  /books/:book/reconcile/:account` (finish); the bank comparison in bank status; automatic
+  reconciliation after syncs; the import balance check.
 
 ## How it gets built
 
-1. **Ledger:** reconciliations (balance directive and posting marks), their history and undo,
-   balance on a date, balance problems; tests.
-2. **`app`:** the bank comparison and where it diverged; the import balance check; tests.
-3. **PWA:** the Reconcile screen, the account page's status, history and problems, the ✓ in
-   ledgers, the warning before editing a reconciled transaction.
-4. **Tests:** ledger (reconcile, undo, a broken balance), API e2e (reconcile a CSV-fed account; a
-   bank-fed one off by one transaction), browser (tick off a statement and finish).
+1. **Ledger:** divided accounts, the posting column (migration 9), reconciling, history, undo,
+   balance checks, day-end balances, the filters, marks kept through edits; tests.
+2. **`app`:** drafts and batches' last balances (migration 16), the reconcile view and finish,
+   the bank comparison, automatic reconciliation, the import balance check; tests.
+3. **PWA:** the Reconcile page, the account page's status and Reconcile, ✓ in ledgers, the
+   filter, Select all, "Divided account" in the editor, the warning before editing.
+4. **Tests:** ledger (reconcile, refuse, dates moved, undo, a divided account, marks kept, a broken
+   balance, filters), API e2e (reconcile a CSV-fed account, a bank-fed one automatically),
+   browser (tick off a statement, save for later, finish; the filter).
 5. **Docs:** design.md ("Reconciliation"), PLAN.md, RESUME.md.
 
 ## Out of scope
@@ -125,16 +185,9 @@ What's ticked so far is kept on the device until it's finished or cancelled
 
 ## Questions
 
-1. **When the difference won't come to zero:** allow "Finish anyway" with an adjustment
-   transaction (proposed), or refuse until it balances?
-2. **Reconciled transactions:** warn before editing one (proposed), or refuse edits until the
-   reconciliation is undone?
-3. **Bank-fed accounts:** reconcile to the bank by a tap (proposed), or automatically after each
-   sync when everything the bank sent is confirmed and the balances agree?
-4. **Which accounts:** assets and liabilities (proposed), or any account?
-5. **Statements' cadence:** reconcile whenever you like (proposed), or nudge monthly ("October's
-   statement isn't reconciled yet")?
-6. **Ticking an unconfirmed transaction** confirms it when the reconciliation finishes (proposed),
-   or should it have to be confirmed in review first?
-7. **What's ticked so far** kept on the device until finished (proposed), or on the server, so
-   reconciling can move between devices?
+1. **Moving dates on Finish** _(guess)_: is it right that finishing moves a ticked transaction
+   dated after the statement onto its date, and an unticked one dated before it to the day
+   after? The alternative is refusing to finish until you change those dates yourself.
+2. **The window after the statement** _(guess)_: 14 days of later transactions to tick from. Enough?
+3. **Automatic reconciliation's statement date** _(guess)_: the day before the bank's balance
+   date (so a late posting that day can't break it). Or the balance date itself?

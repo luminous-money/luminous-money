@@ -280,6 +280,7 @@ button:focus-visible,
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.75rem;
 }
@@ -1246,12 +1247,14 @@ button.plain {
 
 .select-bar-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
 }
 
-.select-bar-row > :nth-child(2) {
-  flex: 1;
+.select-bar-row > .picker-value,
+.select-bar-row > .picker {
+  flex: 1 1 10rem;
   min-width: 0;
 }
 
@@ -2183,4 +2186,140 @@ main a.largest-row,
 .member .pill {
   background: var(--line);
   color: var(--muted);
+}
+
+/* Reconciliation (M14). Ledgers mark reconciled transactions ✓ and filter by it; Reconcile
+   ticks off a statement, its arithmetic pinned below. */
+
+.reconciled-mark {
+  color: var(--good);
+  font-weight: 700;
+}
+
+.ledger-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0 0.5rem;
+}
+
+.ledger-tools .ledger-jump {
+  flex: 1 1 14rem;
+}
+
+.ledger-filter {
+  display: contents;
+}
+
+.filter-button {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+}
+
+.filter-button.on {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.filter-panel,
+.filter-note {
+  flex-basis: 100%;
+  margin: 0 0 0.75rem;
+}
+
+.filter-panel {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.reconcile-row {
+  grid-template-columns: 1.4rem 5.6rem minmax(6.5rem, 1fr) minmax(0, max-content);
+}
+
+.reconcile-row .tick {
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 2px solid var(--line);
+  border-radius: 0.35rem;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.reconcile-row.selected .tick {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.reconcile-row.selected {
+  outline: 0;
+}
+
+.reconcile-group {
+  margin: 0;
+  padding: 0.5rem 0.8rem 0.2rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.reconcile-sum {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.reconcile-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+.reconcile-figures dt {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.reconcile-figures dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.reconcile-figures .ok dd {
+  color: var(--good);
+}
+
+.reconcile-figures .error dd {
+  color: var(--bad);
+}
+
+.reconcile-sum .actions {
+  margin: 0;
+}
+
+.statement-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.confirm-row {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.confirm-row p,
+.reconciled-note {
+  margin: 0;
 }

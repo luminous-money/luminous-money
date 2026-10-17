@@ -17,6 +17,7 @@ import type { DailyJob } from "../daily.js";
 import { localMinutes } from "../daily.js";
 import type { AppDb } from "../db.js";
 import { importRows } from "../imports.js";
+import { autoReconcile } from "../reconcile.js";
 import { pairAfterImport, pairTransfers } from "../transfers.js";
 import type { LedgerPort } from "../ledger.js";
 import { fetchAccounts, type SfAccountSet, type SfTransaction } from "./client.js";
@@ -183,6 +184,9 @@ export async function syncConnection(
     const result = await importLink(deps, link);
     if (result) results.push(result);
   }
+  // Then reconcile what agrees with the bank (M14), once everything's in.
+  for (const link of deps.store.links(connection.id))
+    await autoReconcile(deps.db, deps.store, deps.ledgerFor(link.user_id), link);
   return results;
 }
 

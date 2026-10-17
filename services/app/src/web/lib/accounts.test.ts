@@ -34,6 +34,7 @@ const account = (name: string, rest: Partial<Account> = {}): Account => ({
   open: "2020-01-01",
   close: null,
   currencies: [],
+  divided: false,
   ...rest,
 });
 

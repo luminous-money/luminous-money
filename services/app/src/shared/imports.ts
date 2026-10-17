@@ -78,9 +78,20 @@ export type ImportBatch = {
   duplicates: number;
   skipped: number;
   unreadable: number;
+  /** A file with a balance column: its last balance (stored sign) and that day (M14). */
+  end_date?: string | null;
+  end_balance?: string | null;
 };
 
-export type ImportResult = { batch: ImportBatch; rows: ImportRow[] };
+/** Whether the books agree with an imported file's last balance (M14). Stored signs. */
+export type FileBalanceCheck = { date: string; file: string; books: string; currency: string };
+
+export type ImportResult = {
+  batch: ImportBatch;
+  rows: ImportRow[];
+  /** For a file with a balance column. */
+  balance_check?: FileBalanceCheck | null;
+};
 
 /** Another row of the account's imports, holding a candidate (so taking it is a swap). */
 export type Holder = { batch_id: string; line: number; date: string | null; description: string };

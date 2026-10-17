@@ -28,6 +28,7 @@ import { randomUUID } from "node:crypto";
 import type { LedgerRow, TransactionIn } from "@fava-beans/ledger-client";
 
 import { add, isZero, negate } from "../../shared/decimal.js";
+import { partOf } from "../../shared/divided.js";
 import type { ImportRow } from "../../shared/imports.js";
 import { now } from "@fava-beans/db";
 import type { LedgerPort, TransactionEdit } from "../ledger.js";
@@ -135,9 +136,14 @@ export async function precheck(deps: SimplefinDeps, input: LinkInput): Promise<v
   if (store.linkTo(book, account)) throw new LinkProblem(409, `${account} is already linked`);
   if (mode === "from-date" && !/^\d{4}-\d{2}-\d{2}$/.test(input.from ?? ""))
     throw new LinkProblem(422, "choose the first date to bring in");
-  const names = new Set(
-    (await ledger.accounts(book)).filter((a) => !a.implicit).map((a) => a.name)
-  );
+  const accounts = await ledger.accounts(book);
+  const whole = partOf(accounts, account);
+  if (whole)
+    throw new LinkProblem(
+      409,
+      `${account} is part of ${whole}, a divided account: it isn't linked to a bank on its own`
+    );
+  const names = new Set(accounts.filter((a) => !a.implicit).map((a) => a.name));
   if (mode === "new" && (names.has(account) || names.has(`${account}:Cash`)))
     throw new LinkProblem(409, `${account} already exists: reconcile with it, or start it over`);
   if (mode !== "new" && !names.has(account) && !names.has(`${account}:Cash`))

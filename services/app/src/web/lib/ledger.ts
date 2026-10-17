@@ -34,6 +34,8 @@ export type BudgetIn = Components["schemas"]["BudgetIn"];
 export type BudgetLine = Components["schemas"]["BudgetLine"];
 export type BudgetStatus = Components["schemas"]["BudgetStatus"];
 export type BudgetBasis = BudgetStatus["basis"];
+export type Reconciliations = Components["schemas"]["Reconciliations"];
+export type Reconciliation = Components["schemas"]["Reconciliation"];
 
 export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"], "updated_at">;
 export type AccountKind = components["schemas"]["AccountIn"]["kind"];
@@ -171,21 +173,43 @@ export const api = {
     ),
 
   /** A page of an account's ledger: the newest, or one either side of a row, or from a date. */
-  accountLedger: (book_id: string, account: string, page: LedgerPageAt = {}): Promise<LedgerPage> =>
+  accountLedger: (
+    book_id: string,
+    account: string,
+    page: LedgerPageAt = {},
+    reconciled?: boolean
+  ): Promise<LedgerPage> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/ledger", {
-        params: { path: { book_id, account }, query: { ...page, limit: 200 } },
+        params: { path: { book_id, account }, query: { ...page, limit: 200, reconciled } },
       })
     ),
 
   /** A page of the book's journal: every account's transactions, newest first, paged as an
    * account's ledger is. */
-  journal: (book_id: string, page: LedgerPageAt = {}): Promise<JournalPage> =>
+  journal: (book_id: string, page: LedgerPageAt = {}, reconciled?: boolean): Promise<JournalPage> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/journal", {
-        params: { path: { book_id }, query: { ...page, limit: 200 } },
+        params: { path: { book_id }, query: { ...page, limit: 200, reconciled } },
       })
     ),
+
+  /** An account's reconciliations (and balance checks from imported books), newest first. */
+  reconciliations: (book_id: string, account: string): Promise<Reconciliations> =>
+    unwrap(
+      ledger.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliations", {
+        params: { path: { book_id, account } },
+      })
+    ),
+
+  /** Undo an account's latest reconciliation. */
+  async undoReconciliation(book_id: string, account: string, statement_date: string) {
+    const { response, error } = await ledger.DELETE(
+      "/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliations/{statement_date}",
+      { params: { path: { book_id, account, statement_date } } }
+    );
+    if (!response.ok) throw new ApiError(response.status, describe(error) ?? "couldn't undo it");
+  },
 
   createTransaction: (book_id: string, body: TransactionIn): Promise<Transaction> =>
     unwrap(

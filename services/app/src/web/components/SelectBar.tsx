@@ -1,11 +1,14 @@
 import { AccountPicker, type AccountCreation } from "./AccountPicker.js";
 
 /**
- * Select mode's bar, sticky across the top of review and account ledgers: how many are
- * selected, "Categorize as…", "Confirm", and "Done".
+ * Select mode's bar, sticky across the top of review and ledgers: how many are selected,
+ * "Select all" (what's shown: a filtered list's rows, loaded so far), "Categorize as…" (where
+ * that means something), "Confirm", and "Done".
  */
 export function SelectBar({
   count,
+  shown,
+  onSelectAll,
   accounts,
   create,
   onCategorize,
@@ -16,10 +19,14 @@ export function SelectBar({
   onDone,
 }: {
   count: number;
+  /** How many are shown, for Select all. */
+  shown: number;
+  /** Select everything shown. */
+  onSelectAll: () => void;
   /** Accounts to categorize as. */
-  accounts: string[];
+  accounts?: string[];
   create?: AccountCreation;
-  onCategorize: (account: string) => void;
+  onCategorize?: (account: string) => void;
   onConfirm: () => void;
   /** Whether the selection can be confirmed (none uncategorized, say). */
   canConfirm: boolean;
@@ -32,13 +39,18 @@ export function SelectBar({
     <div className="select-bar" role="toolbar" aria-label="Selected">
       <div className="select-bar-row">
         <span className="select-count">{count} selected</span>
-        <AccountPicker
-          label="Categorize as"
-          accounts={accounts}
-          value=""
-          create={create}
-          onChange={onCategorize}
-        />
+        <button type="button" disabled={!shown || count === shown} onClick={onSelectAll}>
+          Select all
+        </button>
+        {onCategorize && accounts && (
+          <AccountPicker
+            label="Categorize as"
+            accounts={accounts}
+            value=""
+            create={create}
+            onChange={onCategorize}
+          />
+        )}
         <button
           type="button"
           className="primary"

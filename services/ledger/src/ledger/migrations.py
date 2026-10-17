@@ -69,6 +69,22 @@ def _backfill_budgeted(conn: sqlite3.Connection) -> None:
         conn.execute("UPDATE directive SET budgeted = ? WHERE id = ?", (int(directive.budgeted), row[0]))
 
 
+def _backfill_reconciled(conn: sqlite3.Connection) -> None:
+    """Fill in migration 9's column for postings written before it."""
+    from . import engine
+
+    rows = conn.execute(
+        "SELECT id, text FROM directive WHERE deleted = 0 AND kind = 'transaction' AND text LIKE '%reconciled:%'"
+    ).fetchall()
+    for row in rows:
+        for idx, p in enumerate(engine.parse_one(row[1], row[0]).postings):
+            if p.reconciled:
+                conn.execute(
+                    "UPDATE posting SET reconciled = ? WHERE directive_id = ? AND idx = ?",
+                    (p.reconciled.isoformat(), row[0], idx),
+                )
+
+
 def _backfill_prices(conn: sqlite3.Connection) -> None:
     """Fill in migration 4's price table from the price directives written before it."""
     from . import engine
@@ -184,6 +200,9 @@ MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
         ),
         "CREATE INDEX book_member_user ON book_member(user_id)",
     ],
+    # 9: reconciliation (M14). Each posting's `reconciled:` mark, the statement date it was
+    # reconciled with, so ledgers and reconciling read it with SQL.
+    ["ALTER TABLE posting ADD COLUMN reconciled TEXT", _backfill_reconciled],
 ]
 
 

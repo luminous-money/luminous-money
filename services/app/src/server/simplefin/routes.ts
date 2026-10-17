@@ -26,6 +26,7 @@ import {
   syncConnection,
   type SimplefinDeps,
 } from "./sync.js";
+import { bankComparison } from "../reconcile.js";
 import { pairTransfers } from "../transfers.js";
 
 type Env = { Variables: { user: string } };
@@ -308,6 +309,7 @@ export function simplefinRoutes(
         errors: errorsOf(
           connection.errors.filter((e) => !e.account_id || e.account_id === link.account_id)
         ),
+        comparison: await bankComparison(deps.db, store, ledgerFor(user), link).catch(() => null),
       };
     }
     return c.json(status);

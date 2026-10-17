@@ -47,6 +47,12 @@
             "description": "A human name, from `display-name` metadata if set.",
             "title": "Display Name"
           },
+          "divided": {
+            "default": false,
+            "description": "A divided account: a node that's one real account (at a bank, say), its sub-accounts dividing what's in it. It's reconciled and linked as one; they can't be themselves.",
+            "title": "Divided",
+            "type": "boolean"
+          },
           "implicit": {
             "default": false,
             "description": "Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.",
@@ -297,6 +303,18 @@
             "description": "A human name; None or \"\": the name's last part.",
             "title": "Display Name"
           },
+          "divided": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An asset or liability node: make it a divided account, one real account its sub-accounts divide (they can't be reconciled, linked or divided themselves).",
+            "title": "Divided"
+          },
           "revalue_every": {
             "anyOf": [
               {
@@ -416,6 +434,12 @@
             ],
             "description": "A human name, from `display-name` metadata if set.",
             "title": "Display Name"
+          },
+          "divided": {
+            "default": false,
+            "description": "A divided account: a node that's one real account (at a bank, say), its sub-accounts dividing what's in it. It's reconciled and linked as one; they can't be themselves.",
+            "title": "Divided",
+            "type": "boolean"
           },
           "gain": {
             "anyOf": [
@@ -1200,6 +1224,19 @@
               }
             ],
             "description": "The posting's change to its account; None if only booking could say."
+          },
+          "reconciled": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The statement it was reconciled with (M14).",
+            "title": "Reconciled"
           }
         },
         "required": [
@@ -1338,6 +1375,60 @@
           }
         },
         "title": "Cost",
+        "type": "object"
+      },
+      "DayBalance": {
+        "properties": {
+          "balance": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Balance",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "balance"
+        ],
+        "title": "DayBalance",
+        "type": "object"
+      },
+      "DayBalances": {
+        "description": "An account's (and its subtree's) balance at the end of each day it changed.",
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "before": {
+            "description": "At the end of the day before `from`.",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Before",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DayBalance"
+            },
+            "title": "Days",
+            "type": "array"
+          }
+        },
+        "required": [
+          "account",
+          "currency",
+          "before",
+          "days"
+        ],
+        "title": "DayBalances",
         "type": "object"
       },
       "Deletion": {
@@ -1770,6 +1861,18 @@
             "title": "Postings",
             "type": "array"
           },
+          "reconciled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether its asset and liability postings are all reconciled; None when it has none.",
+            "title": "Reconciled"
+          },
           "updated_at": {
             "title": "Updated At",
             "type": "string"
@@ -1918,6 +2021,19 @@
               }
             ],
             "title": "Payee"
+          },
+          "reconciled": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Once all its postings in the account are reconciled: the (latest) statement's date.",
+            "title": "Reconciled"
           },
           "splits": {
             "title": "Splits",
@@ -2358,6 +2474,292 @@
           "rows"
         ],
         "title": "QueryResult",
+        "type": "object"
+      },
+      "ReconcileIn": {
+        "additionalProperties": false,
+        "properties": {
+          "automatic": {
+            "default": false,
+            "description": "Reconciled with the bank's balance after a sync. It replaces the latest reconciliation if that was automatic too and in the same month, so there's one a month.",
+            "title": "Automatic",
+            "type": "boolean"
+          },
+          "balance": {
+            "description": "The statement's ending balance, as stored (negative on a liability).",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Balance",
+            "type": "string"
+          },
+          "statement_date": {
+            "format": "date",
+            "title": "Statement Date",
+            "type": "string"
+          },
+          "transactions": {
+            "description": "The unreconciled transactions on the statement.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Transactions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "statement_date",
+          "balance",
+          "transactions"
+        ],
+        "title": "ReconcileIn",
+        "type": "object"
+      },
+      "ReconcileItem": {
+        "description": "An unreconciled transaction, as reconciling an account lists it.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "Its unreconciled change to the account (and those under it), as stored."
+          },
+          "counterpart": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The account on its other side, if just one.",
+            "title": "Counterpart"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "flag": {
+            "title": "Flag",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "narration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narration"
+          },
+          "opening": {
+            "description": "An opening balance: it came from a statement too.",
+            "title": "Opening",
+            "type": "boolean"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "flag",
+          "payee",
+          "narration",
+          "amount",
+          "counterpart",
+          "opening",
+          "updated_at"
+        ],
+        "title": "ReconcileItem",
+        "type": "object"
+      },
+      "ReconcileState": {
+        "description": "What reconciling an account needs.",
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "currency": {
+            "description": "What it's reconciled in: its currency, else the book's.",
+            "title": "Currency",
+            "type": "string"
+          },
+          "internal": {
+            "description": "Transfers between its sub-accounts, to `through`, that reconcile themselves.",
+            "title": "Internal",
+            "type": "integer"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last statement's date; the next must be later.",
+            "title": "Last"
+          },
+          "reconciled_balance": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "What's reconciled so far: the starting balance."
+          },
+          "transactions": {
+            "description": "Unreconciled, oldest first: to `through` and the days after it (all, without it).",
+            "items": {
+              "$ref": "#/components/schemas/ReconcileItem"
+            },
+            "title": "Transactions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "account",
+          "currency",
+          "reconciled_balance",
+          "last",
+          "transactions",
+          "internal"
+        ],
+        "title": "ReconcileState",
+        "type": "object"
+      },
+      "Reconciled": {
+        "properties": {
+          "confirmed": {
+            "description": "Unconfirmed transactions confirmed with it.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Confirmed",
+            "type": "array"
+          },
+          "moved": {
+            "description": "Transactions whose date moved to agree with the statement.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Moved",
+            "type": "array"
+          },
+          "reconciliation": {
+            "$ref": "#/components/schemas/Reconciliation"
+          }
+        },
+        "required": [
+          "reconciliation",
+          "confirmed",
+          "moved"
+        ],
+        "title": "Reconciled",
+        "type": "object"
+      },
+      "Reconciliation": {
+        "description": "A balance check on the account: a reconciliation's (with a statement), or one from an imported book.",
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "automatic": {
+            "default": false,
+            "description": "Reconciled with the bank's balance after a sync.",
+            "title": "Automatic",
+            "type": "boolean"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "off_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The statement less the books, when they don't agree."
+          },
+          "statement": {
+            "description": "A reconciliation (else a balance check from an imported book).",
+            "title": "Statement",
+            "type": "boolean"
+          },
+          "statement_date": {
+            "description": "The day it holds at the end of (the directive's date, less a day).",
+            "format": "date",
+            "title": "Statement Date",
+            "type": "string"
+          },
+          "transactions": {
+            "description": "How many transactions it reconciled.",
+            "title": "Transactions",
+            "type": "integer"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "account",
+          "statement_date",
+          "balance",
+          "statement",
+          "transactions",
+          "off_by",
+          "updated_at"
+        ],
+        "title": "Reconciliation",
+        "type": "object"
+      },
+      "Reconciliations": {
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "reconciliations": {
+            "description": "Newest first.",
+            "items": {
+              "$ref": "#/components/schemas/Reconciliation"
+            },
+            "title": "Reconciliations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "account",
+          "reconciliations"
+        ],
+        "title": "Reconciliations",
         "type": "object"
       },
       "RevalueIn": {
@@ -3183,6 +3585,12 @@
             "description": "A human name, from `display-name` metadata if set.",
             "title": "Display Name"
           },
+          "divided": {
+            "default": false,
+            "description": "A divided account: a node that's one real account (at a bank, say), its sub-accounts dividing what's in it. It's reconciled and linked as one; they can't be themselves.",
+            "title": "Divided",
+            "type": "boolean"
+          },
           "implicit": {
             "default": false,
             "description": "Never opened: a top-level account, or a parent that exists because accounts exist under it. Always a node.",
@@ -4005,6 +4413,75 @@
         "summary": "Archive Account"
       }
     },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/balances": {
+      "get": {
+        "description": "The account's (and its subtree's) balance at the end of each day it changed, in its\ncurrency, and at the end of the day before `from`.",
+        "operationId": "day_balances_api_ledger_v1_books__book_id__accounts__account__balances_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayBalances"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Day Balances"
+      }
+    },
     "/api/ledger/v1/books/{book_id}/accounts/{account}/holdings": {
       "get": {
         "description": "What an account and everything under it holds: units, prices, value, cost basis, gains\nand lots per commodity.",
@@ -4159,6 +4636,24 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "description": "Only reconciled transactions (true), or only those not (false).",
+            "in": "query",
+            "name": "reconciled",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only reconciled transactions (true), or only those not (false).",
+              "title": "Reconciled"
+            }
           }
         ],
         "responses": {
@@ -4184,6 +4679,211 @@
           }
         },
         "summary": "Account Ledger"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliation": {
+      "get": {
+        "description": "What reconciling the account needs: what's reconciled so far, the last statement, and\nthe unreconciled transactions, oldest first.",
+        "operationId": "reconciliation_api_ledger_v1_books__book_id__accounts__account__reconciliation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The statement's date: transactions to 14 days after it.",
+            "in": "query",
+            "name": "through",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The statement's date: transactions to 14 days after it.",
+              "title": "Through"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcileState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Not reconciled itself"
+          }
+        },
+        "summary": "Reconciliation"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliations": {
+      "get": {
+        "description": "The account's reconciliations (and balance checks from imported books), newest first,\neach against the books.",
+        "operationId": "reconciliations_api_ledger_v1_books__book_id__accounts__account__reconciliations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reconciliations"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reconciliations"
+      },
+      "post": {
+        "description": "Reconcile the account with a statement, in one write: the ticked transactions (and\ntransfers within it) marked, unconfirmed ones confirmed, dates moved to agree with the\nstatement, its balance written. Refused unless it balances.",
+        "operationId": "reconcile_account_api_ledger_v1_books__book_id__accounts__account__reconciliations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reconciled"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "It doesn't balance, or isn't allowed"
+          }
+        },
+        "summary": "Reconcile Account"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliations/{statement_date}": {
+      "delete": {
+        "description": "Undo the account's latest reconciliation: its marks and balance go.",
+        "operationId": "undo_reconciliation_api_ledger_v1_books__book_id__accounts__account__reconciliations__statement_date__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "statement_date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Statement Date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Not the latest"
+          }
+        },
+        "summary": "Undo Reconciliation"
       }
     },
     "/api/ledger/v1/books/{book_id}/accounts/{account}/rename": {
@@ -5270,6 +5970,24 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Only reconciled transactions (true), or only those not (false).",
+            "in": "query",
+            "name": "reconciled",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only reconciled transactions (true), or only those not (false).",
+              "title": "Reconciled"
             }
           }
         ],

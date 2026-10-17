@@ -41,6 +41,13 @@ DISPLAY_NAME_KEY = "display-name"
 # A revalued asset (a house, a car): how many days its value stays current (M5).
 REVALUE_EVERY_KEY = "revalue-every"
 BUDGET_KEY = "budget"  # on a transaction: FALSE keeps it out of budgets (M11)
+# Reconciliation (M14): on a posting, the statement date it was reconciled with; on a balance
+# directive, the statement it records.
+RECONCILED_KEY = "reconciled"
+STATEMENT_KEY = "statement"
+SOURCE_KEY = "source"  # on a balance directive: "bank" for an automatic reconciliation
+# On a node's open: a divided account, one real account its sub-accounts divide (M14).
+DIVIDED_KEY = "divided"
 NODE = "node"
 ROOT_OPTIONS = (
     ("name_assets", "asset"),
@@ -74,6 +81,7 @@ class Posting:
     # unambiguous (see `_amounts`). None when only full booking could say.
     amount: Decimal | None = None
     amount_currency: str | None = None
+    reconciled: datetime.date | None = None  # its `reconciled:` statement date (M14)
 
 
 @dataclass(frozen=True)
@@ -181,6 +189,7 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
                 currency=None if p.units is MISSING or p.units.currency is MISSING else p.units.currency,
                 amount=amount[0] if amount else None,
                 amount_currency=amount[1] if amount else None,
+                reconciled=_mark(p.meta),
             )
             for p, amount in zip(entry.postings, amounts)
         )
@@ -196,6 +205,11 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
         price=(entry.currency, entry.amount.number, entry.amount.currency) if isinstance(entry, data.Price) else None,
         budgeted=not (isinstance(entry, data.Transaction) and entry.meta.get(BUDGET_KEY) is False),
     )
+
+
+def _mark(meta: dict | None) -> datetime.date | None:
+    value = (meta or {}).get(RECONCILED_KEY)
+    return value if isinstance(value, datetime.date) else None
 
 
 def _weight(p: data.Posting) -> tuple[Decimal, str] | None:
@@ -334,6 +348,7 @@ def accounts(header: list[str], texts: list[str], versions: dict[str, str] | Non
                 booking=entry.booking.name if entry.booking else None,
                 updated_at=(versions or {}).get(str(entry.meta.get(ID_KEY))),
                 revalue_every=int(entry.meta[REVALUE_EVERY_KEY]) if REVALUE_EVERY_KEY in entry.meta else None,
+                divided=entry.meta.get(DIVIDED_KEY) is True,
             )
     for entry in entries:
         if isinstance(entry, data.Close) and entry.account in found:
@@ -395,10 +410,16 @@ _KEEP = object()
 
 
 def reopened(
-    text: str, *, booking: str | None, revalue_every: int | None, display_name: object = _KEEP
+    text: str,
+    *,
+    booking: str | None,
+    revalue_every: int | None,
+    display_name: object = _KEEP,
+    divided: object = _KEEP,
 ) -> Directive:
     """An `open` directive with its booking method and `revalue-every` set (None: removed), and
-    its `display-name` set (None or "": removed; not given: kept)."""
+    its `display-name` (None or "": removed) and `divided` (False: removed) set
+    if given, kept if not."""
     entries, errors, _ = parser.parse_string(text)
     if errors or len(entries) != 1 or not isinstance(entries[0], data.Open):
         raise ParseFailure(["not an open directive"])
@@ -410,6 +431,10 @@ def reopened(
         meta.pop(DISPLAY_NAME_KEY, None)
         if display_name:
             meta[DISPLAY_NAME_KEY] = str(display_name)
+    if divided is not _KEEP:
+        meta.pop(DIVIDED_KEY, None)
+        if divided:
+            meta[DIVIDED_KEY] = True
     return to_directive(entry._replace(meta=meta, booking=data.Booking[booking] if booking else None))
 
 
@@ -602,6 +627,73 @@ def moved_opens(open_texts: list[str], earliest: dict[str, datetime.date]) -> li
         for e in entries
         if isinstance(e, data.Open) and e.account in earliest and e.date > earliest[e.account]
     ]
+
+
+def rewritten(
+    text: str,
+    *,
+    date: datetime.date | None = None,
+    flag: str | None = None,
+    marks: dict[int, datetime.date | None] | None = None,
+) -> Directive:
+    """A transaction with its date or flag changed, and the postings at the indexes in `marks`
+    given that `reconciled:` mark (None: removed). Everything else stays as it was."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1 or not isinstance(entries[0], data.Transaction):
+        raise ParseFailure(["not a transaction"])
+    entry = entries[0]
+    postings = list(entry.postings)
+    for i, mark in (marks or {}).items():
+        meta = {k: v for k, v in (postings[i].meta or {}).items() if k != RECONCILED_KEY}
+        if mark is not None:
+            meta[RECONCILED_KEY] = mark
+        postings[i] = postings[i]._replace(meta=meta or None)
+    entry = entry._replace(postings=postings, date=date or entry.date, flag=flag or entry.flag)
+    return to_directive(entry)
+
+
+def balance_directive(
+    account: str,
+    date: datetime.date,
+    number: Decimal,
+    currency: str,
+    statement: datetime.date | None,
+    source: str | None = None,
+) -> Directive:
+    """A `balance` directive: the account (and everything under it) holds `number` at the start
+    of `date`, with the statement it records (M14), and where that came from ("bank")."""
+    meta = {STATEMENT_KEY: statement} if statement else {}
+    if source:
+        meta[SOURCE_KEY] = source
+    entry = data.Balance(data.new_metadata("<new>", 0, meta), date, account, bc_amount.Amount(number, currency), None, None)
+    return parse_one(to_directive(entry).text)
+
+
+@dataclass(frozen=True)
+class BalanceCheck:
+    account: str
+    date: datetime.date
+    number: Decimal
+    currency: str
+    statement: datetime.date | None
+    source: str | None = None
+
+
+def balance_check(text: str) -> BalanceCheck | None:
+    """A `balance` directive's account, date, amount and statement date (if it records one)."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1 or not isinstance(entries[0], data.Balance):
+        return None
+    entry = entries[0]
+    statement = entry.meta.get(STATEMENT_KEY)
+    return BalanceCheck(
+        account=entry.account,
+        date=entry.date,
+        number=entry.amount.number,
+        currency=entry.amount.currency,
+        statement=statement if isinstance(statement, datetime.date) else None,
+        source=entry.meta.get(SOURCE_KEY) if isinstance(entry.meta.get(SOURCE_KEY), str) else None,
+    )
 
 
 def with_flag(text: str, flag: str) -> Directive:

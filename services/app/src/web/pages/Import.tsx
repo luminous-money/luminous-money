@@ -98,7 +98,12 @@ export function Import({ book }: { book: string }) {
 
       {stage.kind === "done" ? (
         <>
-          <ImportResults result={stage.result} book={book} currency={currency} />
+          <ImportResults
+            result={stage.result}
+            book={book}
+            currency={currency}
+            type={target?.type}
+          />
           <p className="center">
             <button type="button" onClick={() => setStage({ kind: "choose" })}>
               Import another file

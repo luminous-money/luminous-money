@@ -671,6 +671,51 @@ same money in through another's, a day or so later. Both would sit in review, un
 - **Read only in the PWA:** a notice under the masthead, and the main write entry points hidden
   (importing, adding transactions or accounts, the ledger's actions, budgets' editing); anything
   else is refused by the server, saying why.
+### Reconciliation (M14)
+
+- **Kept as Beancount,** so exports carry it and every load checks it: a `balance` directive
+  dated the day after the statement (balances hold at the start of a day), with `statement:`
+  metadata (and `source: "bank"` for an automatic one), and `reconciled: <statement date>` on
+  each posting it covers. On the posting, not the transaction: a transfer's two sides reconcile
+  with two different statements. `posting.reconciled` (ledger migration 9) is the mark's derived
+  column, for SQL.
+- **The starting balance is what's reconciled so far** (the sum of reconciled postings), not
+  the last statement's figure: the two agree until an edit breaks one, and then the next
+  reconciliation still starts from the truth while the account says it's off.
+- **Finish only when it balances** (the ledger refuses anything else, 422); "Save for later"
+  keeps a draft in `app` (`reconcile_draft`, one per account, shared by the book's members,
+  versioned), since a draft isn't the books' business until it's finished.
+- **Dates agree with the statement:** Beancount checks a balance against everything dated up to
+  it, so finishing moves a ticked transaction dated after the statement onto its date, and an
+  unticked one dated on or before it to the day after, refusing a move that would break the
+  other side's reconciliation. Imported transactions carry the bank's dates, so it's mostly
+  hand-entered ones that move.
+- **Marks belong to reconciliations:** edits through the JSON API keep a posting's mark while it
+  stays in the same account, and new transactions arrive without one; only reconciling and undo
+  change them. (Text imports and restores keep what the text says.)
+- **What starts ticked** is `app`'s to say: what was imported into the account (a file or the
+  bank: import rows hold them) and the opening balance (it came from a statement). Reconciling
+  confirms the unconfirmed ones ticked.
+- **Divided accounts:** an asset or liability node can be one real account (`divided: TRUE` on
+  its `open`), its sub-accounts dividing what's in it. It's reconciled as one (Beancount's
+  balance on a node is its subtree's), transfers between its parts reconcile themselves, and
+  its parts can't be reconciled, linked to a bank or divided themselves. Named for what it is,
+  not for reconciling: M15 links one to a bank. `shared/divided.ts` says what follows, for the
+  server and the PWA; the ledger enforces it.
+- **Bank-fed accounts** are compared with the bank's day-end balance the day before its balance
+  date (so a late posting that day can't break it), backed out from the reported balance and
+  the mirror, with where they diverged. After each sync, one that agrees, with everything
+  through then confirmed and nothing in progress, is reconciled automatically; an automatic
+  reconciliation replaces the latest if that was automatic too and in the same month, so
+  there's one a month rather than one a day.
+- **Ledgers filter by reconciliation** on the server (`reconciled=`), so pages stay full and
+  running balances stay the account's. In the journal a transaction is reconciled when its
+  asset and liability postings all are. Select all selects what's shown.
+- **Imported files with a balance column** keep their last balance (`import_batch.end_date`,
+  `end_balance`), checked against the books at import and offered as Reconcile's prefill. The
+  running balance says which way a file runs on a single day, and whether a card's balance is
+  shown owed or as stored.
+
 ### Bank feeds: SimpleFIN (M9)
 
 [SimpleFIN](https://www.simplefin.org/protocol.html), usually through the SimpleFIN Bridge, is the

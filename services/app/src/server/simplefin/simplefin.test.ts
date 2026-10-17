@@ -6,6 +6,7 @@ import { createFakeSimplefin } from "@fava-beans/simplefin-fake";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { AppDb } from "../db.js";
+import { bankComparison } from "../reconcile.js";
 import { FakeLedger } from "../testing.js";
 import { claim, parseAccountSet, SimplefinProblem } from "./client.js";
 import { Sealer } from "./crypto.js";
@@ -552,5 +553,60 @@ describe("linking in the background", () => {
     expect(resumeAttempts(deps)).toBe(1);
     await until(idle);
     expect(deps.store.attempt("u", attempt.id)!.state).toBe("ready");
+  });
+});
+
+describe("reconciling with the bank (M14)", () => {
+  const HISTORY = [
+    { id: "a", date: "2026-08-01", amount: "-40.00" },
+    { id: "b", date: "2026-08-15", amount: "2000.00" },
+    { id: "c", date: "2026-09-10", amount: "-60.00" },
+  ];
+  const linkedNew = async () => {
+    const { connection } = await connected(HISTORY, "2400.00");
+    const planned = await plan(deps, {
+      user: "u",
+      connection,
+      accountId: "chk",
+      book: "b",
+      account: CHECKING,
+      mode: "new",
+    });
+    await planned.apply();
+    return deps.store.connection("u", connection.id)!;
+  };
+
+  it("reconciles automatically once everything the bank sent is confirmed and agrees", async () => {
+    const connection = await linkedNew();
+    await syncConnection(deps, connection);
+    expect(ledger.statements.get(CHECKING)).toBeUndefined(); // still unconfirmed
+
+    for (const t of ledger.transactions) t.flag = "*";
+    await syncConnection(deps, connection);
+
+    // Through the day before the bank's balance date (Oct 15 in Chicago).
+    expect(ledger.statements.get(CHECKING)).toEqual([{ date: "2026-10-14", balance: "2400.00" }]);
+    const link = deps.store.linkTo("b", CHECKING)!;
+    expect(await bankComparison(db, deps.store, ledger, link)).toMatchObject({
+      date: "2026-10-14",
+      off_by: null,
+    });
+  });
+
+  it("says where the books went off from the bank", async () => {
+    await linkedNew();
+    tx("2026-09-20", "-12.40", "*", "not at the bank");
+    const link = deps.store.linkTo("b", CHECKING)!;
+
+    expect(await bankComparison(db, deps.store, ledger, link)).toMatchObject({
+      bank: "2400.00",
+      books: "2387.60",
+      off_by: "12.40",
+      since: "2026-09-20",
+    });
+    // Off, it isn't reconciled automatically.
+    for (const t of ledger.transactions) t.flag = "*";
+    await syncConnection(deps, deps.store.connection("u", link.connection_id)!);
+    expect(ledger.statements.get(CHECKING)).toBeUndefined();
   });
 });
