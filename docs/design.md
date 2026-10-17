@@ -623,8 +623,9 @@ same money in through another's, a day or so later. Both would sit in review, un
     datasets, drawn with Apache ECharts (a peer dependency; only the line, bar and pie charts are
     bundled, SVG-rendered). The host passes a theme (ours reads the app's CSS variables, light
     or dark) and the charts describe themselves for screen readers.
-  - They start in this repo; moving them to a public `luminous-money` monorepo and npm waits
-    for the contract to settle (and a yes).
+  - Their home is the public [luminous-money/ledger-graphs](https://github.com/luminous-money/ledger-graphs)
+    monorepo (ISC). Until they're on npm, `packages/ledger-graphs-*` here are copies the app
+    builds from.
 - **`app` computes them** (`/books/:book/reports/*`): it reads the window each report needs from
   the ledger's `transactions/compact` (which says what's `budgeted`) and runs the library; the
   page passes "today". The PWA loads the charts lazily, so ECharts isn't in the first screen.

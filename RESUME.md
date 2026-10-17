@@ -144,6 +144,20 @@ How it's put together:
 3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
 
+## The ledger-graphs libraries
+
+- **Their home is now [luminous-money/ledger-graphs](https://github.com/luminous-money/ledger-graphs)**
+  (public, ISC; `libs/api`, `libs/ui`; CI on every push; `pnpm publish:all` or a `v*` tag with
+  the `NPM_TOKEN` secret publishes what isn't on npm yet). Local clone:
+  `~/Repos/luminous-money/ledger-graphs`.
+- **Not on npm yet:** this machine isn't logged in to npm (`npm whoami`: 401), and the
+  `@luminous-money` scope has to exist on npm (an npm organization, or the user's own scope).
+  To publish: `npm login`, then `pnpm publish:all` there (or add `NPM_TOKEN` to the repo's
+  secrets and push the tag `v0.1.0`).
+- **Until then, `packages/ledger-graphs-*` here are copies** the app builds from. Change them
+  in the library repo first; once 0.1.0 is published, depend on `^0.1.0` here and delete the
+  copies.
+
 ## Gotchas
 
 - **Loans and withheld taxes:** how to record them is in [docs/loans-and-taxes.md](docs/loans-and-taxes.md).
