@@ -1701,3 +1701,38 @@ button.chart-more {
 .editor label select {
   font-size: 1rem;
 }
+
+/* An account ledger's partial view: going to a date, and loading the newer page above it. */
+
+.ledger-jump {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.ledger-jump input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ledger-jump p {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.ledger-more {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 3rem;
+  padding: 0 0.25rem;
+  border-bottom: 1px dashed var(--line);
+}
+
+.ledger-more button.plain {
+  min-height: 2.75rem;
+  padding: 0 0.5rem;
+}

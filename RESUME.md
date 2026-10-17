@@ -52,7 +52,8 @@ What a user can do now:
     grayed rows with a projected balance.
 - **Manage books** also sets each book's time zone (new books take the browser's).
 - **An account's ledger:**
-  - newest first, 200 a page, with infinite scroll; running balances, and the other account or
+  - newest first, 200 a page, with infinite scroll; "Go to date" for a partial view from that
+    date back, with "Load more" above for newer pages; running balances, and the other account or
     `<multiple>`; liabilities and income shown inverted, colored by their effect on net worth
   - a star toggle (home page), "Import transactions", and the add line above the transactions
   - tapping a transaction opens the editor, whose Back and Save stay pinned on screen
@@ -105,10 +106,10 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 142 tests, including the table lint
+    - ledger: 143 tests, including the table lint
     - auth: 20; app: 139; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 68 API tests and 74 browser tests (with Mailpit and a fake SimpleFIN server)
+  - `pnpm e2e`: 68 API tests and 75 browser tests (with Mailpit and a fake SimpleFIN server)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).

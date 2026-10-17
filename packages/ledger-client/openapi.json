@@ -1350,6 +1350,18 @@
             "description": "Pass as `cursor` for the next (older) page; None at the end.",
             "title": "Next Cursor"
           },
+          "prev_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as `after` for the page before (newer); None when this page starts at the newest.",
+            "title": "Prev Cursor"
+          },
           "rows": {
             "description": "Newest first.",
             "items": {
@@ -1361,7 +1373,8 @@
         },
         "required": [
           "rows",
-          "next_cursor"
+          "next_cursor",
+          "prev_cursor"
         ],
         "title": "LedgerPage",
         "type": "object"
@@ -3560,6 +3573,7 @@
             }
           },
           {
+            "description": "The page just older than this row.",
             "in": "query",
             "name": "cursor",
             "required": false,
@@ -3572,7 +3586,45 @@
                   "type": "null"
                 }
               ],
+              "description": "The page just older than this row.",
               "title": "Cursor"
+            }
+          },
+          {
+            "description": "The page just newer than this row.",
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The page just newer than this row.",
+              "title": "After"
+            }
+          },
+          {
+            "description": "The page starting on or before this date.",
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The page starting on or before this date.",
+              "title": "Date"
             }
           },
           {

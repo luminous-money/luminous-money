@@ -69,7 +69,6 @@ To build for the Pi (or both architectures):
 
 ## Configuration
 
-| Variable | Default | Purpose |
-|---|---|---|
+| Variable          | Default | Purpose                |
+| ----------------- | ------- | ---------------------- |
 | `LEDGER_DATA_DIR` | `/data` | Holds `ledger.sqlite`. |
-

@@ -433,6 +433,13 @@ How auth works (M8; the shape is M1's):
   - Pending transactions count.
 - **An account's ledger** is its transactions newest first, in keyset pages of 200. Each shows
   its running balance and the other account (or `<multiple>`).
+  - **The full view** starts at the newest and loads older pages as you scroll.
+  - **A partial view** starts at a date (`?date=`, the newest 200 on or before it) and loads
+    either way: older pages as you scroll, newer ones above with "Load more" (by hand, so
+    landing mid-ledger doesn't pull in everything above). Every page names the cursors either
+    side of it (`next_cursor`, older; `prev_cursor`, newer), so pages load outward from
+    any one until the whole ledger is there. The date sits in the URL so Back from a
+    transaction returns to the same view.
 
 ### Investments (M5)
 

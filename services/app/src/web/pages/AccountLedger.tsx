@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 import { displayName, shortName, shown } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";
 import { bookHome } from "../lib/books.js";
-import { withBack } from "../lib/navigation.js";
+import { useParam, withBack } from "../lib/navigation.js";
 import { AccountValueNote, headline } from "../components/AccountValue.js";
 import { BankErrors, ReportedLine } from "../components/BankStatus.js";
 import { HoldingsPanel } from "../components/Holdings.js";
@@ -32,7 +32,8 @@ import { upcomingFor } from "../lib/upcoming.js";
 
 /**
  * One account's ledger: every transaction, newest first, 200 at a time, more loading as you
- * scroll. A simple transaction shows the account on its other side; one with more splits shows
+ * scroll. "Go to date" opens a partial view instead (`?date=`): from that date back, with
+ * "Load more" above for the newer page before it, so pages load either way until it's all there. A simple transaction shows the account on its other side; one with more splits shows
  * <multiple>. Tapping one opens it; the line above them adds a new one. Its header stars the
  * account (putting it on the home page) and links to importing into it. Amounts and balances
  * are shown as the account reads (a card's balance is what's owed); colors follow the stored
@@ -41,7 +42,8 @@ import { upcomingFor } from "../lib/upcoming.js";
  */
 export function AccountLedger({ book, account }: { book: string; account: string }) {
   const [, navigate] = useLocation();
-  const ledger = useAccountLedger(book, account);
+  const date = useParam("date")?.match(/^\d{4}-\d{2}-\d{2}$/)?.[0];
+  const ledger = useAccountLedger(book, account, date);
   const summary = useSummary(book, [account]);
   const info = summary.data?.[0];
   const stars = useStars(book);
@@ -62,7 +64,9 @@ export function AccountLedger({ book, account }: { book: string; account: string
   const starred = stars.data?.includes(account) ?? false;
   const type = info?.type;
   const end = useRef<HTMLDivElement>(null);
-  const here = `/books/${book}/accounts/${encodeURIComponent(account)}`;
+  const list = useRef<HTMLOListElement>(null);
+  const base = `/books/${book}/accounts/${encodeURIComponent(account)}`;
+  const here = date ? `${base}?date=${date}` : base;
 
   useEffect(() => {
     const el = end.current;
@@ -76,6 +80,22 @@ export function AccountLedger({ book, account }: { book: string; account: string
   }, [ledger]);
 
   const rows = ledger.data?.pages.flatMap((page) => page.rows) ?? [];
+
+  // A newer page goes in above: keep what's on screen where it was (where the browser doesn't).
+  const anchor = useRef<{ id: string; top: number } | null>(null);
+  const rowElement = (id: string) => list.current?.querySelector(`[data-row="${id}"]`);
+  const loadNewer = () => {
+    const first = rows[0] && rowElement(rows[0].id);
+    anchor.current = first ? { id: rows[0]!.id, top: first.getBoundingClientRect().top } : null;
+    void ledger.fetchPreviousPage();
+  };
+  useLayoutEffect(() => {
+    const kept = anchor.current;
+    if (!kept || ledger.isFetchingPreviousPage) return;
+    anchor.current = null;
+    const el = rowElement(kept.id);
+    if (el) window.scrollBy(0, el.getBoundingClientRect().top - kept.top);
+  }, [ledger.data, ledger.isFetchingPreviousPage]);
   const open = (id: string) => navigate(withBack(`/books/${book}/transactions/${id}`, here));
   const chosen = rows.filter((r) => selection.has(r.id));
   const categorizeChosen = (category: string) => {
@@ -206,11 +226,35 @@ export function AccountLedger({ book, account }: { book: string; account: string
         </div>
       )}
 
+      <JumpToDate
+        key={date ?? ""}
+        date={date}
+        onGo={(to) => navigate(to ? `${base}?date=${to}` : base)}
+      />
+
       {ledger.isPending && <p className="muted">Loading…</p>}
       {ledger.error && <p className="card error">{explain(ledger.error)}</p>}
-      {ledger.data && rows.length === 0 && <p className="card muted">No transactions yet.</p>}
+      {ledger.data && rows.length === 0 && (
+        <p className="card muted">
+          {date ? `Nothing on or before ${date}.` : "No transactions yet."}
+        </p>
+      )}
 
-      {ahead.length > 0 && !selection.selecting && (
+      {ledger.hasPreviousPage && (
+        <div className="ledger-more">
+          <span className="muted small">Newer transactions above</span>
+          <button
+            type="button"
+            className="plain"
+            disabled={ledger.isFetchingPreviousPage}
+            onClick={loadNewer}
+          >
+            {ledger.isFetchingPreviousPage ? "Loading…" : "Load more"}
+          </button>
+        </div>
+      )}
+
+      {ahead.length > 0 && !selection.selecting && !ledger.hasPreviousPage && (
         <ol className="ledger upcoming-rows" aria-label="Upcoming">
           {ahead.map((row) => (
             <li key={row.key}>
@@ -244,9 +288,9 @@ export function AccountLedger({ book, account }: { book: string; account: string
         </ol>
       )}
 
-      <ol className="ledger" aria-label="Transactions">
+      <ol className="ledger" aria-label="Transactions" ref={list}>
         {rows.map((row) => (
-          <li key={row.id}>
+          <li key={row.id} data-row={row.id}>
             <button
               type="button"
               className={`ledger-row${row.flag === "!" ? " pending" : ""}${selection.has(row.id) ? " selected" : ""}`}
@@ -305,5 +349,38 @@ export function AccountLedger({ book, account }: { book: string; account: string
         {ledger.isFetchingNextPage && <span className="muted">Loading more…</span>}
       </div>
     </main>
+  );
+}
+
+/** Go to a date: a partial view, from that date back. Back to newest: the full view. */
+function JumpToDate({ date, onGo }: { date?: string; onGo: (date?: string) => void }) {
+  const [value, setValue] = useState(date ?? "");
+  return (
+    <form
+      className="ledger-jump"
+      aria-label="Go to a date"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (value) onGo(value);
+      }}
+    >
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        aria-label="Go to date"
+      />
+      <button type="submit" disabled={!value || value === date}>
+        Go
+      </button>
+      {date && (
+        <p className="small muted">
+          From {date} back.{" "}
+          <button type="button" className="plain" onClick={() => onGo(undefined)}>
+            Back to newest
+          </button>
+        </p>
+      )}
+    </form>
   );
 }

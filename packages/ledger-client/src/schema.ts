@@ -1122,6 +1122,11 @@ export interface components {
        */
       next_cursor: string | null;
       /**
+       * Prev Cursor
+       * @description Pass as `after` for the page before (newer); None when this page starts at the newest.
+       */
+      prev_cursor: string | null;
+      /**
        * Rows
        * @description Newest first.
        */
@@ -2215,7 +2220,12 @@ export interface operations {
   account_ledger_api_ledger_v1_books__book_id__accounts__account__ledger_get: {
     parameters: {
       query?: {
+        /** @description The page just older than this row. */
         cursor?: string | null;
+        /** @description The page just newer than this row. */
+        after?: string | null;
+        /** @description The page starting on or before this date. */
+        date?: string | null;
         limit?: number;
       };
       header?: never;

@@ -30,6 +30,8 @@ export type TreeAccount = Components["schemas"]["TreeAccount"];
 
 export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"], "updated_at">;
 export type AccountKind = components["schemas"]["AccountIn"]["kind"];
+/** Where a ledger page is: older than `cursor`, newer than `after`, or from `date` back. */
+export type LedgerPageAt = { cursor?: string; after?: string; date?: string };
 
 /** An API error with its status, so callers can tell a conflict (409) from a rejection (422). */
 export class ApiError extends Error {
@@ -161,10 +163,11 @@ export const api = {
       })
     ),
 
-  accountLedger: (book_id: string, account: string, cursor?: string): Promise<LedgerPage> =>
+  /** A page of an account's ledger: the newest, or one either side of a row, or from a date. */
+  accountLedger: (book_id: string, account: string, page: LedgerPageAt = {}): Promise<LedgerPage> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/ledger", {
-        params: { path: { book_id, account }, query: { cursor, limit: 200 } },
+        params: { path: { book_id, account }, query: { ...page, limit: 200 } },
       })
     ),
 

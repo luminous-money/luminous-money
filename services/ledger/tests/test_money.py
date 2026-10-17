@@ -256,6 +256,32 @@ def test_ledger_pages_are_stable_keyset_pages(book):
     assert rest.next_cursor is None
 
 
+def test_ledger_pages_load_outward_from_a_date_until_the_whole_ledger_is_loaded(book):
+    account = bank(book).name
+    for day in range(1, 11):
+        spend(book, account, "-1", date=f"2024-02-{day:02d}")
+    dates = lambda page: [str(r.date) for r in page.rows]  # noqa: E731
+
+    middle = book.account_ledger("book", account, date=datetime.date(2024, 2, 6), limit=3)
+    newer = book.account_ledger("book", account, after=middle.prev_cursor, limit=3)
+    newest = book.account_ledger("book", account, after=newer.prev_cursor, limit=3)
+    older = book.account_ledger("book", account, cursor=middle.next_cursor, limit=3)
+
+    assert dates(middle) == ["2024-02-06", "2024-02-05", "2024-02-04"]
+    assert dates(newer) == ["2024-02-09", "2024-02-08", "2024-02-07"]
+    assert dates(newest) == ["2024-02-10"] and newest.prev_cursor is None
+    assert dates(older) == ["2024-02-03", "2024-02-02", "2024-02-01"] and older.prev_cursor
+    assert book.account_ledger("book", account, limit=3).prev_cursor is None  # the full view
+    # Before every transaction: nothing on the page, and all of it above.
+    empty = book.account_ledger("book", account, date=datetime.date(2023, 1, 1), limit=3)
+    assert empty.rows == [] and empty.next_cursor is None
+    assert dates(book.account_ledger("book", account, after=empty.prev_cursor, limit=3)) == [
+        "2024-02-02",
+        "2024-02-01",
+        "2024-01-01",
+    ]
+
+
 def test_batches_are_all_or_nothing(book):
     account = bank(book).name
     good = models.TransactionIn(date="2024-01-10", postings=[models.Posting(account=account, units=models.Amount(number="-1", currency="USD")), models.Posting(account="Expenses:Food")])
@@ -285,7 +311,12 @@ def test_opening_balances_summaries_and_ledgers_over_http(book):
     assert [(a["name"], a["as_of"]) for a in listed] == [("Assets:Bank:PNC-Checking", "2024-01-01")]
     assert listed[0]["balance"] == [{"number": "500.00", "currency": "USD"}]
     assert page["rows"][0]["narration"] == "Opening balance"
-    assert page["next_cursor"] is None
+    assert page["next_cursor"] is None and page["prev_cursor"] is None
+    both = client.get(
+        "/api/ledger/v1/books/book/accounts/Assets:Bank:PNC-Checking/ledger",
+        params={"date": "2024-01-01", "cursor": "2024-01-01~1"},
+    )
+    assert both.status_code == 422
 
 def test_segments_from_human_names():
     assert engine.segment("PNC checking") == "PNC-checking"

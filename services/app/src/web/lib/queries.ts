@@ -44,7 +44,7 @@ import {
   type SchedulePatch,
 } from "./appApi.js";
 import type { CategoryRulePatch } from "../../shared/rules.js";
-import { api, ApiError, type TransactionChanges } from "./ledger.js";
+import { api, ApiError, type LedgerPageAt, type TransactionChanges } from "./ledger.js";
 import {
   account,
   authConfig,
@@ -334,12 +334,20 @@ export function useLastImports(book: string | undefined) {
 }
 
 /** An account's ledger, newest first, 200 transactions a page, more as you scroll. */
-export function useAccountLedger(book: string, account: string) {
+/**
+ * An account's ledger, newest first, 200 rows a page: from the newest (the full view), or from
+ * `date` back (a partial view). Pages load older below (`fetchNextPage`) and newer above
+ * (`fetchPreviousPage`), until the whole ledger is loaded.
+ */
+export function useAccountLedger(book: string, account: string, date?: string) {
   return useInfiniteQuery({
-    queryKey: keys.ledger(book, account),
+    queryKey: [...keys.ledger(book, account), date ?? null],
     queryFn: ({ pageParam }) => api.accountLedger(book, account, pageParam),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (page) => page.next_cursor ?? undefined,
+    initialPageParam: (date ? { date } : {}) as LedgerPageAt,
+    getNextPageParam: (page): LedgerPageAt | undefined =>
+      page.next_cursor ? { cursor: page.next_cursor } : undefined,
+    getPreviousPageParam: (page): LedgerPageAt | undefined =>
+      page.prev_cursor ? { after: page.prev_cursor } : undefined,
   });
 }
 

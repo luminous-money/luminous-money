@@ -217,7 +217,7 @@ export class FakeLedger implements LedgerPort {
         };
       })
       .sort((a, b) => b.date.localeCompare(a.date));
-    return { rows, next_cursor: null };
+    return { rows, next_cursor: null, prev_cursor: null };
   }
 
   async createTransactions(_book: string, transactions: TransactionIn[]) {

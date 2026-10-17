@@ -41,6 +41,21 @@ class Backup:
     deleted_books: list[str] = field(default_factory=list)  # deleted since the cursor
 
 
+# Account ledger cursors name a row by its key, (date, ordinal): "2024-01-31~12".
+
+
+def _ledger_key(cursor: str) -> tuple[str, int]:
+    date, _, ordinal = cursor.partition("~")
+    return date, int(ordinal)
+
+
+def _ledger_cursor(key: tuple[str, int]) -> str:
+    return f"{key[0]}~{key[1]}"
+
+
+_BEFORE_ALL = "0000-01-01~-1"  # every row is newer
+
+
 class Ledger:
     def __init__(self, store: Store):
         self.store = store
@@ -454,14 +469,24 @@ class Ledger:
         return [models.Amount(number=n, currency=c) for n, c in (p.split(" ")[:2] for p in positions)]
 
     def account_ledger(
-        self, book_id: str, account: str, *, cursor: str | None = None, limit: int = 200
+        self,
+        book_id: str,
+        account: str,
+        *,
+        cursor: str | None = None,
+        after: str | None = None,
+        date: datetime.date | None = None,
+        limit: int = 200,
     ) -> models.LedgerPage:
         """One account's ledger: its transactions newest first, with running balances.
 
-        Pages are keyset pages: `cursor` names the last row of the previous page (its date and
-        ordinal), so pages stay stable as transactions are added. Running balances accumulate
-        from the oldest transaction, pending ones included; after an amount only booking could
-        work out, they're unknown (None).
+        Pages are keyset pages, so they stay stable as transactions are added. A page is the
+        newest `limit` rows; or, from `cursor` (a row's date and ordinal), the `limit` just older
+        than it; or, from `after`, the `limit` just newer; or, from `date`, the newest `limit` on
+        or before it. Each page names the cursors either side of it, so pages can be loaded
+        outward from any one until the whole ledger is. Running balances accumulate from the
+        oldest transaction, pending ones included; after an amount only booking could work
+        out, they're unknown (None).
         """
         rows = []
         totals: dict[str, Decimal] | None = {}
@@ -503,14 +528,23 @@ class Ledger:
                 )
             )
         rows.reverse()
-        if cursor:
-            date, _, ordinal = cursor.partition("~")
-            rows = [r for r in rows if r[0] < (date, int(ordinal))]
-        page = rows[:limit]
-        more = len(rows) > limit
+        if after:  # the `limit` rows just newer, so up to the row it names
+            end = sum(1 for r in rows if r[0] > _ledger_key(after))
+            top = max(end - limit, 0)
+        else:
+            if cursor:
+                top = next((i for i, r in enumerate(rows) if r[0] < _ledger_key(cursor)), len(rows))
+            elif date:
+                top = next((i for i, r in enumerate(rows) if r[0][0] <= date.isoformat()), len(rows))
+            else:
+                top = 0
+            end = min(top + limit, len(rows))
+        page = rows[top:end]
         return models.LedgerPage(
             rows=[r[1] for r in page],
-            next_cursor=f"{page[-1][0][0]}~{page[-1][0][1]}" if more and page else None,
+            next_cursor=_ledger_cursor(page[-1][0]) if page and end < len(rows) else None,
+            # Past the oldest row, every row is newer than the page.
+            prev_cursor=(_ledger_cursor(page[0][0]) if page else _BEFORE_ALL) if top > 0 else None,
         )
 
     def create_transactions(self, book_id: str, batch: list[models.TransactionIn]) -> list[engine.Directive]:

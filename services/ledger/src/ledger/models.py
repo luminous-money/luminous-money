@@ -392,6 +392,9 @@ class LedgerRow(Api):
 class LedgerPage(Api):
     rows: list[LedgerRow] = Field(description="Newest first.")
     next_cursor: str | None = Field(description="Pass as `cursor` for the next (older) page; None at the end.")
+    prev_cursor: str | None = Field(
+        description="Pass as `after` for the page before (newer); None when this page starts at the newest."
+    )
 
 
 class AccountIn(Strict):

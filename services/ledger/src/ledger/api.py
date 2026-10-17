@@ -266,10 +266,14 @@ def create_app(ledger: Ledger) -> FastAPI:
     def account_ledger(
         book_id: OwnedBook,
         account: str,
-        cursor: str | None = None,
+        cursor: Annotated[str | None, Query(description="The page just older than this row.")] = None,
+        after: Annotated[str | None, Query(description="The page just newer than this row.")] = None,
+        date: Annotated[datetime.date | None, Query(description="The page starting on or before this date.")] = None,
         limit: Annotated[int, Query(ge=1, le=1000)] = 200,
     ) -> models.LedgerPage:
-        return ledger.account_ledger(book_id, account, cursor=cursor, limit=limit)
+        if sum(x is not None for x in (cursor, after, date)) > 1:
+            raise HTTPException(422, "pass one of cursor, after and date")
+        return ledger.account_ledger(book_id, account, cursor=cursor, after=after, date=date, limit=limit)
 
     # Transactions, as JSON
 

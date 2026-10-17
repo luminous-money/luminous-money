@@ -208,3 +208,5 @@ Smaller improvements to pick up between milestones or at the end.
 - [ ] **Select all, and "select uncategorized",** in select mode.
 - [ ] **Review newest first.**
 - [ ] **Mobile usability,** across the app.
+- [x] **Go to a date in an account's ledger:** a partial view from that date back, loading
+      newer pages above ("Load more") and older ones as you scroll.
