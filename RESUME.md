@@ -15,7 +15,7 @@ What a user can do now:
 - **Accounts (M10):** Menu → Accounts: one card, the tree by type, tap a node to open or close
   it, balances rolled up (one figure each), Find, "Show archived". A node's › opens its editor
   (with "Add an account under it"); a leaf opens its ledger, whose Edit opens the same editor:
-  names (display and full: rename or move), settings, archive (with an optional closing
+  names (display and full: rename or move), an asset's settings (lots, revaluing), archive (with an optional closing
   transfer), delete or merge into another account. System accounts are protected.
 - **Bank feeds (M9):** Menu → Bank connections: paste a SimpleFIN Bridge setup token, then link
   each bank account (new, or an existing one reconciled with the bank as the source of truth;
@@ -108,7 +108,7 @@ How it's put together:
     - ledger: 142 tests, including the table lint
     - auth: 20; app: 139; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 68 API tests and 73 browser tests (with Mailpit and a fake SimpleFIN server)
+  - `pnpm e2e`: 68 API tests and 74 browser tests (with Mailpit and a fake SimpleFIN server)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).

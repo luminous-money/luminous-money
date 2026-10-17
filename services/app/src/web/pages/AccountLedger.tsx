@@ -5,7 +5,6 @@ import { displayName, shortName, shown } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";
 import { bookHome } from "../lib/books.js";
 import { withBack } from "../lib/navigation.js";
-import { AccountSettings } from "../components/AccountSettings.js";
 import { AccountValueNote, headline } from "../components/AccountValue.js";
 import { BankErrors, ReportedLine } from "../components/BankStatus.js";
 import { HoldingsPanel } from "../components/Holdings.js";
@@ -170,7 +169,6 @@ export function AccountLedger({ book, account }: { book: string; account: string
               : "Nothing new to suggest."}
           </p>
         )}
-        {info && <AccountSettings book={book} account={info} />}
       </header>
 
       {info && !selection.selecting && (

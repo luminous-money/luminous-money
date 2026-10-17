@@ -1375,15 +1375,6 @@ button.plain {
   flex: 1 1 8rem;
 }
 
-.account-settings {
-  margin-top: 0.5rem;
-}
-
-.account-settings[open] {
-  display: grid;
-  gap: 0.5rem;
-}
-
 .segmented {
   display: flex;
   border: 1px solid var(--line);
@@ -1695,14 +1686,6 @@ button.chart-more {
 
 .disclosures details > :not(summary) {
   margin-inline: 1.1rem;
-}
-
-.disclosures .account-settings {
-  margin-top: 0;
-}
-
-.disclosures summary.small {
-  font-size: inherit;
 }
 
 .editor .actions {

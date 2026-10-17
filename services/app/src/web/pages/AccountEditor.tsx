@@ -49,7 +49,8 @@ export function AccountEditor({ book, account }: { book: string; account: string
       </main>
     );
   const isRoot = !found.name.includes(":");
-  const settings = found.kind === "leaf" && !found.implicit;
+  // What they set (lots sold, revaluing) only means something for what's owned.
+  const settings = found.kind === "leaf" && !found.implicit && found.type === "asset";
   return (
     <main className="stack">
       <header className="page-head">
@@ -79,10 +80,10 @@ export function AccountEditor({ book, account }: { book: string; account: string
       ) : (
         <Names book={book} account={found} accounts={tree.data!} />
       )}
+      {settings && <Settings book={book} account={account} />}
       {found.close && <Unarchive book={book} account={found} />}
-      {!isRoot && (settings || !found.close || !found.protected) && (
+      {!isRoot && (!found.close || !found.protected) && (
         <div className="card disclosures">
-          {settings && <Settings book={book} account={account} />}
           {!found.close && <Archive book={book} account={found} accounts={tree.data!} />}
           {!found.protected && <Remove book={book} account={found} accounts={tree.data!} />}
         </div>

@@ -81,3 +81,21 @@ test("system accounts can't be renamed", async ({ page }) => {
   await expect(page.getByRole("combobox", { name: "Full name" })).toHaveCount(0);
   await expect(page.getByText("Delete or merge")).toHaveCount(0);
 });
+
+test("an asset's settings are in its editor, not on its ledger", async ({ page }) => {
+  const { book, account } = await chart(page);
+  const ledger = `/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`;
+  await page.goto(ledger);
+  await expect(page.getByRole("heading", { name: /PNC Checking/ })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Sales draw on" })).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Edit" }).click();
+  const settings = page.getByRole("region", { name: "Settings" });
+  await settings.getByRole("combobox", { name: "Sales draw on" }).selectOption("FIFO");
+  await page.reload();
+  await expect(settings.getByRole("combobox", { name: "Sales draw on" })).toHaveValue("FIFO");
+
+  await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent("Expenses:Fun")}/edit`);
+  await expect(page.getByRole("heading", { name: "Fun" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Settings" })).toHaveCount(0);
+});

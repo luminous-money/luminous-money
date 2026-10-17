@@ -13,8 +13,8 @@ const METHODS = [
 ] as const;
 
 /**
- * An account's settings: which lots sales draw on (match what the broker reports on the 1099-B),
- * and whether it's a revalued asset (a house, a car) and how often it should be revalued.
+ * An asset account's settings, saved as they change: which lots sales draw on (match what the
+ * broker reports on the 1099-B), and whether it's revalued (a house, a car) and how often.
  */
 export function AccountSettings({ book, account }: { book: string; account: AccountSummary }) {
   const set = useSetAccount(book, account.name);
@@ -25,8 +25,8 @@ export function AccountSettings({ book, account }: { book: string; account: Acco
 
   if (account.kind !== "leaf" || account.implicit || !account.updated_at) return null;
   return (
-    <details className="account-settings">
-      <summary className="small">Account settings</summary>
+    <section className="card editor" aria-label="Settings">
+      <h2 className="section-title">Settings</h2>
       <label>
         Sales draw on
         <select
@@ -65,6 +65,6 @@ export function AccountSettings({ book, account }: { book: string; account: Acco
         </label>
       )}
       {set.error && <p className="error">{explain(set.error)}</p>}
-    </details>
+    </section>
   );
 }
