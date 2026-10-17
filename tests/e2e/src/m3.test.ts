@@ -66,7 +66,7 @@ const rent = (start: string) => ({
 describe("schedules", () => {
   before(stackIsUp);
 
-  it("stage their due occurrences as pending, marked transactions, once", async () => {
+  it("stage their due occurrences as unconfirmed, marked transactions, once", async () => {
     const { user, book, json } = await setUp();
     const start = day(-40); // two occurrences are due: 40 days ago, and a month after
 

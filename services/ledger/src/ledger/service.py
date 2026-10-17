@@ -447,7 +447,7 @@ class Ledger:
         ]
 
     def balance(self, book_id: str, account: str) -> list[models.Amount]:
-        """The account's balance, pending transactions included, one amount per currency.
+        """The account's balance, unconfirmed transactions included, one amount per currency.
 
         Plain SQL over each posting's stored amount, so it's fast at any book size. If any of the
         account's amounts could only be worked out by full booking (rare: lots, prices, mixed
@@ -485,7 +485,7 @@ class Ledger:
         than it; or, from `after`, the `limit` just newer; or, from `date`, the newest `limit` on
         or before it. Each page names the cursors either side of it, so pages can be loaded
         outward from any one until the whole ledger is. Running balances accumulate from the
-        oldest transaction, pending ones included; after an amount only booking could work
+        oldest transaction, unconfirmed ones included; after an amount only booking could work
         out, they're unknown (None).
         """
         rows = []

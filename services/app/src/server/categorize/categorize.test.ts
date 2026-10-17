@@ -19,7 +19,7 @@ import { categorize, SETTLE } from "./chain.js";
 import { external, providersFrom } from "./external.js";
 import { history } from "./history.js";
 import { rules } from "./rules.js";
-import { applyRule, coveredBy, settle, suggestPending } from "./service.js";
+import { applyRule, coveredBy, settle, suggestUnconfirmed } from "./service.js";
 import type { Categorizer } from "./types.js";
 
 const CHECKING = "Assets:Bank:Checking";
@@ -183,7 +183,7 @@ describe("history", () => {
         date: "2024-02-01",
         payee: "Corner Cafe",
       }),
-      past("CORNER CAFE CHICAGO", "Expenses:Food:Coffee", { flag: "!" }), // pending: not learned
+      past("CORNER CAFE CHICAGO", "Expenses:Food:Coffee", { flag: "!" }), // unconfirmed: not learned
       past("CORNER CAFE CHICAGO", "Expenses:Uncategorized"), // uncategorized: not learned
     ];
 
@@ -417,11 +417,11 @@ describe("importing with categorization", () => {
   });
 });
 
-describe("pending transactions", () => {
+describe("unconfirmed transactions", () => {
   let db: AppDb;
   let ledger: FakeLedger;
   const book = { id: "b", name: "Book" };
-  const pending = (narration: string, other = "Expenses:Uncategorized") =>
+  const unconfirmed = (narration: string, other = "Expenses:Uncategorized") =>
     ledger.addTransaction({
       date: "2024-03-05",
       flag: "!",
@@ -448,10 +448,10 @@ describe("pending transactions", () => {
   });
 
   it("Suggest categories fills in the ones not yet categorized, leaving decided ones", async () => {
-    const open = pending("CORNER CAFE");
-    const decided = pending("CORNER CAFE", "Expenses:Food:Groceries"); // the user chose this
+    const open = unconfirmed("CORNER CAFE");
+    const decided = unconfirmed("CORNER CAFE", "Expenses:Food:Groceries"); // the user chose this
 
-    const n = await suggestPending({ db, ledger, book, categorizers: [history] });
+    const n = await suggestUnconfirmed({ db, ledger, book, categorizers: [history] });
 
     expect(n).toBe(1);
     expect([open.payee, open.postings[1]!.account]).toEqual([
@@ -462,7 +462,7 @@ describe("pending transactions", () => {
   });
 
   it("a rule re-applies to what it covers that hasn't been touched, and counts", async () => {
-    const open = pending("TEA HOUSE");
+    const open = unconfirmed("TEA HOUSE");
     const id = db.addRule("b", {
       name: "Tea",
       conditions: { account: null, key: null, contains: "tea", min: null, max: null },
@@ -482,15 +482,15 @@ describe("pending transactions", () => {
   });
 
   it("settling records whether the proposal was kept, and gives feedback", async () => {
-    const kept = pending("CORNER CAFE");
-    const changed = pending("CORNER CAFE");
+    const kept = unconfirmed("CORNER CAFE");
+    const changed = unconfirmed("CORNER CAFE");
     const told: unknown[] = [];
     const provider: Categorizer = {
       name: "history",
       categorize: history.categorize,
       feedback: async (r) => void told.push(...r.outcomes),
     };
-    await suggestPending({ db, ledger, book, categorizers: [provider] });
+    await suggestUnconfirmed({ db, ledger, book, categorizers: [provider] });
     kept.flag = "*";
     changed.flag = "*";
     changed.postings[1]!.account = "Expenses:Food:Groceries";

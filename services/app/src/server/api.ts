@@ -24,7 +24,7 @@ import {
 } from "./schedules.js";
 import type { Categorizer } from "./categorize/types.js";
 import { ruleProblem } from "./categorize/rules.js";
-import { applyRule, coveredBy, settle, suggestPending } from "./categorize/service.js";
+import { applyRule, coveredBy, settle, suggestUnconfirmed } from "./categorize/service.js";
 import type { CategoryRuleIn, CategoryRulePatch } from "../shared/rules.js";
 import { LedgerError, type Book, type LedgerPort } from "./ledger.js";
 import { simplefinRoutes } from "./simplefin/routes.js";
@@ -233,7 +233,7 @@ export function createApi({
     return c.json(db.rules(book));
   });
 
-  /** Create a rule. Says how many pending transactions it covers, to offer re-applying. */
+  /** Create a rule. Says how many unconfirmed transactions it covers, to offer re-applying. */
   api.post("/books/:book/rules", async (c) => {
     const { book } = c.req.param();
     const info = await bookOf(c.get("user"), book);
@@ -259,7 +259,7 @@ export function createApi({
     return rule ? c.json(rule) : c.json({ detail: "not found" }, 404);
   });
 
-  /** Change a rule (only the fields sent), against `updated_at`. Says how many pending
+  /** Change a rule (only the fields sent), against `updated_at`. Says how many unconfirmed
    * transactions it now covers, to offer re-applying. */
   api.patch("/books/:book/rules/:id", async (c) => {
     const { book, id } = c.req.param();
@@ -304,7 +304,7 @@ export function createApi({
     return c.body(null, 204);
   });
 
-  /** Re-apply a rule to the pending transactions it covers that haven't been touched. */
+  /** Re-apply a rule to the unconfirmed transactions it covers that haven't been touched. */
   api.post("/books/:book/rules/:id/apply", async (c) => {
     const { book, id } = c.req.param();
     const info = await bookOf(c.get("user"), book);
@@ -342,13 +342,13 @@ export function createApi({
       : c.json({ detail: "no proposal" }, 404);
   });
 
-  /** "Suggest categories" for pending transactions not yet categorized (`?account=`: only
+  /** "Suggest categories" for unconfirmed transactions not yet categorized (`?account=`: only
    * those from that account and its subaccounts). */
   api.post("/books/:book/suggest", async (c) => {
     const { book } = c.req.param();
     const info = await bookOf(c.get("user"), book);
     if (!info) return c.json({ detail: "not found" }, 404);
-    const suggested = await suggestPending({
+    const suggested = await suggestUnconfirmed({
       db,
       ledger: ledgerFor(c.get("user")),
       book: info,

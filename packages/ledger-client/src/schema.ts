@@ -756,7 +756,7 @@ export interface components {
       as_of: string | null;
       /**
        * Balance
-       * @description The current balance, pending transactions included: one amount per currency held.
+       * @description The current balance, unconfirmed transactions included: one amount per currency held.
        */
       balance: components["schemas"]["Amount"][];
       /**
@@ -1144,7 +1144,7 @@ export interface components {
        * @description The account's change in every currency (a buy: cash out, shares in); empty if only booking could say.
        */
       amounts?: components["schemas"]["Amount"][];
-      /** @description The account's running balance in `amount`'s currency, pending included. */
+      /** @description The account's running balance in `amount`'s currency, unconfirmed included. */
       balance: components["schemas"]["Amount"] | null;
       /**
        * Balances
@@ -1606,7 +1606,7 @@ export interface components {
     TreeAccount: {
       /**
        * Balance
-       * @description Its own balance (a node: none), pending included.
+       * @description Its own balance (a node: none), unconfirmed included.
        */
       balance: components["schemas"]["Amount"][];
       /**

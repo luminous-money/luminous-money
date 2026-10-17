@@ -160,7 +160,7 @@ class Account(Api):
 class TreeAccount(Account):
     """An account in the chart of accounts, with its balances."""
 
-    balance: list[Amount] = Field(description="Its own balance (a node: none), pending included.")
+    balance: list[Amount] = Field(description="Its own balance (a node: none), unconfirmed included.")
     total: list[Amount] = Field(description="Its subtree's balance, itself included: one amount per currency.")
     value: Amount = Field(description="The subtree's value in the operating currency: everything that has a price.")
     unpriced: list[str] = Field(default_factory=list, description="Commodities in the subtree with no price, left out of `value`.")
@@ -185,7 +185,7 @@ class AccountSummary(Account):
     """An account with what a card or a ledger's header shows."""
 
     balance: list[Amount] = Field(
-        description="The current balance, pending transactions included: one amount per currency held."
+        description="The current balance, unconfirmed transactions included: one amount per currency held."
     )
     as_of: datetime.date | None = Field(
         description="The date of its opening balance, which includes everything up to then (imports skip rows up "
@@ -375,7 +375,7 @@ class LedgerRow(Api):
         description="The account's change in this transaction, if it's in one currency; None for several, or if only "
         "booking could say."
     )
-    balance: Amount | None = Field(description="The account's running balance in `amount`'s currency, pending included.")
+    balance: Amount | None = Field(description="The account's running balance in `amount`'s currency, unconfirmed included.")
     amounts: list[Amount] = Field(
         default_factory=list,
         description="The account's change in every currency (a buy: cash out, shares in); empty if only booking could say.",

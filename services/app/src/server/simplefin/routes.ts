@@ -271,10 +271,10 @@ export function simplefinRoutes(
     if (!(await owned(user, book))) return c.json({ detail: "not found" }, 404);
     const status: Record<string, unknown> = {};
     const links = store.linksIn(book);
-    const pending = links.length ? await ledgerFor(user).pending(book) : [];
+    const unconfirmed = links.length ? await ledgerFor(user).unconfirmed(book) : [];
     const notAtBank = (account: string, kind: LinkKind, from: string) => {
       const cash = cashAccountOf({ account, kind });
-      const mine = pending.filter(
+      const mine = unconfirmed.filter(
         (t) => t.date >= from && t.postings.some((p) => p.account === cash)
       );
       const held = deps.db.claimed(
@@ -301,7 +301,7 @@ export function simplefinRoutes(
           balance_date: snapshot.balance_date,
         },
         last_sync_at: connection.last_sync_at,
-        // Pending transactions of yours from the link's start that no bank row holds.
+        // Unconfirmed transactions of yours from the link's start that no bank row holds.
         not_at_bank: [...notAtBank(link.account, link.kind, link.starts_on)],
         errors: errorsOf(
           connection.errors.filter((e) => !e.account_id || e.account_id === link.account_id)

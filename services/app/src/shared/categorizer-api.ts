@@ -40,7 +40,7 @@ export type ContextAccount = {
 export type HistoryTransaction = {
   id: string;
   date: string;
-  /** `*` confirmed by the user (trust these), `!` still pending review (don't learn from them). */
+  /** `*` confirmed by the user (trust these), `!` still unconfirmed (don't learn from them). */
   flag: string;
   payee: string | null;
   /** The description (for imported transactions, the bank's text). */

@@ -2,7 +2,7 @@
  * Scheduled transactions: checking schedules, the generator, and what's coming.
  *
  * The generator stages each due occurrence of every schedule that isn't paused, acting as the
- * schedule's owner toward the ledger: pending (`!`) for review, or confirmed if the schedule
+ * schedule's owner toward the ledger: unconfirmed (`!`) for review, or confirmed if the schedule
  * confirms automatically. It runs at startup, after a schedule is saved, and once a day just
  * after midnight in each book's time zone. An occurrence is due on its (weekend-adjusted) date,
  * in the book's time zone.

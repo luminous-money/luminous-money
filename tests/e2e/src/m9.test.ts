@@ -147,7 +147,7 @@ describe("M9: bank feeds (SimpleFIN)", () => {
     assert.equal(synced.staged, 0);
   });
 
-  it("reconciles an account with history: matches confirmed, the rest pending, the bank's balance kept", async () => {
+  it("reconciles an account with history: matches confirmed, the rest unconfirmed, the bank's balance kept", async () => {
     const { me, book, post } = await setUp();
     const account = "Assets:Bank:Checking";
     await me.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {

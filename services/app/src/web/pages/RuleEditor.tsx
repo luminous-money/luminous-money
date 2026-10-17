@@ -29,7 +29,7 @@ const BLANK: CategoryRuleIn = {
 };
 
 /** A new rule (blank, or from `?from=<transaction>`: "Remember as a rule…"), or an existing
- * one. After saving, offers to re-apply it to the pending transactions it covers. */
+ * one. After saving, offers to re-apply it to the unconfirmed transactions it covers. */
 export function RuleEditor({ book, id }: { book: string; id?: string }) {
   const from = useParam("from");
   const existing = useRule(book, id);
@@ -145,8 +145,8 @@ function Form({
     return (
       <section className="card stack" aria-label="Apply the rule">
         <p>
-          Saved. It covers {saved.covers} pending transaction{saved.covers === 1 ? "" : "s"} not yet
-          decided. Categorize {saved.covers === 1 ? "it" : "them"} as {shortName(category)} now?
+          Saved. It covers {saved.covers} unconfirmed transaction{saved.covers === 1 ? "" : "s"} not
+          yet decided. Categorize {saved.covers === 1 ? "it" : "them"} as {shortName(category)} now?
         </p>
         <div className="actions">
           <button type="button" onClick={() => navigate(back)}>

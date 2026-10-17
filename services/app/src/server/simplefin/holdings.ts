@@ -3,11 +3,11 @@
  * (symbol, shares, cost basis, market value), not trades or lots, so:
  *
  * - **Prices:** each snapshot records that day's price per symbol (market value / shares).
- * - **Positions:** when the bank's shares differ from the books' (pending included), the
+ * - **Positions:** when the bank's shares differ from the books' (unconfirmed included), the
  *   difference is staged for review as a **position change**, through M5's trade booking:
  *   - more shares: a buy at the cost-basis increase (or the market price, without one)
  *   - fewer shares: a sale booked by the account's sale method, with gains split by term
- *   - **the cash side** is the bank's matching cash transaction when there is one: a pending
+ *   - **the cash side** is the bank's matching cash transaction when there is one: an unconfirmed
  *     transaction in the brokerage's cash, within a few days, for about the amount, still
  *     uncategorized. It becomes the trade. Without one, the other side stays uncategorized.
  * - **Money-market core positions** (a price of 1, like Fidelity's SPAXX) count as cash, not as
@@ -77,7 +77,7 @@ export function openingHoldings(holdings: SfHolding[]) {
   }));
 }
 
-/** A pending, still-uncategorized cash transaction near `date` for about `amount`: the cash side
+/** An unconfirmed, still-uncategorized cash transaction near `date` for about `amount`: the cash side
  * of a trade the bank reported separately. */
 async function cashSideOf(
   ledger: LedgerPort,

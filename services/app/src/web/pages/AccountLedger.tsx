@@ -293,7 +293,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
           <li key={row.id} data-row={row.id}>
             <button
               type="button"
-              className={`ledger-row${row.flag === "!" ? " pending" : ""}${selection.has(row.id) ? " selected" : ""}`}
+              className={`ledger-row${row.flag === "!" ? " unconfirmed" : ""}${selection.has(row.id) ? " selected" : ""}`}
               onClick={() => (selection.selecting ? selection.toggle(row.id) : open(row.id))}
               {...(selection.selecting
                 ? { role: "checkbox", "aria-checked": selection.has(row.id) }
@@ -316,7 +316,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
                 </span>
                 <span className="ledger-account muted">
                   {row.counterpart ? shortName(row.counterpart) : "<multiple>"}
-                  {row.flag === "!" && " · pending"}
+                  {row.flag === "!" && " · unconfirmed"}
                 </span>
               </span>
               <span className="ledger-numbers">

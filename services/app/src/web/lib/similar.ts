@@ -4,7 +4,7 @@ import { payeeKey } from "../../shared/payees.js";
 import type { ProposalSummary } from "./appApi.js";
 import { simple, UNCATEGORIZED } from "./split.js";
 
-/** Whether a pending transaction's category is still undecided: uncategorized, or exactly what
+/** Whether an unconfirmed transaction's category is still undecided: uncategorized, or exactly what
  * was proposed for it (the user hasn't touched it). */
 export function undecided(t: Transaction, proposal: ProposalSummary | undefined): boolean {
   const view = simple(t);
@@ -18,10 +18,10 @@ export function undecided(t: Transaction, proposal: ProposalSummary | undefined)
 }
 
 /**
- * The other pending transactions like `t`: in the same account (the active account), with the
+ * The other unconfirmed transactions like `t`: in the same account (the active account), with the
  * same payee key, and their category still undecided. What "Also categorize N similar" covers.
  */
-export function similarPending(
+export function similarUnconfirmed(
   t: Transaction,
   queue: Transaction[],
   proposals: Record<string, ProposalSummary> = {}

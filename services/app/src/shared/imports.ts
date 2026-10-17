@@ -6,7 +6,7 @@ export type { CsvProfile } from "@fava-beans/csv-import";
 
 /** What became of one CSV row. */
 export type Outcome =
-  /** Staged as a pending transaction in the account, for review. */
+  /** Staged as an unconfirmed transaction in the account, for review. */
   | "staged"
   /** The same event as a transaction already in the account: it claims that one instead of
    * adding another (proposed until confirmed in review). */

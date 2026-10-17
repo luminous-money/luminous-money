@@ -1,9 +1,9 @@
 /**
- * Categorization beyond imports: suggesting categories for transactions already pending,
+ * Categorization beyond imports: suggesting categories for transactions already unconfirmed,
  * re-applying a changed rule, and settling proposals once their transactions are confirmed
  * (acceptance tracking, and feedback to providers that want it).
  *
- * A pending transaction is **open to categorizing** when it's simple (two postings) and the
+ * An unconfirmed transaction is **open to categorizing** when it's simple (two postings) and the
  * user hasn't decided its category: its other side is uncategorized, or still exactly what was
  * proposed for it. Its first posting is its own side (where it came from), as imports and
  * schedules stage them.
@@ -22,7 +22,7 @@ import type { Categorizer, Chosen } from "./types.js";
 
 const FALLBACKS = new Set([UNCATEGORIZED.out, UNCATEGORIZED.in]);
 
-/** The pending transaction as a categorizer sees it, if it's open to categorizing. */
+/** The unconfirmed transaction as a categorizer sees it, if it's open to categorizing. */
 function openToCategorizing(t: Transaction, proposal: StoredProposal | undefined) {
   if (t.postings.length !== 2) return undefined;
   const [own, other] = t.postings as [Transaction["postings"][0], Transaction["postings"][0]];
@@ -44,7 +44,7 @@ function openToCategorizing(t: Transaction, proposal: StoredProposal | undefined
 
 type Services = { db: AppDb; ledger: LedgerPort; book: { id: string; name: string } };
 
-/** Write a decision to a pending transaction, and record the proposal. */
+/** Write a decision to an unconfirmed transaction, and record the proposal. */
 async function apply(
   { db, ledger, book }: Services,
   t: Transaction,
@@ -84,15 +84,15 @@ async function apply(
   return true;
 }
 
-/** "Suggest categories": run the chain over the pending transactions open to categorizing
+/** "Suggest categories": run the chain over the unconfirmed transactions open to categorizing
  * (those from `account` or its subaccounts, if given). Returns how many got a proposal. */
-export async function suggestPending(
+export async function suggestUnconfirmed(
   services: Services & { categorizers: Categorizer[]; account?: string }
 ): Promise<number> {
   const { db, ledger, book, categorizers, account } = services;
-  const pending = await ledger.pending(book.id);
+  const unconfirmed = await ledger.unconfirmed(book.id);
   const inScope = (name: string) => !account || name === account || name.startsWith(`${account}:`);
-  const open = pending.flatMap((t) => {
+  const open = unconfirmed.flatMap((t) => {
     const incoming = openToCategorizing(t, db.proposal(book.id, t.id));
     return incoming && inScope(incoming.account) ? [{ t, incoming }] : [];
   });
@@ -114,10 +114,10 @@ export async function suggestPending(
   return n;
 }
 
-/** The pending transactions a rule covers that are open to categorizing (not already its). */
+/** The unconfirmed transactions a rule covers that are open to categorizing (not already its). */
 export async function coveredBy(services: Services, rule: CategoryRule) {
   const { db, ledger, book } = services;
-  return (await ledger.pending(book.id)).flatMap((t) => {
+  return (await ledger.unconfirmed(book.id)).flatMap((t) => {
     const incoming = openToCategorizing(t, db.proposal(book.id, t.id));
     if (!incoming || !matches(rule, incoming)) return [];
     if (t.postings[1]!.account === rule.account && (!rule.payee || t.payee === rule.payee))
@@ -126,7 +126,7 @@ export async function coveredBy(services: Services, rule: CategoryRule) {
   });
 }
 
-/** Re-apply a rule to the pending transactions it covers that the user hasn't touched. */
+/** Re-apply a rule to the unconfirmed transactions it covers that the user hasn't touched. */
 export async function applyRule(services: Services, rule: CategoryRule): Promise<number> {
   const covered = await coveredBy(services, rule);
   for (const { t, incoming } of covered) {

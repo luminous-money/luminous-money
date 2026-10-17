@@ -134,7 +134,7 @@ export class FakeLedger implements LedgerPort {
     return { ...price, id: `p${this.prices.length}`, source: null } as never;
   }
 
-  /** Units (and total cost) per commodity in the account or under it, pending included. */
+  /** Units (and total cost) per commodity in the account or under it, unconfirmed included. */
   async holdings(_book: string, account: string): Promise<Holdings> {
     const totals = new Map<string, { units: number; cost: number }>();
     for (const t of this.transactions)
@@ -261,7 +261,7 @@ export class FakeLedger implements LedgerPort {
     return { fetched: [], errors: {} };
   }
 
-  async pending() {
+  async unconfirmed() {
     return this.transactions.filter((t) => t.flag === "!");
   }
 

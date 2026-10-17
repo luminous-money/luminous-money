@@ -185,7 +185,7 @@ test.describe("an account's ledger", () => {
 
     const costco = page.getByRole("button", { name: /Costco/ });
     await expect(costco).toContainText("<multiple>");
-    await expect(costco).toContainText("pending");
+    await expect(costco).toContainText("unconfirmed");
     await expect(page.getByRole("button", { name: /Opening balance/ })).toContainText(
       "Equity:Opening-Balances"
     );

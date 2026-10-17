@@ -161,7 +161,7 @@ def test_summaries_are_of_the_accounts_asked_for_in_order(book):
 
     assert [a.name for a in found] == ["Assets:Cash", "Assets:Bank:PNC-Checking"]
 
-def test_balances_include_pending_and_fill_in_elided_amounts(book):
+def test_balances_include_unconfirmed_and_fill_in_elided_amounts(book):
     account = bank(book).name
     spend(book, account, "-25.50")
     spend(book, account, "-4.50", flag="!")

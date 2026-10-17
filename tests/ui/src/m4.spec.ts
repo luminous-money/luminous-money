@@ -5,8 +5,8 @@ import { setUpUser } from "./support.js";
 
 const usd = (number: string) => ({ number, currency: "USD" });
 
-/** A user with categories, a confirmed coffee to learn from, and `pending` uncategorized ones. */
-async function withPending(page: Page, pending: string[]) {
+/** A user with categories, a confirmed coffee to learn from, and `unconfirmed` uncategorized ones. */
+async function withUnconfirmed(page: Page, unconfirmed: string[]) {
   const { session, book, account } = await setUpUser(page);
   const post = <T>(path: string, body: T) =>
     session.ledger.POST(path as never, { params: { path: { book_id: book.id } }, body } as never);
@@ -26,13 +26,13 @@ async function withPending(page: Page, pending: string[]) {
       postings: [{ account, units: usd("-4.50") }, { account: other }],
     });
   await add("CORNER CAFE", "*", "Expenses:Food:Coffee");
-  for (const narration of pending) await add(narration, "!", "Expenses:Uncategorized");
+  for (const narration of unconfirmed) await add(narration, "!", "Expenses:Uncategorized");
   await page.goto(`/ui/books/${book.id}/review`);
   return { book };
 }
 
 test("Suggest categories fills in a category and says where it came from", async ({ page }) => {
-  await withPending(page, ["CORNER CAFE #57"]);
+  await withUnconfirmed(page, ["CORNER CAFE #57"]);
 
   await page.getByRole("button", { name: "Suggest categories" }).click();
 
@@ -44,10 +44,10 @@ test("Suggest categories fills in a category and says where it came from", async
   await expect(page.getByText("All caught up")).toBeVisible();
 });
 
-test("picking a category offers it to similar pending transactions in the account", async ({
+test("picking a category offers it to similar unconfirmed transactions in the account", async ({
   page,
 }) => {
-  await withPending(page, ["TEA HOUSE #1", "TEA HOUSE #2", "TEA HOUSE #3", "SOMEWHERE ELSE"]);
+  await withUnconfirmed(page, ["TEA HOUSE #1", "TEA HOUSE #2", "TEA HOUSE #3", "SOMEWHERE ELSE"]);
   const first = page.getByRole("article").first();
 
   await first.getByRole("button", { name: /^Category:/ }).click();
@@ -60,7 +60,7 @@ test("picking a category offers it to similar pending transactions in the accoun
 });
 
 test("Remember as a rule makes a rule from a card, and offers to apply it", async ({ page }) => {
-  const { book } = await withPending(page, ["TEA HOUSE #1", "TEA HOUSE #2"]);
+  const { book } = await withUnconfirmed(page, ["TEA HOUSE #1", "TEA HOUSE #2"]);
   const first = page.getByRole("article").first();
   await first.getByRole("button", { name: /^Category:/ }).click();
   await page.getByRole("combobox", { name: "Category" }).fill("tea");
@@ -81,7 +81,7 @@ test("Remember as a rule makes a rule from a card, and offers to apply it", asyn
 });
 
 test("Select mode categorizes and confirms several at once", async ({ page }) => {
-  await withPending(page, ["ONE", "TWO", "THREE"]);
+  await withUnconfirmed(page, ["ONE", "TWO", "THREE"]);
 
   await page.getByRole("button", { name: "Select" }).click();
   const boxes = page.getByRole("checkbox", { name: "Select" });
@@ -101,7 +101,7 @@ test("Select mode categorizes and confirms several at once", async ({ page }) =>
 test("in Select mode, tapping anywhere on a card selects it, and its own controls are off", async ({
   page,
 }) => {
-  await withPending(page, ["ONE", "TWO"]);
+  await withUnconfirmed(page, ["ONE", "TWO"]);
   await page.getByRole("button", { name: "Select" }).click();
   const bar = page.getByRole("toolbar", { name: "Selected" });
 
@@ -118,7 +118,7 @@ test("in Select mode, tapping anywhere on a card selects it, and its own control
 test("an account's ledger suggests categories, and categorizes and confirms in bulk", async ({
   page,
 }) => {
-  const { book } = await withPending(page, ["CORNER CAFE #9", "TEA ONE", "TEA TWO"]);
+  const { book } = await withUnconfirmed(page, ["CORNER CAFE #9", "TEA ONE", "TEA TWO"]);
   await page.goto(
     `/ui/books/${book.id}/accounts/${encodeURIComponent("Assets:Bank:PNC-Checking")}`
   );
@@ -127,7 +127,7 @@ test("an account's ledger suggests categories, and categorizes and confirms in b
   await expect(page.getByText("Suggested categories for 1.")).toBeVisible();
   const list = page.getByRole("list", { name: "Transactions" });
   // Now with history's clean payee, and its category.
-  await expect(list.getByRole("button", { name: /Corner Cafe.*pending/ })).toContainText(
+  await expect(list.getByRole("button", { name: /Corner Cafe.*unconfirmed/ })).toContainText(
     "Food:Coffee"
   );
 
@@ -143,6 +143,6 @@ test("an account's ledger suggests categories, and categorizes and confirms in b
   await expect(list.getByRole("checkbox", { name: /TEA ONE/ })).toContainText("Food:Tea");
   await bar.getByRole("button", { name: "Confirm 2" }).click();
 
-  await expect(list.getByRole("checkbox", { name: /TEA ONE/ })).not.toContainText("pending");
-  await expect(list.getByRole("checkbox", { name: /TEA TWO/ })).not.toContainText("pending");
+  await expect(list.getByRole("checkbox", { name: /TEA ONE/ })).not.toContainText("unconfirmed");
+  await expect(list.getByRole("checkbox", { name: /TEA TWO/ })).not.toContainText("unconfirmed");
 });

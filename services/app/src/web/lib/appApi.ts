@@ -305,7 +305,7 @@ export const appApi = {
   rule: async (book: string, id: string): Promise<CategoryRule> =>
     json(await apiFetch(`${base(book)}/rules/${id}`)),
 
-  /** Create or change a rule; the answer says how many pending transactions it covers. */
+  /** Create or change a rule; the answer says how many unconfirmed transactions it covers. */
   saveRule: async (
     book: string,
     rule: CategoryRuleIn | CategoryRulePatch,
@@ -339,7 +339,7 @@ export const appApi = {
     await apiFetch(`${base(book)}/proposals/${transaction}/settle`, { method: "POST" });
   },
 
-  /** Suggest categories for pending transactions (from `account`, if given). */
+  /** Suggest categories for unconfirmed transactions (from `account`, if given). */
   suggest: async (book: string, account?: string): Promise<{ suggested: number }> =>
     json(
       await apiFetch(

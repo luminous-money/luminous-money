@@ -1,7 +1,7 @@
 import type { Transaction } from "@fava-beans/ledger-client";
 import { expect, it } from "vitest";
 
-import { similarPending } from "./similar.js";
+import { similarUnconfirmed } from "./similar.js";
 
 let n = 0;
 const t = (
@@ -22,7 +22,7 @@ const t = (
     ],
   }) as unknown as Transaction;
 
-it("finds pending ones with the same payee key in the same account, still undecided", () => {
+it("finds unconfirmed ones with the same payee key in the same account, still undecided", () => {
   const picked = t("POS CORNER CAFE #1 CHICAGO IL", "Assets:Checking", "Expenses:Coffee");
   const same = t("CORNER CAFE #2 CHICAGO IL");
   const proposed = t("CORNER CAFE CHICAGO", "Assets:Checking", "Expenses:Food");
@@ -31,15 +31,19 @@ it("finds pending ones with the same payee key in the same account, still undeci
   const other = t("TEA HOUSE");
   const done = t("CORNER CAFE CHICAGO", "Assets:Checking", "Expenses:Uncategorized", "*");
 
-  const found = similarPending(picked, [picked, same, proposed, chosen, elsewhere, other, done], {
-    [proposed.id]: {
-      categorizer: "history",
-      accounts: ["Expenses:Food"],
-      payee: null,
-      confidence: 0.5,
-      reason: "",
-    },
-  });
+  const found = similarUnconfirmed(
+    picked,
+    [picked, same, proposed, chosen, elsewhere, other, done],
+    {
+      [proposed.id]: {
+        categorizer: "history",
+        accounts: ["Expenses:Food"],
+        payee: null,
+        confidence: 0.5,
+        reason: "",
+      },
+    }
+  );
 
   expect(found.map((x) => x.id)).toEqual([same.id, proposed.id]);
 });

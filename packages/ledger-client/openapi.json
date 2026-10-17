@@ -366,7 +366,7 @@
             "title": "As Of"
           },
           "balance": {
-            "description": "The current balance, pending transactions included: one amount per currency held.",
+            "description": "The current balance, unconfirmed transactions included: one amount per currency held.",
             "items": {
               "$ref": "#/components/schemas/Amount"
             },
@@ -1410,7 +1410,7 @@
                 "type": "null"
               }
             ],
-            "description": "The account's running balance in `amount`'s currency, pending included."
+            "description": "The account's running balance in `amount`'s currency, unconfirmed included."
           },
           "balances": {
             "description": "The running balance in every currency held so far; empty once only booking could say.",
@@ -2612,7 +2612,7 @@
         "description": "An account in the chart of accounts, with its balances.",
         "properties": {
           "balance": {
-            "description": "Its own balance (a node: none), pending included.",
+            "description": "Its own balance (a node: none), unconfirmed included.",
             "items": {
               "$ref": "#/components/schemas/Amount"
             },

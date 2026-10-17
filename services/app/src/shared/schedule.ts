@@ -209,7 +209,7 @@ export type Schedule = {
   rule: Rule;
   template: TransactionTemplate;
   paused: boolean;
-  /** Stage occurrences confirmed, rather than pending for review. */
+  /** Stage occurrences confirmed, rather than unconfirmed for review. */
   auto_confirm: boolean;
   /** The last nominal date the schedule ran for: occurrences after it are still to come. Null
    * before the first. */

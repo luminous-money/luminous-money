@@ -7,7 +7,7 @@
  *   everything synced (a brokerage: its cash; positions open as one estimated lot each), and
  *   import the history.
  * - **reconcile** (an existing account; the default):
- *   1. every transaction of yours from S on is pending, except those the bank confirms:
+ *   1. every transaction of yours from S on is unconfirmed, except those the bank confirms:
  *   2. the bank's transactions are matched against them (the usual matcher and assignment), and
  *      each match is confirmed (your date, payee and splits kept; the bank's amount where a
  *      schedule's tolerance allowed a difference);
@@ -15,7 +15,7 @@
  *      balance less everything synced): the existing opening balance changes (moving to S − 1 if
  *      it was later), or one is made;
  *   4. the bank's unmatched transactions import as a normal batch, categorized, for review.
- *   Yours from S on that the bank doesn't know stay pending: "Not at the bank".
+ *   Yours from S on that the bank doesn't know stay unconfirmed: "Not at the bank".
  * - **start-over:** delete every transaction posting to the account, then as **new**.
  * - **from-date:** just sync from a date, reconciling nothing.
  *
@@ -72,7 +72,7 @@ export type LinkPreview = {
   matched: number;
   /** Bank transactions that come in as new. */
   added: number;
-  /** Yours from S on the bank doesn't know (reconcile): left pending. */
+  /** Yours from S on the bank doesn't know (reconcile): left unconfirmed. */
   not_at_bank: number;
   /** Transactions deleted (start-over), and how many of them also post to another balance
    * sheet account (a transfer: that account loses its side). */

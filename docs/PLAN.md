@@ -97,7 +97,11 @@ milestone starts.
       needs a substitute to move their transactions to). Built 2026-10-16: the tree (one read),
       rename and move, display names, archive with a closing transfer, delete or merge into a
       substitute, protected accounts, and `app`'s references following.
-- [ ] **M11: Budgets.**
+- [ ] **M11: Budgets.** A budget on any account, for any period: how much you're allowed to
+      spend (or aim to earn or save). A node's budget can be split across the accounts under it,
+      the rest its "Unallocated"; none is higher than one above it. Shown on a Budgets page, an
+      account's ledger and home, as filled lines. [Planned](milestones/m11-budgets/PLAN.md)
+      2026-10-17.
 - [ ] **M12: Reports.** From basic to more complex.
 - [ ] **M13: Sharing books with other users.** Any user can be added to a book with read, write
       or manage permissions. Every book has an owner.
@@ -112,6 +116,9 @@ milestone starts.
       deeply nested expense accounts. Accounts should always say WHAT, not WHY (tags say why, if
       anything)". A new bulk action in review: "Categorize with AI".
 - [ ] **M19: Design polish.**
+- [ ] **M20: Sub-accounts of linked accounts.** Split a bank-linked account's money into
+      sub-accounts, e.g. the $10,000 in a PNC checking account as $5,000 of padding and $5,000
+      for general use, while the bank feed keeps it in step with the bank.
 
 ## Notes collected so far
 
@@ -131,7 +138,7 @@ elaborated.
     - Confirmed or not is a transaction-level checkbox.
     - Any transaction's date can be set by hand, separately from `created_at`.
   - **Scoped to one account,** it's that account's ledger. Every line shows the account's
-    running balance, and pending (`!`) transactions count.
+    running balance, and unconfirmed (`!`) transactions count.
   - **A read-only view:** a prettier, one-line format for reading. Tapping a transaction opens
     it for editing, including complex splits.
 - **Money accounts** (M1, M2, M5): accounts linked to a real institution that actually hold
@@ -167,7 +174,7 @@ elaborated.
   - a target budget on any account, for any period
   - no descendant may have a higher base budget than its ancestor (base amounts, before
     rollover)
-  - each target can roll over from period to period, or not
+  - rollover: dropped (2026-10-17)
 - **Infrastructure, when it's needed:**
   - **Background validation in `ledger`,** once a screen needs Beancount's full booking (lots,
     balance assertions, BQL) and it's too slow on the target hardware. Plain balances come from
@@ -190,8 +197,6 @@ elaborated.
   - What does confidence mean, and is it comparable across resolvers?
   - Can a resolver return a partial answer (e.g. a match with a suggested split)?
   - Should high-confidence matches ever auto-confirm, or does everything go through review?
-- **Budget display across periods** (to revisit): budgets can have any period. How does a view
-  show accounts whose budgets have different periods side by side?
 - **Cutover:** deferred until hydration.
 
 ## Polish

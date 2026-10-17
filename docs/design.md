@@ -65,11 +65,15 @@ So:
 
 ### Staging is a status, not a separate store
 
-Every Beancount transaction carries a flag: `*` means confirmed and `!` means pending. Entries
+Every Beancount transaction carries a flag: `*` means confirmed and `!` means unconfirmed. Entries
 the system creates for you (imports, mirrored entries, scheduled entries) arrive as `!` with a
 proposed match or categorization. The **review queue is every `!` entry**, and confirming one
 changes its flag to `*`. Staged entries are real entries from the moment they're created. In the
 database, the flag is a status column on the entry, and an export writes it out as the flag.
+
+**`!` is "unconfirmed" everywhere,** in the UI, the code and these docs: it says what's true (you
+haven't confirmed it yet). "Pending" is kept for the bank's own meaning, a transaction it hasn't
+posted yet (SimpleFIN's `pending`).
 
 ### Writes: JSON for transactions, Beancount text for everything
 
@@ -430,7 +434,7 @@ How auth works (M8; the shape is M1's):
   - Each posting stores its change to its account, with an elided amount filled in when that's
     unambiguous (one currency, no lots or prices).
   - When it isn't, that account's balance falls back to Beancount.
-  - Pending transactions count.
+  - Unconfirmed transactions count.
 - **An account's ledger** is its transactions newest first, in keyset pages of 200. Each shows
   its running balance and the other account (or `<multiple>`).
   - **The full view** starts at the newest and loads older pages as you scroll.
@@ -494,7 +498,7 @@ How auth works (M8; the shape is M1's):
     plus the row's occurrence among identical ones in the file
   - **rows skipped:** duplicates of earlier imports, rows before the opening balance, and rows
     that can't be read
-  - **the rest** go through the pipeline, then are staged in one atomic ledger batch as pending
+  - **the rest** go through the pipeline, then are staged in one atomic ledger batch as unconfirmed
     transactions against `Expenses:Uncategorized` or `Income:Uncategorized`
   - **recorded:** the batch and each row's outcome; the last batch's time is the account's
     "last updated"
@@ -577,11 +581,11 @@ and `holdings`, and errors either as coded `errlist` or as the older plain `erro
   - **New:** the account opens on S − 1 at the reported balance less everything synced, so the
     books agree with the bank from the start.
   - **Reconcile** (an existing account; the default):
-    - Your transactions from S on are pending, except those matching the bank, which are
+    - Your transactions from S on are unconfirmed, except those matching the bank, which are
       confirmed (yours kept: date, payee, splits).
     - The opening balance becomes whatever makes the balance at S − 1 the bank's.
     - The bank's unmatched transactions import.
-    - Yours the bank doesn't know stay pending, marked **Not at the bank** in review.
+    - Yours the bank doesn't know stay unconfirmed, marked **Not at the bank** in review.
   - **Start over** deletes the account's transactions first (the user's choice, never the
     default). **From a date** reconciles nothing.
   - The reconcile is one atomic ledger write (`/transactions/changes` takes versioned updates
@@ -677,11 +681,11 @@ As built in M3:
 - **The generator** runs in `app` at startup, after saves, and once a day just after midnight
   in each book's time zone (a book setting in `app`, defaulting to the browser's), acting as the
   owner. An occurrence is staged on its (weekend-adjusted) date as a transaction marked
-  `schedule`/`schedule-date`: pending for review, or confirmed if the schedule confirms
+  `schedule`/`schedule-date`: unconfirmed for review, or confirmed if the schedule confirms
   automatically. The bank's row matches it on import (M2).
 - **Each occurrence is staged once.** A schedule's `last_applied` date is the last nominal date
   it ran for; the generator stages from after it (or from the start) through today. So "Not
-  this time" (deleting a pending occurrence, distinct from review's "Skip") is for good. A new
+  this time" (deleting an unconfirmed occurrence, distinct from review's "Skip") is for good. A new
   schedule starting in the past stages everything since its start.
 - **Editing resets a schedule to now:** its unconfirmed occurrences from today on are deleted
   (not ones an import matched) and staged again as edited; dates already past are never staged
@@ -756,7 +760,7 @@ The default chain:
 
 Resolution only proposes. Everything lands in the review queue (new transactions as `!`, matches
 as proposed), with the match or proposal shown and confirmable with one tap, except what a
-user's rule confirms automatically. Review also has "Suggest categories" (the chain over pending
+user's rule confirms automatically. Review also has "Suggest categories" (the chain over unconfirmed
 uncategorized transactions), "Also categorize N similar" (same payee key, same account), "Remember
 as a rule", and Select mode for categorizing or confirming many at once.
 

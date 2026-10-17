@@ -33,7 +33,7 @@ beforeEach(() => {
 });
 
 describe("importing a file", () => {
-  it("stages each new row as a pending, uncategorized transaction", async () => {
+  it("stages each new row as an unconfirmed, uncategorized transaction", async () => {
     const result = await run();
 
     expect(result.batch).toMatchObject({

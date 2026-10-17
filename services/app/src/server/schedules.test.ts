@@ -63,7 +63,7 @@ beforeEach(() => {
 });
 
 describe("the generator", () => {
-  it("stages every due occurrence, pending and marked, once", async () => {
+  it("stages every due occurrence, unconfirmed and marked, once", async () => {
     const s = await create(rent(), "2024-03-15"); // a start in the past backfills
 
     expect(ledger.transactions.map((t) => [t.date, t.flag, t.payee])).toEqual([
@@ -160,7 +160,7 @@ describe("answers to M3's questions", () => {
     editSchedule({ db, ledgerFor, user: "u", book: "b", id, on, patch: { updated_at, ...change } });
 
   it("editing resets to now: today's unconfirmed occurrence is staged again as edited", async () => {
-    const s = await create(rent(), "2024-03-01"); // Jan, Feb and Mar 1, pending
+    const s = await create(rent(), "2024-03-01"); // Jan, Feb and Mar 1, unconfirmed
     ledger.transactions[0]!.flag = "*"; // January's was confirmed
 
     await edit(s.id, s.updated_at, "2024-03-01", {

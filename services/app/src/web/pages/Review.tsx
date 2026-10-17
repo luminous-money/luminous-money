@@ -12,7 +12,7 @@ import { bookHome } from "../lib/books.js";
 import { today } from "../lib/format.js";
 import { withBack } from "../lib/navigation.js";
 import { useSelection } from "../lib/selection.js";
-import { similarPending } from "../lib/similar.js";
+import { similarUnconfirmed } from "../lib/similar.js";
 import {
   explain,
   readSkipped,
@@ -33,7 +33,7 @@ import {
 import { simple, UNCATEGORIZED, withCounterpart } from "../lib/split.js";
 
 /**
- * The review queue: pending transactions to categorize and confirm, and imported rows matched
+ * The review queue: unconfirmed transactions to categorize and confirm, and imported rows matched
  * to transactions already in the account, whose matches are confirmed here too (or moved,
  * swapped, or undone). Categories proposed on import say where they came from. "Suggest
  * categories" proposes for anything still uncategorized; Select mode categorizes or confirms
@@ -152,7 +152,7 @@ export function Review({ book }: { book: string }) {
               proposal={proposals.data?.[t.id]}
               similar={(account) => ({
                 account,
-                others: similarPending(t, queued, proposals.data),
+                others: similarUnconfirmed(t, queued, proposals.data),
               })}
               onCategorizeSimilar={(others, account) =>
                 bulk.mutate({
@@ -185,7 +185,7 @@ type ItemProps = {
   notAtBank: boolean;
   /** What categorization proposed for it, if anything. */
   proposal: ProposalSummary | undefined;
-  /** After picking `account` for it: the similar pending transactions to offer it to. */
+  /** After picking `account` for it: the similar unconfirmed transactions to offer it to. */
   similar: (account: string) => { account: string; others: Transaction[] };
   onCategorizeSimilar: (others: Transaction[], account: string) => void;
   selecting: boolean;
@@ -242,7 +242,7 @@ function QueueItem({
     if (narration !== t.narration) void save({ narration });
   };
   // Confirming carries the description too, in case it was edited without leaving the field;
-  // it confirms the transaction if it's pending, and any matches proposed with it.
+  // it confirms the transaction if it's unconfirmed, and any matches proposed with it.
   const confirm = async () => {
     if (t.flag === "!" && !(await save({ flag: "*", narration }))) return false;
     try {

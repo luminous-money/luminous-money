@@ -205,7 +205,7 @@ export function ChartOfAccounts({ book }: { book: string }) {
         </div>
       )}
       <p className="small muted chart-notes">
-        Balances include pending transactions.
+        Balances include unconfirmed transactions.
         {unpriced.length > 0 && <> * Plus {unpriced.join(", ")}, which have no price.</>}
       </p>
     </main>

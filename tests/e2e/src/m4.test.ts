@@ -138,7 +138,7 @@ describe("categorization", () => {
     assert.equal(imported.rows[0]!.proposal!.categorizer, "rules");
   });
 
-  it("suggests categories for pending transactions, and re-applies a new rule to untouched ones", async () => {
+  it("suggests categories for unconfirmed transactions, and re-applies a new rule to untouched ones", async () => {
     const { json, add, transaction } = await setUp();
     await add("CORNER CAFE", "*", "Expenses:Food:Coffee");
     const { data: open } = await add("CORNER CAFE", "!", "Expenses:Uncategorized");

@@ -9,7 +9,7 @@ _Updated 2026-10-15._ Keep this current: every finalized change set updates it (
 **M1 through M10 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN) and M10 (chart of
-accounts) are described in their plans. The milestones ahead (M11–M19, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+accounts) are described in their plans. The milestones ahead (M11–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
 - **Accounts (M10):** Menu → Accounts: one card, the tree by type, tap a node to open or close
@@ -42,7 +42,7 @@ What a user can do now:
 - **Schedules:** a transaction plus a rule (every N days/weeks/months/years, days of the month,
   weekends moved or kept, an optional end), made new or with "Repeat…" on any transaction.
   - Due occurrences are staged (at startup, after saves, and daily after midnight in the book's
-    time zone) as pending transactions, or confirmed if the schedule confirms automatically;
+    time zone) as unconfirmed transactions, or confirmed if the schedule confirms automatically;
     marked ↻ in ledgers, and matched by imports like any transaction.
   - Each split can have a match tolerance: the bank's amount within it matches, and wins on
     confirm.
@@ -66,7 +66,7 @@ What a user can do now:
     payment categorized to the card on checking's import is recognized by the card's import, and
     hand-entered transactions are reconciled
   - the rest are staged for review, uncategorized
-- **Review:** pending transactions (skip, categorize, confirm, swipe, create accounts) and
+- **Review:** unconfirmed transactions (skip, categorize, confirm, swipe, create accounts) and
   proposed matches: confirm, "Match with this instead", "Swap" (with the row holding a
   candidate), or "Not a match" (stages the row on its own).
 - **Categorization (M4):** imported rows are staged with a proposed category and clean payee:
@@ -116,7 +116,8 @@ How it's put together:
 
 ## Next steps
 
-1. Say `elaborate plan for M11` (budgets).
+1. Answer the questions in [the M11 plan](docs/milestones/m11-budgets/PLAN.md#questions), then
+   say `build M11` (budgets).
 2. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
 
 ## Gotchas

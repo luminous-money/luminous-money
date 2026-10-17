@@ -84,8 +84,8 @@ export interface LedgerPort {
     changes: Partial<Pick<TransactionIn, "postings" | "payee" | "flag">>,
     updated_at: string
   ): Promise<Transaction>;
-  /** The book's pending (`!`) transactions. */
-  pending(book: string): Promise<Transaction[]>;
+  /** The book's unconfirmed (`!`) transactions. */
+  unconfirmed(book: string): Promise<Transaction[]>;
   /** Fetch the latest prices of commodities still held that name a source. */
   fetchPrices(book: string): Promise<FetchResult>;
   /** Create, change and delete (with the versions read) in one write, or not at all. Returns
@@ -237,7 +237,7 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
           params: { path: { book_id: book } },
         })
       ),
-    pending: (book) =>
+    unconfirmed: (book) =>
       unwrap(
         client.GET("/api/ledger/v1/books/{book_id}/transactions", {
           params: { path: { book_id: book }, query: { flag: "!", limit: 5000 } },

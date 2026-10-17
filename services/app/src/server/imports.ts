@@ -12,7 +12,7 @@
  *    be the same event (any not already held by a row of this account's imports), and
  *    assignment gives each row the best one no other row took.
  * 5. A row that got one is `matched`: it claims that transaction, and nothing is added. The rest
- *    are staged in one atomic ledger write as pending (`!`) transactions, uncategorized:
+ *    are staged in one atomic ledger write as unconfirmed (`!`) transactions, uncategorized:
  *    `Expenses:Uncategorized` for money out, `Income:Uncategorized` for money in, until M4.
  * 6. The batch, each row's outcome, transaction and candidates are recorded. A row with
  *    candidates has its match proposed until it's confirmed in review.
@@ -62,7 +62,7 @@ export type Stageable = {
   fingerprint: string;
 };
 
-/** A row as a transaction in `account`: pending, with the category and payee the chain
+/** A row as a transaction in `account`: unconfirmed, with the category and payee the chain
  * decided (confirmed if a rule says so), or uncategorized on the other side. */
 export function stagedTransaction(
   account: string,

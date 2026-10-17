@@ -407,15 +407,15 @@ export function useMatches(book: string) {
 }
 
 /**
- * What review shows: pending transactions, plus transactions with a proposed match (which may
+ * What review shows: unconfirmed transactions, plus transactions with a proposed match (which may
  * be confirmed already, like one entered by hand), oldest first, each with its matches.
  */
 export function useReviewQueue(book: string) {
   const queue = useQueue(book);
   const matches = useMatches(book);
-  const pending = new Set(queue.data?.map((t) => t.id));
+  const unconfirmed = new Set(queue.data?.map((t) => t.id));
   const extra = [...new Set(matches.data?.map((m) => m.transaction_id!) ?? [])].filter(
-    (id) => id && !pending.has(id)
+    (id) => id && !unconfirmed.has(id)
   );
   const fetched = useQueries({
     queries: extra.map((id) => ({
@@ -552,7 +552,7 @@ export function useBulkEdit(book: string) {
   });
 }
 
-/** "Suggest categories" for pending transactions not yet categorized. */
+/** "Suggest categories" for unconfirmed transactions not yet categorized. */
 export function useSuggest(book: string, account?: string) {
   const client = useQueryClient();
   return useMutation({
@@ -590,7 +590,7 @@ export function useDeleteRule(book: string) {
   });
 }
 
-/** Re-apply a rule to the pending transactions it covers. */
+/** Re-apply a rule to the unconfirmed transactions it covers. */
 export function useApplyRule(book: string) {
   const client = useQueryClient();
   return useMutation({
@@ -689,12 +689,12 @@ async function latest(book: string, id: string): Promise<Transaction> {
 }
 
 /** Put a saved transaction everywhere it's cached. Confirmed ones leave the queue; one that
- * was pending has its proposal (if any) settled: was it kept? */
+ * was unconfirmed has its proposal (if any) settled: was it kept? */
 function remember(book: string, saved: Transaction) {
-  const wasPending =
+  const wasUnconfirmed =
     queryClient.getQueryData<Transaction[]>(keys.queue(book))?.some((t) => t.id === saved.id) ||
     queryClient.getQueryData<Transaction>(keys.transaction(book, saved.id))?.flag === "!";
-  if (saved.flag === "*" && wasPending) void appApi.settle(book, saved.id);
+  if (saved.flag === "*" && wasUnconfirmed) void appApi.settle(book, saved.id);
   queryClient.setQueryData(keys.transaction(book, saved.id), saved);
   queryClient.setQueryData<Transaction[]>(keys.queue(book), (queue) =>
     queue?.flatMap((t) => (t.id !== saved.id ? [t] : saved.flag === "!" ? [saved] : []))
