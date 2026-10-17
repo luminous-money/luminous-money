@@ -39,13 +39,14 @@ export function SpendingThisMonth({ book }: { book: string }) {
       </div>
       <SpendingChart data={d} theme={theme} height={180} />
       <p className="small muted chart-legend">
-        <span className="key solid" aria-hidden /> This month
+        <span className="legend-item">
+          <span className="key solid" aria-hidden /> This month
+        </span>
         {d.projected_end !== null && (
-          <>
-            {" "}
-            <span className="key dotted" aria-hidden /> 85% of months stay under ·{" "}
+          <span className="legend-item">
+            <span className="key dotted" aria-hidden /> 85% of months stay under:{" "}
             {money(d.projected_end)} by the end
-          </>
+          </span>
         )}
       </p>
     </section>

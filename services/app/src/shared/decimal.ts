@@ -51,6 +51,9 @@ export function isNegative(value: string): boolean {
   return parse(value).units < 0n;
 }
 
+/** Whether `currency` is money we have a symbol for (USD, EUR, …) rather than, say, shares. */
+export const isMoney = (currency: string) => currency in SYMBOLS;
+
 /** For display: thousands separators, and a symbol for the common currencies. */
 export function formatMoney(number: string, currency: string): string {
   const negative = isNegative(number);

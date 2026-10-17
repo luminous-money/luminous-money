@@ -1,9 +1,12 @@
 M12: Reports: plan
 ==================================================================================================
 
-> **Status: planned (2026-10-17),** from [the answers](#answers-2026-10-17). The brief: reports,
-> from basic to more complex. Mostly graphs, and *really nice* ones; statements (profit and
-> loss, balance sheets) later.
+> **Status: built (2026-10-17),** with library, unit, API and browser tests, from [the
+> answers](#answers-2026-10-17). The brief: reports, from basic to more complex. Mostly graphs,
+> and *really nice* ones; statements (profit and loss, balance sheets) later. Added along the
+> way: home's recent transactions (the journal's first page) and a Transactions page (every
+> account's, paged as a ledger is). Not done: moving the libraries to their public monorepo,
+> which waits for a yes.
 
 ## What exists elsewhere (2026-10-17)
 

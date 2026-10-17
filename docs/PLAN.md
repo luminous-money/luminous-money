@@ -102,11 +102,12 @@ milestone starts.
       the rest its "Other"; none is higher than one above it. Shown on a Budgets page, an
       account's ledger and home, as filled lines. [Built](milestones/m11-budgets/PLAN.md)
       2026-10-17, with "Exclude from budget" on transactions and the book's week start.
-- [ ] **M12: Reports.** From basic to more complex: home's "Spent this month" (against the budget
+- [x] **M12: Reports.** From basic to more complex: home's "Spent this month" (against the budget
       and a simulated month), cash flow, expense and income breakdowns, largest transactions,
       net worth, and account statistics, on our own `ledger-graphs` libraries with ECharts.
-      [Planned](milestones/m12-reports/PLAN.md) 2026-10-17. Statements (P&L, balance sheet)
-      later.
+      [Built](milestones/m12-reports/PLAN.md) 2026-10-17, with home's recent transactions and
+      a Transactions page (every account's). Statements (P&L, balance sheet) later; moving the
+      libraries to a public monorepo waits for a yes.
 - [ ] **M13: Sharing books with other users.** Any user can be added to a book with read, write
       or manage permissions. Every book has an owner.
 - [ ] **M14: Reconciliation.**

@@ -609,6 +609,39 @@ same money in through another's, a day or so later. Both would sit in review, un
   confirming; the kept originals are forgotten on the next pass.
 - **When:** after every import (a file, a bank's sync even with nothing new, a new link), over
   the whole book's review, so the second side pairs whenever it arrives.
+
+### Reports (M12)
+
+- **Two libraries of our own,** since nothing generic exists to adopt (Fava's, Paisa's and
+  Actual's charts live inside those apps; fava-dashboards only inside Fava):
+  - **`@luminous-money/ledger-graphs-api`** (`packages/ledger-graphs-api`): plain TypeScript, no
+    dependencies. Reports over a **posting stream** (`{transaction, date, flag, budgeted, payee,
+    narration, account, amount, currency}`, plus current balances and prices for net worth),
+    returning plain JSON datasets. Roots are parameters; sums run in integer cents; simulations
+    take a seed, so they're stable and testable.
+  - **`@luminous-money/ledger-graphs-ui`** (`packages/ledger-graphs-ui`): React charts over those
+    datasets, drawn with Apache ECharts (a peer dependency; only the line, bar and pie charts are
+    bundled, SVG-rendered). The host passes a theme (ours reads the app's CSS variables, light
+    or dark) and the charts describe themselves for screen readers.
+  - They start in this repo; moving them to a public `luminous-money` monorepo and npm waits
+    for the contract to settle (and a yes).
+- **`app` computes them** (`/books/:book/reports/*`): it reads the window each report needs from
+  the ledger's `transactions/compact` (which says what's `budgeted`) and runs the library; the
+  page passes "today". The PWA loads the charts lazily, so ECharts isn't in the first screen.
+- **"Spent this month"** (home): expenses under the highest-level expense budgets (or all of
+  them), what's excluded from budgets left out, against those budgets per month, and the 85th
+  percentile of 2,000 simulated months, each day drawn from the same day of one of the last 12
+  (so rent on the 1st stays on the 1st), exclusions included.
+- **Reports page:** cash flow (6 months, this one so far), a breakdown of expenses or income
+  (6-month averages or this month, at a depth, 6 slices and Other, drilling in), this month's
+  largest expenses, and net worth (24 month ends backed out from today's balances, holdings at
+  each month end's price; what has no price is named, not counted).
+- **An account's "Typically"** (expense and income accounts): the median week, month and year
+  (52 weeks, 12 months, up to 5 years) and what 85% of simulated ones stay under.
+- **The journal** (`GET /books/{b}/journal`): every transaction, newest first, keyset-paged in
+  SQL a page at a time (no running balance to accumulate), as account ledgers are. Home shows
+  its first page in a window of its own; its title opens the Transactions page, paged and
+  dated as an account's ledger is (one paging hook and its pieces, `components/Paged`).
 ### Bank feeds: SimpleFIN (M9)
 
 [SimpleFIN](https://www.simplefin.org/protocol.html), usually through the SimpleFIN Bridge, is the

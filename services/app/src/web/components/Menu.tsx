@@ -4,7 +4,7 @@ import { bookHome, useSelectedBook } from "../lib/books.js";
 import { usePopover } from "../lib/popover.js";
 import { useBooks, useLogOut, useMe } from "../lib/queries.js";
 
-/** The hamburger menu: the selected book's Home, Review, Accounts, Budgets, Reports, Schedules, Rules,
+/** The hamburger menu: the selected book's Home, Review, Transactions, Accounts, Budgets, Reports, Schedules, Rules,
  * Commodities and Bank connections;
  * Manage books; your account; and logging out. */
 export function Menu() {
@@ -36,6 +36,7 @@ export function Menu() {
         <nav className="menu-panel" aria-label="Main">
           {home && item(home, "Home")}
           {home && item(`${home}/review`, "Review")}
+          {home && item(`${home}/transactions`, "Transactions")}
           {home && item(`${home}/accounts`, "Accounts")}
           {home && item(`${home}/budgets`, "Budgets")}
           {home && item(`${home}/reports`, "Reports")}

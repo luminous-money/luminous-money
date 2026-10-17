@@ -549,6 +549,66 @@ class Ledger:
             prev_cursor=(_ledger_cursor(page[0][0]) if page else _BEFORE_ALL) if top > 0 else None,
         )
 
+    def journal(
+        self,
+        book_id: str,
+        *,
+        cursor: str | None = None,
+        after: str | None = None,
+        date: datetime.date | None = None,
+        limit: int = 200,
+    ) -> models.JournalPage:
+        """Every transaction in the book, newest first, in keyset pages as an account's ledger
+        has them (`cursor`: older than a row; `after`: just newer; `date`: from it back), read
+        with plain SQL a page at a time."""
+        self._header(book_id)
+        store = self.store
+
+        def key(row) -> tuple[str, int]:
+            return row["date"], row["ordinal"]
+
+        if after:
+            newer = store.journal(book_id, newer_than=_ledger_key(after), limit=limit + 1)
+            page = list(reversed(newer[:limit]))
+            more_newer = len(newer) > limit
+            more_older = bool(page) and bool(store.journal(book_id, older_than=key(page[-1]), limit=1))
+        else:
+            older = store.journal(
+                book_id,
+                older_than=_ledger_key(cursor) if cursor else None,
+                through=date.isoformat() if date else None,
+                limit=limit + 1,
+            )
+            page = older[:limit]
+            more_older = len(older) > limit
+            if not (cursor or date):
+                more_newer = False  # the full view starts at the newest
+            elif page:
+                more_newer = bool(store.journal(book_id, newer_than=key(page[0]), limit=1))
+            else:  # nothing on or before it: all there is, if anything, is newer
+                more_newer = bool(store.journal(book_id, limit=1))
+        postings: dict[str, list[models.CompactPosting]] = {}
+        for p in store.postings_of([r["id"] for r in page]) if page else []:
+            amount = models.Amount(number=p["amount"], currency=p["amount_currency"]) if p["amount"] is not None else None
+            postings.setdefault(p["directive_id"], []).append(models.CompactPosting(account=p["account"], amount=amount))
+        return models.JournalPage(
+            rows=[
+                models.JournalRow(
+                    id=r["id"],
+                    date=datetime.date.fromisoformat(r["date"]),
+                    flag=r["flag"],
+                    payee=r["payee"],
+                    narration=r["narration"],
+                    budgeted=bool(r["budgeted"]),
+                    postings=postings.get(r["id"], []),
+                    updated_at=r["updated_at"],
+                )
+                for r in page
+            ],
+            next_cursor=_ledger_cursor(key(page[-1])) if page and more_older else None,
+            prev_cursor=(_ledger_cursor(key(page[0])) if page else _BEFORE_ALL) if more_newer else None,
+        )
+
     def create_transactions(self, book_id: str, batch: list[models.TransactionIn]) -> list[engine.Directive]:
         """Create many transactions in one atomic write: all of them, or none."""
         self._header(book_id)

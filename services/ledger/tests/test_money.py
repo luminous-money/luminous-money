@@ -340,3 +340,26 @@ def test_compact_transactions_are_the_window_oldest_first_with_amounts(book):
         ("Expenses:Food", "4.50"),  # the elided side, filled in
     ]
     assert http(book).get("/api/ledger/v1/books/book/transactions/compact", params={"from": "2024-03-01"}).json()[0]["narration"] == "Coffee"
+
+
+def test_the_journal_is_every_account_newest_first_paged_either_way(book):
+    account = bank(book).name
+    for day in range(1, 11):
+        spend(book, account, "-1", date=f"2024-02-{day:02d}")
+    dates = lambda page: [str(r.date) for r in page.rows]  # noqa: E731
+
+    full = book.journal("book", limit=4)
+    older = book.journal("book", cursor=full.next_cursor, limit=4)
+    middle = book.journal("book", date=datetime.date(2024, 2, 6), limit=3)
+    newer = book.journal("book", after=middle.prev_cursor, limit=3)
+
+    assert dates(full) == ["2024-02-10", "2024-02-09", "2024-02-08", "2024-02-07"]
+    assert full.prev_cursor is None and dates(older)[0] == "2024-02-06"
+    assert {p.account for p in full.rows[0].postings} == {account, "Expenses:Food"}
+    assert dates(middle) == ["2024-02-06", "2024-02-05", "2024-02-04"]
+    assert dates(newer) == ["2024-02-09", "2024-02-08", "2024-02-07"] and newer.prev_cursor
+    empty = book.journal("book", date=datetime.date(2023, 1, 1), limit=3)
+    assert empty.rows == [] and dates(book.journal("book", after=empty.prev_cursor, limit=2)) == [
+        "2024-02-01",
+        "2024-01-01",
+    ]

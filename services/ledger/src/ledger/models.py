@@ -470,6 +470,27 @@ class BudgetStatus(Api):
     summary: BudgetSummary | None
 
 
+class JournalRow(Api):
+    """One transaction in the book's journal (every account's), compactly."""
+
+    id: str
+    date: datetime.date
+    flag: str
+    payee: str | None
+    narration: str | None
+    budgeted: bool
+    postings: list[CompactPosting]
+    updated_at: str
+
+
+class JournalPage(Api):
+    rows: list[JournalRow] = Field(description="Newest first.")
+    next_cursor: str | None = Field(description="Pass as `cursor` for the next (older) page; None at the end.")
+    prev_cursor: str | None = Field(
+        description="Pass as `after` for the page before (newer); None when this page starts at the newest."
+    )
+
+
 class AccountIn(Strict):
     name: str = Field(
         description="The fully qualified name. Its root sets the type. Its nearest existing ancestor must be a "

@@ -366,6 +366,42 @@ class Store:
             (book_id,),
         ).fetchall()
 
+    def journal(
+        self,
+        book_id: str,
+        *,
+        older_than: tuple[str, int] | None = None,
+        newer_than: tuple[str, int] | None = None,
+        through: str | None = None,
+        limit: int,
+    ) -> list[sqlite3.Row]:
+        """Live transactions, a keyset page: newest first, older than a row's key (date,
+        ordinal) and dated `through` or earlier if given; or, `newer_than` a key, the closest
+        newer ones first (oldest first)."""
+        where, args = ["book_id = ?", "deleted = 0", "kind = 'transaction'"], [book_id]
+        for key, op in ((older_than, "<"), (newer_than, ">")):
+            if key is not None:
+                where.append(f"(date {op} ? OR (date = ? AND ordinal {op} ?))")
+                args += [key[0], key[0], key[1]]
+        if through is not None:
+            where.append("date <= ?")
+            args.append(through)
+        order = "ASC" if newer_than is not None else "DESC"
+        return self._conn.execute(
+            "SELECT id, date, ordinal, flag, payee, narration, budgeted, updated_at FROM directive"
+            f" WHERE {' AND '.join(where)} ORDER BY date {order}, ordinal {order} LIMIT ?",
+            (*args, limit),
+        ).fetchall()
+
+    def postings_of(self, directive_ids: list[str]) -> list[sqlite3.Row]:
+        """The postings of these directives, in order: directive_id, account, amount, currency."""
+        marks = ",".join("?" * len(directive_ids))
+        return self._conn.execute(
+            f"SELECT directive_id, account, amount, amount_currency FROM posting"
+            f" WHERE directive_id IN ({marks}) ORDER BY directive_id, idx",
+            directive_ids,
+        ).fetchall()
+
     def flow(self, book_id: str, account: str, date_from: str, date_to: str) -> list[sqlite3.Row]:
         """Every live transaction posting to `account` or under it dated in [from, to), but those
         kept out of budgets: its transaction's flag, and its currency and change (`amount`, None

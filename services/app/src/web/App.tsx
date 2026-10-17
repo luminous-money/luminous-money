@@ -16,6 +16,7 @@ import { AddAccount } from "./pages/AddAccount.js";
 import { Books } from "./pages/Books.js";
 import { Budgets } from "./pages/Budgets.js";
 import { Reports } from "./pages/Reports.js";
+import { Transactions } from "./pages/Transactions.js";
 import { Home } from "./pages/Home.js";
 import { Import } from "./pages/Import.js";
 import { Login } from "./pages/Login.js";
@@ -109,6 +110,9 @@ function Gate() {
           </Route>
           <Route path="/books/:book/budgets">
             {({ book: id }) => <Budgets key={id} book={id} />}
+          </Route>
+          <Route path="/books/:book/transactions">
+            {({ book: id }) => <Transactions key={id} book={id} />}
           </Route>
           <Route path="/books/:book/reports">
             {({ book: id }) => <Reports key={id} book={id} />}

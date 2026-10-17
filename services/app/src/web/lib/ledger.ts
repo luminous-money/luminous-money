@@ -27,6 +27,8 @@ export const ledger = createLedgerClient({
 });
 
 export type TreeAccount = Components["schemas"]["TreeAccount"];
+export type JournalPage = Components["schemas"]["JournalPage"];
+export type JournalRow = Components["schemas"]["JournalRow"];
 export type Budget = Components["schemas"]["Budget"];
 export type BudgetIn = Components["schemas"]["BudgetIn"];
 export type BudgetLine = Components["schemas"]["BudgetLine"];
@@ -173,6 +175,15 @@ export const api = {
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/ledger", {
         params: { path: { book_id, account }, query: { ...page, limit: 200 } },
+      })
+    ),
+
+  /** A page of the book's journal: every account's transactions, newest first, paged as an
+   * account's ledger is. */
+  journal: (book_id: string, page: LedgerPageAt = {}): Promise<JournalPage> =>
+    unwrap(
+      ledger.GET("/api/ledger/v1/books/{book_id}/journal", {
+        params: { path: { book_id }, query: { ...page, limit: 200 } },
       })
     ),
 

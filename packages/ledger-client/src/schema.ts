@@ -489,6 +489,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/journal": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Journal
+     * @description Every transaction in the book (every account's), newest first, paged as an account's
+     *     ledger is.
+     */
+    get: operations["journal_api_ledger_v1_books__book_id__journal_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/prices": {
     parameters: {
       query?: never;
@@ -1326,6 +1347,49 @@ export interface components {
       /** Stale */
       stale: boolean;
       value: components["schemas"]["Amount"] | null;
+    };
+    /** JournalPage */
+    JournalPage: {
+      /**
+       * Next Cursor
+       * @description Pass as `cursor` for the next (older) page; None at the end.
+       */
+      next_cursor: string | null;
+      /**
+       * Prev Cursor
+       * @description Pass as `after` for the page before (newer); None when this page starts at the newest.
+       */
+      prev_cursor: string | null;
+      /**
+       * Rows
+       * @description Newest first.
+       */
+      rows: components["schemas"]["JournalRow"][];
+    };
+    /**
+     * JournalRow
+     * @description One transaction in the book's journal (every account's), compactly.
+     */
+    JournalRow: {
+      /** Budgeted */
+      budgeted: boolean;
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Flag */
+      flag: string;
+      /** Id */
+      id: string;
+      /** Narration */
+      narration: string | null;
+      /** Payee */
+      payee: string | null;
+      /** Postings */
+      postings: components["schemas"]["CompactPosting"][];
+      /** Updated At */
+      updated_at: string;
     };
     /** LedgerPage */
     LedgerPage: {
@@ -3077,6 +3141,45 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Applied"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  journal_api_ledger_v1_books__book_id__journal_get: {
+    parameters: {
+      query?: {
+        /** @description The page just older than this row. */
+        cursor?: string | null;
+        /** @description The page just newer than this row. */
+        after?: string | null;
+        /** @description The page starting on or before this date. */
+        date?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["JournalPage"];
         };
       };
       /** @description Validation Error */

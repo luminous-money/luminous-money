@@ -5,7 +5,8 @@ import { Chart, fade } from "./Chart.js";
 import { monthLabel, moneyFormat, type MoneyFormat } from "./format.js";
 import { alpha, LIGHT, type ChartTheme } from "./theme.js";
 
-/** Net worth by month end (a strong line, a faded fill), with assets and what's owed beside it. */
+/** Net worth by month end (a strong line, a faded fill), with assets (quiet) and what's owed
+ * (in the negative color) beside it. */
 export function NetWorthChart({
   data,
   theme = LIGHT,
@@ -69,8 +70,8 @@ export function NetWorthChart({
           type: "line",
           data: data.months.map((m) => m.assets),
           symbol: "none",
-          lineStyle: { width: 1.5, color: theme.positive },
-          itemStyle: { color: theme.positive },
+          lineStyle: { width: 1.5, color: theme.muted },
+          itemStyle: { color: theme.muted },
         },
         {
           name: "Owed",

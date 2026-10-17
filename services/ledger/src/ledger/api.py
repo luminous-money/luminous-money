@@ -304,6 +304,20 @@ def create_app(ledger: Ledger) -> FastAPI:
             raise HTTPException(422, "pass one of cursor, after and date")
         return ledger.account_ledger(book_id, account, cursor=cursor, after=after, date=date, limit=limit)
 
+    @api.get("/books/{book_id}/journal")
+    def journal(
+        book_id: OwnedBook,
+        cursor: Annotated[str | None, Query(description="The page just older than this row.")] = None,
+        after: Annotated[str | None, Query(description="The page just newer than this row.")] = None,
+        date: Annotated[datetime.date | None, Query(description="The page starting on or before this date.")] = None,
+        limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+    ) -> models.JournalPage:
+        """Every transaction in the book (every account's), newest first, paged as an account's
+        ledger is."""
+        if sum(x is not None for x in (cursor, after, date)) > 1:
+            raise HTTPException(422, "pass one of cursor, after and date")
+        return ledger.journal(book_id, cursor=cursor, after=after, date=date, limit=limit)
+
     # Transactions, as JSON
 
     @api.post("/books/{book_id}/transactions/batch", status_code=201)

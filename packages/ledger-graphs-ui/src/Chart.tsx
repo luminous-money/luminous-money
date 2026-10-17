@@ -67,7 +67,12 @@ export function Chart({
     current.on("click", handler);
     return () => void current.off("click", handler);
   }, [onClick]);
-  return <div ref={box} role="img" aria-label={label} style={{ width: "100%", height }} />;
+  // ECharts labels its own box (its `aria` description), so ours is the box around it.
+  return (
+    <div role="img" aria-label={label}>
+      <div ref={box} style={{ width: "100%", height }} />
+    </div>
+  );
 }
 
 /** A vertical fade, from the `top` color to the `bottom` one. */

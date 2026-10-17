@@ -348,10 +348,23 @@ export function useLastImports(book: string | undefined) {
  * `date` back (a partial view). Pages load older below (`fetchNextPage`) and newer above
  * (`fetchPreviousPage`), until the whole ledger is loaded.
  */
-export function useAccountLedger(book: string, account: string, date?: string) {
+export const useAccountLedger = (book: string, account: string, date?: string) =>
+  usePages(keys.ledger(book, account), (at) => api.accountLedger(book, account, at), date);
+
+/** The book's journal: every account's transactions, newest first, paged as a ledger is. */
+export const useJournal = (book: string, date?: string) =>
+  usePages([...keys.book(book), "journal"], (at) => api.journal(book, at), date);
+
+/** Keyset pages loading either way: older below (`fetchNextPage`), newer above
+ * (`fetchPreviousPage`), from the newest or from `date` back. */
+function usePages<P extends { next_cursor: string | null; prev_cursor: string | null }>(
+  key: readonly unknown[],
+  fetch: (at: LedgerPageAt) => Promise<P>,
+  date?: string
+) {
   return useInfiniteQuery({
-    queryKey: [...keys.ledger(book, account), date ?? null],
-    queryFn: ({ pageParam }) => api.accountLedger(book, account, pageParam),
+    queryKey: [...key, date ?? null],
+    queryFn: ({ pageParam }) => fetch(pageParam),
     initialPageParam: (date ? { date } : {}) as LedgerPageAt,
     getNextPageParam: (page): LedgerPageAt | undefined =>
       page.next_cursor ? { cursor: page.next_cursor } : undefined,

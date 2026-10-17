@@ -6,12 +6,18 @@ _Updated 2026-10-17._ Keep this current: every finalized change set updates it (
 
 ## State
 
-**M1 through M11 are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M12 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
-accounts) and M11 (budgets) are described in their plans. The milestones ahead (M12–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+accounts), M11 (budgets) and M12 (reports) are described in their plans. The milestones ahead
+(M13–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
+- **Reports (M12):** home's "Spent this month" (the month's spending by day against the budget,
+  and what 85% of months stay under), then recent transactions (every account's), whose title
+  opens **Transactions** (the whole journal, paged, "Go to date"). **Reports** (menu): cash flow,
+  a breakdown to drill into, this month's largest, net worth. An expense or income account's
+  page shows what its weeks, months and years typically come to.
 - **Budgets (M11):** Menu → Budgets: one card by type, each budgeted account (and those above
   it) with a filled line, "$88 left · 12 days left", and what's unconfirmed; a budgeted node
   with budgets under it shows its Other. Tap a row to set or change its budget (amount, period:
@@ -118,30 +124,24 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 155 tests, including the table lint
-    - auth: 20; app: 148; db: 10; csv-import: 22
+    - ledger: 156 tests, including the table lint
+    - auth: 20; app: 154; db: 10; csv-import: 22; ledger-graphs-api: 13
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 73 API tests and 81 browser tests (with Mailpit and a fake SimpleFIN server)
+  - `pnpm e2e`: 76 API tests and 84 browser tests (with Mailpit and a fake SimpleFIN server)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps
 
-1. **Finish M12 (reports), in progress** ([plan](docs/milestones/m12-reports/PLAN.md)). Built and
-   on the dev stack: `packages/ledger-graphs-api` (the reports, 13 unit tests),
-   `packages/ledger-graphs-ui` (ECharts charts), `app`'s `/reports/*` routes (4 unit tests),
-   home's "Spent this month", the Reports page (menu), and an account's "Typically" card; the
-   ledger's `Book` has `currency` and `transactions/compact` has `budgeted`. Left:
-   - run `pnpm test` and `pnpm e2e` (not yet run on this work), then API e2e and browser tests
-     for the reports
-   - polish seen in screenshots: home's legend wraps badly; net worth's line and assets share
-     a green; cash flow's income and expenses are two greens
-   - docs: design.md "Reports", PLAN.md (check off M12), RESUME
-   - then extracting the libraries to a public `luminous-money` monorepo, once confirmed
+1. **M13 (sharing books) is being built** ([plan](docs/milestones/m13-sharing-books/PLAN.md)).
 2. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
 
 ## Gotchas
+
+- **Loans and withheld taxes:** how to record them is in [docs/loans-and-taxes.md](docs/loans-and-taxes.md).
+- **The first browser tests of a cold e2e stack** can time out waiting for review to load (seen
+  once, 2026-10-17: three of accounts.spec, passing on a rerun).
 
 - **Fetching prices needs the network** (beanprice's sources: Yahoo and friends, which change
   now and then). A commodity's source is its `commodity` directive's `price:` metadata;

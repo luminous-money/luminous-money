@@ -84,7 +84,9 @@ test("the ledger and home show how it's going, and the editor changes it", async
   await budget(GROCERIES, "400");
 
   await page.goto(`/ui/books/${book}`);
-  await expect(page.getByRole("link", { name: "Budgets" })).toContainText("$100.00 of $400.00");
+  await expect(page.getByRole("region", { name: "Spent this month" })).toContainText(
+    "of $400 budgeted"
+  );
 
   await page.goto(`/ui/books/${book}/accounts/${encodeURIComponent(GROCERIES)}`);
   await expect(page.getByRole("link", { name: "Budget" })).toContainText("this month");
