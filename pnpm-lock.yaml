@@ -53,34 +53,6 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/ledger-graphs-api:
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^5.0.3
-        version: 5.0.3(@types/node@24.19.2)(vite@8.3.2(@types/node@24.19.2)(terser@5.51.2))
-
-  packages/ledger-graphs-ui:
-    dependencies:
-      '@luminous-money/ledger-graphs-api':
-        specifier: workspace:*
-        version: link:../ledger-graphs-api
-    devDependencies:
-      '@types/react':
-        specifier: ^19.3.0
-        version: 19.3.0
-      echarts:
-        specifier: ^6.1.0
-        version: 6.1.0
-      react:
-        specifier: ^19.3.0
-        version: 19.3.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
   services/app:
     dependencies:
       '@fava-beans/csv-import':
@@ -96,11 +68,11 @@ importers:
         specifier: ^2.1.3
         version: 2.1.3(hono@4.13.13)
       '@luminous-money/ledger-graphs-api':
-        specifier: workspace:*
-        version: link:../../packages/ledger-graphs-api
+        specifier: ^0.1.1
+        version: 0.1.1
       '@luminous-money/ledger-graphs-ui':
-        specifier: workspace:*
-        version: link:../../packages/ledger-graphs-ui
+        specifier: ^0.1.1
+        version: 0.1.1(echarts@6.1.0)(react@19.3.0)
       '@wymp/config-simple':
         specifier: ^1.1.0
         version: 1.1.0
@@ -772,6 +744,15 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@luminous-money/ledger-graphs-api@0.1.1':
+    resolution: {integrity: sha512-dO6p2oVwA++eesXvbaeKtceQjGmwHFIU2yWK6oAnMTZt07gFE7lJ0iMel022v1W/N8RC/OQAUFICXZgMPdOvlw==}
+
+  '@luminous-money/ledger-graphs-ui@0.1.1':
+    resolution: {integrity: sha512-GkFag8H6hDvir2V1CXNx/MPIzRHMbK9P1dxxzT47MRNea6P2ovTgpZnMg9xM5oNyUmVxzydztR6B2ipQWNXSYQ==}
+    peerDependencies:
+      echarts: ^6.1.0
+      react: ^19.0.0
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     resolution: {integrity: sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==}
@@ -3096,6 +3077,14 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  '@luminous-money/ledger-graphs-api@0.1.1': {}
+
+  '@luminous-money/ledger-graphs-ui@0.1.1(echarts@6.1.0)(react@19.3.0)':
+    dependencies:
+      '@luminous-money/ledger-graphs-api': 0.1.1
+      echarts: 6.1.0
+      react: 19.3.0
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true

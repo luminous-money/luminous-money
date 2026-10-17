@@ -614,18 +614,18 @@ same money in through another's, a day or so later. Both would sit in review, un
 
 - **Two libraries of our own,** since nothing generic exists to adopt (Fava's, Paisa's and
   Actual's charts live inside those apps; fava-dashboards only inside Fava):
-  - **`@luminous-money/ledger-graphs-api`** (`packages/ledger-graphs-api`): plain TypeScript, no
+  - **`@luminous-money/ledger-graphs-api`**: plain TypeScript, no
     dependencies. Reports over a **posting stream** (`{transaction, date, flag, budgeted, payee,
     narration, account, amount, currency}`, plus current balances and prices for net worth),
     returning plain JSON datasets. Roots are parameters; sums run in integer cents; simulations
     take a seed, so they're stable and testable.
-  - **`@luminous-money/ledger-graphs-ui`** (`packages/ledger-graphs-ui`): React charts over those
+  - **`@luminous-money/ledger-graphs-ui`**: React charts over those
     datasets, drawn with Apache ECharts (a peer dependency; only the line, bar and pie charts are
     bundled, SVG-rendered). The host passes a theme (ours reads the app's CSS variables, light
     or dark) and the charts describe themselves for screen readers.
   - Their home is the public [luminous-money/ledger-graphs](https://github.com/luminous-money/ledger-graphs)
-    monorepo (ISC). Until they're on npm, `packages/ledger-graphs-*` here are copies the app
-    builds from.
+    monorepo (ISC), published to npm by its CI with npm's trusted publishing; the app depends on
+    the published versions.
 - **`app` computes them** (`/books/:book/reports/*`): it reads the window each report needs from
   the ledger's `transactions/compact` (which says what's `budgeted`) and runs the library; the
   page passes "today". The PWA loads the charts lazily, so ECharts isn't in the first screen.

@@ -2,3 +2,7 @@ packages:
   - packages/*
   - services/*
   - tests/*
+# Our own libraries (luminous-money/ledger-graphs, published with provenance) skip the wait on
+# new releases.
+minimumReleaseAgeExclude:
+  - '@luminous-money/*'

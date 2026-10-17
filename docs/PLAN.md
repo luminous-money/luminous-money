@@ -108,7 +108,7 @@ milestone starts.
       [Built](milestones/m12-reports/PLAN.md) 2026-10-17, with home's recent transactions and
       a Transactions page (every account's). Statements (P&L, balance sheet) later. The
       libraries moved to [luminous-money/ledger-graphs](https://github.com/luminous-money/ledger-graphs)
-      (2026-10-17); publishing to npm waits for an npm login.
+      (2026-10-17), and the app depends on them from npm.
 - [x] **M13: Sharing books with other users.** Any user can be added to a book with read, write
       or manage permissions. Every book has an owner. [Built](milestones/m13-sharing-books/PLAN.md)
       2026-10-17: invitations by link, roles enforced by the ledger and `app`, leaving and

@@ -129,7 +129,7 @@ How it's put together:
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 159 tests, including the table lint
-    - auth: 20; app: 154; db: 10; csv-import: 22; ledger-graphs-api: 13
+    - auth: 20; app: 154; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
   - `pnpm e2e`: 78 API tests and 85 browser tests (with Mailpit and a fake SimpleFIN server)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
@@ -140,23 +140,20 @@ How it's put together:
 
 1. **M14 (reconciliation):** answer the questions in [its plan](docs/milestones/m14-reconciliation/PLAN.md#questions),
    then say `build M14`.
-2. **Publishing `ledger-graphs`:** see "The ledger-graphs libraries" below.
-3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
+2. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
 
 ## The ledger-graphs libraries
 
-- **Their home is now [luminous-money/ledger-graphs](https://github.com/luminous-money/ledger-graphs)**
-  (public, ISC; `libs/api`, `libs/ui`; CI on every push; `pnpm publish:all` or a `v*` tag with
-  the `NPM_TOKEN` secret publishes what isn't on npm yet). Local clone:
+- **The app depends on them from npm** (`@luminous-money/ledger-graphs-api` and `-ui`, `^0.1.1`).
+  Their home is [luminous-money/ledger-graphs](https://github.com/luminous-money/ledger-graphs)
+  (public, ISC; `libs/api`, `libs/ui`; CI on every push). Local clone:
   `~/Repos/luminous-money/ledger-graphs`.
-- **Not on npm yet:** this machine isn't logged in to npm (`npm whoami`: 401), and the
-  `@luminous-money` scope has to exist on npm (an npm organization, or the user's own scope).
-  To publish: `npm login`, then `pnpm publish:all` there (or add `NPM_TOKEN` to the repo's
-  secrets and push the tag `v0.1.0`).
-- **Until then, `packages/ledger-graphs-*` here are copies** the app builds from. Change them
-  in the library repo first; once 0.1.0 is published, depend on `^0.1.0` here and delete the
-  copies.
+- **Changing them:** change and test them there, then `pnpm release <version>` there. The `v*`
+  tag runs its Publish workflow, which publishes by npm's trusted publishing (OIDC: no token,
+  with provenance). Then bump the version here.
+- **`minimumReleaseAgeExclude: '@luminous-money/*'`** (pnpm-workspace.yaml) lets a fresh
+  release install here at once.
 
 ## Gotchas
 
