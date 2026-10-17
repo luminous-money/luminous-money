@@ -15,6 +15,7 @@
  */
 import { LinkProblem, plan, precheck, type LinkInput, type LinkMode } from "./link.js";
 import type { Attempt, Link } from "./store.js";
+import { pairTransfers } from "../transfers.js";
 import { backfill, type SimplefinDeps } from "./sync.js";
 
 const running = new Set<string>();
@@ -90,6 +91,7 @@ export async function confirmAttempt(deps: SimplefinDeps, attempt: Attempt): Pro
   if (!input) throw new LinkProblem(404, "its connection is gone");
   const link = await (await plan(deps, input, { fetch: false })).apply();
   deps.store.deleteAttempt(attempt.id);
+  await pairTransfers({ db: deps.db, ledger: deps.ledgerFor(link.user_id), book: link.book_id });
   return link;
 }
 

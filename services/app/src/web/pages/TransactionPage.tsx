@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
+import { PairedTransfer } from "../components/PairedTransfer.js";
 import { SplitsFieldset, useSplits } from "../components/Splits.js";
 import { postable } from "../lib/accounts.js";
 import { today } from "../lib/format.js";
@@ -133,6 +134,8 @@ function Editor({
           </Link>
         </p>
       )}
+
+      {!isNew && <PairedTransfer book={book} transaction={t} onRejected={() => navigate(back)} />}
 
       <label>
         Date

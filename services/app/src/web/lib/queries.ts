@@ -409,6 +409,23 @@ export function useQueue(book: string) {
   return useQuery({ queryKey: keys.queue(book), queryFn: () => api.staged(book) });
 }
 
+/** Transfers paired in review (two imports made one), by their transaction. */
+export function useTransfers(book: string) {
+  return useQuery({
+    queryKey: [...keys.book(book), "transfers"],
+    queryFn: () => appApi.transfers(book),
+  });
+}
+
+/** Reject a paired transfer: the two it was made of come back. */
+export function useRejectTransfer(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => appApi.rejectTransfer(book, id),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
 /** Import rows whose match is up for review. */
 export function useMatches(book: string) {
   return useQuery({ queryKey: keys.matches(book), queryFn: () => appApi.matches(book) });

@@ -5,6 +5,7 @@ import { Link } from "wouter";
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
+import { PairedTransfer } from "../components/PairedTransfer.js";
 import { Swipeable, type SwipeHandle } from "../components/Swipeable.js";
 import { postable, preferredRoots, shortName } from "../lib/accounts.js";
 import { add, formatMoney, isNegative, isZero, negate } from "../lib/decimal.js";
@@ -373,6 +374,8 @@ function QueueItem({
               ))}
             </ul>
           )}
+
+          <PairedTransfer book={book} transaction={t} />
 
           <ExcludeFromBudget
             meta={meta}

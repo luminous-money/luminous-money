@@ -19,7 +19,7 @@ import type {
   ImportSource,
   ProposalSummary,
 } from "../shared/imports.js";
-import type { FetchResult } from "@fava-beans/ledger-client";
+import type { FetchResult, TransactionIn } from "@fava-beans/ledger-client";
 
 import type { CategoryRule, CategoryRuleIn, RuleConditions } from "../shared/rules.js";
 import type { Occurrence, Rule, TransactionTemplate } from "../shared/schedule.js";
@@ -257,6 +257,20 @@ export const MIGRATIONS: Migration[] = [
   // 12: budgets (M11). A book's weeks start on a day (0 Sunday to 6 Saturday; Monday unless
   // set), where a new weekly budget's periods start by default.
   ["ALTER TABLE book_setting ADD COLUMN week_start INTEGER NOT NULL DEFAULT 1"],
+  // 13: transfers paired in review. Two imported transactions (money out of one account, the
+  // same into another, within days) are made one; the pair keeps the two as they were, so
+  // rejecting it restores them, and a rejected pair isn't made again.
+  [
+    createTable("transfer_pair", [
+      "id TEXT PRIMARY KEY",
+      "book_id TEXT NOT NULL",
+      "transaction_id TEXT NOT NULL", // the transfer made of them
+      "originals TEXT NOT NULL", // JSON: PairedOriginal[]
+      "state TEXT NOT NULL", // 'proposed' | 'rejected'
+      "restored TEXT", // JSON: the originals' IDs once restored
+    ]),
+    "CREATE INDEX transfer_pair_transaction ON transfer_pair(book_id, transaction_id)",
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -327,6 +341,37 @@ const toRule = (r: RuleRecord): CategoryRule => ({
 
 /** An edit based on a version that has moved on. */
 export class StaleVersion extends Error {}
+
+/** One of the two transactions a transfer was made of: as it was, and the import rows that held
+ * it (each points at the transfer until it's rejected). */
+export type PairedOriginal = {
+  id: string;
+  transaction: TransactionIn;
+  account: string;
+  rows: { batch: string; line: number }[];
+};
+
+export type TransferPair = {
+  id: string;
+  book_id: string;
+  transaction_id: string;
+  originals: PairedOriginal[];
+  state: "proposed" | "rejected";
+  restored: string[] | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type PairRecord = Omit<TransferPair, "originals" | "restored"> & {
+  originals: string;
+  restored: string | null;
+};
+
+const toPair = (r: PairRecord): TransferPair => ({
+  ...r,
+  originals: JSON.parse(r.originals) as PairedOriginal[],
+  restored: r.restored ? (JSON.parse(r.restored) as string[]) : null,
+});
 
 export type BookSettings = {
   time_zone: string;
@@ -552,6 +597,94 @@ export class AppDb {
       .get(book, account, transaction, except.batch, except.line) as
       (RowRecord & { account: string; filename: string }) | undefined;
     return r && toHeldRow(r);
+  }
+
+  /** The rows of the book's imports that hold any of `transactions` (staged or matched). */
+  holders(book: string, transactions: string[]): HeldRow[] {
+    if (!transactions.length) return [];
+    const rows = this.db
+      .prepare(
+        `${HELD} WHERE b.book_id = ? AND r.outcome IN ('staged', 'matched')
+           AND r.transaction_id IN (SELECT value FROM json_each(?))`
+      )
+      .all(book, JSON.stringify(transactions)) as (RowRecord & {
+      account: string;
+      filename: string;
+    })[];
+    return rows.map(toHeldRow);
+  }
+
+  // Transfers paired in review
+
+  /** Record transfers just made, each from its two originals, and point the rows that held
+   * the originals at it. One write. */
+  recordPairs(
+    book: string,
+    pairs: { transaction_id: string; originals: PairedOriginal[] }[]
+  ): void {
+    const stamp = now();
+    const insert = this.db.prepare(
+      `INSERT INTO transfer_pair (id, book_id, transaction_id, originals, state, restored, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'proposed', NULL, ?, ?)`
+    );
+    const point = this.db.prepare(
+      "UPDATE import_row SET transaction_id = ?, updated_at = ? WHERE batch_id = ? AND line = ?"
+    );
+    transaction(this.db, () => {
+      for (const p of pairs) {
+        insert.run(randomUUID(), book, p.transaction_id, JSON.stringify(p.originals), stamp, stamp);
+        for (const o of p.originals)
+          for (const r of o.rows) point.run(p.transaction_id, stamp, r.batch, r.line);
+      }
+    });
+  }
+
+  /** The book's pairs: proposed (the transfer stands), or rejected too. */
+  transferPairs(book: string, states: TransferPair["state"][] = ["proposed"]): TransferPair[] {
+    return (
+      this.db
+        .prepare(
+          "SELECT * FROM transfer_pair WHERE book_id = ? AND state IN (SELECT value FROM json_each(?)) ORDER BY created_at"
+        )
+        .all(book, JSON.stringify(states)) as PairRecord[]
+    ).map(toPair);
+  }
+
+  /** The proposed pair a transfer was made from. */
+  transferPair(book: string, transactionId: string): TransferPair | undefined {
+    const r = this.db
+      .prepare(
+        "SELECT * FROM transfer_pair WHERE book_id = ? AND transaction_id = ? AND state = 'proposed'"
+      )
+      .get(book, transactionId) as PairRecord | undefined;
+    return r && toPair(r);
+  }
+
+  /** The pair was rejected and its originals restored as `restored` (in order): point their
+   * rows back at them, and remember not to pair them again. */
+  rejectPair(pair: TransferPair, restored: string[]): void {
+    const stamp = now();
+    const point = this.db.prepare(
+      "UPDATE import_row SET transaction_id = ?, updated_at = ? WHERE batch_id = ? AND line = ?"
+    );
+    transaction(this.db, () => {
+      pair.originals.forEach((o, i) => {
+        for (const r of o.rows) point.run(restored[i]!, stamp, r.batch, r.line);
+      });
+      this.db
+        .prepare(
+          "UPDATE transfer_pair SET state = 'rejected', restored = ?, updated_at = ? WHERE id = ?"
+        )
+        .run(JSON.stringify(restored), after(pair.updated_at), pair.id);
+    });
+  }
+
+  /** Forget proposed pairs whose transfer isn't unconfirmed any more: confirmed (the originals
+   * are gone for good) or deleted. */
+  prunePairs(book: string, unconfirmed: Set<string>): void {
+    const gone = this.transferPairs(book).filter((p) => !unconfirmed.has(p.transaction_id));
+    const remove = this.db.prepare("DELETE FROM transfer_pair WHERE id = ?");
+    transaction(this.db, () => gone.forEach((p) => remove.run(p.id)));
   }
 
   /** Rows whose match is proposed, oldest first: what review shows. */
@@ -894,6 +1027,7 @@ export class AppDb {
         "DELETE FROM book_setting WHERE book_id = ?",
         "DELETE FROM simplefin_link WHERE book_id = ?",
         "DELETE FROM simplefin_attempt WHERE book_id = ?",
+        "DELETE FROM transfer_pair WHERE book_id = ?",
       ])
         this.db.prepare(sql).run(book);
     });

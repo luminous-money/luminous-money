@@ -591,6 +591,24 @@ bring in (a **goal**, for income, assets such as savings, and liabilities being 
   so they don't move to the substitute.
 - **A book's weeks start** on a day kept in `app`'s book settings (Monday unless set; a
   versioned `PATCH /settings`), where a new weekly budget starts by default.
+
+### Transfers paired in review
+
+A transfer between two of your accounts arrives twice: money out in one account's import, the
+same money in through another's, a day or so later. Both would sit in review, uncategorized.
+
+- **A pair** is two unconfirmed, still-uncategorized transactions staged by imports, in
+  different asset or liability accounts (a card payment counts), one out and one in by the same
+  amount, within 7 days. The closest dates pair first; each pairs once.
+- **Pairing makes them one:** the transfer (out of one, into the other, on the earlier date,
+  still unconfirmed) replaces the two in one atomic ledger write. `app` keeps the two as they
+  were (`transfer_pair`), and the import rows that held them now hold the transfer, so
+  duplicates, matching and "Not at the bank" carry on unchanged.
+- **Reject** (in review, and on the transaction's page) restores the two, with their rows
+  pointing back, and remembers the pair so it isn't made again. **Confirming** is just
+  confirming; the kept originals are forgotten on the next pass.
+- **When:** after every import (a file, a bank's sync even with nothing new, a new link), over
+  the whole book's review, so the second side pairs whenever it arrives.
 ### Bank feeds: SimpleFIN (M9)
 
 [SimpleFIN](https://www.simplefin.org/protocol.html), usually through the SimpleFIN Bridge, is the

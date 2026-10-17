@@ -11,6 +11,7 @@ import type { AppDb } from "./db.js";
 import { ImportProblem, importFile } from "./imports.js";
 import { fetchPrices } from "./prices.js";
 import { assignRow, confirmRow, MatchProblem, proposedMatches } from "./matches.js";
+import { pairAfterImport, pairedTransfers, rejectTransfer, TransferProblem } from "./transfers.js";
 import { UPCOMING_DAYS, type ScheduleIn, type SchedulePatch } from "../shared/schedule.js";
 import { StaleVersion } from "./db.js";
 import {
@@ -150,9 +151,10 @@ export function createApi({
       return c.json({ detail: "send an account and a file" }, 422);
     }
     try {
+      const ledger = ledgerFor(c.get("user"));
       const result = await importFile({
         db,
-        ledger: ledgerFor(c.get("user")),
+        ledger,
         book,
         account,
         filename: file.name,
@@ -160,7 +162,7 @@ export function createApi({
         userId: c.get("user"),
         categorizers,
       });
-      return c.json(result, 201);
+      return c.json(await pairAfterImport({ db, ledger, book }, result), 201);
     } catch (error) {
       if (error instanceof ImportProblem) {
         return c.json(
@@ -168,6 +170,31 @@ export function createApi({
           error.code === "no-such-book" ? 404 : 409
         );
       }
+      throw error;
+    }
+  });
+
+  /** Transfers paired in review, each with the two transactions it was made of. */
+  api.get("/books/:book/transfers", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    return c.json(pairedTransfers(db, book));
+  });
+
+  /** Reject a paired transfer: the two it was made of come back in its place. */
+  api.post("/books/:book/transfers/:transaction/reject", async (c) => {
+    const { book, transaction } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    try {
+      const restored = await rejectTransfer({
+        db,
+        ledger: ledgerFor(c.get("user")),
+        book,
+        transactionId: transaction,
+      });
+      return c.json({ restored });
+    } catch (error) {
+      if (error instanceof TransferProblem) return c.json({ detail: error.message }, error.status);
       throw error;
     }
   });

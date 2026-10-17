@@ -20,6 +20,7 @@ import type {
 } from "../../shared/bank-feeds.js";
 
 import { ApiError } from "./ledger.js";
+import type { PairedTransfer } from "../../shared/transfers.js";
 import { apiFetch } from "./session.js";
 
 export type {
@@ -230,6 +231,14 @@ export const appApi = {
     ),
 
   /** Import rows whose match is up for review. */
+  /** Transfers paired in review, each with the two transactions it was made of. */
+  transfers: async (book: string): Promise<PairedTransfer[]> =>
+    json(await apiFetch(`${base(book)}/transfers`)),
+
+  /** Reject a paired transfer: the two it was made of come back in its place. */
+  rejectTransfer: async (book: string, id: string): Promise<{ restored: string[] }> =>
+    json(await apiFetch(`${base(book)}/transfers/${id}/reject`, { method: "POST" })),
+
   matches: async (book: string): Promise<ProposedMatch[]> =>
     json(await apiFetch(`${base(book)}/matches`)),
 

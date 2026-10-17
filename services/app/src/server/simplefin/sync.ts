@@ -17,6 +17,7 @@ import type { DailyJob } from "../daily.js";
 import { localMinutes } from "../daily.js";
 import type { AppDb } from "../db.js";
 import { importRows } from "../imports.js";
+import { pairAfterImport, pairTransfers } from "../transfers.js";
 import type { LedgerPort } from "../ledger.js";
 import { fetchAccounts, type SfAccountSet, type SfTransaction } from "./client.js";
 import type { Sealer } from "./crypto.js";
@@ -159,7 +160,9 @@ export async function importLink(deps: SimplefinDeps, link: Link): Promise<Impor
       })
     : null;
   if (link.kind === "brokerage") await holdingChanges(deps, link);
-  return result;
+  // Even with nothing new, what's in review may pair now (the other side came in earlier).
+  const pairing = { db, ledger: deps.ledgerFor(link.user_id), book: link.book_id };
+  return result ? pairAfterImport(pairing, result) : (await pairTransfers(pairing), null);
 }
 
 /** Sync a connection: fetch what's new for all its accounts, then import each link's. */

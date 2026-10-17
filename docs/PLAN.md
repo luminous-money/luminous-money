@@ -212,6 +212,9 @@ Smaller improvements to pick up between milestones or at the end.
 - [ ] **Review shows the book's ID at the top,** where its name belongs.
 - [ ] **Select all, and "select uncategorized",** in select mode.
 - [x] **Review newest first** (2026-10-17), the latest entered of a day first too.
+- [x] **Pair transfers in review** (2026-10-17): money out of one account and the same into
+      another within 7 days, both imported, become one transfer, with "Reject" to restore the
+      two.
 - [ ] **Mobile usability,** across the app.
 - [x] **Go to a date in an account's ledger:** a partial view from that date back, loading
       newer pages above ("Load more") and older ones as you scroll.

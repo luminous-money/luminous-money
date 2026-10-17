@@ -20,6 +20,9 @@ What a user can do now:
   home shows this month against the top-level expense budgets. "Exclude from budget" on a
   transaction (review, or its page) keeps it out of budgets only. Manage books sets the day
   weeks start.
+- **Transfers in review:** money out of one account and the same into another within 7 days,
+  both imported, are paired into one transfer (after every import or sync), shown with what it
+  was made of; "Reject" brings the two back and they're not paired again.
 - **Accounts (M10):** Menu → Accounts: one card, the tree by type, tap a node to open or close
   it, balances rolled up (one figure each), Find, "Show archived". A node's › opens its editor
   (with "Add an account under it"); a leaf opens its ledger, whose Edit opens the same editor:
@@ -116,19 +119,18 @@ How it's put together:
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 155 tests, including the table lint
-    - auth: 20; app: 144; db: 10; csv-import: 22
+    - auth: 20; app: 148; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 72 API tests and 80 browser tests (with Mailpit and a fake SimpleFIN server)
+  - `pnpm e2e`: 73 API tests and 81 browser tests (with Mailpit and a fake SimpleFIN server)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps
 
-1. Pairing transfers in review (a withdrawal and a deposit in two accounts within 7 days, made
-   one transaction, with "Reject" to restore the two): being built.
-2. Spec M12 (reports) together.
-3. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
+1. Spec M12 (reports) together: research and questions are in the conversation of 2026-10-17;
+   the result goes in [the M12 plan](docs/milestones/m12-reports/PLAN.md).
+2. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
 
 ## Gotchas
 

@@ -26,6 +26,7 @@ import {
   syncConnection,
   type SimplefinDeps,
 } from "./sync.js";
+import { pairTransfers } from "../transfers.js";
 
 type Env = { Variables: { user: string } };
 
@@ -197,6 +198,7 @@ export function simplefinRoutes(
     try {
       const planned = await plan(deps, await linkInput(c, user, book));
       const link = await planned.apply();
+      await pairTransfers({ db: deps.db, ledger: deps.ledgerFor(user), book });
       return c.json({ link, preview: planned.preview }, 201);
     } catch (error) {
       return c.json(...failure(error));
