@@ -8,7 +8,14 @@ import {
   type KeyboardEvent,
 } from "react";
 
-import { checkNewAccount, completeWith, completions, typed, TYPE_LABELS } from "../lib/accounts.js";
+import {
+  checkNewAccount,
+  completeWith,
+  completions,
+  typed,
+  TYPE_LABELS,
+  type NewAccountCheck,
+} from "../lib/accounts.js";
 import { AccountName } from "./AccountPicker.js";
 
 type Props = {
@@ -19,6 +26,8 @@ type Props = {
   accounts: Account[];
   /** Focus the field on mount, with the cursor after any prefilled name. */
   autoFocus?: boolean;
+  /** The account being renamed: its own name, as it stands, isn't checked. */
+  current?: Pick<Account, "name" | "type">;
 };
 
 /**
@@ -31,12 +40,22 @@ type Props = {
  * - The name is checked against the ledger's rules as it's typed. Levels on the way that don't
  *   exist yet are created as nodes.
  */
-export function NewAccountField({ label = "Account", name, onName, accounts, autoFocus }: Props) {
+export function NewAccountField({
+  label = "Account",
+  name,
+  onName,
+  accounts,
+  autoFocus,
+  current,
+}: Props) {
   const [active, setActive] = useState(0);
   const field = useRef<HTMLInputElement>(null);
   const nameId = useId();
   const listId = useId();
-  const check = checkNewAccount(name, accounts);
+  const check: NewAccountCheck =
+    name === current?.name
+      ? { ok: true, type: current.type, creates: [] }
+      : checkNewAccount(name, accounts);
   const suggestions = completions(name, accounts).slice(0, 8);
 
   // After a fill, the cursor belongs at the end, ready for the next part. Setting the value

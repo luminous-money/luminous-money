@@ -30,16 +30,27 @@ function useExpanded(book: string) {
   return { open, toggle };
 }
 
-/** An account's figure: its subtree's value in the operating currency (holdings at market). As
- * shown: liabilities and income inverted. */
-function figure(account: TreeAccount): string {
-  return formatMoney(shown(account.value.number, account.type), account.value.currency);
+/** An account's figure: its subtree's value in the operating currency (holdings at market), as
+ * shown (liabilities and income inverted), marked when some of it has no price to value it by. */
+function Figure({ account }: { account: TreeAccount }) {
+  const unpriced = account.unpriced ?? [];
+  return (
+    <span className={`num chart-balance${Number(account.value.number) === 0 ? " muted" : ""}`}>
+      {formatMoney(shown(account.value.number, account.type), account.value.currency)}
+      {unpriced.length > 0 && (
+        <sup className="muted" aria-label={`plus ${unpriced.join(", ")}, which have no price`}>
+          *
+        </sup>
+      )}
+    </span>
+  );
 }
 
 /**
- * The chart of accounts: every account in a tree by type, nodes collapsible (remembered per
- * device), balances rolled up through them. A leaf opens its ledger; a node's name opens its
- * editor. Find narrows the tree; archived accounts wait behind "Show archived".
+ * The chart of accounts: one card, a section per account type, every account in a tree under
+ * it with balances rolled up through the nodes. Tapping a node opens or closes it (remembered per
+ * device), and its › opens its editor; tapping a leaf opens its ledger. Find narrows the tree;
+ * archived accounts wait behind "Show archived".
  */
 export function ChartOfAccounts({ book }: { book: string }) {
   const tree = useAccountTree(book);
@@ -75,113 +86,128 @@ export function ChartOfAccounts({ book }: { book: string }) {
     return shownNames;
   }, [byName, query, archived]);
 
+  const archivedCount = [...byName.values()].filter((a) => a.close).length;
+  const unpriced = [...new Set(ROOTS.flatMap((r) => byName.get(r)?.unpriced ?? []))].sort();
   const starred = new Set(stars.data ?? []);
   const linked = new Set(Object.keys(bank.data ?? {}));
+
+  const label = (a: TreeAccount) => (
+    <span className="chart-name">
+      <span className="chart-label" title={a.name}>
+        {displayName(a)}
+      </span>
+      {starred.has(a.name) && (
+        <span className="muted" aria-label="starred">
+          ★
+        </span>
+      )}
+      {linked.has(a.name) && <span className="pill">linked</span>}
+      {a.close && <span className="pill stale">archived</span>}
+      {a.protected && !ROOTS.includes(a.name) && <span className="pill">system</span>}
+    </span>
+  );
 
   const row = (a: TreeAccount, depth: number): React.ReactNode => {
     if (!visible.has(a.name)) return null;
     const kids = (children.get(a.name) ?? []).filter((k) => visible.has(k.name));
     const isOpen = !!query.trim() || open.has(a.name);
-    const node = a.kind === "node" || kids.length > 0;
     const href = `/books/${book}/accounts/${encodeURIComponent(a.name)}`;
-    return (
-      <li key={a.name}>
-        <div className="chart-row" style={{ paddingLeft: `${depth * 1.1}rem` }}>
-          {node ? (
+    const indent = { "--depth": depth } as React.CSSProperties;
+    // A node, or a leaf that (from an imported ledger) has accounts under it.
+    if (a.kind === "node" || kids.length > 0)
+      return (
+        <li key={a.name}>
+          <div className="chart-row">
             <button
               type="button"
-              className="plain chart-toggle"
+              className="chart-main"
+              style={indent}
               aria-expanded={isOpen}
               aria-label={`${isOpen ? "Collapse" : "Expand"} ${a.name}`}
               onClick={() => toggle(a.name)}
             >
-              {isOpen ? "▾" : "▸"}
-            </button>
-          ) : (
-            <span className="chart-toggle" aria-hidden />
-          )}
-          <Link
-            href={node && !ROOTS.includes(a.name) ? `${href}/edit` : href}
-            className="chart-name"
-            title={a.name}
-          >
-            {displayName(a)}
-          </Link>
-          {starred.has(a.name) && (
-            <span className="muted small" aria-label="starred">
-              {" "}
-              ★
-            </span>
-          )}
-          {linked.has(a.name) && <span className="pill">linked</span>}
-          {a.close && <span className="pill stale">archived</span>}
-          {a.protected && !ROOTS.includes(a.name) && <span className="pill">system</span>}
-          <span className="num chart-balance">
-            {figure(a)}
-            {(a.unpriced ?? []).length > 0 && (
-              <span className="muted small block" title={(a.unpriced ?? []).join(", ")}>
-                + {(a.unpriced ?? []).length} unpriced
+              <span className="chart-chevron" aria-hidden>
+                {isOpen ? "▾" : "▸"}
               </span>
+              {label(a)}
+              <Figure account={a} />
+            </button>
+            {depth > 0 ? (
+              <Link
+                href={a.kind === "node" ? `${href}/edit` : href}
+                className="chart-open"
+                aria-label={`Open ${a.name}`}
+              >
+                ›
+              </Link>
+            ) : (
+              <span className="chart-open" aria-hidden />
             )}
+          </div>
+          {isOpen && kids.length > 0 && <ul>{kids.map((k) => row(k, depth + 1))}</ul>}
+        </li>
+      );
+    return (
+      <li key={a.name}>
+        <Link href={href} className="chart-row chart-leaf">
+          <span className="chart-main" style={indent}>
+            <span className="chart-chevron" aria-hidden />
+            {label(a)}
+            <Figure account={a} />
           </span>
-          {node && (
-            <Link
-              href={`/books/${book}/accounts/new?under=${encodeURIComponent(a.name)}`}
-              className="plain small chart-add"
-              aria-label={`Add an account under ${a.name}`}
-            >
-              +
-            </Link>
-          )}
-        </div>
-        {node && isOpen && kids.length > 0 && (
-          <ul className="chart-list">{kids.map((k) => row(k, depth + 1))}</ul>
-        )}
+          <span className="chart-open" aria-hidden>
+            ›
+          </span>
+        </Link>
       </li>
     );
   };
 
+  const roots = ROOTS.map((r) => byName.get(r)).filter(
+    (a): a is TreeAccount => !!a && visible.has(a.name)
+  );
   return (
     <main>
-      <header className="page-head home-head">
-        <div>
-          <h1>Accounts</h1>
-          <p className="muted">Balances include pending transactions.</p>
-        </div>
+      <header className="page-head chart-head">
+        <h1>Accounts</h1>
         <Link href={`/books/${book}/accounts/new`} className="button primary-link">
-          Add an account
+          + Add
         </Link>
       </header>
-      <div className="chart-tools">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Find an account"
-          aria-label="Find an account"
-        />
-        <label className="check small">
-          <input
-            type="checkbox"
-            checked={archived}
-            onChange={(e) => setArchived(e.target.checked)}
-          />
-          Show archived
-        </label>
-      </div>
+      <input
+        type="search"
+        className="chart-search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Find an account"
+        aria-label="Find an account"
+      />
       {tree.isPending && <p className="muted">Loading…</p>}
       {tree.error && <p className="card error">{explain(tree.error)}</p>}
-      {ROOTS.map((root) => {
-        const account = byName.get(root);
-        return (
-          account &&
-          visible.has(root) && (
-            <section key={root} className="card chart" aria-label={root}>
-              <ul className="chart-list">{row(account, 0)}</ul>
+      {tree.data && (
+        <div className="card chart">
+          {roots.map((root) => (
+            <section key={root.name} aria-label={root.name} className="chart-section">
+              <ul>{row(root, 0)}</ul>
             </section>
-          )
-        );
-      })}
+          ))}
+          {roots.length === 0 && <p className="muted chart-empty">No accounts match.</p>}
+          {archivedCount > 0 && (
+            <button
+              type="button"
+              className="plain chart-more"
+              aria-pressed={archived}
+              onClick={() => setArchived(!archived)}
+            >
+              {archived ? "Hide archived" : `Show archived (${archivedCount})`}
+            </button>
+          )}
+        </div>
+      )}
+      <p className="small muted chart-notes">
+        Balances include pending transactions.
+        {unpriced.length > 0 && <> * Plus {unpriced.join(", ")}, which have no price.</>}
+      </p>
     </main>
   );
 }

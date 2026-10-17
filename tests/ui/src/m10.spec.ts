@@ -29,6 +29,21 @@ test("the tree rolls balances up, collapses, and finds accounts", async ({ page 
   await expect(section(page, "Assets")).toBeHidden();
 });
 
+test("a node opens its editor, where its display name is set", async ({ page }) => {
+  const { book } = await chart(page);
+  await page.getByRole("link", { name: "Open Expenses:Food" }).click();
+  await expect(page.getByRole("combobox", { name: "Full name" })).toHaveValue("Expenses:Food");
+  await expect(page.getByText("Expense account").first()).toBeVisible(); // not flagged as taken
+
+  await page.getByRole("textbox", { name: "Display name" }).fill("Eating");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Eating" })).toBeVisible();
+  await page.goto(`/ui/books/${book.id}/accounts`);
+  await expect(
+    section(page, "Expenses").getByRole("button", { name: /Expenses:Food/ })
+  ).toContainText("Eating");
+});
+
 test("an account is renamed, then merged into another, from its editor", async ({ page }) => {
   const { book } = await chart(page);
   await page.goto(
@@ -37,9 +52,10 @@ test("an account is renamed, then merged into another, from its editor", async (
 
   const name = page.getByRole("combobox", { name: "Full name" });
   await name.fill("Expenses:Food:Supermarket");
-  await page.getByRole("button", { name: "Rename" }).click();
+  await page.getByRole("button", { name: "Save and rename" }).click();
   await expect(page.getByRole("heading", { name: "Supermarket" })).toBeVisible();
 
+  await page.getByText("Delete or merge").click();
   const merge = page.getByRole("form", { name: "Delete or merge" });
   await expect(merge).toContainText("Its 3 splits move to another account");
   await merge.getByRole("button", { name: /Move its splits to/ }).click();
@@ -62,5 +78,6 @@ test("system accounts can't be renamed", async ({ page }) => {
     `/ui/books/${book.id}/accounts/${encodeURIComponent("Equity:Opening-Balances")}/edit`
   );
   await expect(page.getByText("A system account")).toBeVisible();
-  await expect(page.getByRole("form", { name: "Rename or move" })).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Full name" })).toHaveCount(0);
+  await expect(page.getByText("Delete or merge")).toHaveCount(0);
 });

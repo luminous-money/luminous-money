@@ -525,6 +525,12 @@ How auth works (M8; the shape is M1's):
   - the system accounts the code relies on (uncategorized, opening balances, unrealized and
     capital gains, fees)
   - a brokerage's parts (`:Cash` and holdings), which follow the brokerage
+- **The page is one card,** a section per type with its top-level row as the header, built for
+  a thumb: every row is a full-width target at least 3rem tall. Tapping a node opens or closes
+  it (remembered per device); its › opens its editor, where "Add an account under it" lives.
+  Tapping a leaf opens its ledger. Amounts with no price mark the figure with `*`, named once
+  under the card. In the editor, both names save as one form; settings, archiving and deleting
+  are folded rows below, since they're rarely needed and the last two are consequential.
 - **`app` follows the ledger:** renames, merges and archives go through `app`, which changes the
   ledger first and then, in one transaction, everything it keeps by account name:
   - **renamed:** stars, CSV profiles, import batches, schedules, rules, proposals, bank links
