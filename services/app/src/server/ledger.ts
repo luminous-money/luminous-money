@@ -23,6 +23,8 @@ export type Book = components["schemas"]["Book"];
 export type LedgerPage = components["schemas"]["LedgerPage"];
 export type TransactionEdit = components["schemas"]["TransactionEdit"];
 export type PriceIn = components["schemas"]["PriceIn"];
+export type TreeAccount = components["schemas"]["TreeAccount"];
+export type BudgetStatus = components["schemas"]["BudgetStatus"];
 
 export class LedgerError extends Error {
   constructor(
@@ -86,6 +88,12 @@ export interface LedgerPort {
   ): Promise<Transaction>;
   /** The book's unconfirmed (`!`) transactions. */
   unconfirmed(book: string): Promise<Transaction[]>;
+  /** Every account with its balance and its subtree's (the chart of accounts). */
+  accountTree(book: string): Promise<TreeAccount[]>;
+  /** A commodity's prices, newest first. */
+  priceHistory(book: string, commodity: string): Promise<PriceOut[]>;
+  /** Every budget in force on `on`, and the highest-level expense budgets' month (M11). */
+  budgetStatus(book: string, on: string, basis: "period" | "month"): Promise<BudgetStatus>;
   /** Fetch the latest prices of commodities still held that name a source. */
   fetchPrices(book: string): Promise<FetchResult>;
   /** Create, change and delete (with the versions read) in one write, or not at all. Returns
@@ -216,6 +224,24 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
       unwrap(
         client.GET("/api/ledger/v1/books/{book_id}/transactions/{directive_id}", {
           params: { path: { book_id: book, directive_id: id } },
+        })
+      ),
+    accountTree: (book) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/accounts/tree", {
+          params: { path: { book_id: book } },
+        })
+      ),
+    priceHistory: (book, commodity) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/prices", {
+          params: { path: { book_id: book }, query: { commodity } },
+        })
+      ),
+    budgetStatus: (book, on, basis) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/budgets/status", {
+          params: { path: { book_id: book }, query: { on, basis } },
         })
       ),
     compact: (book, from) =>

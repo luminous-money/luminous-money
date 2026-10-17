@@ -8,6 +8,7 @@ import { useParam, withBack } from "../lib/navigation.js";
 import { AccountValueNote, headline } from "../components/AccountValue.js";
 import { BankErrors, ReportedLine } from "../components/BankStatus.js";
 import { BudgetGlance } from "../components/Budget.js";
+import { TypicalPeriods } from "../components/TypicalPeriods.js";
 import { HoldingsPanel } from "../components/Holdings.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { postable } from "../lib/accounts.js";
@@ -202,6 +203,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
       {info && !selection.selecting && (
         <HoldingsPanel book={book} account={account} summary={info} here={here} />
       )}
+      {info && !selection.selecting && <TypicalPeriods book={book} account={info} />}
 
       {selection.selecting ? (
         <SelectBar

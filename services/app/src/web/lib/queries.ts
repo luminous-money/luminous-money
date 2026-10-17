@@ -35,6 +35,7 @@ import {
   bankFeeds,
   type LinkRequest,
   type BookInfo,
+  type BreakdownOptions,
   type CsvProfile,
   type CategoryRule,
   type CategoryRuleIn,
@@ -861,6 +862,49 @@ function useChartChange<A, R>(book: string, fn: (args: A) => Promise<R>) {
     onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
   });
 }
+
+// Reports (M12): each refetches when anything in the book changes.
+
+const reportKey = (book: string, name: string, ...rest: unknown[]) =>
+  [...keys.book(book), "reports", name, today(), ...rest] as const;
+
+export const useSpendingReport = (book: string) =>
+  useQuery({
+    queryKey: reportKey(book, "spending"),
+    queryFn: () => appApi.reports.spending(book, today()),
+  });
+
+export const useCashFlowReport = (book: string) =>
+  useQuery({
+    queryKey: reportKey(book, "cash-flow"),
+    queryFn: () => appApi.reports.cashFlow(book, today()),
+  });
+
+export const useBreakdownReport = (book: string, options: BreakdownOptions) =>
+  useQuery({
+    queryKey: reportKey(book, "breakdown", options),
+    queryFn: () => appApi.reports.breakdown(book, today(), options),
+    placeholderData: (previous) => previous, // keep the donut while the next level loads
+  });
+
+export const useLargestReport = (book: string) =>
+  useQuery({
+    queryKey: reportKey(book, "largest"),
+    queryFn: () => appApi.reports.largest(book, today()),
+  });
+
+export const useNetWorthReport = (book: string) =>
+  useQuery({
+    queryKey: reportKey(book, "net-worth"),
+    queryFn: () => appApi.reports.netWorth(book, today()),
+  });
+
+export const useTypicalReport = (book: string, account: string, enabled = true) =>
+  useQuery({
+    queryKey: reportKey(book, "typical", account),
+    queryFn: () => appApi.reports.typical(book, today(), account),
+    enabled,
+  });
 
 // Budgets (M11)
 

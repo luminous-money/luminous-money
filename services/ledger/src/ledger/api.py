@@ -324,8 +324,9 @@ def create_app(ledger: Ledger) -> FastAPI:
         book_id: OwnedBook,
         date_from: Annotated[datetime.date, Query(alias="from", description="The first date included.")],
     ) -> list[models.CompactTransaction]:
-        """Every transaction from a date on, oldest first, with only payee, narration and each
-        posting's account and amount: the context categorizers work from. Not paged."""
+        """Every transaction from a date on, oldest first, with only payee, narration, whether it
+        counts against budgets, and each posting's account and amount: the context categorizers
+        work from, and reports' posting stream. Not paged."""
         return ledger.compact(book_id, date_from)
 
     @api.get("/books/{book_id}/transactions")

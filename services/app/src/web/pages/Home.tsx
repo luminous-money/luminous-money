@@ -2,22 +2,15 @@ import type { Book } from "@fava-beans/ledger-client";
 import { Link } from "wouter";
 
 import { AccountValueNote, headline } from "../components/AccountValue.js";
-import { BudgetBar, leftWords } from "../components/Budget.js";
+import { SpendingThisMonth } from "../components/SpendingThisMonth.js";
 import { displayName } from "../lib/accounts.js";
 import { bookHome } from "../lib/books.js";
-import { add, formatMoney, negate } from "../lib/decimal.js";
 import { formatWhen } from "../lib/format.js";
-import {
-  explain,
-  useBankStatus,
-  useBudgetStatus,
-  useLastImports,
-  useStarredAccounts,
-} from "../lib/queries.js";
+import { explain, useBankStatus, useLastImports, useStarredAccounts } from "../lib/queries.js";
 import { ReportedLine } from "../components/BankStatus.js";
 
-/** How this month is going against the budgets, and the user's starred accounts, with their
- * balances (as shown: a card's is what's owed) and when each was last updated by an import. */
+/** This month's spending against the budget, and the user's starred accounts, with their balances
+ * (as shown: a card's is what's owed) and when each was last updated by an import. */
 export function Home({ book }: { book: Book }) {
   const accounts = useStarredAccounts(book.id);
   const imports = useLastImports(book.id);
@@ -35,7 +28,7 @@ export function Home({ book }: { book: Book }) {
         </Link>
       </header>
 
-      <BudgetsThisMonth book={book.id} />
+      <SpendingThisMonth book={book.id} />
 
       {accounts.isPending && <p className="muted">Loading…</p>}
       {accounts.error && <p className="card error">{explain(accounts.error)}</p>}
@@ -79,40 +72,5 @@ export function Home({ book }: { book: Book }) {
         </p>
       )}
     </main>
-  );
-}
-
-/** One filled line: this month's spending against the highest-level expense budgets (those with
- * no budget above them), each restated per month. Nothing without budgets. */
-function BudgetsThisMonth({ book }: { book: string }) {
-  const summary = useBudgetStatus(book).data?.summary;
-  if (!summary) return null;
-  const month = new Date(`${summary.month_start}T00:00:00Z`).toLocaleDateString(undefined, {
-    month: "long",
-    timeZone: "UTC",
-  });
-  const left = {
-    ...summary.budget,
-    number: add(summary.budget.number, negate(summary.spent.number)),
-  };
-  return (
-    <Link href={`/books/${book}/budgets`} className="card link budget-home" aria-label="Budgets">
-      <div className="account-card-top">
-        <h2>{month}</h2>
-        <span className="num">
-          {formatMoney(summary.spent.number, summary.spent.currency)}{" "}
-          <span className="muted">
-            of {formatMoney(summary.budget.number, summary.budget.currency)}
-          </span>
-        </span>
-      </div>
-      <BudgetBar
-        kind="limit"
-        budget={summary.budget}
-        spent={summary.spent}
-        label={`${month}'s budgets`}
-      />
-      <p className="muted small">{leftWords("limit", left)} of what's budgeted</p>
-    </Link>
   );
 }

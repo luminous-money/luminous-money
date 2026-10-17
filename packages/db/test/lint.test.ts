@@ -27,11 +27,19 @@ export function offenders(path: string, text = readFileSync(path, "utf8")): stri
   const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true);
   const found: string[] = [];
   const visit = (node: ts.Node, inHelper: boolean) => {
-    const helper = inHelper || (path === HELPER && ts.isFunctionDeclaration(node) && node.name?.text === "createTable");
+    const helper =
+      inHelper ||
+      (path === HELPER && ts.isFunctionDeclaration(node) && node.name?.text === "createTable");
     const literal =
-      ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node);
+      ts.isStringLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node) ||
+      ts.isTemplateHead(node) ||
+      ts.isTemplateMiddle(node) ||
+      ts.isTemplateTail(node);
     if (literal && !helper && CREATE_TABLE.test(node.text)) {
-      found.push(`${relative(ROOT, path)}:${file.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
+      found.push(
+        `${relative(ROOT, path)}:${file.getLineAndCharacterOfPosition(node.getStart()).line + 1}`
+      );
     }
     ts.forEachChild(node, (child) => visit(child, helper));
   };
@@ -43,13 +51,20 @@ it("creates tables only through createTable", () => {
   const roots = ["packages", "services"].flatMap((top) =>
     readdirSync(join(ROOT, top)).map((name) => join(ROOT, top, name, "src"))
   );
-  const found = roots.filter((dir) => statSync(dir, { throwIfNoEntry: false })?.isDirectory()).flatMap((dir) => sources(dir).flatMap((f) => offenders(f)));
+  const found = roots
+    .filter((dir) => statSync(dir, { throwIfNoEntry: false })?.isDirectory())
+    .flatMap((dir) => sources(dir).flatMap((f) => offenders(f)));
 
-  expect(found, "create tables with createTable from @fava-beans/db, not raw CREATE TABLE").toEqual([]);
+  expect(found, "create tables with createTable from @fava-beans/db, not raw CREATE TABLE").toEqual(
+    []
+  );
 });
 
 it("catches a raw CREATE TABLE, but not one in a comment", () => {
-  const rogue = '// docs may say CREATE TABLE\nconst sql = "create table x (id text)";\nconst t = `CREATE TABLE ${"y"} (id text)`;\n';
+  const rogue =
+    '// docs may say CREATE TABLE\nconst sql = "create table x (id text)";\nconst t = `CREATE TABLE ${"y"} (id text)`;\n';
 
-  expect(offenders(join(ROOT, "services/x/src/rogue.ts"), rogue).map((o) => o.split(":")[1])).toEqual(["2", "3"]);
+  expect(
+    offenders(join(ROOT, "services/x/src/rogue.ts"), rogue).map((o) => o.split(":")[1])
+  ).toEqual(["2", "3"]);
 });

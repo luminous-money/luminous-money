@@ -360,6 +360,7 @@ class CompactTransaction(Api):
     flag: str
     payee: str | None
     narration: str | None
+    budgeted: bool = Field(True, description="False with `budget: FALSE`: kept out of budgets (M11).")
     postings: list[CompactPosting]
 
 
@@ -505,6 +506,7 @@ class Directive(Api):
 class Book(Api):
     id: str
     name: str = Field(description="The book's `option \"title\"`, or its ID if it has none.")
+    currency: str = Field(description="Its operating currency (the first `operating_currency` option), or USD.")
     created_at: str
     updated_at: str
 

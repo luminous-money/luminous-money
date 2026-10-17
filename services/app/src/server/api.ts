@@ -11,6 +11,15 @@ import type { AppDb } from "./db.js";
 import { ImportProblem, importFile } from "./imports.js";
 import { fetchPrices } from "./prices.js";
 import { assignRow, confirmRow, MatchProblem, proposedMatches } from "./matches.js";
+import {
+  breakdownReport,
+  cashFlowReport,
+  largestReport,
+  netWorthReport,
+  ReportProblem,
+  spendingReport,
+  typicalReport,
+} from "./reports.js";
 import { pairAfterImport, pairedTransfers, rejectTransfer, TransferProblem } from "./transfers.js";
 import { UPCOMING_DAYS, type ScheduleIn, type SchedulePatch } from "../shared/schedule.js";
 import { StaleVersion } from "./db.js";
@@ -173,6 +182,84 @@ export function createApi({
       throw error;
     }
   });
+
+  // Reports (M12): datasets from the ledger's postings, ready to draw. `on` is the caller's
+  // today (the book's, if not given).
+
+  const reportOn = (c: Context, book: string) => {
+    const on = c.req.query("on");
+    return on && /^\d{4}-\d{2}-\d{2}$/.test(on) ? on : bookToday(db, book);
+  };
+  const count = (value: string | undefined, low: number, high: number, fallback: number) => {
+    const n = Number(value ?? fallback);
+    return Number.isInteger(n) && n >= low && n <= high ? n : fallback;
+  };
+  const report =
+    (run: (c: Context, book: string, ledger: LedgerPort) => Promise<unknown>) =>
+    async (c: Context) => {
+      const { book } = c.req.param() as { book: string };
+      if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+      try {
+        return c.json(await run(c, book, ledgerFor(c.get("user"))));
+      } catch (error) {
+        if (error instanceof ReportProblem) return c.json({ detail: error.message }, error.status);
+        throw error;
+      }
+    };
+
+  /** This month's spending by day, against the budget and a simulated month. */
+  api.get(
+    "/books/:book/reports/spending",
+    report((c, book, ledger) => spendingReport(ledger, book, reportOn(c, book)))
+  );
+  /** Income and expenses for each of the last `months` (6) months. */
+  api.get(
+    "/books/:book/reports/cash-flow",
+    report((c, book, ledger) =>
+      cashFlowReport(ledger, book, reportOn(c, book), count(c.req.query("months"), 1, 24, 6))
+    )
+  );
+  /** The largest categories: `side` expenses or income, `depth`, `slices`, `window` (average
+   * over 6 months, or this month), or the accounts just under `of`. */
+  api.get(
+    "/books/:book/reports/breakdown",
+    report((c, book, ledger) =>
+      breakdownReport(ledger, book, reportOn(c, book), {
+        side: c.req.query("side") === "income" ? "income" : "expenses",
+        of: c.req.query("of") || undefined,
+        depth: count(c.req.query("depth"), 1, 4, 1),
+        slices: count(c.req.query("slices"), 2, 12, 6),
+        window: c.req.query("window") === "month" ? "month" : "average",
+      })
+    )
+  );
+  /** This month's largest expenses. */
+  api.get(
+    "/books/:book/reports/largest",
+    report((c, book, ledger) =>
+      largestReport(ledger, book, reportOn(c, book), count(c.req.query("limit"), 1, 50, 8))
+    )
+  );
+  /** Assets, liabilities and net worth at each of the last `months` (24) month ends. */
+  api.get(
+    "/books/:book/reports/net-worth",
+    report((c, book, ledger) =>
+      netWorthReport(ledger, book, reportOn(c, book), count(c.req.query("months"), 2, 120, 24))
+    )
+  );
+  /** What an expense or income account's week, month and year typically come to. */
+  api.get(
+    "/books/:book/reports/typical",
+    report((c, book, ledger) =>
+      typicalReport(
+        ledger,
+        book,
+        reportOn(c, book),
+        c.req.query("account") ?? "",
+        db.settings(book)?.week_start ?? 1
+      )
+    )
+  );
 
   /** Transfers paired in review, each with the two transactions it was made of. */
   api.get("/books/:book/transfers", async (c) => {

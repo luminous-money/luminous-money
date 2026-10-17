@@ -21,6 +21,14 @@ import type {
 
 import { ApiError } from "./ledger.js";
 import type { PairedTransfer } from "../../shared/transfers.js";
+import type {
+  Breakdown,
+  CashFlow,
+  LargestTransactions,
+  NetWorth,
+  SpendingThisMonth,
+  TypicalPeriods,
+} from "@luminous-money/ledger-graphs-api";
 import { apiFetch } from "./session.js";
 
 export type {
@@ -53,6 +61,14 @@ export type {
 
 /** A book: the ledger's, with what the app keeps about it. */
 export type BookInfo = Book & { time_zone: string | null };
+export type BreakdownOptions = {
+  side: "expenses" | "income";
+  depth: number;
+  window: "average" | "month";
+  /** Drilled into: the accounts just under it. */
+  of?: string;
+};
+
 export type BookSettings = {
   time_zone: string | null;
   /** 0 Sunday to 6 Saturday. */
@@ -231,6 +247,36 @@ export const appApi = {
     ),
 
   /** Import rows whose match is up for review. */
+  /** Reports (M12): datasets to draw, measured on `on` (the caller's today). */
+  reports: {
+    spending: async (book: string, on: string): Promise<SpendingThisMonth> =>
+      json(await apiFetch(`${base(book)}/reports/spending?on=${on}`)),
+    cashFlow: async (book: string, on: string): Promise<CashFlow> =>
+      json(await apiFetch(`${base(book)}/reports/cash-flow?on=${on}`)),
+    breakdown: async (book: string, on: string, options: BreakdownOptions): Promise<Breakdown> =>
+      json(
+        await apiFetch(
+          `${base(book)}/reports/breakdown?${new URLSearchParams({
+            on,
+            side: options.side,
+            depth: String(options.depth),
+            window: options.window,
+            ...(options.of ? { of: options.of } : {}),
+          })}`
+        )
+      ),
+    largest: async (book: string, on: string): Promise<LargestTransactions> =>
+      json(await apiFetch(`${base(book)}/reports/largest?on=${on}`)),
+    netWorth: async (book: string, on: string): Promise<NetWorth> =>
+      json(await apiFetch(`${base(book)}/reports/net-worth?on=${on}`)),
+    typical: async (book: string, on: string, account: string): Promise<TypicalPeriods> =>
+      json(
+        await apiFetch(
+          `${base(book)}/reports/typical?on=${on}&account=${encodeURIComponent(account)}`
+        )
+      ),
+  },
+
   /** Transfers paired in review, each with the two transactions it was made of. */
   transfers: async (book: string): Promise<PairedTransfer[]> =>
     json(await apiFetch(`${base(book)}/transfers`)),

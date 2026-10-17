@@ -5,6 +5,7 @@ import type {
   AccountSummary,
   CompactTransaction,
   Holdings,
+  PriceOut,
   TradeIn,
   Transaction,
   TransactionIn,
@@ -13,10 +14,12 @@ import type {
 import {
   LedgerError,
   type Book,
+  type BudgetStatus,
   type LedgerPage,
   type LedgerPort,
   type PriceIn,
   type TransactionEdit,
+  type TreeAccount,
 } from "./ledger.js";
 
 export class FakeLedger implements LedgerPort {
@@ -27,7 +30,7 @@ export class FakeLedger implements LedgerPort {
   private next = 1;
 
   addBook(id: string) {
-    this.books.set(id, { id, name: id, created_at: "", updated_at: "" });
+    this.books.set(id, { id, name: id, currency: "USD", created_at: "", updated_at: "" });
   }
 
   addAccount(name: string, extra: Partial<Account> & { as_of?: string } = {}) {
@@ -240,6 +243,7 @@ export class FakeLedger implements LedgerPort {
         flag: t.flag,
         payee: t.payee ?? null,
         narration: t.narration ?? null,
+        budgeted: t.meta?.budget !== false,
         postings: t.postings.map((p) => ({ account: p.account, amount: p.units ?? null })),
       }));
   }
@@ -259,6 +263,41 @@ export class FakeLedger implements LedgerPort {
   async fetchPrices() {
     this.fetched++;
     return { fetched: [], errors: {} };
+  }
+
+  /** Each account's own balance (from the transactions) as its total, without rolling up. */
+  async accountTree(): Promise<TreeAccount[]> {
+    return this.accountList.map((a) => {
+      const sums = new Map<string, number>();
+      for (const t of this.transactions)
+        for (const p of t.postings)
+          if (p.units && (p.account === a.name || p.account.startsWith(`${a.name}:`)))
+            sums.set(p.units.currency, (sums.get(p.units.currency) ?? 0) + Number(p.units.number));
+      const total = [...sums].map(([currency, n]) => ({ number: n.toFixed(2), currency }));
+      return {
+        ...a,
+        balance: [],
+        total,
+        value: { number: "0.00", currency: "USD" },
+        unpriced: [],
+        splits: 0,
+        protected: false,
+      } as TreeAccount;
+    });
+  }
+
+  /** Price histories by commodity, as tests set them. */
+  priceHistories: Record<string, PriceOut[]> = {};
+
+  async priceHistory(_book: string, commodity: string): Promise<PriceOut[]> {
+    return this.priceHistories[commodity] ?? [];
+  }
+
+  /** Budgets as set by tests (`status`), measured nowhere: what the ledger would answer. */
+  budgets: BudgetStatus | null = null;
+
+  async budgetStatus(_book: string, on: string, basis: "period" | "month"): Promise<BudgetStatus> {
+    return this.budgets ?? { on, basis, lines: [], summary: null };
   }
 
   async unconfirmed() {

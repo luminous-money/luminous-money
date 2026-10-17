@@ -1074,7 +1074,10 @@ a.primary-link {
 
 /* Plain links */
 
-main a:not(.button):not(.card):not(.back):not(.menu-item):not(.chart-leaf):not(.budget-link) {
+main
+  a:not(.button):not(.card):not(.back):not(.menu-item):not(.chart-leaf):not(.budget-link):not(
+    .largest-row
+  ) {
   color: var(--green);
   font-weight: 600;
 }
@@ -1903,4 +1906,196 @@ a.budget-link {
   margin-right: 0.25rem;
   background: var(--green-soft);
   color: var(--green);
+}
+
+/* Reports (M12) */
+
+.chart-placeholder {
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--line) 35%, transparent);
+}
+
+.spending-card,
+.report {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.spending-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.spending-figure {
+  margin: 0.15rem 0 0;
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.card .spending-figure {
+  margin: 0.15rem 0 0;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.chart-legend .key {
+  display: inline-block;
+  width: 1.1rem;
+  border-top: 3px solid var(--good);
+}
+
+.chart-legend .key.dotted {
+  border-top: 2px dotted var(--muted);
+  margin-left: 0.5rem;
+}
+
+.report-totals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0;
+}
+
+.report-totals div {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  text-align: center;
+}
+
+.report-totals dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.report-totals dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.report-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.report-controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+}
+
+.report-controls select {
+  font-size: 1rem;
+}
+
+.breadcrumb button.plain {
+  min-height: 2.75rem;
+}
+
+.breakdown-list,
+.largest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.breakdown-list li + li,
+.largest-list li + li {
+  border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.breakdown-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto 1.5rem;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 3rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 400;
+  text-align: left;
+}
+
+.breakdown-row .dot {
+  margin: 0;
+}
+
+.breakdown-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breakdown-row .chart-open {
+  width: auto;
+}
+
+main a.largest-row,
+.largest-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.25rem;
+  color: inherit;
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.largest-row > span:first-child {
+  display: grid;
+  min-width: 0;
+}
+
+.largest-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.typical {
+  margin: 0.75rem 0;
+}
+
+.typical-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.4rem 0;
+}
+
+.typical-table th,
+.typical-table td {
+  padding: 0.4rem 0;
+  text-align: right;
+}
+
+.typical-table th:first-child {
+  text-align: left;
+}
+
+.typical-table thead th {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.typical-table tbody tr + tr {
+  border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
 }

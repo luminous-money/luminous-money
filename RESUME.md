@@ -128,8 +128,17 @@ How it's put together:
 
 ## Next steps
 
-1. Spec M12 (reports) together: research and questions are in the conversation of 2026-10-17;
-   the result goes in [the M12 plan](docs/milestones/m12-reports/PLAN.md).
+1. **Finish M12 (reports), in progress** ([plan](docs/milestones/m12-reports/PLAN.md)). Built and
+   on the dev stack: `packages/ledger-graphs-api` (the reports, 13 unit tests),
+   `packages/ledger-graphs-ui` (ECharts charts), `app`'s `/reports/*` routes (4 unit tests),
+   home's "Spent this month", the Reports page (menu), and an account's "Typically" card; the
+   ledger's `Book` has `currency` and `transactions/compact` has `budgeted`. Left:
+   - run `pnpm test` and `pnpm e2e` (not yet run on this work), then API e2e and browser tests
+     for the reports
+   - polish seen in screenshots: home's legend wraps badly; net worth's line and assets share
+     a green; cash flow's income and expenses are two greens
+   - docs: design.md "Reports", PLAN.md (check off M12), RESUME
+   - then extracting the libraries to a public `luminous-money` monorepo, once confirmed
 2. Answer the open questions in [the M8 plan](docs/milestones/m8-auth/PLAN.md#questions).
 
 ## Gotchas

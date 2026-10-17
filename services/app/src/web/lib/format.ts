@@ -30,3 +30,14 @@ export function formatReported(seconds: number, now = new Date()): string {
   const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(at);
   return `${date} ${time}`;
 }
+
+/** A report's figure (a number in the currency's units) as money: whole units by default
+ * ("$6,092"), or with cents. */
+export function formatAmount(n: number, currency: string, cents = false): string {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: cents ? 2 : 0,
+    maximumFractionDigits: cents ? 2 : 0,
+  }).format(n);
+}

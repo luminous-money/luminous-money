@@ -53,6 +53,34 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/ledger-graphs-api:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.2)(vite@8.3.2(@types/node@24.19.2)(terser@5.51.2))
+
+  packages/ledger-graphs-ui:
+    dependencies:
+      '@luminous-money/ledger-graphs-api':
+        specifier: workspace:*
+        version: link:../ledger-graphs-api
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      echarts:
+        specifier: ^6.1.0
+        version: 6.1.0
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   services/app:
     dependencies:
       '@fava-beans/csv-import':
@@ -67,12 +95,21 @@ importers:
       '@hono/node-server':
         specifier: ^2.1.3
         version: 2.1.3(hono@4.13.13)
+      '@luminous-money/ledger-graphs-api':
+        specifier: workspace:*
+        version: link:../../packages/ledger-graphs-api
+      '@luminous-money/ledger-graphs-ui':
+        specifier: workspace:*
+        version: link:../../packages/ledger-graphs-ui
       '@wymp/config-simple':
         specifier: ^1.1.0
         version: 1.1.0
       dotenv:
         specifier: ^18.0.8
         version: 18.0.8
+      echarts:
+        specifier: ^6.1.0
+        version: 6.1.0
       hono:
         specifier: ^4.13.13
         version: 4.13.13
@@ -1311,6 +1348,9 @@ packages:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
 
+  echarts@6.1.0:
+    resolution: {integrity: sha512-q0yaFPggC9FUdsWH4blavRWFmxdrIodbkoKNAjJudAI6CA9gNPxHtV2RcZNEepZVlk4yvBYkOkbk6HIVpIyHZA==}
+
   ejs@3.1.10:
     resolution: {integrity: sha512-UeJmFfOrAQS8OJWPZ4qtgHyWExa088/MtK5UEyoJGFH67cDEXkZSviOiKRCZ4Xij0zxI3JECgYs3oKx+AizQBA==}
     engines: {node: '>=0.10.0'}
@@ -2083,6 +2123,9 @@ packages:
     resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
     engines: {node: '>=12.0.0'}
 
+  tslib@2.3.0:
+    resolution: {integrity: sha512-N82ooyxVNm6h1riLCoyS9e3fuJ3AMG2zIZs2Gd1ATcSFjSA23Q0fzjjZeh0jbJvWVDZ0cJT8yaNNaaXHzueNjg==}
+
   type-fest@0.16.0:
     resolution: {integrity: sha512-eaBzG6MxNzEn9kiwvtre90cXaNLkmadMWa1zQMs3XORCXNbsH/OewwbxC5ia9dCxIxnTAsSxXJaa/p5y8DlvJg==}
     engines: {node: '>=10'}
@@ -2349,6 +2392,9 @@ packages:
   yargs-parser@21.1.1:
     resolution: {integrity: sha512-tVpsJW7DdjecAiFpbIB1e3qxIQsE6NoPc5/eTdrbbIC4h0LVsWhnoa3g+m2HclBIujHzsxZ4VJVA+GUuc2/LBw==}
     engines: {node: '>=12'}
+
+  zrender@6.1.0:
+    resolution: {integrity: sha512-oEGMDB6pOP2S6OwRR4PdVv610zrjnA3Bh+JnSG12fYJlBKjtNAoEb5fSUoCOOINlH96I2fU38/A2UpRKs67xYQ==}
 
 snapshots:
 
@@ -3500,6 +3546,11 @@ snapshots:
       es-errors: 1.3.0
       gopd: 1.2.0
 
+  echarts@6.1.0:
+    dependencies:
+      tslib: 2.3.0
+      zrender: 6.1.0
+
   ejs@3.1.10:
     dependencies:
       jake: 10.9.4
@@ -4358,6 +4409,8 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.7)
       picomatch: 4.0.7
 
+  tslib@2.3.0: {}
+
   type-fest@0.16.0: {}
 
   type-fest@4.41.0: {}
@@ -4674,3 +4727,7 @@ snapshots:
   yaml-ast-parser@0.0.43: {}
 
   yargs-parser@21.1.1: {}
+
+  zrender@6.1.0:
+    dependencies:
+      tslib: 2.3.0

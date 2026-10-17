@@ -635,8 +635,9 @@ export interface paths {
     };
     /**
      * Compact Transactions
-     * @description Every transaction from a date on, oldest first, with only payee, narration and each
-     *     posting's account and amount: the context categorizers work from. Not paged.
+     * @description Every transaction from a date on, oldest first, with only payee, narration, whether it
+     *     counts against budgets, and each posting's account and amount: the context categorizers
+     *     work from, and reports' posting stream. Not paged.
      */
     get: operations["compact_transactions_api_ledger_v1_books__book_id__transactions_compact_get"];
     put?: never;
@@ -926,6 +927,11 @@ export interface components {
     Book: {
       /** Created At */
       created_at: string;
+      /**
+       * Currency
+       * @description Its operating currency (the first `operating_currency` option), or USD.
+       */
+      currency: string;
       /** Id */
       id: string;
       /**
@@ -1156,6 +1162,12 @@ export interface components {
      * @description A transaction with only what categorizers use: who, when, and where the money went.
      */
     CompactTransaction: {
+      /**
+       * Budgeted
+       * @description False with `budget: FALSE`: kept out of budgets (M11).
+       * @default true
+       */
+      budgeted: boolean;
       /**
        * Date
        * Format: date

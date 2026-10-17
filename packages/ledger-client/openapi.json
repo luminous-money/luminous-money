@@ -55,10 +55,7 @@
           },
           "kind": {
             "description": "Leaf accounts hold transactions; node accounts hold sub-accounts.",
-            "enum": [
-              "leaf",
-              "node"
-            ],
+            "enum": ["leaf", "node"],
             "title": "Kind",
             "type": "string"
           },
@@ -93,13 +90,7 @@
           "type": {
             "anyOf": [
               {
-                "enum": [
-                  "asset",
-                  "liability",
-                  "equity",
-                  "income",
-                  "expense"
-                ],
+                "enum": ["asset", "liability", "equity", "income", "expense"],
                 "type": "string"
               },
               {
@@ -122,11 +113,7 @@
             "title": "Updated At"
           }
         },
-        "required": [
-          "name",
-          "type",
-          "kind"
-        ],
+        "required": ["name", "type", "kind"],
         "title": "Account",
         "type": "object"
       },
@@ -180,13 +167,7 @@
           "booking": {
             "anyOf": [
               {
-                "enum": [
-                  "FIFO",
-                  "LIFO",
-                  "HIFO",
-                  "STRICT",
-                  "NONE"
-                ],
+                "enum": ["FIFO", "LIFO", "HIFO", "STRICT", "NONE"],
                 "type": "string"
               },
               {
@@ -197,10 +178,7 @@
           },
           "kind": {
             "default": "leaf",
-            "enum": [
-              "leaf",
-              "node"
-            ],
+            "enum": ["leaf", "node"],
             "title": "Kind",
             "type": "string"
           },
@@ -255,9 +233,7 @@
             "title": "Revalue Every"
           }
         },
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "title": "AccountIn",
         "type": "object"
       },
@@ -268,13 +244,7 @@
           "booking": {
             "anyOf": [
               {
-                "enum": [
-                  "FIFO",
-                  "LIFO",
-                  "HIFO",
-                  "STRICT",
-                  "NONE"
-                ],
+                "enum": ["FIFO", "LIFO", "HIFO", "STRICT", "NONE"],
                 "type": "string"
               },
               {
@@ -315,9 +285,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "updated_at"
-        ],
+        "required": ["updated_at"],
         "title": "AccountPatch",
         "type": "object"
       },
@@ -343,9 +311,7 @@
             "title": "Updated At"
           }
         },
-        "required": [
-          "to"
-        ],
+        "required": ["to"],
         "title": "AccountRename",
         "type": "object"
       },
@@ -436,10 +402,7 @@
           },
           "kind": {
             "description": "Leaf accounts hold transactions; node accounts hold sub-accounts.",
-            "enum": [
-              "leaf",
-              "node"
-            ],
+            "enum": ["leaf", "node"],
             "title": "Kind",
             "type": "string"
           },
@@ -493,13 +456,7 @@
           "type": {
             "anyOf": [
               {
-                "enum": [
-                  "asset",
-                  "liability",
-                  "equity",
-                  "income",
-                  "expense"
-                ],
+                "enum": ["asset", "liability", "equity", "income", "expense"],
                 "type": "string"
               },
               {
@@ -546,13 +503,7 @@
             "title": "Value As Of"
           }
         },
-        "required": [
-          "name",
-          "type",
-          "kind",
-          "balance",
-          "as_of"
-        ],
+        "required": ["name", "type", "kind", "balance", "as_of"],
         "title": "AccountSummary",
         "type": "object"
       },
@@ -569,10 +520,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "number",
-          "currency"
-        ],
+        "required": ["number", "currency"],
         "title": "Amount",
         "type": "object"
       },
@@ -587,10 +535,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "put",
-          "deleted"
-        ],
+        "required": ["put", "deleted"],
         "title": "Applied",
         "type": "object"
       },
@@ -621,11 +566,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "since",
-          "cursor",
-          "chunks"
-        ],
+        "required": ["since", "cursor", "chunks"],
         "title": "Backup",
         "type": "object"
       },
@@ -633,6 +574,11 @@
         "properties": {
           "created_at": {
             "title": "Created At",
+            "type": "string"
+          },
+          "currency": {
+            "description": "Its operating currency (the first `operating_currency` option), or USD.",
+            "title": "Currency",
             "type": "string"
           },
           "id": {
@@ -649,12 +595,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "created_at",
-          "updated_at"
-        ],
+        "required": ["id", "name", "currency", "created_at", "updated_at"],
         "title": "Book",
         "type": "object"
       },
@@ -680,9 +621,7 @@
             "title": "Text"
           }
         },
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "title": "BookIn",
         "type": "object"
       },
@@ -700,10 +639,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "name",
-          "updated_at"
-        ],
+        "required": ["name", "updated_at"],
         "title": "BookPatch",
         "type": "object"
       },
@@ -731,12 +667,7 @@
             "type": "string"
           },
           "unit": {
-            "enum": [
-              "day",
-              "week",
-              "month",
-              "year"
-            ],
+            "enum": ["day", "week", "month", "year"],
             "title": "Unit",
             "type": "string"
           },
@@ -745,15 +676,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "account",
-          "start",
-          "amount",
-          "every",
-          "unit",
-          "updated_at"
-        ],
+        "required": ["id", "account", "start", "amount", "every", "unit", "updated_at"],
         "title": "Budget",
         "type": "object"
       },
@@ -780,12 +703,7 @@
             "type": "string"
           },
           "unit": {
-            "enum": [
-              "day",
-              "week",
-              "month",
-              "year"
-            ],
+            "enum": ["day", "week", "month", "year"],
             "title": "Unit",
             "type": "string"
           },
@@ -802,11 +720,7 @@
             "title": "Updated At"
           }
         },
-        "required": [
-          "start",
-          "amount",
-          "unit"
-        ],
+        "required": ["start", "amount", "unit"],
         "title": "BudgetIn",
         "type": "object"
       },
@@ -822,10 +736,7 @@
           },
           "kind": {
             "description": "An expense budget is a limit; any other, a goal.",
-            "enum": [
-              "limit",
-              "goal"
-            ],
+            "enum": ["limit", "goal"],
             "title": "Kind",
             "type": "string"
           },
@@ -877,13 +788,7 @@
           "type": {
             "anyOf": [
               {
-                "enum": [
-                  "asset",
-                  "liability",
-                  "equity",
-                  "income",
-                  "expense"
-                ],
+                "enum": ["asset", "liability", "equity", "income", "expense"],
                 "type": "string"
               },
               {
@@ -932,21 +837,14 @@
             "$ref": "#/components/schemas/Amount"
           }
         },
-        "required": [
-          "budget",
-          "spent",
-          "left"
-        ],
+        "required": ["budget", "spent", "left"],
         "title": "BudgetOther",
         "type": "object"
       },
       "BudgetStatus": {
         "properties": {
           "basis": {
-            "enum": [
-              "period",
-              "month"
-            ],
+            "enum": ["period", "month"],
             "title": "Basis",
             "type": "string"
           },
@@ -974,12 +872,7 @@
             ]
           }
         },
-        "required": [
-          "on",
-          "basis",
-          "lines",
-          "summary"
-        ],
+        "required": ["on", "basis", "lines", "summary"],
         "title": "BudgetStatus",
         "type": "object"
       },
@@ -998,11 +891,7 @@
             "$ref": "#/components/schemas/Amount"
           }
         },
-        "required": [
-          "month_start",
-          "budget",
-          "spent"
-        ],
+        "required": ["month_start", "budget", "spent"],
         "title": "BudgetSummary",
         "type": "object"
       },
@@ -1165,16 +1054,19 @@
             "description": "The posting's change to its account; None if only booking could say."
           }
         },
-        "required": [
-          "account",
-          "amount"
-        ],
+        "required": ["account", "amount"],
         "title": "CompactPosting",
         "type": "object"
       },
       "CompactTransaction": {
         "description": "A transaction with only what categorizers use: who, when, and where the money went.",
         "properties": {
+          "budgeted": {
+            "default": true,
+            "description": "False with `budget: FALSE`: kept out of budgets (M11).",
+            "title": "Budgeted",
+            "type": "boolean"
+          },
           "date": {
             "format": "date",
             "title": "Date",
@@ -1218,14 +1110,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "id",
-          "date",
-          "flag",
-          "payee",
-          "narration",
-          "postings"
-        ],
+        "required": ["id", "date", "flag", "payee", "narration", "postings"],
         "title": "CompactTransaction",
         "type": "object"
       },
@@ -1310,10 +1195,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "updated_at"
-        ],
+        "required": ["id", "updated_at"],
         "title": "Deletion",
         "type": "object"
       },
@@ -1358,15 +1240,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "date",
-          "kind",
-          "flag",
-          "text",
-          "created_at",
-          "updated_at"
-        ],
+        "required": ["id", "date", "kind", "flag", "text", "created_at", "updated_at"],
         "title": "Directive",
         "type": "object"
       },
@@ -1404,10 +1278,7 @@
             "title": "Label"
           },
           "term": {
-            "enum": [
-              "short",
-              "long"
-            ],
+            "enum": ["short", "long"],
             "title": "Term",
             "type": "string"
           },
@@ -1416,13 +1287,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "units",
-          "cost",
-          "date",
-          "term",
-          "gain"
-        ],
+        "required": ["units", "cost", "date", "term", "gain"],
         "title": "DrawnLot",
         "type": "object"
       },
@@ -1445,10 +1310,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "fetched",
-          "errors"
-        ],
+        "required": ["fetched", "errors"],
         "title": "FetchResult",
         "type": "object"
       },
@@ -1623,15 +1485,7 @@
             ]
           }
         },
-        "required": [
-          "account",
-          "currency",
-          "holdings",
-          "value",
-          "gain",
-          "as_of",
-          "stale"
-        ],
+        "required": ["account", "currency", "holdings", "value", "gain", "as_of", "stale"],
         "title": "Holdings",
         "type": "object"
       },
@@ -1670,11 +1524,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "rows",
-          "next_cursor",
-          "prev_cursor"
-        ],
+        "required": ["rows", "next_cursor", "prev_cursor"],
         "title": "LedgerPage",
         "type": "object"
       },
@@ -1823,11 +1673,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "units",
-          "cost",
-          "date"
-        ],
+        "required": ["units", "cost", "date"],
         "title": "Lot",
         "type": "object"
       },
@@ -1852,11 +1698,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "date",
-          "cost",
-          "units"
-        ],
+        "required": ["date", "cost", "units"],
         "title": "LotRef",
         "type": "object"
       },
@@ -1869,9 +1711,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "date"
-        ],
+        "required": ["date"],
         "title": "MetaDate",
         "type": "object"
       },
@@ -1884,9 +1724,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "number"
-        ],
+        "required": ["number"],
         "title": "MetaNumber",
         "type": "object"
       },
@@ -1911,10 +1749,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "amount",
-          "date"
-        ],
+        "required": ["amount", "date"],
         "title": "OpeningBalance",
         "type": "object"
       },
@@ -1946,10 +1781,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "commodity",
-          "units"
-        ],
+        "required": ["commodity", "units"],
         "title": "OpeningHolding",
         "type": "object"
       },
@@ -2029,9 +1861,7 @@
             "description": "Omit to let booking fill in the balancing amount."
           }
         },
-        "required": [
-          "account"
-        ],
+        "required": ["account"],
         "title": "Posting",
         "type": "object"
       },
@@ -2053,11 +1883,7 @@
             "description": "What one unit was worth, in a currency."
           }
         },
-        "required": [
-          "date",
-          "commodity",
-          "price"
-        ],
+        "required": ["date", "commodity", "price"],
         "title": "PriceIn",
         "type": "object"
       },
@@ -2080,12 +1906,7 @@
             "$ref": "#/components/schemas/Amount"
           }
         },
-        "required": [
-          "id",
-          "date",
-          "commodity",
-          "price"
-        ],
+        "required": ["id", "date", "commodity", "price"],
         "title": "PriceOut",
         "type": "object"
       },
@@ -2107,10 +1928,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "message",
-          "directive_id"
-        ],
+        "required": ["message", "directive_id"],
         "title": "Problem",
         "type": "object"
       },
@@ -2132,10 +1950,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "columns",
-          "rows"
-        ],
+        "required": ["columns", "rows"],
         "title": "QueryResult",
         "type": "object"
       },
@@ -2152,10 +1967,7 @@
             "$ref": "#/components/schemas/Amount"
           }
         },
-        "required": [
-          "date",
-          "value"
-        ],
+        "required": ["date", "value"],
         "title": "RevalueIn",
         "type": "object"
       },
@@ -2223,11 +2035,7 @@
             "title": "Holding Account"
           },
           "kind": {
-            "enum": [
-              "buy",
-              "sell",
-              "dividend"
-            ],
+            "enum": ["buy", "sell", "dividend"],
             "title": "Kind",
             "type": "string"
           },
@@ -2284,11 +2092,7 @@
             "title": "Units"
           }
         },
-        "required": [
-          "kind",
-          "date",
-          "commodity"
-        ],
+        "required": ["kind", "date", "commodity"],
         "title": "TradeIn",
         "type": "object"
       },
@@ -2313,11 +2117,7 @@
             "$ref": "#/components/schemas/TransactionIn"
           }
         },
-        "required": [
-          "transaction",
-          "lots",
-          "opens"
-        ],
+        "required": ["transaction", "lots", "opens"],
         "title": "TradePreview",
         "type": "object"
       },
@@ -2412,13 +2212,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "date",
-          "postings",
-          "id",
-          "created_at",
-          "updated_at"
-        ],
+        "required": ["date", "postings", "id", "created_at", "updated_at"],
         "title": "Transaction",
         "type": "object"
       },
@@ -2587,10 +2381,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "updated_at",
-          "id"
-        ],
+        "required": ["updated_at", "id"],
         "title": "TransactionEdit",
         "type": "object"
       },
@@ -2672,10 +2463,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "date",
-          "postings"
-        ],
+        "required": ["date", "postings"],
         "title": "TransactionIn",
         "type": "object"
       },
@@ -2809,9 +2597,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "updated_at"
-        ],
+        "required": ["updated_at"],
         "title": "TransactionPatch",
         "type": "object"
       },
@@ -2899,11 +2685,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "date",
-          "postings",
-          "updated_at"
-        ],
+        "required": ["date", "postings", "updated_at"],
         "title": "TransactionUpdate",
         "type": "object"
       },
@@ -2970,10 +2752,7 @@
           },
           "kind": {
             "description": "Leaf accounts hold transactions; node accounts hold sub-accounts.",
-            "enum": [
-              "leaf",
-              "node"
-            ],
+            "enum": ["leaf", "node"],
             "title": "Kind",
             "type": "string"
           },
@@ -3027,13 +2806,7 @@
           "type": {
             "anyOf": [
               {
-                "enum": [
-                  "asset",
-                  "liability",
-                  "equity",
-                  "income",
-                  "expense"
-                ],
+                "enum": ["asset", "liability", "equity", "income", "expense"],
                 "type": "string"
               },
               {
@@ -3068,15 +2841,7 @@
             "description": "The subtree's value in the operating currency: everything that has a price."
           }
         },
-        "required": [
-          "name",
-          "type",
-          "kind",
-          "balance",
-          "total",
-          "value",
-          "splits"
-        ],
+        "required": ["name", "type", "kind", "balance", "total", "value", "splits"],
         "title": "TreeAccount",
         "type": "object"
       },
@@ -3112,11 +2877,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
+        "required": ["loc", "msg", "type"],
         "title": "ValidationError",
         "type": "object"
       }
@@ -4334,10 +4095,7 @@
             "schema": {
               "default": "period",
               "description": "Each its own period, or all per month.",
-              "enum": [
-                "period",
-                "month"
-              ],
+              "enum": ["period", "month"],
               "title": "Basis",
               "type": "string"
             }
@@ -5488,7 +5246,7 @@
     },
     "/api/ledger/v1/books/{book_id}/transactions/compact": {
       "get": {
-        "description": "Every transaction from a date on, oldest first, with only payee, narration and each\nposting's account and amount: the context categorizers work from. Not paged.",
+        "description": "Every transaction from a date on, oldest first, with only payee, narration, whether it\ncounts against budgets, and each posting's account and amount: the context categorizers\nwork from, and reports' posting stream. Not paged.",
         "operationId": "compact_transactions_api_ledger_v1_books__book_id__transactions_compact_get",
         "parameters": [
           {

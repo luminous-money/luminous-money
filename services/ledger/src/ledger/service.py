@@ -76,6 +76,7 @@ class Ledger:
         return models.Book(
             id=row["id"],
             name=engine.book_title(header) or row["id"],
+            currency=investments.operating_currency(header),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -418,6 +419,7 @@ class Ledger:
                         flag=r["flag"],
                         payee=r["payee"],
                         narration=r["narration"],
+                        budgeted=bool(r["budgeted"]),
                         postings=[],
                     )
                 )

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { applyProfile, detectDateFormat, fits, guessProfile, parseAmount, parseDate } from "../src/index.js";
+import {
+  applyProfile,
+  detectDateFormat,
+  fits,
+  guessProfile,
+  parseAmount,
+  parseDate,
+} from "../src/index.js";
 
 const CHASE = `Details,Posting Date,Description,Amount,Type,Balance,Check or Slip #
 DEBIT,01/15/2024,"STARBUCKS STORE 123 SEATTLE WA",-4.50,DEBIT_CARD,"1,234.56",
@@ -46,7 +53,14 @@ describe("guessing a profile", () => {
   it("skips a summary preamble to find the real header", () => {
     const profile = guessProfile(BOFA)!;
 
-    expect(profile).toMatchObject({ skip: 4, header: true, date: { column: 0 }, amount: { column: 2 }, description: 1, balance: 3 }); // blank lines don't count
+    expect(profile).toMatchObject({
+      skip: 4,
+      header: true,
+      date: { column: 0 },
+      amount: { column: 2 },
+      description: 1,
+      balance: 3,
+    }); // blank lines don't count
     expect(applyProfile(BOFA, profile).map((r) => [r.date, r.amount])).toEqual([
       ["2024-01-02", "-54.50"],
       ["2024-01-03", "100.00"],
@@ -64,7 +78,13 @@ describe("guessing a profile", () => {
   it("works without a header, naming the columns by position", () => {
     const profile = guessProfile(BARE)!;
 
-    expect(profile).toMatchObject({ header: false, skip: 0, date: { column: 0, format: "YYYY-MM-DD" }, amount: { column: 1 }, description: 2 });
+    expect(profile).toMatchObject({
+      header: false,
+      skip: 0,
+      date: { column: 0, format: "YYYY-MM-DD" },
+      amount: { column: 1 },
+      description: 2,
+    });
     expect(profile.columns).toEqual(["Column 1", "Column 2", "Column 3"]);
   });
 
@@ -78,10 +98,44 @@ describe("applying a profile", () => {
   it("normalizes every row: ISO dates, signed decimal amounts, the description", () => {
     const rows = applyProfile(CHASE, guessProfile(CHASE)!);
 
-    expect(rows.map(({ line, date, amount, description, id, balance, error }) => ({ line, date, amount, description, id, balance, error }))).toEqual([
-      { line: 2, date: "2024-01-15", amount: "-4.50", description: "STARBUCKS STORE 123 SEATTLE WA", id: null, balance: "1234.56", error: null },
-      { line: 3, date: "2024-01-14", amount: "2000.00", description: "ACME PAYROLL DIRECT DEP", id: null, balance: "1239.06", error: null },
-      { line: 4, date: "2024-01-13", amount: "-150.00", description: "CHECK 1001", id: "1001", balance: "-760.94", error: null },
+    expect(
+      rows.map(({ line, date, amount, description, id, balance, error }) => ({
+        line,
+        date,
+        amount,
+        description,
+        id,
+        balance,
+        error,
+      }))
+    ).toEqual([
+      {
+        line: 2,
+        date: "2024-01-15",
+        amount: "-4.50",
+        description: "STARBUCKS STORE 123 SEATTLE WA",
+        id: null,
+        balance: "1234.56",
+        error: null,
+      },
+      {
+        line: 3,
+        date: "2024-01-14",
+        amount: "2000.00",
+        description: "ACME PAYROLL DIRECT DEP",
+        id: null,
+        balance: "1239.06",
+        error: null,
+      },
+      {
+        line: 4,
+        date: "2024-01-13",
+        amount: "-150.00",
+        description: "CHECK 1001",
+        id: "1001",
+        balance: "-760.94",
+        error: null,
+      },
     ]);
   });
 
@@ -89,14 +143,22 @@ describe("applying a profile", () => {
     const profile = guessProfile(CHASE)!;
     const flipped = { ...profile, amount: { kind: "signed" as const, column: 3, negate: true } };
 
-    expect(applyProfile(CHASE, flipped).map((r) => r.amount)).toEqual(["4.50", "-2000.00", "150.00"]);
+    expect(applyProfile(CHASE, flipped).map((r) => r.amount)).toEqual([
+      "4.50",
+      "-2000.00",
+      "150.00",
+    ]);
   });
 
   it("says why a row can't be read", () => {
     const profile = guessProfile(CHASE)!;
     const broken = `${CHASE}DEBIT,13/45/2024,BAD DATE,-1.00,X,1,\nDEBIT,01/16/2024,NO AMOUNT,,X,1,\nDEBIT,01/16/2024\n`;
 
-    expect(applyProfile(broken, profile).slice(3).map((r) => r.error)).toEqual([
+    expect(
+      applyProfile(broken, profile)
+        .slice(3)
+        .map((r) => r.error)
+    ).toEqual([
       '"13/45/2024" isn\'t a MM/DD/YYYY date',
       "no amount",
       "expected 7 columns, found 2",
