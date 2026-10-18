@@ -18,7 +18,7 @@ What a user can do now:
   statement's date and ending balance (prefilled from the bank, or the last imported file's
   balance column), its unreconciled transactions to tick (imported ones and the opening balance
   start ticked), and the difference pinned below. **Finish** once it's zero (ticked unconfirmed
-  ones are confirmed, dates moved to agree with the statement); **Save for later** keeps it for
+  ones are confirmed; nothing's date changes, and what isn't ticked stays outstanding); **Save for later** keeps it for
   any device; past statements with **Undo** on the latest. Ledgers mark reconciled transactions
   ✓ and say "Reconciled through …" or "Off by … since …"; every ledger (and Transactions) has a
   **filter** (Reconciliation: all, reconciled, not), and Select mode's **Select all** takes
@@ -142,7 +142,7 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 169 tests, including the table lint
+    - ledger: 171 tests, including the table lint
     - auth: 20; app: 160; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
   - `pnpm e2e`: 81 API tests and 87 browser tests (with Mailpit and a fake SimpleFIN server)
@@ -152,13 +152,10 @@ How it's put together:
 
 ## Next steps
 
-1. **M14's questions** (best guesses built): [its plan](docs/milestones/m14-reconciliation/PLAN.md#questions)
-   (moving dates on Finish, the 14 days after a statement, automatic reconciliation's date).
-2. **M15 (sub-accounts of linked accounts):** answer the questions in
-   [its plan](docs/milestones/m15-sub-accounts-of-linked-accounts/PLAN.md#questions), then say
-   `build M15`. (M18, suggested recurring transactions, moved after tagging: M16 is now receipt
+1. **M15 (sub-accounts of linked accounts):** [planned and answered](docs/milestones/m15-sub-accounts-of-linked-accounts/PLAN.md):
+   say `build M15`. (M18, suggested recurring transactions, moved after tagging: M16 is now receipt
    capture, M17 tagging.)
-3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
+2. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
 
 ## The ledger-graphs libraries
@@ -178,9 +175,15 @@ How it's put together:
 - **Reconciliation's marks belong to reconciling:** the ledger keeps a posting's `reconciled:`
   through JSON edits and strips it from new transactions (`service._marked`). Write marks only
   through `reconcile.py`.
+- **Statements hold by marks, not dates:** a statement is a `custom "statement"` directive, not
+  a `balance` assertion, so Beancount doesn't check it; `reconcile._history` does (what's
+  reconciled with it and before). Don't turn statements back into `balance` directives: a
+  transfer two banks date apart can't satisfy both sides by date.
 - **Loans and withheld taxes:** how to record them is in [docs/loans-and-taxes.md](docs/loans-and-taxes.md).
 - **The first browser tests of a cold e2e stack** can time out waiting for review to load (seen
-  once, 2026-10-17: three of accounts.spec, passing on a rerun).
+  once, 2026-10-17: three of accounts.spec, passing on a rerun). Also seen once each, passing on
+  a rerun: m1.spec's "a file in another layout" (no import results) and m3.spec's time zone
+  (reloaded before the save landed).
 
 - **Fetching prices needs the network** (beanprice's sources: Yahoo and friends, which change
   now and then). A commodity's source is its `commodity` directive's `price:` metadata;

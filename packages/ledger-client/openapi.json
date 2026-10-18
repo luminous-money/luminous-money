@@ -2655,28 +2655,19 @@
             "title": "Confirmed",
             "type": "array"
           },
-          "moved": {
-            "description": "Transactions whose date moved to agree with the statement.",
-            "items": {
-              "type": "string"
-            },
-            "title": "Moved",
-            "type": "array"
-          },
           "reconciliation": {
             "$ref": "#/components/schemas/Reconciliation"
           }
         },
         "required": [
           "reconciliation",
-          "confirmed",
-          "moved"
+          "confirmed"
         ],
         "title": "Reconciled",
         "type": "object"
       },
       "Reconciliation": {
-        "description": "A balance check on the account: a reconciliation's (with a statement), or one from an imported book.",
+        "description": "A statement the account was reconciled with, or a balance assertion on it (from an imported book).",
         "properties": {
           "account": {
             "title": "Account",
@@ -2704,15 +2695,15 @@
                 "type": "null"
               }
             ],
-            "description": "The statement less the books, when they don't agree."
+            "description": "When they don't agree, the statement less the books: for a statement, what's reconciled with it and before; for an assertion, everything dated up to it."
           },
           "statement": {
-            "description": "A reconciliation (else a balance check from an imported book).",
+            "description": "A reconciliation (else a balance assertion from an imported book).",
             "title": "Statement",
             "type": "boolean"
           },
           "statement_date": {
-            "description": "The day it holds at the end of (the directive's date, less a day).",
+            "description": "The day it holds at the end of.",
             "format": "date",
             "title": "Statement Date",
             "type": "string"

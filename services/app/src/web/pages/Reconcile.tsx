@@ -118,8 +118,9 @@ function Statement({
   const difference = statement !== null ? add(statement, negate(reached)) : null;
   const valid = DAY.test(date) && !(state.last && date <= state.last);
   const balanced = valid && difference !== null && isZero(difference);
-  const moving = valid
-    ? state.transactions.filter((t) => (isTicked(t.id) ? t.date > date : t.date <= date)).length
+  // Not on this statement: they wait for a later one (nothing's date changes).
+  const outstanding = valid
+    ? state.transactions.filter((t) => !isTicked(t.id) && t.date <= date).length
     : 0;
   const money = (n: string) => formatMoney(shown(n, type), state.currency);
   const later = (t: ReconcileItem) => valid && t.date > date;
@@ -138,7 +139,7 @@ function Statement({
       });
       setMessage({
         kind: "ok",
-        text: `Reconciled ${r.reconciliation.transactions} through ${formatDay(date)}.${r.moved.length ? ` Moved ${r.moved.length} to agree with the statement.` : ""}`,
+        text: `Reconciled ${r.reconciliation.transactions} through ${formatDay(date)}.`,
       });
       onFinished();
     } catch (e) {
@@ -263,11 +264,11 @@ function Statement({
             <dd aria-live="polite">{difference !== null ? money(difference) : "—"}</dd>
           </div>
         </dl>
-        {balanced && moving > 0 && (
+        {balanced && outstanding > 0 && (
           <p className="small muted">
-            Finishing moves{" "}
-            {moving === 1 ? "1 transaction's date" : `${moving} transactions' dates`} to agree with
-            the statement.
+            {outstanding === 1
+              ? "1 not ticked stays outstanding, for a later statement."
+              : `${outstanding} not ticked stay outstanding, for a later statement.`}
           </p>
         )}
         {message && <p className={`small ${message.kind}`}>{message.text}</p>}

@@ -550,23 +550,25 @@ class ReconcileIn(Strict):
 
 
 class Reconciliation(Api):
-    """A balance check on the account: a reconciliation's (with a statement), or one from an imported book."""
+    """A statement the account was reconciled with, or a balance assertion on it (from an imported book)."""
 
     id: str
     account: str
-    statement_date: datetime.date = Field(description="The day it holds at the end of (the directive's date, less a day).")
+    statement_date: datetime.date = Field(description="The day it holds at the end of.")
     balance: Amount
-    statement: bool = Field(description="A reconciliation (else a balance check from an imported book).")
+    statement: bool = Field(description="A reconciliation (else a balance assertion from an imported book).")
     automatic: bool = Field(False, description="Reconciled with the bank's balance after a sync.")
     transactions: int = Field(description="How many transactions it reconciled.")
-    off_by: Amount | None = Field(description="The statement less the books, when they don't agree.")
+    off_by: Amount | None = Field(
+        description="When they don't agree, the statement less the books: for a statement, what's reconciled with "
+        "it and before; for an assertion, everything dated up to it."
+    )
     updated_at: str
 
 
 class Reconciled(Api):
     reconciliation: Reconciliation
     confirmed: list[str] = Field(description="Unconfirmed transactions confirmed with it.")
-    moved: list[str] = Field(description="Transactions whose date moved to agree with the statement.")
 
 
 class Reconciliations(Api):

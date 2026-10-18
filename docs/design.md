@@ -673,23 +673,25 @@ same money in through another's, a day or so later. Both would sit in review, un
   else is refused by the server, saying why.
 ### Reconciliation (M14)
 
-- **Kept as Beancount,** so exports carry it and every load checks it: a `balance` directive
-  dated the day after the statement (balances hold at the start of a day), with `statement:`
-  metadata (and `source: "bank"` for an automatic one), and `reconciled: <statement date>` on
-  each posting it covers. On the posting, not the transaction: a transfer's two sides reconcile
-  with two different statements. `posting.reconciled` (ledger migration 9) is the mark's derived
-  column, for SQL.
+- **Kept as Beancount,** so exports carry it: the statement as `custom "statement" <account>
+  <balance>` dated its day (`source: "bank"` for an automatic one), and `reconciled: <statement
+  date>` on each posting it covers. On the posting, not the transaction: a transfer's two sides
+  reconcile with two different statements. `posting.reconciled` (ledger migration 9) is the
+  mark's derived column, for SQL.
+- **A statement holds by marks, not dates** (as GnuCash and QuickBooks do it): the postings
+  reconciled with it and the statements before it add up to its balance. Not a `balance`
+  assertion, which checks everything *dated* up to a day: a transfer two banks date apart, with
+  statements that don't line up, can't satisfy both sides' that way; moving its date breaks one
+  side, and splitting it through an in-transit account was turned down as clutter. So nothing's
+  date moves, a transaction not on a statement stays outstanding, and Beancount carries
+  statements without checking them (the ledger does). Balance assertions from imported books
+  are still checked by date.
 - **The starting balance is what's reconciled so far** (the sum of reconciled postings), not
   the last statement's figure: the two agree until an edit breaks one, and then the next
   reconciliation still starts from the truth while the account says it's off.
 - **Finish only when it balances** (the ledger refuses anything else, 422); "Save for later"
   keeps a draft in `app` (`reconcile_draft`, one per account, shared by the book's members,
   versioned), since a draft isn't the books' business until it's finished.
-- **Dates agree with the statement:** Beancount checks a balance against everything dated up to
-  it, so finishing moves a ticked transaction dated after the statement onto its date, and an
-  unticked one dated on or before it to the day after, refusing a move that would break the
-  other side's reconciliation. Imported transactions carry the bank's dates, so it's mostly
-  hand-entered ones that move.
 - **Marks belong to reconciliations:** edits through the JSON API keep a posting's mark while it
   stays in the same account, and new transactions arrive without one; only reconciling and undo
   change them. (Text imports and restores keep what the text says.)
@@ -697,8 +699,8 @@ same money in through another's, a day or so later. Both would sit in review, un
   bank: import rows hold them) and the opening balance (it came from a statement). Reconciling
   confirms the unconfirmed ones ticked.
 - **Divided accounts:** an asset or liability node can be one real account (`divided: TRUE` on
-  its `open`), its sub-accounts dividing what's in it. It's reconciled as one (Beancount's
-  balance on a node is its subtree's), transfers between its parts reconcile themselves, and
+  its `open`), its sub-accounts dividing what's in it. It's reconciled as one (its statements
+  count the whole subtree's marks), transfers between its parts reconcile themselves, and
   its parts can't be reconciled, linked to a bank or divided themselves. Named for what it is,
   not for reconciling: M15 links one to a bank. `shared/divided.ts` says what follows, for the
   server and the PWA; the ledger enforces it.

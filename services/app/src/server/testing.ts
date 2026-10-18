@@ -419,7 +419,6 @@ export class FakeLedger implements LedgerPort {
         updated_at: "v1",
       },
       confirmed,
-      moved: [],
     };
   }
 

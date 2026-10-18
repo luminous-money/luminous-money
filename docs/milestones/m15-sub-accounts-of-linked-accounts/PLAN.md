@@ -1,11 +1,23 @@
 M15: Sub-accounts of linked accounts: plan
 ==================================================================================================
 
-> **Status: planned (2026-10-17),** with [questions](#questions) at the end; proposals are marked
-> where a question could change them. The brief, from [the plan](../../PLAN.md): split a
+> **Status: planned (2026-10-17), answered the same day** (below); ready to build. The brief, from [the plan](../../PLAN.md): split a
 > bank-linked account's money into sub-accounts, e.g. the $10,000 in a PNC checking account as
 > $5,000 of padding and $5,000 for general use, while the bank feed keeps it in step with the
 > bank.
+
+## Answers (2026-10-17)
+
+1. **Home's headline:** the whole's balance, the parts beneath.
+2. **Rules and parts:** parts are ordinary accounts, so a rule can already categorize into one
+   (a Fidelity import's transfer, categorized as Padding). What a rule can't yet say is where
+   the *bank's own side* of a transaction lands (always the main part): "Interest → Padding"
+   needs that. Added, as a rule's optional **lands in** part.
+3. **Targets for parts:** later.
+4. **Start over** on a divided account keeps the moves between its parts.
+5. **Undivide:** later.
+6. **Splitting deposits by share:** later.
+7. **Moves between parts** show in the whole's ledger, as "General → Padding".
 
 ## What M15 is
 
@@ -65,8 +77,8 @@ divided themselves. What's missing is everything that gets money into it and aro
    account's (its transactions, their reconciliation marks, its opening balance) moves to the
    main part (`Assets:PNC` → `Assets:PNC:General`), and `Assets:PNC` is opened as a divided node
    with the main part set. Its display name stays with the whole; the part is named "General".
-3. **Its statements stay with the whole:** balance directives aren't moved (they're the real
-   account's), so its reconciliations hold as they were.
+3. **Its statements stay with the whole:** they're the real account's, and the marks they
+   count move with the postings, so its reconciliations hold as they were.
 4. **Each other part is opened** (same currency) and given its amount by **one transfer** from
    the main part, dated as chosen: "Divided PNC Checking". A part that would leave the main part
    below zero is allowed, and flagged.
@@ -90,7 +102,7 @@ templates, since a node can't take postings.
   - **reconcile** compares the whole with the bank's history; its opening balance adjustment
     goes to the main part.
   - **start over** deletes every transaction of the whole that came from outside it, and keeps
-    the moves between its parts _(proposed: [question 4](#questions))_.
+    the moves between its parts.
   - **from a date** and **new** (a new account is a leaf; divide it after) are as they are.
 - **What's "Not at the bank"** is the whole's unconfirmed transactions no bank row holds, leaving
   out moves between parts.
@@ -108,54 +120,62 @@ templates, since a node can't take postings.
   ready to cover it from the part with the most.
 - **Its ledger** lists every transaction of the whole, each with the part it touched ("General",
   "Padding"); a move between parts shows as "General → Padding", leaving the whole's running
-  balance as it was _(proposed: [question 7](#questions))_.
+  balance as it was.
 - **A part's page** is an ordinary account ledger: its own transactions and running balance, and
   "Part of PNC Checking".
 - **Home:** a starred divided account's card shows the whole's balance (the bank's figure), with
-  the parts under it as a stacked line _(the headline: [question 1](#questions))_.
+  the parts under it as a stacked line.
 - **Choosing a transaction's part:** in review and on a transaction's page, a transaction in a
   divided account shows its part as a choice ("Paid from: General ▾"): moving it to another part
   is just changing that posting's account, so nothing else about it changes.
 
-### Undividing
+### Rules that choose a part
 
-**Undivide…** (the Divided account card) puts it back as one account, in one write: every
-part's transactions move to the whole's name, the moves between parts (now from the account to
-itself) are deleted, and the parts and the node's `open` give way to one leaf's, keeping the
-main part's settings _(in scope: [question 5](#questions))_. Linked, it stays linked.
+- **A rule's optional "lands in" part:** for a rule matching transactions imported into a
+  divided account, the part their bank side goes to instead of the main part ("Interest, lands
+  in Padding"). Its category still sets the other side, as now.
+- **Applied when staged,** as categories are (the chain, M4), and by "Apply to existing" on
+  unconfirmed ones; a rule's part must be one of the account's parts (the editor offers only
+  those, once the rule names an account to match).
+- **Categorizing into a part** (a transfer from another account straight into Padding) needs
+  nothing new: a part is an account.
 
 ### The API
 
 - **Ledger:**
   - `main_part` on `Account` and `AccountPatch` (a part of it; refused otherwise); deleting the
     main part refused.
-  - `POST /books/{b}/accounts/{a}/divide` `{main, parts: [{name, amount}], date, updated_at}`
-    and `POST …/undivide` `{updated_at}`: one write each.
+  - `POST /books/{b}/accounts/{a}/divide` `{main, parts: [{name, amount}], date, updated_at}`:
+    one write.
   - Renaming rewrites `main-part` values; the divided account's ledger rows say which part.
 - **`app`:**
   - `cashAccountOf` and the import target look up a divided account's main part; the matcher's
     context reads the whole.
-  - Dividing and undividing go through `app` (`POST /books/:book/accounts/:account/divide`,
-    `…/undivide`), so schedules and drafts follow, as renames do.
+  - Rules gain `part` (`category_rule.part`, migration 17), applied by the chain when staging.
+  - Dividing goes through `app` (`POST /books/:book/accounts/:account/divide`), so schedules
+    follow, as renames do.
   - Not at the bank, start over, and the reconcile link mode work on the whole.
 
 ## How it gets built
 
-1. **Ledger:** the main part (metadata, settings, renames, deletes), divide and undivide, the
-   part on ledger rows; tests (divide a linked-like leaf with reconciled history and its
-   balance directives holding; undivide back; renames carry the main part).
+1. **Ledger:** the main part (metadata, settings, renames, deletes), divide, the part on ledger
+   rows; tests (divide a leaf with reconciled history, its statements holding; renames carry
+   the main part).
 2. **`app`:** cash account and import target for divided accounts, the matcher across parts,
-   linking modes, not at the bank, divide and undivide with schedules following; tests.
-3. **PWA:** the Divided account card (divide, main part, undivide), the Parts card and Move
-   money, part labels in ledgers, the part choice in review and the transaction page, home's
-   card.
+   linking modes, not at the bank, divide with schedules following, rules' part; tests.
+3. **PWA:** the Divided account card (divide, main part), the Parts card and Move money, part
+   labels in ledgers, the part choice in review and the transaction page, rules' "lands in",
+   home's card.
 4. **Tests:** ledger and unit as above; API e2e (divide a bank-linked account, sync: the bank's
    transactions land in the main part, the whole still reconciles automatically); browser
-   (divide PNC into General and Padding, move money, choose a transaction's part).
+   (divide PNC into General and Padding, move money, choose a transaction's part; a rule lands
+   interest in Padding).
 5. **Docs:** design.md ("Divided accounts", extending M14's), PLAN.md, RESUME.md.
 
 ## Out of scope
 
+- **Undividing** (back to one account), **targets for parts** (a set amount, flagged or topped
+  up), and **splitting deposits by share**: later (answers 3, 5, 6).
 - **Brokerages:** their cash is already a part of the brokerage (`:Cash`); dividing that cash
   waits.
 - **Parts across real accounts** (one "Emergency fund" spread over PNC and Fidelity): a part is
@@ -164,19 +184,4 @@ main part's settings _(in scope: [question 5](#questions))_. Linked, it stays li
 
 ## Questions
 
-1. **Home's headline:** a divided account's card shows the whole (the bank's figure), with the
-   parts beneath (proposed). Or the main part's, as what's free to spend ("$5,000 to spend of
-   $10,000")?
-2. **Rules choosing a part:** should categorization rules (M4) also be able to put a
-   transaction in a part ("Interest → Padding", "Payroll → General")? Proposed: not in M15;
-   review and the transaction page choose it.
-3. **Targets for parts:** should a part be able to hold a set amount ("Padding: $5,000"), with
-   a shortfall flagged, or even topped up from the main part automatically? Proposed: not yet;
-   a part holds what you move into it.
-4. **Start over, on a divided account:** keep the moves between its parts (proposed), or delete
-   everything and divide again?
-5. **Undivide:** in M15 (proposed), or later?
-6. **Splitting deposits by share** (a paycheck: 20% to Padding as it arrives): wanted, now or
-   later? Proposed: later, beside rules.
-7. **Moves between parts in the whole's ledger:** shown, as "General → Padding" (proposed), or
-   hidden there (they don't change the whole)?
+None open: [answered](#answers-2026-10-17).

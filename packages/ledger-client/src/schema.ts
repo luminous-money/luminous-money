@@ -1913,16 +1913,11 @@ export interface components {
        * @description Unconfirmed transactions confirmed with it.
        */
       confirmed: string[];
-      /**
-       * Moved
-       * @description Transactions whose date moved to agree with the statement.
-       */
-      moved: string[];
       reconciliation: components["schemas"]["Reconciliation"];
     };
     /**
      * Reconciliation
-     * @description A balance check on the account: a reconciliation's (with a statement), or one from an imported book.
+     * @description A statement the account was reconciled with, or a balance assertion on it (from an imported book).
      */
     Reconciliation: {
       /** Account */
@@ -1936,17 +1931,17 @@ export interface components {
       balance: components["schemas"]["Amount"];
       /** Id */
       id: string;
-      /** @description The statement less the books, when they don't agree. */
+      /** @description When they don't agree, the statement less the books: for a statement, what's reconciled with it and before; for an assertion, everything dated up to it. */
       off_by: components["schemas"]["Amount"] | null;
       /**
        * Statement
-       * @description A reconciliation (else a balance check from an imported book).
+       * @description A reconciliation (else a balance assertion from an imported book).
        */
       statement: boolean;
       /**
        * Statement Date
        * Format: date
-       * @description The day it holds at the end of (the directive's date, less a day).
+       * @description The day it holds at the end of.
        */
       statement_date: string;
       /**

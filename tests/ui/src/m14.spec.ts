@@ -30,10 +30,12 @@ test("a statement is ticked off, saved for later, and finished; ledgers show and
 
   await row(/Shop 2/).click();
   await expect(page.getByRole("region", { name: "Difference" })).toContainText("$0.00");
-  // Shop 3, not on it, moves after it.
-  await expect(page.getByText("Finishing moves 1 transaction's date")).toBeVisible();
+  // Shop 3 isn't on it: it waits for a later statement, its date as it was.
+  await expect(
+    page.getByText("1 not ticked stays outstanding, for a later statement.")
+  ).toBeVisible();
   await finish.click();
-  await expect(page.getByText(/Reconciled 3 through Feb 29.* Moved 1/)).toBeVisible();
+  await expect(page.getByText(/Reconciled 3 through Feb 29/)).toBeVisible();
   const past = page.getByRole("region", { name: "Past statements" });
   await expect(past).toContainText("Feb 29");
   await expect(past.getByRole("button", { name: "Undo" })).toBeVisible();
@@ -58,7 +60,9 @@ test("a statement is ticked off, saved for later, and finished; ledgers show and
   await page.getByRole("radio", { name: "All" }).click();
   await transactions.getByRole("button", { name: /Shop 1/ }).click();
   await expect(page.getByText(/Reconciled with PNC Checking's Feb 29.* statement/)).toBeVisible();
-  await page.getByLabel("Date", { exact: true }).fill("2024-03-05");
+  const amounts = page.getByRole("textbox", { name: "Amount" });
+  await amounts.nth(0).fill("-1.25");
+  await amounts.nth(1).fill("1.25");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("alertdialog", { name: "Reconciled" })).toBeVisible();
   await page.getByRole("button", { name: "Save anyway" }).click();
@@ -75,7 +79,10 @@ test("a divided account is reconciled as one; its parts point to it", async ({ p
 
   await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent("Assets:PNC")}/edit`);
   const card = page.getByRole("region", { name: "Divided account" });
+  // Shown at once; saved a moment later.
+  const saved = page.waitForResponse((r) => r.url().endsWith("/divided") && r.ok());
   await card.getByRole("checkbox", { name: "One real account, divided" }).check();
+  await saved;
   await expect(card.getByRole("link", { name: "Reconcile" })).toBeVisible();
 
   await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent("Assets:PNC:General")}`);

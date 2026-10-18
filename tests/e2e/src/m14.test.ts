@@ -108,7 +108,10 @@ describe("M14: reconciliation", () => {
       params: { path: { book_id: book } },
       parseAs: "text",
     });
-    assert.match(exported.data as unknown as string, /balance Assets:Bank:Checking +488\.00 USD/);
+    assert.match(
+      exported.data as unknown as string,
+      /2026-01-31 custom "statement" Assets:Bank:Checking +488\.00 USD/
+    );
   });
 
   it("saves for later, then a divided account reconciles as one", async () => {

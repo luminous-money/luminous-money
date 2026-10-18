@@ -41,11 +41,11 @@ DISPLAY_NAME_KEY = "display-name"
 # A revalued asset (a house, a car): how many days its value stays current (M5).
 REVALUE_EVERY_KEY = "revalue-every"
 BUDGET_KEY = "budget"  # on a transaction: FALSE keeps it out of budgets (M11)
-# Reconciliation (M14): on a posting, the statement date it was reconciled with; on a balance
-# directive, the statement it records.
+# Reconciliation (M14): on a posting, the statement date it was reconciled with. A statement is a
+# `custom "statement"` directive; `source: "bank"` on one marks an automatic reconciliation.
 RECONCILED_KEY = "reconciled"
-STATEMENT_KEY = "statement"
-SOURCE_KEY = "source"  # on a balance directive: "bank" for an automatic reconciliation
+STATEMENT_TYPE = "statement"
+SOURCE_KEY = "source"
 # On a node's open: a divided account, one real account its sub-accounts divide (M14).
 DIVIDED_KEY = "divided"
 NODE = "node"
@@ -448,7 +448,7 @@ def with_accounts(
     """The directive with every account it names passed through `rename`: postings, `open` and
     `close`, `balance`, `pad` (both accounts), `note`, `document`, and `custom` account values.
     None if it's about an account `drop` says is going (its open, close, balance, pad, note,
-    document or budget): those go with it. Unchanged directives come back as they were."""
+    document, budget or statement): those go with it. Unchanged directives come back as they were."""
     entries, errors, _ = parser.parse_string(text)
     if errors or len(entries) != 1:
         raise ParseFailure([f"directive {directive_id} doesn't parse"])
@@ -464,8 +464,8 @@ def with_accounts(
             return None
         entry = entry._replace(account=rename(entry.account), source_account=rename(entry.source_account))
     elif isinstance(entry, data.Custom):
-        # A budget is the account's own (M11): it doesn't move to a substitute.
-        if entry.type == "budget" and entry.values and isinstance(entry.values[0].value, str):
+        # A budget (M11) or a statement (M14) is the account's own: it doesn't move to a substitute.
+        if entry.type in ("budget", STATEMENT_TYPE) and entry.values and isinstance(entry.values[0].value, str):
             if drop(entry.values[0].value):
                 return None
         entry = entry._replace(
@@ -652,21 +652,47 @@ def rewritten(
     return to_directive(entry)
 
 
-def balance_directive(
-    account: str,
-    date: datetime.date,
-    number: Decimal,
-    currency: str,
-    statement: datetime.date | None,
-    source: str | None = None,
-) -> Directive:
-    """A `balance` directive: the account (and everything under it) holds `number` at the start
-    of `date`, with the statement it records (M14), and where that came from ("bank")."""
-    meta = {STATEMENT_KEY: statement} if statement else {}
-    if source:
-        meta[SOURCE_KEY] = source
-    entry = data.Balance(data.new_metadata("<new>", 0, meta), date, account, bc_amount.Amount(number, currency), None, None)
-    return parse_one(to_directive(entry).text)
+@dataclass(frozen=True)
+class Statement:
+    """A statement an account was reconciled with (M14): its date, ending balance, and where it
+    came from ("bank", for an automatic one)."""
+
+    account: str
+    date: datetime.date
+    number: Decimal
+    currency: str
+    source: str | None = None
+
+
+def statement_directive(statement: Statement) -> Directive:
+    """`2026-09-30 custom "statement" Assets:Bank:Checking 4212.18 USD`: kept as Beancount, so an
+    export carries it, but not a `balance` assertion: what it holds is checked against the
+    postings reconciled with it, not against dates (a transfer's two banks can date it apart)."""
+    text = (
+        f'{statement.date.isoformat()} custom "{STATEMENT_TYPE}" {statement.account} '
+        f"{decimal_text(statement.number)} {statement.currency}\n"
+    )
+    if statement.source:
+        text += f'  {SOURCE_KEY}: "{statement.source}"\n'
+    return parse_one(text)
+
+
+def statement_of(text: str) -> Statement | None:
+    """A statement directive's contents; None for any other directive."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1 or not isinstance(entries[0], data.Custom) or entries[0].type != STATEMENT_TYPE:
+        return None
+    entry = entries[0]
+    if len(entry.values) != 2 or entry.values[0].dtype != bc_account.TYPE or not isinstance(entry.values[1].value, bc_amount.Amount):
+        return None
+    source = entry.meta.get(SOURCE_KEY)
+    return Statement(
+        account=entry.values[0].value,
+        date=entry.date,
+        number=entry.values[1].value.number,
+        currency=entry.values[1].value.currency,
+        source=source if isinstance(source, str) else None,
+    )
 
 
 @dataclass(frozen=True)
@@ -675,24 +701,16 @@ class BalanceCheck:
     date: datetime.date
     number: Decimal
     currency: str
-    statement: datetime.date | None
-    source: str | None = None
 
 
 def balance_check(text: str) -> BalanceCheck | None:
-    """A `balance` directive's account, date, amount and statement date (if it records one)."""
+    """A `balance` directive's account, date and amount (from an imported book, say)."""
     entries, errors, _ = parser.parse_string(text)
     if errors or len(entries) != 1 or not isinstance(entries[0], data.Balance):
         return None
     entry = entries[0]
-    statement = entry.meta.get(STATEMENT_KEY)
     return BalanceCheck(
-        account=entry.account,
-        date=entry.date,
-        number=entry.amount.number,
-        currency=entry.amount.currency,
-        statement=statement if isinstance(statement, datetime.date) else None,
-        source=entry.meta.get(SOURCE_KEY) if isinstance(entry.meta.get(SOURCE_KEY), str) else None,
+        account=entry.account, date=entry.date, number=entry.amount.number, currency=entry.amount.currency
     )
 
 

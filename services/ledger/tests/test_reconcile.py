@@ -68,13 +68,13 @@ def test_a_statement_reconciles_whats_ticked_into_the_books(ledger, book):
         models.ReconcileIn(statement_date=D(2026, 1, 31), balance="1488.00", transactions=[opening, lunch, pay]),
     )
 
-    assert done.confirmed == [lunch] and done.moved == []
+    assert done.confirmed == [lunch]
     assert (done.reconciliation.statement_date, done.reconciliation.transactions) == (D(2026, 1, 31), 3)
     assert done.reconciliation.off_by is None
-    # Beancount's own check holds, and the export carries it.
+    # The export carries it: the statement, and the marks.
     assert ledger.problems(book) == []
     text = ledger.export(book)
-    assert "2026-02-01 balance Assets:Bank:Checking" in text and "statement: 2026-01-31" in text
+    assert re.search(r'2026-01-31 custom "statement" Assets:Bank:Checking +1488.00 USD', text)
     assert text.count("reconciled: 2026-01-31") == 3
     # Next time, it starts from there.
     after = reconcile.state(ledger, book, "Assets:Bank:Checking", D(2026, 2, 28))
@@ -97,25 +97,55 @@ def test_it_wont_finish_until_it_balances_or_go_back_in_time(ledger, book):
         )
 
 
-def test_finishing_moves_dates_to_agree_with_the_statement(ledger, book):
-    cleared_late, not_yet = add(
+def test_nothing_moves_what_isnt_on_the_statement_stays_outstanding(ledger, book):
+    account = "Assets:Bank:Checking"
+    cleared, outstanding = add(
         ledger,
         book,
-        spend(D(2026, 2, 2), "-20.00", payee="Written the 2nd, cleared the 30th"),
+        spend(D(2026, 2, 2), "-20.00", payee="Written the 2nd, on January's statement"),
         spend(D(2026, 1, 28), "-50.00", payee="Check, not cashed yet"),
     )
 
-    done = reconcile.reconcile(
-        ledger,
-        book,
-        "Assets:Bank:Checking",
-        models.ReconcileIn(statement_date=D(2026, 1, 31), balance="-20.00", transactions=[cleared_late]),
-    )
+    reconcile.reconcile(ledger, book, account, models.ReconcileIn(statement_date=D(2026, 1, 31), balance="-20.00", transactions=[cleared]))
 
-    assert done.moved == sorted([cleared_late, not_yet])
-    assert ledger.transaction(book, cleared_late).date == D(2026, 1, 31)
-    assert ledger.transaction(book, not_yet).date == D(2026, 2, 1)
+    assert ledger.transaction(book, cleared).date == D(2026, 2, 2)
+    assert ledger.transaction(book, outstanding).date == D(2026, 1, 28)
+    [statement] = reconcile.history(ledger, book, account).reconciliations
+    assert statement.off_by is None  # by what's reconciled with it, not by dates
+    # February's statement has the check.
+    reconcile.reconcile(ledger, book, account, models.ReconcileIn(statement_date=D(2026, 2, 28), balance="-70.00", transactions=[outstanding]))
+    assert all(r.off_by is None for r in reconcile.history(ledger, book, account).reconciliations)
+
+
+def test_a_transfer_its_two_banks_date_apart_reconciles_on_each_side(ledger, book):
+    """Checking's bank says the money left Jan 30; savings' says it arrived Feb 2. One
+    transaction, each side reconciled with its own bank's statement."""
+    checking, savings = "Assets:Bank:Checking", "Assets:Bank:Savings"
+    [move] = add(ledger, book, spend(D(2026, 1, 30), "-100.00", other=savings))
+
+    reconcile.reconcile(ledger, book, checking, models.ReconcileIn(statement_date=D(2026, 1, 31), balance="-100.00", transactions=[move]))
+    reconcile.reconcile(ledger, book, savings, models.ReconcileIn(statement_date=D(2026, 1, 31), balance="0", transactions=[]))
+    reconcile.reconcile(ledger, book, savings, models.ReconcileIn(statement_date=D(2026, 2, 28), balance="100.00", transactions=[move]))
+
+    moved = ledger.transaction(book, move)
+    assert moved.date == D(2026, 1, 30) and len(moved.postings) == 2
+    assert [p.meta["reconciled"] for p in moved.postings] == [
+        models.MetaDate(date=D(2026, 1, 31)),
+        models.MetaDate(date=D(2026, 2, 28)),
+    ]
+    for account in (checking, savings):
+        assert all(r.off_by is None for r in reconcile.history(ledger, book, account).reconciliations)
     assert ledger.problems(book) == []
+
+
+def test_an_imported_books_balance_assertions_are_checked_by_date(ledger, book):
+    add(ledger, book, spend(D(2026, 1, 5), "-12.00"))
+    ledger.create(book, "2026-02-01 balance Assets:Bank:Checking -10.00 USD\n")
+
+    [check] = reconcile.history(ledger, book, "Assets:Bank:Checking").reconciliations
+
+    assert (check.statement, check.statement_date) == (False, D(2026, 1, 31))
+    assert check.off_by == models.Amount(number="2.00", currency="USD")
 
 
 def test_undo_takes_the_latest_off(ledger, book):
@@ -154,10 +184,10 @@ def test_a_divided_account_reconciles_as_one(ledger, book):
 
     reconcile.reconcile(ledger, book, pnc, models.ReconcileIn(statement_date=D(2026, 1, 31), balance="975.00", transactions=[pay, lunch]))
 
-    # The transfer between them reconciled itself; Beancount checks the subtree's balance.
+    # The transfer between them reconciled itself.
     assert all(p.meta.get("reconciled") for p in ledger.transaction(book, move).postings)
     assert ledger.problems(book) == []
-    assert re.search(r"2026-02-01 balance Assets:PNC +975.00 USD", ledger.export(book))
+    assert re.search(r'2026-01-31 custom "statement" Assets:PNC +975.00 USD', ledger.export(book))
 
 
 def test_only_asset_and_liability_nodes_are_divided_once(ledger, book):

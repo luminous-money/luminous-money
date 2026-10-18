@@ -116,11 +116,11 @@ function Editor({
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
   const names = accounts.data ? postable(accounts.data, date) : [];
   const staged = t.flag === "!";
-  // Reconciled: saving a change to its date or splits asks first (it can break the statement).
+  // Reconciled: saving a change to its splits asks first (it can break the statement). Its
+  // date can change freely: statements hold by what's reconciled with them, not by dates.
   const reconciled = isNew ? [] : reconciliations(t);
   const [confirming, setConfirming] = useState(false);
-  const changesReconciled =
-    reconciled.length > 0 && (date !== t.date || gist(postings) !== gist(t.postings));
+  const changesReconciled = reconciled.length > 0 && gist(postings) !== gist(t.postings);
 
   const submit = async (flag: string, then?: string) => {
     setMessage(null);
@@ -172,7 +172,7 @@ function Editor({
               return `${displayName(found ?? { name: r.account })}'s ${formatDay(r.date)} statement`;
             })
             .join(" and ")}
-          : changing its date or amounts can put that out of balance.
+          : changing its amounts or accounts can put that out of balance.
         </p>
       )}
 

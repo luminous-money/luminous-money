@@ -1,22 +1,22 @@
 """Reconciliation (M14): agreeing an account with a statement.
 
-- **Kept as Beancount,** so exports carry it and every load checks it:
-  - a `balance` directive dated the day after the statement (balances hold at the start of a
-    day), with `statement:` metadata: the statement's date
+- **Kept as Beancount,** so exports carry it:
+  - the statement, `custom "statement" <account> <balance>`, dated the statement's date
   - `reconciled: <statement date>` on each posting it covers (the posting, not the transaction:
     a transfer's two sides reconcile with two different statements)
+- **By marks, not dates** (as GnuCash and QuickBooks do it): a statement holds when the
+  postings reconciled with it and before it add up to its balance. A transaction's date doesn't
+  have to agree with the statement, so nothing moves: one not on it stays outstanding, and a
+  transfer whose two banks date it apart reconciles on each side with its own bank's statement.
+  (A `balance` assertion would check everything dated up to it, which can't hold both ways.)
 - **Scope:** a leaf reconciles itself; a divided account (`divided: TRUE` on a node: one real
   account its sub-accounts divide) reconciles as one, and its sub-accounts can't themselves.
-  Beancount's balance on a node is its subtree's, which is what's wanted. Transfers between its
-  sub-accounts aren't money moving: they reconcile themselves.
+  Transfers between its sub-accounts aren't money moving: they reconcile themselves.
 - **The starting balance** is what's reconciled so far: the sum of the scope's reconciled
   postings. A reconciliation ticks unreconciled transactions until the starting balance plus
   theirs is the statement's; it's refused otherwise.
-- **Dates agree with the statement:** Beancount checks a balance against everything dated up to
-  it, so finishing moves a ticked transaction dated after the statement onto its date, and an
-  unticked one dated on or before it to the day after (unless that would break the other side's
-  reconciliation, which refuses it).
-- **Undo** takes the latest reconciliation's marks and balance off, in one write.
+- **Undo** takes the latest reconciliation's marks and statement off, in one write.
+- **Balance assertions** from imported books are still checked by date, beside the statements.
 """
 
 from __future__ import annotations
@@ -101,8 +101,21 @@ class _Scope:
         )
 
     def balance_through(self, day: datetime.date) -> Decimal:
-        """What the books say at the end of `day`."""
+        """What the books say at the end of `day`, by date."""
         return sum((self.net(t) for t in self.transactions if t.date <= day), Decimal(0))
+
+    def reconciled_through(self, day: datetime.date) -> Decimal:
+        """What's reconciled with the statements up to `day`'s."""
+        return sum(
+            (
+                p.amount
+                for t in self.transactions
+                for p in t.postings
+                if self.mine(p) and p.reconciled and p.reconciled <= day
+                and p.currency == self.currency and p.amount is not None
+            ),
+            Decimal(0),
+        )
 
 
 def scope_of(accounts: dict[str, models.Account], name: str) -> str | None:
@@ -152,14 +165,31 @@ def _scope(ledger: Ledger, book_id: str, name: str) -> _Scope:
     return _Scope(name, currency, transactions)
 
 
-def _checks(ledger: Ledger, book_id: str, account: str) -> list[tuple[engine.BalanceCheck, str, str]]:
-    """The account's balance directives, oldest first: (the check, its id, its version)."""
+@dataclass(frozen=True)
+class _Check:
+    """A statement of the account's, or a balance assertion on it (from an imported book)."""
+
+    id: str
+    updated_at: str
+    day: datetime.date  # what it holds at the end of
+    number: Decimal
+    currency: str
+    statement: bool
+    source: str | None = None
+
+
+def _checks(ledger: Ledger, book_id: str, account: str) -> list[_Check]:
+    """The account's statements and balance assertions, oldest first."""
     found = []
+    for row in ledger.store.find(book_id, kind="custom", limit=None):
+        s = row.text and engine.statement_of(row.text)
+        if s and s.account == account:
+            found.append(_Check(row.id, row.updated_at, s.date, s.number, s.currency, True, s.source))
     for row in ledger.store.find(book_id, kind="balance", limit=None):
-        check = row.text and engine.balance_check(row.text)
-        if check and check.account == account:
-            found.append((check, row.id, row.updated_at))
-    return sorted(found, key=lambda c: c[0].date)
+        b = row.text and engine.balance_check(row.text)
+        if b and b.account == account:  # it holds at the start of its date
+            found.append(_Check(row.id, row.updated_at, b.date - _DAY, b.number, b.currency, False))
+    return sorted(found, key=lambda c: (c.day, c.statement))
 
 
 def _money(number: Decimal, currency: str) -> models.Amount:
@@ -169,25 +199,25 @@ def _money(number: Decimal, currency: str) -> models.Amount:
 def _history(ledger: Ledger, book_id: str, scope: _Scope) -> list[models.Reconciliation]:
     """Every balance check on the account, newest first, each against the books."""
     out = []
-    for check, directive_id, updated_at in _checks(ledger, book_id, scope.account):
-        day = check.statement or check.date - _DAY
-        books = sum(
-            (scope.net(t) for t in scope.transactions if t.date < check.date), Decimal(0)
-        ) if check.currency == scope.currency else None
+    for check in _checks(ledger, book_id, scope.account):
+        # A statement, against what's reconciled with it (and before); an assertion, by date.
+        books = None
+        if check.currency == scope.currency:
+            books = scope.reconciled_through(check.day) if check.statement else scope.balance_through(check.day)
         count = sum(
-            1 for t in scope.transactions if check.statement and any(scope.mine(p) and p.reconciled == check.statement for p in t.postings)
+            1 for t in scope.transactions if check.statement and any(scope.mine(p) and p.reconciled == check.day for p in t.postings)
         )
         out.append(
             models.Reconciliation(
-                id=directive_id,
+                id=check.id,
                 account=scope.account,
-                statement_date=day,
+                statement_date=check.day,
                 balance=_money(check.number, check.currency),
-                statement=check.statement is not None,
+                statement=check.statement,
                 automatic=check.source == "bank",
                 transactions=count,
                 off_by=_money(check.number - books, check.currency) if books is not None and books != check.number else None,
-                updated_at=updated_at,
+                updated_at=check.updated_at,
             )
         )
     return list(reversed(out))
@@ -241,8 +271,8 @@ def history(ledger: Ledger, book_id: str, account: str) -> models.Reconciliation
 
 def reconcile(ledger: Ledger, book_id: str, account: str, r: models.ReconcileIn) -> models.Reconciled:
     """Reconcile the account with a statement, in one atomic write: the ticked transactions
-    (and transfers within it) are marked, unconfirmed ones confirmed, dates moved to agree with
-    the statement, and its balance written. Refused unless it comes to the statement's balance."""
+    (and transfers within it) are marked, unconfirmed ones confirmed, and the statement written.
+    Refused unless it comes to the statement's balance. Nothing's dates change."""
     day = r.statement_date
     balance = Decimal(r.balance)
     with ledger.store.transaction():
@@ -286,34 +316,15 @@ def reconcile(ledger: Ledger, book_id: str, account: str, r: models.ReconcileIn)
                 f"{engine.decimal_text(balance - reached)} short of the statement's {engine.decimal_text(balance)}"
             )
 
-        # Dates agree with the statement: on it, by its date; not on it, after.
-        moves: dict[str, datetime.date] = {t.id: day for t in covered if t.date > day}
-        for t in scope.transactions:
-            if scope.open(t) and t.id not in ticked and not scope.internal(t) and t.date <= day:
-                moves[t.id] = day + _DAY
-        for tid, to in moves.items():
-            for p in by_id[tid].postings:
-                if not scope.mine(p) and p.reconciled and to > p.reconciled:
-                    raise ReconcileRefused(
-                        f"{by_id[tid].payee or by_id[tid].narration or tid} ({by_id[tid].date}) would move to {to}, "
-                        f"after {p.account}'s {p.reconciled} statement it's reconciled with"
-                    )
-
         writes, confirmed = [], []
-        on_it = {t.id for t in covered}
-        for tid in sorted(on_it | set(moves)):
-            t = by_id[tid]
-            text = ledger.get(book_id, tid).text
-            marks = {p.idx: day for p in scope.open(t)} if tid in on_it else {}
-            flag = "*" if tid in on_it and t.flag == "!" else None
+        for t in covered:
+            flag = "*" if t.flag == "!" else None
             if flag:
                 confirmed.append(t.id)
-            writes.append(engine.parse_one(engine.rewritten(text, date=moves.get(tid), flag=flag, marks=marks).text, tid))
-        existing = next(
-            (c for c in _checks(ledger, book_id, account) if c[0].date == day + _DAY), None
-        )
-        written = engine.balance_directive(account, day + _DAY, balance, scope.currency, day, "bank" if r.automatic else None)
-        writes.append(engine.parse_one(written.text, existing[1] if existing else None))
+            marks = {p.idx: day for p in scope.open(t)}
+            writes.append(engine.parse_one(engine.rewritten(ledger.get(book_id, t.id).text, flag=flag, marks=marks).text, t.id))
+        statement = engine.Statement(account, day, balance, scope.currency, "bank" if r.automatic else None)
+        writes.append(engine.statement_directive(statement))
         ledger._write(book_id, writes)
         if replacing:
             ledger.store.delete(book_id, [replacing.id])
@@ -322,13 +333,12 @@ def reconcile(ledger: Ledger, book_id: str, account: str, r: models.ReconcileIn)
     return models.Reconciled(
         reconciliation=next(x for x in done if x.statement and x.statement_date == day),
         confirmed=sorted(confirmed),
-        moved=sorted(moves),
     )
 
 
 def undo(ledger: Ledger, book_id: str, account: str, statement_date: datetime.date) -> None:
-    """Undo the account's latest reconciliation: its marks and its balance go, in one write.
-    (What it confirmed, or moved, stays.)"""
+    """Undo the account's latest reconciliation: its marks and its statement go, in one write.
+    (What it confirmed stays confirmed.)"""
     with ledger.store.transaction():
         scope = _scope(ledger, book_id, account)
         last = _last(_history(ledger, book_id, scope))

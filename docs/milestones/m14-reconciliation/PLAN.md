@@ -1,8 +1,8 @@
 M14: Reconciliation: plan
 ==================================================================================================
 
-> **Status: built (2026-10-17),** with ledger, unit, API and browser tests, on the answers and
-> the best guesses marked _(guess)_, which [the questions](#questions) at the end confirm. The
+> **Status: built (2026-10-17),** with ledger, unit, API and browser tests, on the answers
+> (including [the second round](#answers-to-the-questions-2026-10-17)). The
 > brief, from [the plan](../../PLAN.md): reconciliation (added 2026-10-12, "as another milestone
 > at the end").
 
@@ -17,6 +17,19 @@ M14: Reconciliation: plan
 5. **Cadence:** whenever you like, no nudges.
 6. **Ticking an unconfirmed transaction** confirms it when the reconciliation finishes.
 7. **What's ticked so far** is kept on the server, so reconciling can move between devices.
+
+### Answers to the questions (2026-10-17)
+
+1. **Moving dates on Finish:** fine, so long as two banks dating a transfer differently, with
+   statements that don't line up, is handled. It wasn't (one side's reconciliation could never
+   finish, or a move could break the other's), and splitting such a transfer through an
+   in-transit account was turned down. **So reconciliation now goes by marks, not dates:** a
+   statement holds when the postings reconciled with it (and before) add up to its balance, as
+   GnuCash and QuickBooks do it. Nothing's date moves; one not on the statement stays
+   outstanding; each side of a transfer reconciles with its own bank's statement. The statement
+   is a `custom "statement"` directive rather than a `balance` assertion (which checks by date).
+2. **14 days after the statement:** fine.
+3. **Automatic reconciliation's date:** the day before the bank's balance date, the safer one.
 
 Also asked for:
 
@@ -49,12 +62,16 @@ can't see.
 ### Kept in the books
 
 - **A reconciliation** is an account, a statement date, the statement's ending balance, and the
-  postings it covers, written as Beancount (exports carry it; Beancount checks it on every load):
-  - a **`balance` directive** dated the day after the statement (Beancount checks balances at
-    the start of a day), with `statement: 2026-09-30` metadata. On an account that includes its
-    sub-accounts, Beancount's balance is the whole subtree's, which is what's wanted.
+  postings it covers, written as Beancount (exports carry it):
+  - **the statement:** `2026-09-30 custom "statement" Assets:Bank:Checking 4212.18 USD`
+    (`source: "bank"` on an automatic one)
   - **`reconciled: 2026-09-30`** metadata on each posting it covers (on the posting, not the
     transaction: a transfer's two sides reconcile with two different statements).
+- **It holds by marks, not dates:** the postings reconciled with a statement, and with those
+  before it, add up to its balance. (A `balance` assertion would check everything *dated* up to
+  it, which a transfer two banks date apart can't satisfy on both sides.) The ledger checks it;
+  Beancount carries it without checking it. Balance assertions from imported books are still
+  checked by date.
 - **A divided account:** `divided: TRUE` on the node's `open` directive. Only an asset or
   liability node is divided, and not one with a divided account above or below it (an account
   is part of one real account at most), nor one with a bank link under it.
@@ -64,23 +81,17 @@ can't see.
 - **The starting balance** is what's reconciled so far: the sum of the scope's reconciled
   postings. Normally that's the last statement's balance; after an edit breaks one, the two
   differ, and the account says by how much.
-- **Undoing** the latest reconciliation removes its balance directive and its marks, in one
-  write. (What finishing confirmed or moved stays.)
+- **Undoing** the latest reconciliation removes its statement and its marks, in one write.
+  (What finishing confirmed stays.)
 
-### Dates agree with the statement _(guess)_
-
-Beancount checks a balance against every posting dated up to the statement, so the books' dates
-have to agree with it: a transaction on the statement is dated on or before its date, and one
-that isn't, after it. Imported transactions carry the bank's dates, so they already do; one
-entered by hand may not (a check written on the 28th that cleared on the 2nd). So:
+### Dates stay as they are
 
 - The list shows the account's unreconciled transactions up to the statement date, and those of
-  the **14 days after it** ("Dated after the statement"), any of which may have cleared in time.
-- **Finishing moves** each ticked transaction dated after the statement to the statement's date,
-  and each unticked one dated on or before it to the day after. The Finish line says how many
-  it moves, before it's tapped.
-- A move that would break another account's reconciliation (a transfer reconciled on its other
-  side) is refused, with which.
+  the **14 days after it** ("Dated after the statement"), any of which may have cleared in time
+  (a check written on the 2nd your bank dated the 31st).
+- **Nothing moves on Finish.** An unticked transaction dated before the statement stays
+  outstanding for a later one (the Finish line says how many), and a ticked one dated after it
+  keeps its date.
 
 ### Reconciling an account
 
@@ -108,10 +119,11 @@ sub-account of a divided account says "Part of PNC, a divided account", linking 
   September 30". The Reconcile page lists past statements (date, balance, how many transactions)
   with **Undo** on the latest.
 - **Editing a reconciled transaction** says so up front ("Reconciled with Checking's September
-  30 statement"), and saving a change asks "Save anyway?".
-- **Broken balances show:** every balance check on the account (its reconciliations', and any
-  from an imported book) is compared with the books by SQL; one that doesn't hold shows on the
-  account's page: "Off by $12.40 since September 30's statement".
+  30 statement"), and saving a change to its splits asks "Save anyway?" (its date can change
+  freely).
+- **Broken statements show:** every statement on the account is compared with what's reconciled
+  with it, and any balance assertion from an imported book with the books by date; one that
+  doesn't hold shows on the account's page: "Off by $12.40 since September 30's statement".
 
 ### The filter
 
@@ -171,8 +183,8 @@ sub-account of a divided account says "Part of PNC, a divided account", linking 
    the bank comparison, automatic reconciliation, the import balance check; tests.
 3. **PWA:** the Reconcile page, the account page's status and Reconcile, ✓ in ledgers, the
    filter, Select all, "Divided account" in the editor, the warning before editing.
-4. **Tests:** ledger (reconcile, refuse, dates moved, undo, a divided account, marks kept, a broken
-   balance, filters), API e2e (reconcile a CSV-fed account, a bank-fed one automatically),
+4. **Tests:** ledger (reconcile, refuse, outstanding, a transfer two banks date apart, undo, a
+   divided account, marks kept, a broken statement, imported assertions, filters), API e2e (reconcile a CSV-fed account, a bank-fed one automatically),
    browser (tick off a statement, save for later, finish; the filter).
 5. **Docs:** design.md ("Reconciliation"), PLAN.md, RESUME.md.
 
@@ -185,9 +197,4 @@ sub-account of a divided account says "Part of PNC, a divided account", linking 
 
 ## Questions
 
-1. **Moving dates on Finish** _(guess)_: is it right that finishing moves a ticked transaction
-   dated after the statement onto its date, and an unticked one dated before it to the day
-   after? The alternative is refusing to finish until you change those dates yourself.
-2. **The window after the statement** _(guess)_: 14 days of later transactions to tick from. Enough?
-3. **Automatic reconciliation's statement date** _(guess)_: the day before the bank's balance
-   date (so a late posting that day can't break it). Or the balance date itself?
+None open: [answered](#answers-to-the-questions-2026-10-17).
