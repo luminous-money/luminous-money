@@ -6,6 +6,7 @@ import { AccountName, AccountPicker, type AccountCreation } from "../components/
 import { SelectBar } from "../components/SelectBar.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
+import { BaseChoice } from "../components/BaseChoice.js";
 import { PartChoice } from "../components/PartChoice.js";
 import { Swipeable, type SwipeHandle } from "../components/Swipeable.js";
 import { postable, preferredRoots, shortName } from "../lib/accounts.js";
@@ -33,7 +34,7 @@ import {
   useSuggest,
   writeSkipped,
 } from "../lib/queries.js";
-import { simple, UNCATEGORIZED, withCounterpart } from "../lib/split.js";
+import { simple, UNCATEGORIZED, unresolved, withCounterpart } from "../lib/split.js";
 
 /**
  * The review queue: unconfirmed transactions to categorize and confirm, and imported rows matched
@@ -141,7 +142,7 @@ export function Review({ book }: { book: string }) {
           onCategorize={categorizeChosen}
           onConfirm={() => void confirmChosen()}
           canConfirm={
-            !chosen.some((i) => i.transaction.postings.some((p) => p.account === UNCATEGORIZED))
+            !chosen.some((i) => i.transaction.postings.some((p) => unresolved(p.account)))
           }
           busy={bulk.isPending}
           note={note}
@@ -245,7 +246,7 @@ function QueueItem({
   const view = useMemo(() => simple(t), [t]);
   const detail = `/books/${book}/transactions/${t.id}`;
   const busy = edit.isPending || confirmMatch.isPending;
-  const uncategorized = t.postings.some((p) => p.account === UNCATEGORIZED);
+  const blocked = t.postings.some((p) => unresolved(p.account));
 
   // Edits to this transaction queue up in order (see lib/queries), so these can fire freely.
   const save = (changes: Parameters<typeof edit.mutateAsync>[0]) => {
@@ -279,7 +280,7 @@ function QueueItem({
       handle={swipe}
       onConfirm={confirm}
       onSkip={onSkip}
-      canConfirm={!uncategorized}
+      canConfirm={!blocked}
       onBlocked={() => setNudge((n) => n + 1)}
       disabled={selecting}
     >
@@ -325,6 +326,12 @@ function QueueItem({
             onChange={(e) => setNarration(e.target.value)}
             onBlur={saveNarration}
             onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          />
+
+          <BaseChoice
+            book={book}
+            postings={t.postings}
+            onChange={(postings) => void save({ postings })}
           />
 
           {view ? (
@@ -441,8 +448,8 @@ function QueueItem({
             <button
               type="button"
               className="primary"
-              disabled={uncategorized}
-              title={uncategorized ? "Choose a category first" : undefined}
+              disabled={blocked}
+              title={blocked ? "Choose its accounts first" : undefined}
               onClick={() => void swipe.current?.commit("confirm")}
             >
               Confirm

@@ -84,11 +84,12 @@ describe("capturing a receipt", () => {
       note: "It couldn't be read: Claude declined to read it",
     });
     const t = await ledger.transaction("b", captured.transaction_id);
-    // No base account known: uncategorized, as the notes ask.
+    // No base account known: the placeholder (opened for it), to choose in review.
     expect(t.postings.map((p) => [p.account, p.units?.number])).toEqual([
-      ["Expenses:Uncategorized", "-8.50"],
+      ["Assets:Unknown", "-8.50"],
       ["Expenses:Uncategorized", "8.50"],
     ]);
+    expect((await ledger.accounts("b")).map((a) => a.name)).toContain("Assets:Unknown");
     expect(ledger.attachments).toHaveLength(1);
   });
 

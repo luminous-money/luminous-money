@@ -2,7 +2,7 @@ import type { Posting } from "@fava-beans/ledger-client";
 import { useEffect, useState } from "react";
 
 import { formatMoney, isDecimal } from "../lib/decimal.js";
-import { checkBalance, UNCATEGORIZED } from "../lib/split.js";
+import { checkBalance, unresolved } from "../lib/split.js";
 import { AccountPicker, type AccountCreation } from "./AccountPicker.js";
 
 /** A posting being edited. The amount stays a raw string until it's valid; anything the form
@@ -69,7 +69,7 @@ export function useSplits(postings: Split[], currency: string) {
     currency,
     postings: edited,
     balance,
-    uncategorized: rows.some((r) => r.account === UNCATEGORIZED),
+    unresolved: rows.some((r) => unresolved(r.account)),
   };
 }
 
@@ -102,7 +102,7 @@ export function SplitsFieldset({
           <AccountPicker
             label="Account"
             accounts={accounts}
-            value={r.account === UNCATEGORIZED ? "" : r.account}
+            value={unresolved(r.account) ? "" : r.account}
             create={create}
             onChange={(account) => update(r.key, { account })}
           />

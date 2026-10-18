@@ -764,8 +764,10 @@ same money in through another's, a day or so later. Both would sit in review, un
   `ai`, and if AI is off, down, or can't read it, makes the transaction from what was typed (a
   zero total if nothing), with the receipt attached and `receipt-note:` saying why. A reading is
   checked against the books: a base account must be an asset or liability (a divided account's
-  main part, as for imports), else `Expenses:Uncategorized` / `Income:Uncategorized` by
-  direction, as the notes ask; splits are kept only if they're on accounts that exist (or that
+  main part, as for imports), else `Assets:Unknown`, a system account opened when it's first
+  needed: review asks "Paid from" before it can be confirmed, as it asks for a category (a base
+  account on an expense account would be a transaction between two categories, which the bank's
+  copy could never match); splits are kept only if they're on accounts that exist (or that
   the reader proposed and the book lets it open) and sum to the total, else one split goes to
   the reader's category. Staged unconfirmed with `source: "receipt"`, it's then found by the
   matcher when the bank's copy arrives.

@@ -171,7 +171,7 @@ function Form({
     name.trim() !== "" &&
     !ruleProblem &&
     splits.balance.state !== "invalid" &&
-    !splits.uncategorized &&
+    !splits.unresolved &&
     splits.postings.every((p) => p.account);
 
   const submit = async () => {

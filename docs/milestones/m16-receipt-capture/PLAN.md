@@ -107,8 +107,8 @@ so the PWA makes one request:
      the split falls back to the global category, else to uncategorized
    - splits that don't sum to the total are replaced by one split of the total to the global
      category
-   - **no base account:** `Expenses:Uncategorized` for money out, `Income:Uncategorized` for
-     money in (as the notes ask), for you to fix in review
+   - **no base account:** `Assets:Unknown`, a system account opened when it's first needed;
+     review asks "Paid from" (or "Into") before it can be confirmed, as it asks for a category
 4. **It always makes something:** if the AI is off, down, or can't read it, the transaction is
    made from what you typed (or a zero amount, "Receipt: couldn't read it"), with the receipt
    attached and a note saying why, so nothing is lost.
@@ -170,11 +170,11 @@ so the PWA makes one request:
 
 ## Questions
 
-1. **No base account:** the notes ask for `Expenses:Uncategorized` (money out) or
-   `Income:Uncategorized` (money in) as the base account when the AI can't tell. That makes a
-   transaction between two expense accounts until you fix it in review, and the bank's copy can't
-   match it then. Built as asked; would you rather it wait in review with the base account left
-   to choose (a placeholder like `Assets:Unknown`)?
+1. **No base account:** the notes asked for `Expenses:Uncategorized` / `Income:Uncategorized`,
+   which made a transaction between two expense accounts. **Answered (2026-10-18):** a system
+   account, `Assets:Unknown`, chosen in review ("Paid from") before it can be confirmed.
 2. **The model:** `claude-opus-5` by default (the most capable widely available). Receipts may
-   not need it; a cheaper model (Sonnet 5) could be a per-book choice. Wanted?
-3. **PDFs:** accepted (statements and e-receipts are often PDFs). Fine?
+   not need it. **Proposed by Kael (2026-10-18):** two passes that share no context: extracting
+   what the receipt says (Sonnet), then categorizing it and proposing accounts (Opus). Still
+   open.
+3. **PDFs:** accepted (statements and e-receipts are often PDFs). **Answered:** yes.

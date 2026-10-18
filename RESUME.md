@@ -20,7 +20,8 @@ What a user can do now:
   instead), the account it was paid from (the page you came from), Itemize?, and anything you
   know (total, date, payee, note). **Create transaction** has it read and lands on it in review;
   confirming or skipping it goes back to where you were. If it can't be read (AI off, down, or
-  it failed), the transaction is made from what you typed, saying why. **Attachments:** any
+  it failed), the transaction is made from what you typed, saying why. One that doesn't say what
+  paid it is on `Assets:Unknown`, and review asks "Paid from" before it can be confirmed. **Attachments:** any
   transaction's page has them (Open camera, or Upload; 5 MB each), new transactions too.
 - **Divided accounts (M15):** an asset or liability account's editor has **Divide…**: name the
   main part (where new money lands, and what's left) and the others with what they start with;
@@ -167,7 +168,7 @@ How it's put together:
     - ledger: 176 tests, including the table lint
     - auth: 20; app: 169; ai: 3; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 86 API tests and 89 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 86 API tests and 90 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
@@ -175,8 +176,8 @@ How it's put together:
 
 ## Next steps
 
-1. **M16's questions** (end of [its plan](docs/milestones/m16-receipt-capture/PLAN.md)): the
-   placeholder for an unknown base account, a cheaper model per book, PDFs.
+1. **M16's open question** (end of [its plan](docs/milestones/m16-receipt-capture/PLAN.md)):
+   reading a receipt in two passes, extracting (Sonnet) then categorizing (Opus).
 2. **M17 (transaction tagging):** see [its plan](docs/milestones/m17-transaction-tagging/PLAN.md).
 3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).

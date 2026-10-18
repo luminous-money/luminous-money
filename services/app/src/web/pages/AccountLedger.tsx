@@ -19,7 +19,7 @@ import { SelectBar } from "../components/SelectBar.js";
 import { postable } from "../lib/accounts.js";
 import { today } from "../lib/format.js";
 import { useSelection } from "../lib/selection.js";
-import { UNCATEGORIZED, withOtherSide } from "../lib/split.js";
+import { unresolved, withOtherSide } from "../lib/split.js";
 import {
   explain,
   useAccountCreation,
@@ -256,7 +256,10 @@ export function AccountLedger({ book, account }: { book: string; account: string
           create={create}
           onCategorize={categorizeChosen}
           onConfirm={confirmChosen}
-          canConfirm={!chosen.some((r) => r.counterpart === UNCATEGORIZED)}
+          canConfirm={
+            !unresolved(account) &&
+            !chosen.some((r) => !!r.counterpart && unresolved(r.counterpart))
+          }
           busy={bulk.isPending}
           note={note}
           onDone={selection.stop}

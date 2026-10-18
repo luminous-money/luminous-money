@@ -32,8 +32,11 @@ from .service import Ledger, NotFound
 
 ROOTS = {"Assets", "Liabilities", "Equity", "Income", "Expenses"}
 UNCATEGORIZED = ("Expenses:Uncategorized", "Income:Uncategorized")
+# Where a receipt's money came from until someone says (M16): `app` opens it when it's needed.
+UNKNOWN = "Assets:Unknown"
 PROTECTED = {
     *UNCATEGORIZED,
+    UNKNOWN,
     Ledger.OPENING_BALANCES,
     investments.UNREALIZED_GAINS,
     *investments.GAINS.values(),

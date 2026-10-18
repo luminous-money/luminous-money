@@ -8,9 +8,15 @@
  */
 import type { Posting, Transaction, TransactionIn } from "@fava-beans/ledger-client";
 
+import { UNKNOWN } from "../../shared/accounts.js";
 import { add, isZero, negate } from "./decimal.js";
 
 export const UNCATEGORIZED = "Expenses:Uncategorized";
+export { UNKNOWN };
+
+/** A posting's account still to choose: no category yet, or (a receipt's) no account it was
+ * paid from. A transaction on one can't be confirmed. */
+export const unresolved = (account: string) => account === UNCATEGORIZED || account === UNKNOWN;
 
 const BALANCE_SHEET = /^(Assets|Liabilities):/;
 

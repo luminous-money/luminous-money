@@ -116,7 +116,7 @@ function Editor({
   const [meta, setMeta] = useState(t.meta);
   const fallbackCurrency = useMemo(() => currencyOf(t), [t]);
   const splits = useSplits(t.postings, fallbackCurrency);
-  const { postings, balance, uncategorized } = splits;
+  const { postings, balance, unresolved } = splits;
   const busy = edit.isPending || add.isPending;
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
   const names = accounts.data ? postable(accounts.data, date) : [];
@@ -238,8 +238,8 @@ function Editor({
           <button
             type="button"
             className="primary"
-            disabled={busy || balance.state === "invalid" || uncategorized}
-            title={uncategorized ? "Choose a category first" : undefined}
+            disabled={busy || balance.state === "invalid" || unresolved}
+            title={unresolved ? "Choose an account for every split first" : undefined}
             onClick={() => void submit("*", back)}
           >
             Confirm

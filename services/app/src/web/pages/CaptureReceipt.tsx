@@ -11,7 +11,7 @@ import { Link, useLocation } from "wouter";
 
 import { AccountPicker } from "../components/AccountPicker.js";
 import { CameraView, prepared, useHasCamera } from "../components/Camera.js";
-import { partOf } from "../../shared/divided.js";
+import { baseAccounts } from "../../shared/accounts.js";
 import { displayName } from "../lib/accounts.js";
 import { isDecimal, negate } from "../lib/decimal.js";
 import { useBack, useParam, withBack } from "../lib/navigation.js";
@@ -37,21 +37,8 @@ export function CaptureReceipt({ book }: { book: string }) {
   const [payee, setPayee] = useState("");
   const [note, setNote] = useState("");
 
-  // Where money can come from: asset and liability accounts that take it (not a divided
-  // account's parts, but the account itself).
   const chart = accounts.data ?? [];
-  const bases = useMemo(
-    () =>
-      chart
-        .filter(
-          (a) =>
-            (a.type === "asset" || a.type === "liability") &&
-            !a.close &&
-            ((a.kind === "leaf" && !a.implicit && !partOf(chart, a.name)) || a.divided)
-        )
-        .map((a) => a.name),
-    [chart]
-  );
+  const bases = useMemo(() => baseAccounts(chart), [chart]);
   useEffect(() => {
     if (preset && bases.includes(preset)) setAccount(preset);
   }, [preset, bases]);

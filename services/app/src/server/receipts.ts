@@ -4,8 +4,7 @@
  * up; `app` checks the reading against the books and stages it, as it stages imports:
  *
  * - **the base account** is the reader's, else the hint's (a divided account's main part, as for
- *   imports), else, as the notes ask, the uncategorized account of the direction
- *   (`Expenses:Uncategorized` for money out, `Income:Uncategorized` for money in)
+ *   imports), else `Assets:Unknown`, to be chosen in review
  * - **splits** are kept when they're all on accounts that exist (or that the reader proposed and
  *   the book lets it open) and sum to minus the total; otherwise one split of the total goes to
  *   the reader's category, else uncategorized
@@ -16,6 +15,7 @@ import type { ChartAccount, ReceiptHints, ReceiptReading } from "@fava-beans/ai-
 import type { Account, TransactionIn } from "@fava-beans/ledger-client";
 
 import { add, isNegative, isZero, negate } from "../shared/decimal.js";
+import { UNKNOWN } from "../shared/accounts.js";
 import { landsIn } from "../shared/divided.js";
 import type { AiPort } from "./ai.js";
 import { UNCATEGORIZED } from "./imports.js";
@@ -57,10 +57,11 @@ export function receiptTransaction(
     accounts.filter((a) => a.kind === "leaf" && !a.implicit && !a.close).map((a) => a.name)
   );
   // The base account is an asset or liability that takes postings: a leaf (a part, if named),
-  // or a divided account's main part.
+  // or a divided account's main part. Never the placeholder: that's for when there's none.
   const types = new Map(accounts.map((a) => [a.name, a.type]));
   const base = (name: string | null | undefined) => {
-    if (!name || !["asset", "liability"].includes(types.get(name) ?? "")) return null;
+    if (!name || name === UNKNOWN || !["asset", "liability"].includes(types.get(name) ?? ""))
+      return null;
     if (leaves.has(name)) return name;
     const into = landsIn(accounts, name);
     return into && leaves.has(into) ? into : null;
@@ -68,7 +69,7 @@ export function receiptTransaction(
   const total = reading?.total ?? hints.total ?? "0";
   const out = isNegative(total) || isZero(total);
   const fallback = out ? UNCATEGORIZED.out : UNCATEGORIZED.in;
-  const account = base(reading?.account) ?? base(hints.account) ?? fallback;
+  const account = base(reading?.account) ?? base(hints.account) ?? UNKNOWN;
 
   const creatable = new Set(
     createAccounts
@@ -140,7 +141,9 @@ export async function captureReceipt({
   else if (!settings.ready) note = "The book's AI isn't set up, so it wasn't read";
   else {
     const chart: ChartAccount[] = accounts
-      .filter((a) => !a.close && ((a.kind === "leaf" && !a.implicit) || a.divided))
+      .filter(
+        (a) => !a.close && a.name !== UNKNOWN && ((a.kind === "leaf" && !a.implicit) || a.divided)
+      )
       .map((a) => ({ name: a.name, type: a.type, display_name: a.display_name ?? null }));
     const result = await ai.read(book, {
       file: {

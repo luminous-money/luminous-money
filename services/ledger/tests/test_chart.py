@@ -18,6 +18,7 @@ TEXT = """option "operating_currency" "USD"
 2024-01-01 open Expenses:Fun
 2024-01-01 open Equity:Opening-Balances
 2024-01-01 open Income:Salary
+2024-01-01 open Assets:Unknown
 
 2024-01-02 * "Opening balance"
   Assets:Bank:Checking   1000.00 USD
@@ -90,6 +91,7 @@ def test_renames_that_would_break_something_are_refused(book):
         ("Expenses:Food", "Assets:Food", "type"),
         ("Expenses:Food", "Expenses:Food:Sub", "under itself"),
         ("Equity:Opening-Balances", "Equity:Start", "system"),
+        ("Assets:Unknown", "Assets:Cash", "system"),
         ("Assets:Broker:Cash", "Assets:Broker:Money", "brokerage"),
         ("Expenses", "Spending", "top-level"),
         ("Expenses:Fun", "Expenses:Food:Coffee:Fun", "under a leaf"),
