@@ -84,12 +84,13 @@ export async function categorize(
 export function stagedPostings(
   account: string,
   amount: { number: string; currency: string },
-  category: Proposal | undefined,
+  category: (Proposal & { part?: string }) | undefined,
   fallback: string
 ) {
   const other = category?.postings ?? [{ account: fallback }];
   return [
-    { account, units: amount },
+    // A rule may land it in another part of the divided account it came into (M15).
+    { account: category?.part ?? account, units: amount },
     ...other.map((p) => ({
       account: p.account,
       units: other.length > 1 && p.amount ? p.amount : null,

@@ -16,7 +16,8 @@ const atMost = (a: string, b: string) => !isNegative(add(b, negate(a)));
 export function matches(rule: CategoryRule, t: IncomingTransaction): boolean {
   const c = rule.conditions;
   if (specificity(c) === 0) return false;
-  if (c.account && c.account !== t.account) return false;
+  // An account, or (a divided account) any of its parts.
+  if (c.account && c.account !== t.account && !t.account.startsWith(`${c.account}:`)) return false;
   if (c.key && c.key !== payeeKey(t.description)) return false;
   if (c.contains && !t.description.toLowerCase().includes(c.contains.toLowerCase())) return false;
   if (c.min && !atMost(c.min, t.amount.number)) return false;
@@ -53,6 +54,7 @@ export function rules(load: (book: string) => CategoryRule[]): Categorizer {
               reason: `Rule "${rule.name}"`,
               auto_confirm: rule.auto_confirm,
               rule_id: rule.id,
+              ...(rule.part ? { part: rule.part } : {}),
             },
           ];
         }),
@@ -73,7 +75,15 @@ export function ruleProblem(rule: CategoryRuleIn | null, accounts: Account[]): s
   const leaves = new Set(
     accounts.filter((a) => a.kind === "leaf" && !a.implicit && !a.close).map((a) => a.name)
   );
+  const divided = new Set(accounts.filter((a) => a.divided && !a.close).map((a) => a.name));
   if (!leaves.has(rule.account)) return `${rule.account || "The category"} isn't an open account`;
-  if (c.account && !leaves.has(c.account)) return `${c.account} isn't an open account`;
+  if (c.account && !leaves.has(c.account) && !divided.has(c.account))
+    return `${c.account} isn't an open account`;
+  if (rule.part) {
+    if (!c.account || !divided.has(c.account))
+      return "Only transactions imported into a divided account land in a part";
+    if (!leaves.has(rule.part) || !rule.part.startsWith(`${c.account}:`))
+      return `${rule.part} isn't one of ${c.account}'s parts`;
+  }
   return null;
 }

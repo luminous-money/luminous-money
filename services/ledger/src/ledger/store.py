@@ -331,7 +331,8 @@ class Store:
         it posts to (comma-separated), the subtree's amounts in it (`amounts`, as "number
         currency" pairs, with "?" for an amount only booking could say), and how many of the
         subtree's postings in it aren't reconciled (`unreconciled`) and the latest mark of those
-        that are (`reconciled`). For a leaf, the subtree is just the account."""
+        that are (`reconciled`), and each of those postings' account and amount (`parts`: "account
+        number currency", or "account ?"). For a leaf, the subtree is just the account."""
         mine = "(%s.account = :account OR %s.account LIKE :under)"
         return self._conn.execute(
             f"""
@@ -341,6 +342,8 @@ class Store:
                      WHERE o.directive_id = d.id AND NOT {mine % ("o", "o")}) AS others,
                    (SELECT GROUP_CONCAT(COALESCE(a.amount || ' ' || a.amount_currency, '?'), ';') FROM posting a
                      WHERE a.directive_id = d.id AND {mine % ("a", "a")}) AS amounts,
+                   (SELECT GROUP_CONCAT(a.account || ' ' || COALESCE(a.amount || ' ' || a.amount_currency, '?'), ';')
+                     FROM posting a WHERE a.directive_id = d.id AND {mine % ("a", "a")}) AS parts,
                    (SELECT COUNT(*) FROM posting r WHERE r.directive_id = d.id AND {mine % ("r", "r")}
                      AND r.reconciled IS NULL) AS unreconciled,
                    (SELECT MAX(r.reconciled) FROM posting r WHERE r.directive_id = d.id

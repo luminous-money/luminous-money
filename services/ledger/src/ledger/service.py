@@ -342,7 +342,7 @@ class Ledger:
     def set_account(self, book_id: str, name: str, patch: models.AccountPatch) -> models.Account:
         """Change an account's settings (only those given), against its version: how its sales
         pick lots, whether it's a revalued asset (and how often), its display name, and whether
-        it's a divided account (an implicit node is opened for that)."""
+        it's a divided account (an implicit node is opened for that) and its main part."""
         changes = patch.model_dump(exclude_unset=True, exclude={"updated_at"})
         accounts = {a.name: a for a in self.accounts(book_id)}
         opened_now = False
@@ -355,6 +355,19 @@ class Ledger:
         account = accounts.get(name)
         if account is None or account.implicit:
             raise NotFound(name)
+        # A divided account's main part (M15): one of its open leaves. Dividing picks the first
+        # if it has none; undivided, it has none.
+        parts = sorted(a.name for a in accounts.values() if a.name.startswith(name + ":") and a.kind == "leaf" and not a.close)
+        divided = changes.get("divided", account.divided)
+        if "main_part" in changes and changes["main_part"] is not None:
+            if not divided:
+                raise engine.ParseFailure([f"{name} isn't a divided account"])
+            if changes["main_part"] not in parts:
+                raise engine.ParseFailure([f"{changes['main_part']} isn't one of {name}'s parts"])
+        elif changes.get("divided") and not account.main_part and parts:
+            changes["main_part"] = parts[0]
+        if "divided" in changes and not changes["divided"]:
+            changes["main_part"] = None
         row = next(r for r in self.store.find(book_id, kind="open", limit=None) if engine.opened(r.text) == name)
         directive = engine.reopened(
             row.text,
@@ -366,6 +379,7 @@ class Ledger:
                 if "divided" in changes
                 else {}
             ),
+            **({"main_part": changes["main_part"]} if "main_part" in changes else {}),
         )
         self._put(book_id, engine.parse_one(directive.text, row.id), None if opened_now else patch.updated_at)
         return self._account(book_id, name)
@@ -579,6 +593,7 @@ class Ledger:
         """
         rows = []
         totals: dict[str, Decimal] | None = {}
+        is_node = any(a.name.startswith(account + ":") for a in self.accounts(book_id))
         for entry in self.store.account_entries(book_id, account):
             pieces = entry["amounts"].split(";")
             amount = None
@@ -613,6 +628,7 @@ class Ledger:
                         counterpart=others[0] if entry["splits"] == 2 and len(others) == 1 else None,
                         splits=entry["splits"],
                         reconciled=entry["reconciled"] if not entry["unreconciled"] else None,
+                        parts=_parts(entry["parts"]) if is_node else [],
                         updated_at=entry["updated_at"],
                     ),
                 )
@@ -811,6 +827,19 @@ class Ledger:
 
     def query(self, book_id: str, bql: str) -> tuple[list[str], list[list]]:
         return engine.query(self.load(book_id), bql)
+
+
+def _parts(text: str | None) -> list[models.CompactPosting]:
+    """A ledger row's postings under a node ("account number currency" or "account ?", ';'-joined)."""
+    out = []
+    for piece in (text or "").split(";"):
+        if not piece:
+            continue
+        account, _, rest = piece.partition(" ")
+        number, _, currency = rest.partition(" ")
+        amount = models.Amount(number=number, currency=currency) if rest != "?" else None
+        out.append(models.CompactPosting(account=account, amount=amount))
+    return out
 
 
 def _marked(t: models.TransactionIn, current: models.TransactionIn | None = None) -> models.TransactionIn:

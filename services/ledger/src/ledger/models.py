@@ -159,6 +159,9 @@ class Account(Api):
         description="A divided account: a node that's one real account (at a bank, say), its sub-accounts dividing "
         "what's in it. It's reconciled and linked as one; they can't be themselves.",
     )
+    main_part: str | None = Field(
+        None, description="A divided account's part that what comes in from the bank or a file lands in (M15)."
+    )
     updated_at: str | None = Field(None, description="Its `open` directive's version; send it back to change settings.")
 
 
@@ -337,6 +340,9 @@ class AccountPatch(Strict):
         description="An asset or liability node: make it a divided account, one real account its sub-accounts "
         "divide (they can't be reconciled, linked or divided themselves).",
     )
+    main_part: str | None = Field(
+        None, description="A divided account's main part: one of its parts, where what comes in lands."
+    )
 
 
 class OpeningHolding(Strict):
@@ -400,6 +406,10 @@ class LedgerRow(Api):
     splits: int
     reconciled: datetime.date | None = Field(
         None, description="Once all its postings in the account are reconciled: the (latest) statement's date."
+    )
+    parts: list[CompactPosting] = Field(
+        default_factory=list,
+        description="A node's ledger (a divided account's, say): each of its postings to an account under it (M15).",
     )
     updated_at: str
 
@@ -588,6 +598,21 @@ class DayBalances(Api):
     currency: str
     before: DecimalStr = Field(description="At the end of the day before `from`.")
     days: list[DayBalance]
+
+
+class DividePart(Strict):
+    name: str = Field(description="The part's name (one segment: \"Padding\"), under the account.")
+    amount: DecimalStr = Field(description="What it starts with, moved from the main part, as stored.")
+
+
+class DivideIn(Strict):
+    """Divide an account (M15): it becomes a divided account of the same name, everything that was
+    its own going to its main part, and the other parts given their amounts by one transfer."""
+
+    main: str = Field("General", description="The main part's name (one segment), where its history goes.")
+    parts: list[DividePart] = Field(default_factory=list)
+    date: datetime.date = Field(description="When the other parts get their amounts.")
+    updated_at: Version
 
 
 class AccountIn(Strict):

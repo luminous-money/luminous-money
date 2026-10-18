@@ -3,6 +3,7 @@ import { Link } from "wouter";
 
 import { AccountValueNote, headline } from "../components/AccountValue.js";
 import { JournalList } from "../components/JournalList.js";
+import { PartsLine } from "../components/Parts.js";
 import { SpendingThisMonth } from "../components/SpendingThisMonth.js";
 import { displayName } from "../lib/accounts.js";
 import { bookHome } from "../lib/books.js";
@@ -66,6 +67,7 @@ export function Home({ book }: { book: Book }) {
                   <span className="balance">{headline(account)}</span>
                 </div>
                 <AccountValueNote account={account} />
+                {account.divided && <PartsLine book={book.id} whole={account.name} />}
                 {bank.data?.[account.name] && (
                   <ReportedLine status={bank.data[account.name]!} type={account.type} />
                 )}

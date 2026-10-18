@@ -758,6 +758,7 @@ function remember(book: string, saved: Transaction) {
   );
   void queryClient.invalidateQueries({ queryKey: ["book", book, "summary"] });
   void queryClient.invalidateQueries({ queryKey: ["book", book, "ledger"] });
+  void queryClient.invalidateQueries({ queryKey: ["book", book, "tree"] });
 }
 
 export function useEditTransaction(book: string, id: string) {
@@ -1029,6 +1030,10 @@ export function usePatchSettings(book: string) {
   });
 }
 
+export const useDivide = (book: string, account: string) =>
+  useChartChange(book, (d: Parameters<typeof accountChanges.divide>[2]) =>
+    accountChanges.divide(book, account, d)
+  );
 export const useSetDivided = (book: string, account: string) =>
   useChartChange(book, ({ divided, updated_at }: { divided: boolean; updated_at: string | null }) =>
     accountChanges.divided(book, account, divided, updated_at)

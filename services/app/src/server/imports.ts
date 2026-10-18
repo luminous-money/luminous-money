@@ -1,6 +1,8 @@
 /**
- * Importing rows into an account (any open leaf): from a CSV file (`importFile`), or from a bank
- * feed (`importRows` directly, simplefin/).
+ * Importing rows into an account (any open leaf, or a divided account: its rows land in its main
+ * part, M15): from a CSV file (`importFile`), or from a bank feed (`importRows` directly,
+ * simplefin/). A divided account is the account for everything else: its batches, duplicates,
+ * and the matcher's candidates, from all its parts.
  *
  * 1. A file is read with the first of the account's CSV profiles whose layout it fits.
  * 2. Each readable row gets a fingerprint. A row whose fingerprint an earlier import already
@@ -31,6 +33,7 @@ import type {
   ProposalSummary,
 } from "../shared/imports.js";
 import { add, isZero, negate } from "../shared/decimal.js";
+import { partOf } from "../shared/divided.js";
 import { categorize, stagedPostings } from "./categorize/chain.js";
 import { buildRequest } from "./categorize/context.js";
 import type { Categorizer, Chosen, Decision } from "./categorize/types.js";
@@ -253,20 +256,32 @@ type ImportInput = {
   categorizers?: Categorizer[];
 };
 
-/** The account rows are imported into, if it can take them: an open leaf. */
+/** The account rows are imported into, if it can take them: an open leaf, or a divided account
+ * (M15), whose rows land in its main part (`into`; its opening balance says where they start). */
 async function importTarget(ledger: LedgerPort, book: string, account: string) {
   const bookInfo = await ledger.book(book);
   if (!bookInfo) throw new ImportProblem("no-such-book", `there's no book ${book}`);
-  const [accounts, [target]] = await Promise.all([
-    ledger.accounts(book),
-    ledger.summary(book, [account]),
-  ]);
+  const accounts = await ledger.accounts(book);
+  const whole = accounts.find((a) => a.name === account);
+  if (whole?.divided && !whole.main_part)
+    throw new ImportProblem(
+      "not-importable",
+      `${account} is a divided account with no main part yet: choose where new money lands`
+    );
+  const part = partOf(accounts, account);
+  if (part)
+    throw new ImportProblem(
+      "not-importable",
+      `${account} is part of ${part}, a divided account: import into ${part}`
+    );
+  const into = whole?.divided ? whole.main_part! : account;
+  const [target] = await ledger.summary(book, [into]);
   if (!target || target.kind !== "leaf" || target.implicit || target.close)
     throw new ImportProblem(
       "not-importable",
       `${account} isn't an open account that holds transactions`
     );
-  return { bookInfo, accounts, target };
+  return { bookInfo, accounts, target, into };
 }
 
 /** Import a CSV file into an account, with the first of its profiles the file fits. */
@@ -312,7 +327,7 @@ export async function importRows({
   windowDays = DEFAULT_WINDOW_DAYS,
   categorizers = [],
 }: ImportInput & { source: ImportSource; label: string; rows: Row[] }): Promise<ImportResult> {
-  const { bookInfo, accounts, target } = await importTarget(ledger, book, account);
+  const { bookInfo, accounts, target, into } = await importTarget(ledger, book, account);
   const currency = target.currencies?.[0] ?? "USD";
   const prints = fingerprints(rows);
   const before = db.importedBefore(
@@ -353,7 +368,11 @@ export async function importRows({
     // Scheduled transactions may match within their split's tolerance.
     const schedules = db.schedulesOf(context.existing.map((t) => t.id));
     for (const t of context.existing) {
-      const split = schedules.get(t.id)?.template.postings.find((p) => p.account === account);
+      const split = schedules
+        .get(t.id)
+        ?.template.postings.find(
+          (p) => p.account === account || p.account.startsWith(`${account}:`)
+        );
       if (split?.tolerance) t.tolerance = split.tolerance;
     }
     for (const [line, found] of await runChain([matcher(windowDays)], incoming, context)) {
@@ -379,7 +398,7 @@ export async function importRows({
       ledger,
       categorizers,
       book: { id: book, name: bookInfo.name },
-      account,
+      account: into,
       currency,
       batchId,
       accounts,

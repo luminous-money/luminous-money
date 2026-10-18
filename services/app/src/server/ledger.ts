@@ -33,6 +33,7 @@ export type ReconcileIn = components["schemas"]["ReconcileIn"];
 export type Reconciled = components["schemas"]["Reconciled"];
 export type Reconciliations = components["schemas"]["Reconciliations"];
 export type DayBalances = components["schemas"]["DayBalances"];
+export type DivideIn = components["schemas"]["DivideIn"];
 
 export class LedgerError extends Error {
   constructor(
@@ -114,6 +115,8 @@ export interface LedgerPort {
   budgetStatus(book: string, on: string, basis: "period" | "month"): Promise<BudgetStatus>;
   /** Fetch the latest prices of commodities still held that name a source. */
   fetchPrices(book: string): Promise<FetchResult>;
+  /** Divide an account (M15): a divided account of the same name, its history in its main part. */
+  divide(book: string, account: string, d: DivideIn): Promise<Account>;
   /** Change an account's settings (only those given), against its version. */
   setAccount(book: string, account: string, patch: AccountPatch): Promise<Account>;
   /** What reconciling an account needs, with transactions to 14 days past `through` (M14). */
@@ -329,6 +332,13 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
         client.POST("/api/ledger/v1/books/{book_id}/transactions/changes", {
           params: { path: { book_id: book } },
           body: { ...changes, update: changes.update ?? [] },
+        })
+      ),
+    divide: (book, account, d) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/accounts/{account}/divide", {
+          params: { path: { book_id: book, account } },
+          body: d,
         })
       ),
     setAccount: (book, account, patch) =>

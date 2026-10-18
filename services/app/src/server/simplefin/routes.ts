@@ -26,6 +26,7 @@ import {
   syncConnection,
   type SimplefinDeps,
 } from "./sync.js";
+import { isInternal, within } from "../../shared/divided.js";
 import { bankComparison } from "../reconcile.js";
 import { pairTransfers } from "../transfers.js";
 
@@ -277,8 +278,12 @@ export function simplefinRoutes(
     const unconfirmed = links.length ? await ledgerFor(user).unconfirmed(book) : [];
     const notAtBank = (account: string, kind: LinkKind, from: string) => {
       const cash = cashAccountOf({ account, kind });
+      // A divided account's parts too (M15), but not moves between them.
       const mine = unconfirmed.filter(
-        (t) => t.date >= from && t.postings.some((p) => p.account === cash)
+        (t) =>
+          t.date >= from &&
+          t.postings.some((p) => within(p.account, cash)) &&
+          !isInternal(t.postings, cash)
       );
       const held = deps.db.claimed(
         book,

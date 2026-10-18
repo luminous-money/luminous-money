@@ -10,6 +10,9 @@ export type InternalProposal = Proposal & {
   auto_confirm?: boolean;
   /** The rule that made it, for counting how often rules apply. */
   rule_id?: string;
+  /** Where the transaction's own side lands, a part of the divided account it came into (M15):
+   * a user's own rule. */
+  part?: string;
 };
 
 export interface Categorizer {

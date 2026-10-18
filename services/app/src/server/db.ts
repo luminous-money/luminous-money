@@ -318,6 +318,9 @@ export const MIGRATIONS: Migration[] = [
     "ALTER TABLE import_batch ADD COLUMN end_date TEXT",
     "ALTER TABLE import_batch ADD COLUMN end_balance TEXT",
   ],
+  // 17: divided accounts (M15). A rule may say which part of a divided account its transactions'
+  // own side lands in.
+  ["ALTER TABLE category_rule ADD COLUMN part TEXT"],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -1144,14 +1147,45 @@ export class AppDb {
         }
       }
     }
-    // JSON columns: every `account` field in them.
-    const remap = (json: string | null) =>
-      json === null ? null : JSON.stringify(mapAccountFields(JSON.parse(json), to));
-    for (const [table, key, columns] of [
+    this.remapAccountFields(book, to, [
       ["schedule", "id", ["template"]],
       ["category_rule", "id", ["conditions"]],
       ["proposal", "transaction_id", ["postings", "proposal"]],
-    ] as const) {
+    ]);
+  }
+
+  /**
+   * Follow an account divided in the ledger (M15): it's a divided account now, of the same name,
+   * its own postings in its main part. What's about the whole stays as it is (stars, CSV
+   * profiles, import batches, bank links, rules' conditions, a reconciliation in progress);
+   * what posts to it moves to the main part, since a node takes no postings: schedules'
+   * templates, rules' categories, open proposals. One transaction.
+   */
+  divideAccount(book: string, whole: string, main: string): void {
+    const to = (name: string) => (name === whole ? main : name);
+    transaction(this.db, () => {
+      this.db
+        .prepare(
+          "UPDATE category_rule SET account = ?, updated_at = ? WHERE book_id = ? AND account = ?"
+        )
+        .run(main, now(), book, whole);
+      this.remapAccountFields(book, to, [
+        ["schedule", "id", ["template"]],
+        ["proposal", "transaction_id", ["postings", "proposal"]],
+      ]);
+    });
+  }
+
+  /** Every `account` field in these tables' JSON columns, through `to`. */
+  private remapAccountFields(
+    book: string,
+    to: (name: string) => string,
+    tables: (readonly [string, string, readonly string[]])[]
+  ): void {
+    const stamp = now();
+    const remap = (json: string | null) =>
+      json === null ? null : JSON.stringify(mapAccountFields(JSON.parse(json), to));
+    for (const [table, key, columns] of tables) {
       const rows = this.db
         .prepare(`SELECT ${key} AS key, ${columns.join(", ")} FROM ${table} WHERE book_id = ?`)
         .all(book) as Record<string, string | null>[];
@@ -1407,8 +1441,8 @@ export class AppDb {
     const stamp = now();
     this.db
       .prepare(
-        `INSERT INTO category_rule (id, book_id, name, conditions, account, payee, auto_confirm, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO category_rule (id, book_id, name, conditions, account, payee, part, auto_confirm, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -1417,6 +1451,7 @@ export class AppDb {
         JSON.stringify(rule.conditions),
         rule.account,
         rule.payee,
+        rule.part ?? null,
         rule.auto_confirm ? 1 : 0,
         stamp,
         stamp
@@ -1433,14 +1468,15 @@ export class AppDb {
         throw new StaleVersion("the rule changed since it was read");
       this.db
         .prepare(
-          `UPDATE category_rule SET name = ?, conditions = ?, account = ?, payee = ?, auto_confirm = ?,
-             updated_at = ? WHERE id = ?`
+          `UPDATE category_rule SET name = ?, conditions = ?, account = ?, payee = ?, part = ?,
+             auto_confirm = ?, updated_at = ? WHERE id = ?`
         )
         .run(
           rule.name,
           JSON.stringify(rule.conditions),
           rule.account,
           rule.payee,
+          rule.part ?? null,
           rule.auto_confirm ? 1 : 0,
           after(current.updated_at),
           id

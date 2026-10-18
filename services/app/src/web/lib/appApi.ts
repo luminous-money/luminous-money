@@ -214,6 +214,14 @@ export const accountChanges = {
     json(await apiFetch(`${accountPath(book, account)}/archive`, post(archive))),
   unarchive: async (book: string, account: string): Promise<string[]> =>
     json(await apiFetch(`${accountPath(book, account)}/unarchive`, post({}))),
+  /** Divide it (M15): a divided account of the same name, its history in its main part, the
+   * other parts given their amounts on `date`. */
+  divide: async (
+    book: string,
+    account: string,
+    d: { main: string; parts: { name: string; amount: string }[]; date: string; updated_at: string }
+  ): Promise<{ name: string; main_part: string | null }> =>
+    json(await apiFetch(`${accountPath(book, account)}/divide`, post(d))),
   /** Make it a divided account (one real account its sub-accounts divide), or not. */
   divided: async (
     book: string,

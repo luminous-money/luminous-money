@@ -14,6 +14,10 @@ and deleting accounts.
   its last transaction, optionally after a closing transfer of what's left in it.
 - **Protected:** the top-level accounts, the system accounts the code relies on, and a
   brokerage's parts (its `:Cash` and holdings, which follow the brokerage).
+- **Dividing** (M15) turns a leaf into a divided account of the same name: everything that was
+  its own moves to its main part, its statements stay with the whole, and the other parts get
+  their amounts by one transfer. A divided account's main part can't be deleted or archived
+  on its own (choose another first): what comes in has to land somewhere.
 """
 
 from __future__ import annotations
@@ -123,11 +127,20 @@ def _account(ledger: Ledger, book_id: str, name: str) -> models.Account:
     return found
 
 
+def _main_part_of(accounts: list[models.Account], name: str) -> str | None:
+    """The divided account above `name` whose main part it is, if any."""
+    return next((a.name for a in accounts if a.main_part == name and a.name != name), None)
+
+
 def _check_changeable(ledger: Ledger, book_id: str, name: str, what: str) -> list[str]:
     """Refuse changing a fixed account; returns the names in its subtree."""
-    names = {a.name for a in ledger.accounts(book_id)}
+    accounts = ledger.accounts(book_id)
+    names = {a.name for a in accounts}
     if name in ROOTS:
         raise AccountRefused(f"top-level accounts can't be {what}")
+    whole = _main_part_of(accounts, name)
+    if whole and what != "renamed":
+        raise AccountRefused(f"it's where new money lands in {whole}: choose another part for that first")
     subtree = sorted(n for n in names if _under(n, name))
     fixed = [n for n in subtree if n in PROTECTED]
     if fixed:
@@ -226,6 +239,9 @@ def archive(
     account = _account(ledger, book_id, name)
     if name in ROOTS:
         raise AccountRefused("top-level accounts can't be archived")
+    whole = _main_part_of(ledger.accounts(book_id), name)
+    if whole:
+        raise AccountRefused(f"it's where new money lands in {whole}: choose another part for that first")
     date = date or datetime.date.today()
     last = ledger.store.last_posting(book_id, name)
     if last and date.isoformat() < last:
@@ -280,3 +296,75 @@ def unarchive(ledger: Ledger, book_id: str, name: str) -> list[str]:
 
 def _closed_name(text: str) -> str:
     return text.split()[2]
+
+
+def divide(ledger: Ledger, book_id: str, name: str, d: models.DivideIn) -> models.Account:
+    """Divide an asset or liability leaf (M15), in one write: it becomes a divided account of the
+    same name, its transactions (their marks too), opening balance and settings going to its
+    main part; its statements and budgets stay with the whole, the real account; each other part
+    opens and gets its amount by one transfer from the main part, on `d.date`."""
+    accounts = {a.name: a for a in ledger.accounts(book_id)}
+    account = _account(ledger, book_id, name)
+    _check_changeable(ledger, book_id, name, "divided")
+    if account.kind != "leaf" or account.implicit or account.close:
+        raise AccountRefused(f"{name} isn't an open account that holds transactions")
+    if account.type not in Ledger.RECONCILED_TYPES:
+        raise AccountRefused("only an asset or liability account is divided")
+    if account.revalue_every:
+        raise AccountRefused("a revalued asset (a house, a car) isn't divided")
+    parts = [name, *_parents(name)]
+    if any(accounts.get(p) and accounts[p].divided for p in parts[1:]):
+        raise AccountRefused(f"{name} is part of a divided account already")
+    if name in _brokerage_parts(set(accounts)):
+        raise AccountRefused(f"{name} is part of its brokerage")
+    segments = [d.main, *(p.name for p in d.parts)]
+    if len(set(segments)) != len(segments):
+        raise AccountRefused("each part needs a name of its own")
+    for segment in segments:
+        engine.parse_one(f"2000-01-01 open {name}:{segment}\n")  # a valid name, or ParseFailure
+    main = f"{name}:{d.main}"
+    currency = account.currencies[0] if account.currencies else investments.operating_currency(ledger._header(book_id))
+
+    with ledger.store.transaction():
+        _versioned(ledger, book_id, name, d.updated_at)
+        writes: list[engine.Directive] = []
+        for row in ledger.store.mentioning(book_id, name):
+            if row.kind == "transaction":
+                moved = engine.moved_postings(row.text, row.id, name, main)
+                if moved.text != row.text:
+                    writes.append(moved)
+            elif row.kind == "open" and engine.opened(row.text) == name:
+                writes.extend(engine.divided_opens(row.text, main))
+            elif row.kind == "pad" and f" {name} " in f" {row.text.split(chr(10), 1)[0]} ":
+                raise AccountRefused("it has pad directives: an account that pads isn't divided")
+        for part in d.parts:
+            writes.append(
+                engine.open_directive(f"{name}:{part.name}", account.open, "leaf", currencies=account.currencies or None)
+            )
+        moving = [p for p in d.parts if Decimal(p.amount) != 0]
+        if moving:
+            label = account.display_name or name.rsplit(":", 1)[-1].replace("-", " ")
+            writes.append(
+                engine.transaction_directive(
+                    models.TransactionIn(
+                        date=d.date,
+                        flag="*",
+                        narration=f"Divided {label}",
+                        postings=[
+                            models.Posting(
+                                account=main,
+                                units=models.Amount(
+                                    number=engine.decimal_text(-sum((Decimal(p.amount) for p in moving), Decimal(0))),
+                                    currency=currency,
+                                ),
+                            ),
+                            *(
+                                models.Posting(account=f"{name}:{p.name}", units=models.Amount(number=p.amount, currency=currency))
+                                for p in moving
+                            ),
+                        ],
+                    )
+                )
+            )
+        ledger._write(book_id, writes)
+    return _account(ledger, book_id, name)

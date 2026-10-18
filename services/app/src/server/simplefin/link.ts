@@ -19,6 +19,10 @@
  * - **start-over:** delete every transaction posting to the account, then as **new**.
  * - **from-date:** just sync from a date, reconciling nothing.
  *
+ * A divided account (M15) is linked as the whole: its parts' transactions are the account's,
+ * the opening balance is its main part's (where the bank's transactions land), and moves
+ * between its parts are left alone (the bank knows nothing of them).
+ *
  * The reconcile (or start-over) is one atomic ledger write; the import after it is an ordinary
  * batch, which the next sync would bring in anyway if it failed.
  * `plan` works it all out first: its `preview` is what the user confirms, `apply` does it.
@@ -28,7 +32,7 @@ import { randomUUID } from "node:crypto";
 import type { LedgerRow, TransactionIn } from "@fava-beans/ledger-client";
 
 import { add, isZero, negate } from "../../shared/decimal.js";
-import { partOf } from "../../shared/divided.js";
+import { isInternal, landsIn, partOf, within } from "../../shared/divided.js";
 import type { ImportRow } from "../../shared/imports.js";
 import { now } from "@fava-beans/db";
 import type { LedgerPort, TransactionEdit } from "../ledger.js";
@@ -176,10 +180,15 @@ export async function plan(
   const kind = kindOf(snapshot);
   const cash = cashAccountOf({ account, kind });
   const accounts = await ledger.accounts(book);
-  const existing = accounts.find((a) => a.name === cash && !a.implicit);
+  // A divided account (M15) is linked as the whole; what the bank brings lands in its main part.
+  const whole = accounts.find((a) => a.name === cash && !a.implicit);
+  const landing = landsIn(accounts, cash) ?? cash;
+  const existing = accounts.find((a) => a.name === landing && !a.implicit);
   if (mode === "new" && accounts.some((a) => a.name === account || a.name === cash))
     throw new LinkProblem(409, `${account} already exists: reconcile with it, or start it over`);
   if (mode !== "new") {
+    if (whole?.divided && !whole.main_part)
+      throw new LinkProblem(422, `${cash} has no main part yet: choose where new money lands`);
     if (!existing || existing.kind !== "leaf" || existing.close)
       throw new LinkProblem(422, `${cash} isn't an open account that holds transactions`);
     if (existing.currencies?.length && !existing.currencies.includes(snapshot.currency))
@@ -249,7 +258,7 @@ export async function plan(
     links: [],
     meta: { source: "simplefin" },
     postings: [
-      { account: cash, units: { number: amount, currency } },
+      { account: landing, units: { number: amount, currency } },
       { account: OPENING_BALANCES, units: null },
     ],
   });
@@ -297,7 +306,8 @@ export async function plan(
     };
   }
 
-  const mine = await allRows(ledger, book, cash);
+  // Moves between a divided account's parts are yours alone: the bank knows nothing of them.
+  const mine = (await allRows(ledger, book, cash)).filter((r) => !isInternal(r.parts ?? [], cash));
   const opening = mine.filter(isOpening).sort((a, b) => a.date.localeCompare(b.date))[0];
 
   if (mode === "start-over") {
@@ -358,7 +368,7 @@ export async function plan(
     }));
   const schedules = db.schedulesOf(candidates.map((t) => t.id));
   for (const t of candidates) {
-    const split = schedules.get(t.id)?.template.postings.find((p) => p.account === cash);
+    const split = schedules.get(t.id)?.template.postings.find((p) => within(p.account, cash));
     if (split?.tolerance) t.tolerance = split.tolerance;
   }
   const resolutions = new Map<number, ImportRow["candidates"]>();
@@ -399,7 +409,7 @@ export async function plan(
             updated_at: r.updated_at,
             flag: "*",
             postings: t.postings.map((p) =>
-              p.account === cash && p.units
+              within(p.account, cash) && p.units
                 ? { ...p, units: { ...p.units, number: bankAmount } }
                 : p
             ),
@@ -417,7 +427,7 @@ export async function plan(
           updated_at: opening.updated_at,
           ...(opening.date < S ? {} : { date: opensOn }),
           postings: t.postings.map((p) =>
-            p.account === cash ? { ...p, units: { number: target, currency } } : p
+            within(p.account, cash) ? { ...p, units: { number: target, currency } } : p
           ),
         });
       } else {

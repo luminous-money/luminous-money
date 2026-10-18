@@ -37,7 +37,7 @@ import type { Categorizer } from "./categorize/types.js";
 import { ruleProblem } from "./categorize/rules.js";
 import { applyRule, coveredBy, settle, suggestUnconfirmed } from "./categorize/service.js";
 import type { CategoryRuleIn, CategoryRulePatch } from "../shared/rules.js";
-import { LedgerError, type Book, type LedgerPort, type Member } from "./ledger.js";
+import { LedgerError, type Book, type DivideIn, type LedgerPort, type Member } from "./ledger.js";
 import { simplefinRoutes } from "./simplefin/routes.js";
 import type { SimplefinDeps } from "./simplefin/sync.js";
 
@@ -396,6 +396,7 @@ export function createApi({
       ...input!,
       name: input!.name.trim(),
       payee: input!.payee || null,
+      part: input!.part || null,
     });
     const rule = db.rule(book, id)!;
     const covers = (await coveredBy({ db, ledger, book: info }, rule)).length;
@@ -430,6 +431,7 @@ export function createApi({
         conditions: merged.conditions,
         account: merged.account,
         payee: merged.payee || null,
+        part: merged.part || null,
         auto_confirm: merged.auto_confirm,
       });
     } catch (error) {
@@ -636,6 +638,18 @@ export function createApi({
       );
       db.mergeAccounts(book, deleted, substitute ?? null);
       return c.json(deleted);
+    })
+  );
+
+  /** Divide an asset or liability account (M15): `{main, parts: [{name, amount}], date,
+   * updated_at}`. It becomes a divided account of the same name, its history in its main part;
+   * what `app` keeps that posts to it follows to the main part. */
+  api.post("/books/:book/accounts/:account/divide", (c) =>
+    accountChange(c, async (ledger, book, account) => {
+      const body = (await c.req.json().catch(() => ({}))) as DivideIn;
+      const divided = await ledger.divide(book, account, body);
+      db.divideAccount(book, account, divided.main_part!);
+      return c.json(divided);
     })
   );
 

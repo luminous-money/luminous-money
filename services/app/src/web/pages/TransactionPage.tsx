@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
+import { PartChoice } from "../components/PartChoice.js";
 import { SplitsFieldset, useSplits } from "../components/Splits.js";
 import { displayName, postable } from "../lib/accounts.js";
 import { formatDay, today } from "../lib/format.js";
@@ -189,6 +190,7 @@ function Editor({
         <input value={narration} onChange={(e) => setNarration(e.target.value)} />
       </label>
 
+      <PartChoice book={book} postings={splits.rows} onChange={(rows) => splits.setRows(rows)} />
       <SplitsFieldset splits={splits} accounts={names} create={create} />
       <ExcludeFromBudget meta={meta} onChange={setMeta} />
 

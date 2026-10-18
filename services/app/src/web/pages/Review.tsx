@@ -6,6 +6,7 @@ import { AccountName, AccountPicker, type AccountCreation } from "../components/
 import { SelectBar } from "../components/SelectBar.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
+import { PartChoice } from "../components/PartChoice.js";
 import { Swipeable, type SwipeHandle } from "../components/Swipeable.js";
 import { postable, preferredRoots, shortName } from "../lib/accounts.js";
 import { add, formatMoney, isNegative, isZero, negate } from "../lib/decimal.js";
@@ -378,6 +379,13 @@ function QueueItem({
           )}
 
           <PairedTransfer book={book} transaction={t} />
+
+          <PartChoice
+            book={book}
+            postings={t.postings}
+            disabled={busy}
+            onChange={(postings) => void save({ postings })}
+          />
 
           <ExcludeFromBudget
             meta={meta}

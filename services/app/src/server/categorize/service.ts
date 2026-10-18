@@ -120,7 +120,11 @@ export async function coveredBy(services: Services, rule: CategoryRule) {
   return (await ledger.unconfirmed(book.id)).flatMap((t) => {
     const incoming = openToCategorizing(t, db.proposal(book.id, t.id));
     if (!incoming || !matches(rule, incoming)) return [];
-    if (t.postings[1]!.account === rule.account && (!rule.payee || t.payee === rule.payee))
+    if (
+      t.postings[1]!.account === rule.account &&
+      (!rule.payee || t.payee === rule.payee) &&
+      (!rule.part || t.postings[0]!.account === rule.part)
+    )
       return [];
     return [{ t, incoming }];
   });
@@ -139,6 +143,7 @@ export async function applyRule(services: Services, rule: CategoryRule): Promise
       auto_confirm: rule.auto_confirm,
       rule_id: rule.id,
       categorizer: "rules",
+      ...(rule.part ? { part: rule.part } : {}),
     };
     await apply(services, t, incoming, proposal, rule.payee ? proposal : undefined, "rule");
   }

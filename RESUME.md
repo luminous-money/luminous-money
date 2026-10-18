@@ -6,14 +6,23 @@ _Updated 2026-10-17._ Keep this current: every finalized change set updates it (
 
 ## State
 
-**M1 through M14 are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M15 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
-accounts), M11 (budgets), M12 (reports), M13 (sharing books) and M14 (reconciliation) are
-described in their plans. The milestones ahead (M15–M20, then Polish) are in
+accounts), M11 (budgets), M12 (reports), M13 (sharing books), M14 (reconciliation) and M15 (divided
+accounts) are described in their plans. The milestones ahead (M16–M20, then Polish) are in
 [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
+- **Divided accounts (M15):** an asset or liability account's editor has **Divide…**: name the
+  main part (where new money lands, and what's left) and the others with what they start with;
+  the account keeps its name, bank link, statements and history (now its main part's). Its page
+  shows the **Parts** (balances, shares, any below zero, **Move money**), its ledger says which
+  part each transaction touched ("General → Padding" for a move), and its home card shows the
+  parts as a stacked line. Bank feeds and files land in the main part (a rule's **Lands in** can
+  send what it matches to another), matching looks across all the parts, and the whole still
+  reconciles with the bank. "Paid from: General ▾" in review and on a transaction's page moves
+  it to another part.
 - **Reconciliation (M14):** an asset or liability account's page has **Reconcile**: the
   statement's date and ending balance (prefilled from the bank, or the last imported file's
   balance column), its unreconciled transactions to tick (imported ones and the opening balance
@@ -142,19 +151,17 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 171 tests, including the table lint
-    - auth: 20; app: 160; db: 10; csv-import: 22
+    - ledger: 174 tests, including the table lint
+    - auth: 20; app: 164; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 81 API tests and 87 browser tests (with Mailpit and a fake SimpleFIN server)
+  - `pnpm e2e`: 83 API tests and 88 browser tests (with Mailpit and a fake SimpleFIN server)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps
 
-1. **M15 (sub-accounts of linked accounts):** [planned and answered](docs/milestones/m15-sub-accounts-of-linked-accounts/PLAN.md):
-   say `build M15`. (M18, suggested recurring transactions, moved after tagging: M16 is now receipt
-   capture, M17 tagging.)
+1. **M16 (receipt capture):** see [its plan](docs/milestones/m16-receipt-capture/PLAN.md).
 2. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
 

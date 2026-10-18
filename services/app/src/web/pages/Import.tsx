@@ -2,6 +2,7 @@ import { guessProfile, type CsvProfile } from "@fava-beans/csv-import";
 import { useState, type DragEvent } from "react";
 import { Link } from "wouter";
 
+import { partOf } from "../../shared/divided.js";
 import { ImportResults } from "../components/ImportResults.js";
 import { ProfileEditor } from "../components/ProfileEditor.js";
 import { displayName } from "../lib/accounts.js";
@@ -37,7 +38,14 @@ type Stage =
 export function Import({ book }: { book: string }) {
   const all = useAccounts(book);
   const stars = useStars(book);
-  const open = (all.data ?? []).filter((a) => a.kind === "leaf" && !a.implicit && !a.close);
+  // Open leaves, and divided accounts (M15: their rows land in the main part), not their parts.
+  const accounts = all.data ?? [];
+  const open = accounts.filter(
+    (a) =>
+      !a.close &&
+      ((a.kind === "leaf" && !a.implicit && !partOf(accounts, a.name)) ||
+        (a.divided && !!a.main_part))
+  );
   const starred = (stars.data ?? []).flatMap((name) => open.filter((a) => a.name === name));
   const others = open.filter((a) => !stars.data?.includes(a.name));
   const back = useBack("/");
@@ -52,7 +60,9 @@ export function Import({ book }: { book: string }) {
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const target = open.find((a) => a.name === chosen);
-  const currency = target?.currencies?.[0] ?? "USD";
+  const currency =
+    (target?.divided ? accounts.find((a) => a.name === target.main_part) : target)
+      ?.currencies?.[0] ?? "USD";
 
   const start = async (file: File) => {
     setError(null);

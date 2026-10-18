@@ -119,14 +119,15 @@ milestone starts.
       [Built](milestones/m14-reconciliation/PLAN.md) 2026-10-17: Reconcile (save for later,
       Finish once it balances, Undo), ✓ in ledgers and their filter (with Select all), divided
       accounts, bank-fed accounts reconciled automatically, imported files' balances checked.
-- [ ] **M15: Sub-accounts of linked accounts.** Split a bank-linked account's money into
+- [x] **M15: Sub-accounts of linked accounts.** Split a bank-linked account's money into
       sub-accounts, e.g. the $10,000 in a PNC checking account as $5,000 of padding and $5,000
       for general use, while the bank feed keeps it in step with the bank. Builds on M14's
       **divided accounts** (a node that's one real account, its sub-accounts dividing it):
       linking one to a bank, and where the feed's transactions land among its parts.
-      [Planned](milestones/m15-sub-accounts-of-linked-accounts/PLAN.md) 2026-10-17: a main part
-      new money lands in, Divide (and Undivide) for an account you already have, the parts on
-      screen with Move money, and choosing a transaction's part.
+      [Built](milestones/m15-sub-accounts-of-linked-accounts/PLAN.md) 2026-10-18: a main part
+      new money lands in, Divide for an account you already have (its link, statements and
+      history kept), the parts on screen with Move money, choosing a transaction's part, and
+      rules that land what they match in a part.
 - [ ] **M16: Receipt capture.** Take a picture of a receipt, and AI makes a transaction from it.
 - [ ] **M17: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
       tag.

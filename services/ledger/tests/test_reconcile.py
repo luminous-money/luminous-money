@@ -281,3 +281,4 @@ def test_automatic_reconciliations_roll_forward_within_a_month(ledger, book):
         (D(2026, 1, 25), True, 2),
     ]
     assert ledger.problems(book) == []
+

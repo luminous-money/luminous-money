@@ -6,8 +6,8 @@ import { AccountSettings } from "../components/AccountSettings.js";
 import { BudgetForm, BudgetGlance } from "../components/Budget.js";
 import { NewAccountField } from "../components/NewAccountField.js";
 import { partOf } from "../../shared/divided.js";
-import { displayName, shown, TYPE_LABELS } from "../lib/accounts.js";
-import { formatMoney } from "../lib/decimal.js";
+import { displayName, shown, toSegment, TYPE_LABELS } from "../lib/accounts.js";
+import { formatMoney, isDecimal } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
 import type { TreeAccount } from "../lib/ledger.js";
 import {
@@ -19,6 +19,7 @@ import {
   useRemoveAccount,
   useRenameAccount,
   useSetAccount,
+  useDivide,
   useSetDivided,
   useSummary,
   useUnarchiveAccount,
@@ -88,7 +89,9 @@ export function AccountEditor({ book, account }: { book: string; account: string
       {!isRoot &&
         !found.close &&
         (found.type === "asset" || found.type === "liability") &&
-        (found.kind === "node" || partOf(tree.data!, found.name)) && (
+        (found.kind === "node" ||
+          partOf(tree.data!, found.name) ||
+          (!found.protected && !found.revalue_every)) && (
           <Divided book={book} account={found} accounts={tree.data!} />
         )}
       {!found.close && found.type && <BudgetCard book={book} account={found} />}
@@ -228,15 +231,21 @@ function Divided({
   accounts: TreeAccount[];
 }) {
   const set = useSetDivided(book, account.name);
+  const setMain = useSetAccount(book, account.name);
   // Shown as chosen at once, and put back if the ledger refuses it.
   const [divided, setDivided] = useState(account.divided);
   const whole = partOf(accounts, account.name);
   const below = accounts.find((a) => a.divided && a.name.startsWith(`${account.name}:`));
+  const parts = accounts.filter(
+    (a) => a.name.startsWith(`${account.name}:`) && a.kind === "leaf" && !a.implicit && !a.close
+  );
   const href = (name: string) => `/books/${book}/accounts/${encodeURIComponent(name)}`;
   return (
     <section className="card editor" aria-label="Divided account">
       <h2 className="section-title">Divided account</h2>
-      {whole ? (
+      {account.kind === "leaf" && !whole ? (
+        <DivideForm book={book} account={account} />
+      ) : whole ? (
         <p className="small muted">
           Part of{" "}
           <Link href={`${href(whole)}/edit`}>
@@ -269,6 +278,32 @@ function Divided({
           {below && (
             <p className="small muted">{displayName(below)}, under it, is divided already.</p>
           )}
+          {divided && account.divided && (
+            <label>
+              New money lands in
+              <select
+                aria-label="New money lands in"
+                value={account.main_part ?? ""}
+                disabled={setMain.isPending}
+                onChange={(e) =>
+                  setMain.mutate({
+                    updated_at: account.updated_at!,
+                    main_part: e.target.value,
+                  } as never)
+                }
+              >
+                {!account.main_part && <option value="">Choose a part</option>}
+                {parts.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {displayName(p)}
+                  </option>
+                ))}
+              </select>
+              <span className="small muted">
+                What the bank or a file brings in, and what's left once the others have theirs.
+              </span>
+            </label>
+          )}
           {divided && (
             <div className="actions">
               <Link href={href(account.name)} className="button">
@@ -281,8 +316,108 @@ function Divided({
           )}
         </>
       )}
-      {set.error && <p className="error">{explain(set.error)}</p>}
+      {(set.error ?? setMain.error) && (
+        <p className="error">{explain(set.error ?? setMain.error)}</p>
+      )}
     </section>
+  );
+}
+
+/**
+ * Dividing an account you have (M15): it becomes a divided account of the same name (its bank
+ * link, statements and stars stay), everything that was its own goes to the main part, and
+ * the other parts start with what's moved to them, on a date.
+ */
+function DivideForm({ book, account }: { book: string; account: TreeAccount }) {
+  const [, navigate] = useLocation();
+  const divide = useDivide(book, account.name);
+  const [main, setMain] = useState("General");
+  const [parts, setParts] = useState([{ name: "", amount: "" }]);
+  const [date, setDate] = useState(today());
+  const segment = (name: string) => toSegment(name.trim());
+  const named = parts.filter((p) => p.name.trim());
+  const valid =
+    !!main.trim() &&
+    named.length > 0 &&
+    named.every((p) => !p.amount.trim() || isDecimal(p.amount.replace(/[$,]/g, "")));
+  const change = (i: number, field: "name" | "amount", value: string) =>
+    setParts((ps) => ps.map((p, j) => (j === i ? { ...p, [field]: value } : p)));
+  return (
+    <details className="divide">
+      <summary>Divide {displayName(account)}…</summary>
+      <form
+        className="editor"
+        aria-label="Divide"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          try {
+            await divide.mutateAsync({
+              main: segment(main),
+              parts: named.map((p) => ({
+                name: segment(p.name),
+                amount: shown(p.amount.replace(/[$,]/g, "") || "0", account.type),
+              })),
+              date,
+              updated_at: account.updated_at!,
+            });
+            navigate(`/books/${book}/accounts/${encodeURIComponent(account.name)}`);
+          } catch {
+            // shown from the mutation's error
+          }
+        }}
+      >
+        <p className="small muted">
+          One real account, held as parts: {displayName(account)} keeps its name, bank link and
+          statements, its history goes to the main part, and the others start with what you move to
+          them.
+        </p>
+        <label>
+          Main part
+          <input value={main} onChange={(e) => setMain(e.target.value)} aria-label="Main part" />
+          <span className="small muted">Where new money lands, and what's left.</span>
+        </label>
+        {parts.map((p, i) => (
+          <div key={i} className="divide-part">
+            <label>
+              Part
+              <input
+                value={p.name}
+                onChange={(e) => change(i, "name", e.target.value)}
+                placeholder="Padding"
+                aria-label={`Part ${i + 1}`}
+              />
+            </label>
+            <label>
+              Starts with
+              <input
+                inputMode="decimal"
+                value={p.amount}
+                onChange={(e) => change(i, "amount", e.target.value)}
+                placeholder="0.00"
+                aria-label={`Part ${i + 1}'s amount`}
+              />
+            </label>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="plain"
+          onClick={() => setParts((ps) => [...ps, { name: "", amount: "" }])}
+        >
+          + Another part
+        </button>
+        <label>
+          As of
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        {divide.error && <p className="error">{explain(divide.error)}</p>}
+        <div className="actions">
+          <button type="submit" className="primary" disabled={!valid || divide.isPending}>
+            {divide.isPending ? "Dividing…" : "Divide"}
+          </button>
+        </div>
+      </form>
+    </details>
   );
 }
 

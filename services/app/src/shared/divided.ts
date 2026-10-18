@@ -6,7 +6,27 @@
  * server and the PWA alike.
  */
 
-type Named = { name: string; kind?: string; type?: string | null; divided?: boolean };
+type Named = {
+  name: string;
+  kind?: string;
+  type?: string | null;
+  divided?: boolean;
+  main_part?: string | null;
+};
+
+/** Whether `name` is `account` or under it: for a divided account, any of its parts. */
+export const within = (name: string, account: string) =>
+  name === account || name.startsWith(`${account}:`);
+
+/** Where what comes into `account` lands: a divided account's main part, else itself (M15). */
+export function landsIn(accounts: Named[], account: string): string | undefined {
+  const found = accounts.find((a) => a.name === account);
+  return found?.divided ? (found.main_part ?? undefined) : account;
+}
+
+/** A transaction that moves money between a divided account's parts only (M15). */
+export const isInternal = (postings: { account: string }[], account: string) =>
+  postings.length > 1 && postings.every((p) => within(p.account, account));
 
 /** The divided account `name` is part of (one above it), if any. */
 export function partOf(accounts: Named[], name: string): string | undefined {

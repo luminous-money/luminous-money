@@ -216,21 +216,31 @@ export class FakeLedger implements LedgerPort {
   }
 
   async accountLedger(_book: string, account: string): Promise<LedgerPage> {
+    // An account and everything under it, as the ledger has it (a divided account's parts too).
+    const mine = (name: string) => name === account || name.startsWith(`${account}:`);
+    const node = this.accountList.some((a) => a.name.startsWith(`${account}:`));
     const rows = this.transactions
-      .filter((t) => t.postings.some((p) => p.account === account))
+      .filter((t) => t.postings.some((p) => mine(p.account)))
       .map((t) => {
-        const units = t.postings.find((p) => p.account === account)!.units ?? null;
+        const ours = t.postings.filter((p) => mine(p.account));
+        const others = t.postings.filter((p) => !mine(p.account));
+        const amount = ours.every((p) => p.units)
+          ? {
+              number: ours.reduce((n, p) => add(n, p.units!.number), "0"),
+              currency: ours[0]!.units!.currency,
+            }
+          : null;
         return {
           id: t.id,
           date: t.date,
           flag: t.flag,
           payee: t.payee ?? null,
           narration: t.narration ?? null,
-          amount: units,
+          amount: ours.length === 1 ? (ours[0]!.units ?? null) : amount,
           balance: null,
-          counterpart:
-            t.postings.length === 2 ? t.postings.find((p) => p.account !== account)!.account : null,
+          counterpart: t.postings.length === 2 && others.length === 1 ? others[0]!.account : null,
           splits: t.postings.length,
+          parts: node ? ours.map((p) => ({ account: p.account, amount: p.units ?? null })) : [],
           updated_at: t.updated_at,
         };
       })
@@ -345,6 +355,49 @@ export class FakeLedger implements LedgerPort {
     return this.transactions
       .filter((t) => keep(t) && this.posting(t, account)?.units)
       .reduce((total, t) => add(total, this.posting(t, account)!.units!.number), "0");
+  }
+
+  /** Divide a leaf (M15), as the ledger does: its postings to the main part, the parts given
+   * their amounts by one transfer. */
+  async divide(
+    book: string,
+    account: string,
+    d: { main?: string; parts?: { name: string; amount: string }[]; date: string }
+  ) {
+    const found = this.accountList.find((a) => a.name === account);
+    if (!found || found.kind !== "leaf") throw new LedgerError(422, "not a leaf");
+    const main = `${account}:${d.main ?? "General"}`;
+    for (const t of this.transactions)
+      for (const p of t.postings) if (p.account === account) p.account = main;
+    Object.assign(found, { kind: "node", divided: true, main_part: main, currencies: [] });
+    this.addAccount(main, { currencies: ["USD"], as_of: found.as_of });
+    for (const part of d.parts ?? [])
+      this.addAccount(`${account}:${part.name}`, { currencies: ["USD"] });
+    const moving = (d.parts ?? []).filter((p) => !isZero(p.amount));
+    if (moving.length)
+      this.addTransaction({
+        date: d.date,
+        flag: "*",
+        payee: null,
+        narration: "Divided",
+        tags: [],
+        links: [],
+        meta: {},
+        postings: [
+          {
+            account: main,
+            units: {
+              number: negate(moving.reduce((n, p) => add(n, p.amount), "0")),
+              currency: "USD",
+            },
+          },
+          ...moving.map((p) => ({
+            account: `${account}:${p.name}`,
+            units: { number: p.amount, currency: "USD" },
+          })),
+        ],
+      } as TransactionIn);
+    return found;
   }
 
   async setAccount(_book: string, account: string, patch: { divided?: boolean | null }) {

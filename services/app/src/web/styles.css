@@ -2323,3 +2323,68 @@ main a.largest-row,
 .reconciled-note {
   margin: 0;
 }
+
+/* Divided accounts (M15): the parts of one real account. */
+
+.part {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.divide-part {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+details.divide summary {
+  cursor: pointer;
+  color: var(--green);
+  font-weight: 600;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+}
+
+.move-money {
+  margin-top: 0.75rem;
+}
+
+.part-choice select {
+  width: auto;
+  font-size: 1rem;
+}
+
+.parts-line {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.stacked-bar {
+  display: flex;
+  height: 0.5rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.stacked-bar .segment {
+  height: 100%;
+}
+
+.stacked-bar .s0 {
+  background: var(--green);
+}
+
+.stacked-bar .s1 {
+  background: var(--green-soft);
+}
+
+.stacked-bar .s2 {
+  background: #d9a441;
+}
+
+.stacked-bar .s3 {
+  background: #7a9cc6;
+}

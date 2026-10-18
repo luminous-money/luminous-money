@@ -704,6 +704,20 @@ same money in through another's, a day or so later. Both would sit in review, un
   its parts can't be reconciled, linked to a bank or divided themselves. Named for what it is,
   not for reconciling: M15 links one to a bank. `shared/divided.ts` says what follows, for the
   server and the PWA; the ledger enforces it.
+- **A divided account's main part** (M15, `main-part:` on its `open`) is where what comes in
+  lands: a bank link's transactions and a file's rows stage there (a rule may land them in
+  another part: `category_rule.part`), while the whole stays the account for everything else
+  (the link, import batches and duplicates, the matcher's candidates from all its parts, not at
+  the bank, reconciling). It can't be deleted or archived until another part is main; renames
+  rewrite it. A transaction's part is just its posting's account, so moving one between parts
+  changes nothing else.
+- **Dividing an account you have** keeps its name: the leaf's `open` becomes the divided node's,
+  everything that was its own (transactions with their marks, opening balance, settings) moves
+  to the main part, and its statements and budgets stay with the whole, the real account. So
+  what `app` keeps by name stays put (links, stars, profiles, batches, rules' conditions, a
+  reconciliation in progress), and only what posts to it follows to the main part: schedules'
+  templates, rules' categories, open proposals (`db.divideAccount`). The other parts get their
+  amounts by one transfer. Undividing waits.
 - **Bank-fed accounts** are compared with the bank's day-end balance the day before its balance
   date (so a late posting that day can't break it), backed out from the reported balance and
   the mirror, with where they diverged. After each sync, one that agrees, with everything

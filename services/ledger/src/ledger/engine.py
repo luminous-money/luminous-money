@@ -46,8 +46,10 @@ BUDGET_KEY = "budget"  # on a transaction: FALSE keeps it out of budgets (M11)
 RECONCILED_KEY = "reconciled"
 STATEMENT_TYPE = "statement"
 SOURCE_KEY = "source"
-# On a node's open: a divided account, one real account its sub-accounts divide (M14).
+# On a node's open: a divided account, one real account its sub-accounts divide (M14), and the
+# part what comes in from the bank or a file lands in (M15).
 DIVIDED_KEY = "divided"
+MAIN_PART_KEY = "main-part"
 NODE = "node"
 ROOT_OPTIONS = (
     ("name_assets", "asset"),
@@ -349,6 +351,7 @@ def accounts(header: list[str], texts: list[str], versions: dict[str, str] | Non
                 updated_at=(versions or {}).get(str(entry.meta.get(ID_KEY))),
                 revalue_every=int(entry.meta[REVALUE_EVERY_KEY]) if REVALUE_EVERY_KEY in entry.meta else None,
                 divided=entry.meta.get(DIVIDED_KEY) is True,
+                main_part=entry.meta[MAIN_PART_KEY] if isinstance(entry.meta.get(MAIN_PART_KEY), str) else None,
             )
     for entry in entries:
         if isinstance(entry, data.Close) and entry.account in found:
@@ -416,6 +419,7 @@ def reopened(
     revalue_every: int | None,
     display_name: object = _KEEP,
     divided: object = _KEEP,
+    main_part: object = _KEEP,
 ) -> Directive:
     """An `open` directive with its booking method and `revalue-every` set (None: removed), and
     its `display-name` (None or "": removed) and `divided` (False: removed) set
@@ -435,6 +439,10 @@ def reopened(
         meta.pop(DIVIDED_KEY, None)
         if divided:
             meta[DIVIDED_KEY] = True
+    if main_part is not _KEEP:
+        meta.pop(MAIN_PART_KEY, None)
+        if main_part:
+            meta[MAIN_PART_KEY] = str(main_part)
     return to_directive(entry._replace(meta=meta, booking=data.Booking[booking] if booking else None))
 
 
@@ -459,6 +467,8 @@ def with_accounts(
         if drop(entry.account):
             return None
         entry = entry._replace(account=rename(entry.account))
+        if isinstance(entry, data.Open) and isinstance(entry.meta.get(MAIN_PART_KEY), str):
+            entry = entry._replace(meta={**entry.meta, MAIN_PART_KEY: rename(entry.meta[MAIN_PART_KEY])})
     elif isinstance(entry, data.Pad):
         if drop(entry.account):
             return None
@@ -474,6 +484,34 @@ def with_accounts(
                 for v in entry.values
             ]
         )
+    return to_directive(entry, directive_id)
+
+
+def divided_opens(text: str, main: str) -> tuple[Directive, Directive]:
+    """Dividing an account (M15): its `open` becomes a divided node's (the same directive: kind
+    node, divided, `main` its main part, its display name kept), and `main` opens as it was (the
+    same date, currencies and booking), to take everything that was the account's."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1 or not isinstance(entries[0], data.Open):
+        raise ParseFailure(["not an open directive"])
+    entry = entries[0]
+    kept = {k: v for k, v in entry.meta.items() if k in (ID_KEY, DISPLAY_NAME_KEY)}
+    node = entry._replace(
+        meta={**kept, KIND_KEY: NODE, DIVIDED_KEY: True, MAIN_PART_KEY: main}, currencies=None, booking=None
+    )
+    rest = {k: v for k, v in entry.meta.items() if k not in ("filename", "lineno", ID_KEY, DISPLAY_NAME_KEY, KIND_KEY)}
+    part = entry._replace(account=main, meta=rest)
+    return to_directive(node), parse_one(to_directive(part, new_id()).text)
+
+
+def moved_postings(text: str, directive_id: str, frm: str, to: str) -> Directive:
+    """A transaction with its postings to `frm` posting to `to` instead (their amounts, metadata
+    and reconciliation marks as they were)."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1 or not isinstance(entries[0], data.Transaction):
+        raise ParseFailure([f"directive {directive_id} isn't a transaction"])
+    entry = entries[0]
+    entry = entry._replace(postings=[p._replace(account=to) if p.account == frm else p for p in entry.postings])
     return to_directive(entry, directive_id)
 
 

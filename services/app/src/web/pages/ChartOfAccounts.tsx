@@ -49,7 +49,7 @@ function Figure({ account }: { account: TreeAccount }) {
 /**
  * The chart of accounts: one card, a section per account type, every account in a tree under
  * it with balances rolled up through the nodes. Tapping a node opens or closes it (remembered per
- * device), and its › opens its editor; tapping a leaf opens its ledger. Find narrows the tree;
+ * device), and its › opens its editor (a divided account's, its ledger); tapping a leaf opens its ledger. Find narrows the tree;
  * archived accounts wait behind "Show archived".
  */
 export function ChartOfAccounts({ book }: { book: string }) {
@@ -103,6 +103,7 @@ export function ChartOfAccounts({ book }: { book: string }) {
         </span>
       )}
       {linked.has(a.name) && <span className="pill">linked</span>}
+      {a.divided && <span className="pill">divided</span>}
       {a.close && <span className="pill stale">archived</span>}
       {a.protected && !ROOTS.includes(a.name) && <span className="pill">system</span>}
     </span>
@@ -135,7 +136,8 @@ export function ChartOfAccounts({ book }: { book: string }) {
             </button>
             {depth > 0 ? (
               <Link
-                href={a.kind === "node" ? `${href}/edit` : href}
+                // A divided account is one real account (M15): its ledger, as a leaf's.
+                href={a.kind === "node" && !a.divided ? `${href}/edit` : href}
                 className="chart-open"
                 aria-label={`Open ${a.name}`}
               >

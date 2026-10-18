@@ -195,6 +195,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/divide": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Divide Account
+     * @description Divide an asset or liability account (M15): a divided account of the same name, its
+     *     history in its main part, the other parts given their amounts by one transfer.
+     */
+    post: operations["divide_account_api_ledger_v1_books__book_id__accounts__account__divide_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/accounts/{account}/holdings": {
     parameters: {
       query?: never;
@@ -866,6 +887,11 @@ export interface components {
        * @enum {string}
        */
       kind: "leaf" | "node";
+      /**
+       * Main Part
+       * @description A divided account's part that what comes in from the bank or a file lands in (M15).
+       */
+      main_part?: string | null;
       /** Name */
       name: string;
       /** Open */
@@ -955,6 +981,11 @@ export interface components {
        */
       divided?: boolean | null;
       /**
+       * Main Part
+       * @description A divided account's main part: one of its parts, where what comes in lands.
+       */
+      main_part?: string | null;
+      /**
        * Revalue Every
        * @description A revalued asset: days its value stays current; None: not one.
        */
@@ -1027,6 +1058,11 @@ export interface components {
        * @enum {string}
        */
       kind: "leaf" | "node";
+      /**
+       * Main Part
+       * @description A divided account's part that what comes in from the bank or a file lands in (M15).
+       */
+      main_part?: string | null;
       /** Name */
       name: string;
       /** Open */
@@ -1457,6 +1493,45 @@ export interface components {
       updated_at: string;
     };
     /**
+     * DivideIn
+     * @description Divide an account (M15): it becomes a divided account of the same name, everything that was
+     *     its own going to its main part, and the other parts given their amounts by one transfer.
+     */
+    DivideIn: {
+      /**
+       * Date
+       * Format: date
+       * @description When the other parts get their amounts.
+       */
+      date: string;
+      /**
+       * Main
+       * @description The main part's name (one segment), where its history goes.
+       * @default General
+       */
+      main: string;
+      /** Parts */
+      parts?: components["schemas"]["DividePart"][];
+      /**
+       * Updated At
+       * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       */
+      updated_at: string;
+    };
+    /** DividePart */
+    DividePart: {
+      /**
+       * Amount
+       * @description What it starts with, moved from the main part, as stored.
+       */
+      amount: string;
+      /**
+       * Name
+       * @description The part's name (one segment: "Padding"), under the account.
+       */
+      name: string;
+    };
+    /**
      * DrawnLot
      * @description A lot a sale draws on.
      */
@@ -1642,6 +1717,11 @@ export interface components {
       id: string;
       /** Narration */
       narration: string | null;
+      /**
+       * Parts
+       * @description A node's ledger (a divided account's, say): each of its postings to an account under it (M15).
+       */
+      parts?: components["schemas"]["CompactPosting"][];
       /** Payee */
       payee: string | null;
       /**
@@ -2295,6 +2375,11 @@ export interface components {
        * @enum {string}
        */
       kind: "leaf" | "node";
+      /**
+       * Main Part
+       * @description A divided account's part that what comes in from the bank or a file lands in (M15).
+       */
+      main_part?: string | null;
       /** Name */
       name: string;
       /** Open */
@@ -2872,6 +2957,47 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
+    };
+  };
+  divide_account_api_ledger_v1_books__book_id__accounts__account__divide_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DivideIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Account"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

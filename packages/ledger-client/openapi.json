@@ -68,6 +68,18 @@
             "title": "Kind",
             "type": "string"
           },
+          "main_part": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A divided account's part that what comes in from the bank or a file lands in (M15).",
+            "title": "Main Part"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -315,6 +327,18 @@
             "description": "An asset or liability node: make it a divided account, one real account its sub-accounts divide (they can't be reconciled, linked or divided themselves).",
             "title": "Divided"
           },
+          "main_part": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A divided account's main part: one of its parts, where what comes in lands.",
+            "title": "Main Part"
+          },
           "revalue_every": {
             "anyOf": [
               {
@@ -466,6 +490,18 @@
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "main_part": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A divided account's part that what comes in from the bank or a file lands in (M15).",
+            "title": "Main Part"
           },
           "name": {
             "title": "Name",
@@ -1504,6 +1540,64 @@
         "title": "Directive",
         "type": "object"
       },
+      "DivideIn": {
+        "additionalProperties": false,
+        "description": "Divide an account (M15): it becomes a divided account of the same name, everything that was\nits own going to its main part, and the other parts given their amounts by one transfer.",
+        "properties": {
+          "date": {
+            "description": "When the other parts get their amounts.",
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "main": {
+            "default": "General",
+            "description": "The main part's name (one segment), where its history goes.",
+            "title": "Main",
+            "type": "string"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/DividePart"
+            },
+            "title": "Parts",
+            "type": "array"
+          },
+          "updated_at": {
+            "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "updated_at"
+        ],
+        "title": "DivideIn",
+        "type": "object"
+      },
+      "DividePart": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "description": "What it starts with, moved from the main part, as stored.",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "name": {
+            "description": "The part's name (one segment: \"Padding\"), under the account.",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "amount"
+        ],
+        "title": "DividePart",
+        "type": "object"
+      },
       "DrawnLot": {
         "description": "A lot a sale draws on.",
         "properties": {
@@ -2010,6 +2104,14 @@
               }
             ],
             "title": "Narration"
+          },
+          "parts": {
+            "description": "A node's ledger (a divided account's, say): each of its postings to an account under it (M15).",
+            "items": {
+              "$ref": "#/components/schemas/CompactPosting"
+            },
+            "title": "Parts",
+            "type": "array"
           },
           "payee": {
             "anyOf": [
@@ -3597,6 +3699,18 @@
             "title": "Kind",
             "type": "string"
           },
+          "main_part": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A divided account's part that what comes in from the bank or a file lands in (M15).",
+            "title": "Main Part"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -4471,6 +4585,61 @@
           }
         },
         "summary": "Day Balances"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/divide": {
+      "post": {
+        "description": "Divide an asset or liability account (M15): a divided account of the same name, its\nhistory in its main part, the other parts given their amounts by one transfer.",
+        "operationId": "divide_account_api_ledger_v1_books__book_id__accounts__account__divide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DivideIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Divide Account"
       }
     },
     "/api/ledger/v1/books/{book_id}/accounts/{account}/holdings": {

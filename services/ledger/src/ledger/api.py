@@ -267,6 +267,15 @@ def create_app(ledger: Ledger) -> FastAPI:
         rewritten, history included, in one write."""
         return chart.rename(ledger, book_id, account, r.to, expected=r.updated_at)
 
+    @api.post(
+        "/books/{book_id}/accounts/{account}/divide",
+        responses={409: {"description": "Stale version"}, 422: {"description": "Not allowed"}},
+    )
+    def divide_account(book_id: MemberBook, account: str, d: models.DivideIn) -> models.Account:
+        """Divide an asset or liability account (M15): a divided account of the same name, its
+        history in its main part, the other parts given their amounts by one transfer."""
+        return chart.divide(ledger, book_id, account, d)
+
     @api.post("/books/{book_id}/accounts/{account}/archive", responses={422: {"description": "Not allowed"}})
     def archive_account(book_id: MemberBook, account: str, a: models.AccountArchive) -> list[str]:
         """Close the account and every opened account under it (after an optional closing

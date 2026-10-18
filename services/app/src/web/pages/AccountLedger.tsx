@@ -13,7 +13,8 @@ import { HoldingsPanel } from "../components/Holdings.js";
 import { JumpToDate, MoreBelow, NewerRow, usePaging } from "../components/Paged.js";
 import { LedgerFilter, useLedgerView } from "../components/LedgerFilter.js";
 import { ReconcileStatus } from "../components/ReconcileStatus.js";
-import { reconciledItself } from "../../shared/divided.js";
+import { partOf, reconciledItself } from "../../shared/divided.js";
+import { MoveMoney, PartsCard, partsOf } from "../components/Parts.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { postable } from "../lib/accounts.js";
 import { today } from "../lib/format.js";
@@ -24,6 +25,7 @@ import {
   useAccountCreation,
   useAccountLedger,
   useAccounts,
+  useAccountTree,
   useBulkEdit,
   useSuggest,
   useScheduled,
@@ -37,6 +39,7 @@ import {
   useUpcoming,
 } from "../lib/queries.js";
 import { upcomingFor } from "../lib/upcoming.js";
+import type { LedgerRow } from "@fava-beans/ledger-client";
 
 /**
  * One account's ledger: every transaction, newest first, 200 at a time, more loading as you
@@ -51,6 +54,23 @@ import { upcomingFor } from "../lib/upcoming.js";
  * Reconciled ones are marked ✓ (M14); the filter beside "Go to date" shows only those, or only
  * the rest (`?reconciled=`), and Reconcile is in the header for an account reconciled itself.
  */
+/**
+ * A node's row (a divided account's, say: M15): which of its accounts it touched. A move between
+ * them reads "General → Padding"; anything else, the part, then the other side.
+ */
+function partsLabel(row: LedgerRow, account: string): string | null {
+  const parts = row.parts ?? [];
+  if (!parts.length) return null;
+  const name = (n: string) => n.slice(account.length + 1).replace(/-/g, " ");
+  if (parts.length === row.splits && parts.length === 2) {
+    const [a, b] = parts as [(typeof parts)[0], (typeof parts)[0]];
+    const [from, to] = a.amount && isNegative(a.amount.number) ? [a, b] : [b, a];
+    return `${name(from.account)} → ${name(to.account)}`;
+  }
+  const mine = [...new Set(parts.map((p) => name(p.account)))].join(", ");
+  return `${mine} · ${row.counterpart ? shortName(row.counterpart) : "<multiple>"}`;
+}
+
 export function AccountLedger({ book, account }: { book: string; account: string }) {
   const [, navigate] = useLocation();
   const base = `/books/${book}/accounts/${encodeURIComponent(account)}`;
@@ -79,6 +99,11 @@ export function AccountLedger({ book, account }: { book: string; account: string
   const type = info?.type;
   const { rows, list, end, loadNewer } = usePaging(ledger);
   const reconcilable = !!accounts.data && reconciledItself(accounts.data, account);
+  // A divided account, or a part of one (M15): its parts, and moving money between them.
+  const whole = info?.divided ? account : accounts.data && partOf(accounts.data, account);
+  const tree = useAccountTree(book);
+  const wholeInfo = whole ? tree.data?.find((a) => a.name === whole) : undefined;
+  const [moving, setMoving] = useState(false);
 
   const open = (id: string) => navigate(withBack(`/books/${book}/transactions/${id}`, here));
   const chosen = rows.filter((r) => selection.has(r.id));
@@ -135,14 +160,20 @@ export function AccountLedger({ book, account }: { book: string; account: string
               <ReconcileStatus book={book} account={account} accounts={accounts.data} />
             )}
           </div>
-          {canWrite && info?.kind === "leaf" && !info.implicit && !info.close && (
-            <Link
-              href={withBack(`/books/${book}/import?account=${encodeURIComponent(account)}`, here)}
-              className="button"
-            >
-              Import transactions
-            </Link>
-          )}
+          {canWrite &&
+            (info?.kind === "leaf" || info?.divided) &&
+            !info.implicit &&
+            !info.close && (
+              <Link
+                href={withBack(
+                  `/books/${book}/import?account=${encodeURIComponent(account)}`,
+                  here
+                )}
+                className="button"
+              >
+                Import transactions
+              </Link>
+            )}
         </div>
         {budget && (
           <Link href={`/books/${book}/budgets`} className="budget-link" aria-label="Budget">
@@ -161,6 +192,11 @@ export function AccountLedger({ book, account }: { book: string; account: string
               <Link href={withBack(`${base}/reconcile`, here)} className="button">
                 Reconcile
               </Link>
+            )}
+            {whole && whole !== account && (
+              <button type="button" onClick={() => setMoving(!moving)} aria-expanded={moving}>
+                Move money
+              </button>
             )}
             <Link
               href={`/books/${book}/accounts/${encodeURIComponent(account)}/edit`}
@@ -188,6 +224,24 @@ export function AccountLedger({ book, account }: { book: string; account: string
         )}
       </header>
 
+      {info?.divided && wholeInfo && tree.data && !selection.selecting && (
+        <PartsCard
+          book={book}
+          whole={wholeInfo}
+          accounts={tree.data}
+          currency={info.currencies?.[0] ?? info.balance[0]?.currency ?? "USD"}
+        />
+      )}
+      {moving && wholeInfo && tree.data && info && (
+        <MoveMoney
+          book={book}
+          parts={partsOf(tree.data, wholeInfo.name)}
+          type={info.type}
+          currency={info.currencies?.[0] ?? info.balance[0]?.currency ?? "USD"}
+          start={{ from: account }}
+          onDone={() => setMoving(false)}
+        />
+      )}
       {info && !selection.selecting && (
         <HoldingsPanel book={book} account={account} summary={info} here={here} />
       )}
@@ -215,7 +269,8 @@ export function AccountLedger({ book, account }: { book: string; account: string
             onClick={() =>
               navigate(
                 withBack(
-                  `/books/${book}/transactions/new?account=${encodeURIComponent(account)}`,
+                  // A divided account's own postings are its parts': the main part, to start.
+                  `/books/${book}/transactions/new?account=${encodeURIComponent(info?.divided && info.main_part ? info.main_part : account)}`,
                   here
                 )
               )
@@ -325,7 +380,8 @@ export function AccountLedger({ book, account }: { book: string; account: string
                       ✓{" "}
                     </span>
                   )}
-                  {row.counterpart ? shortName(row.counterpart) : "<multiple>"}
+                  {partsLabel(row, account) ??
+                    (row.counterpart ? shortName(row.counterpart) : "<multiple>")}
                   {row.flag === "!" && " · unconfirmed"}
                 </span>
               </span>

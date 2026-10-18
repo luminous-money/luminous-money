@@ -5,7 +5,7 @@
  */
 
 export type RuleConditions = {
-  /** The account imported into. */
+  /** The account imported into (a divided account: any of its parts). */
   account: string | null;
   /** The description's payee key equals this (see payees.ts). */
   key: string | null;
@@ -25,6 +25,9 @@ export type CategoryRule = {
   account: string;
   /** A clean payee to give, if any. */
   payee: string | null;
+  /** For transactions imported into a divided account (M15): the part their own side lands in,
+   * instead of its main part ("Interest, lands in Padding"). One of `conditions.account`'s. */
+  part: string | null;
   /** Stage matching transactions confirmed, skipping review. */
   auto_confirm: boolean;
   /** How many transactions it has categorized. */
@@ -36,7 +39,7 @@ export type CategoryRule = {
 export type CategoryRuleIn = Pick<
   CategoryRule,
   "name" | "conditions" | "account" | "payee" | "auto_confirm"
->;
+> & { part?: string | null };
 
 export type CategoryRulePatch = Partial<CategoryRuleIn> & { updated_at: string };
 

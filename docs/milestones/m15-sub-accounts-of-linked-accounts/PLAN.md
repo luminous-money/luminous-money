@@ -1,7 +1,8 @@
 M15: Sub-accounts of linked accounts: plan
 ==================================================================================================
 
-> **Status: planned (2026-10-17), answered the same day** (below); ready to build. The brief, from [the plan](../../PLAN.md): split a
+> **Status: built (2026-10-18),** with ledger, unit, API and browser tests, on the answers
+> below. The brief, from [the plan](../../PLAN.md): split a
 > bank-linked account's money into sub-accounts, e.g. the $10,000 in a PNC checking account as
 > $5,000 of padding and $5,000 for general use, while the bank feed keeps it in step with the
 > bank.
