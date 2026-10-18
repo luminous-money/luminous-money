@@ -21,6 +21,8 @@ import {
   typicalReport,
 } from "./reports.js";
 import { finish, ReconcileProblem, reconcileView, saveDraft } from "./reconcile.js";
+import type { AiPort } from "./ai.js";
+import { captureReceipt, ReceiptProblem } from "./receipts.js";
 import { pairAfterImport, pairedTransfers, rejectTransfer, TransferProblem } from "./transfers.js";
 import { UPCOMING_DAYS, type ScheduleIn, type SchedulePatch } from "../shared/schedule.js";
 import { StaleVersion } from "./db.js";
@@ -64,9 +66,12 @@ export function createApi({
   ledgerFor,
   categorizers = [],
   simplefin,
+  aiFor,
 }: {
   db: AppDb;
   ledgerFor: (userId: string) => LedgerPort;
+  /** The ai service as the user (M16); without it, receipts are made unread. */
+  aiFor?: (userId: string) => AiPort;
   /** The categorization chain, in order (see categorize/chain.ts). */
   categorizers?: Categorizer[];
   simplefin?: SimplefinServices;
@@ -216,6 +221,50 @@ export function createApi({
         );
       }
       throw error;
+    }
+  });
+
+  /** Capture a receipt (M16): multipart, with `file` and the hints (`account`, `itemize`
+   * yes/no, `total` as stored, `date`, `payee`, `note`). Read by the ai service if the book has
+   * it set up, staged unconfirmed with the receipt attached; made from the hints otherwise. */
+  api.post("/books/:book/receipts", async (c) => {
+    const { book } = c.req.param();
+    const form = await c.req.parseBody();
+    const file = form["file"];
+    if (!(file instanceof File)) return c.json({ detail: "send the receipt as `file`" }, 422);
+    const text = (key: string) => {
+      const value = form[key];
+      return typeof value === "string" && value.trim() ? value.trim() : null;
+    };
+    const total = text("total");
+    if (total && !/^-?\d+(\.\d+)?$/.test(total))
+      return c.json({ detail: "the total is a number, like -12.34" }, 422);
+    try {
+      return c.json(
+        await captureReceipt({
+          ledger: ledgerFor(c.get("user")),
+          ai: aiFor?.(c.get("user")),
+          book,
+          file: {
+            name: file.name,
+            type: file.type,
+            bytes: new Uint8Array(await file.arrayBuffer()),
+          },
+          hints: {
+            account: text("account"),
+            total,
+            date: text("date"),
+            payee: text("payee"),
+            note: text("note"),
+            itemize: text("itemize") === null ? null : text("itemize") === "yes",
+          },
+          today: bookToday(db, book),
+        }),
+        201
+      );
+    } catch (error) {
+      if (error instanceof ReceiptProblem) return c.json({ detail: error.message }, error.status);
+      return c.json(...ledgerStatus(error));
     }
   });
 
@@ -570,6 +619,7 @@ export function createApi({
       return c.json(...ledgerStatus(error));
     }
     db.forgetBook(book);
+    await aiFor?.(c.get("user")).forgetBook(book);
     return c.body(null, 204);
   });
 

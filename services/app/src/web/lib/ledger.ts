@@ -36,6 +36,7 @@ export type BudgetStatus = Components["schemas"]["BudgetStatus"];
 export type BudgetBasis = BudgetStatus["basis"];
 export type Reconciliations = Components["schemas"]["Reconciliations"];
 export type Reconciliation = Components["schemas"]["Reconciliation"];
+export type Attachment = Components["schemas"]["Attachment"];
 
 export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"], "updated_at">;
 export type AccountKind = components["schemas"]["AccountIn"]["kind"];
@@ -193,6 +194,46 @@ export const api = {
         params: { path: { book_id }, query: { ...page, limit: 200, reconciled } },
       })
     ),
+
+  /** A transaction's attachments (M16), oldest first. */
+  attachments: (book_id: string, transaction: string): Promise<Attachment[]> =>
+    unwrap(
+      ledger.GET("/api/ledger/v1/books/{book_id}/transactions/{directive_id}/attachments", {
+        params: { path: { book_id, directive_id: transaction } },
+      })
+    ),
+
+  /** Attach a file: the body is the file itself (at most 5 MB). */
+  async attach(
+    book_id: string,
+    transaction: string,
+    file: Blob,
+    filename: string
+  ): Promise<Attachment> {
+    const response = await apiFetch(
+      `/api/ledger/v1/books/${encodeURIComponent(book_id)}/transactions/${encodeURIComponent(transaction)}/attachments?filename=${encodeURIComponent(filename)}`,
+      {
+        method: "POST",
+        headers: { "content-type": file.type || "application/octet-stream" },
+        body: file,
+      }
+    );
+    const body = (await response.json().catch(() => ({}))) as Attachment & { detail?: unknown };
+    if (!response.ok) throw new ApiError(response.status, describe(body) ?? "couldn't attach it");
+    return body;
+  },
+
+  async detach(book_id: string, attachment: string) {
+    const { response, error } = await ledger.DELETE(
+      "/api/ledger/v1/books/{book_id}/attachments/{attachment_id}",
+      { params: { path: { book_id, attachment_id: attachment } } }
+    );
+    if (!response.ok) throw new ApiError(response.status, describe(error) ?? "couldn't remove it");
+  },
+
+  /** Where an attachment's file is (the session's cookie lets an <img> load it). */
+  attachmentUrl: (book_id: string, attachment: string) =>
+    `/api/ledger/v1/books/${encodeURIComponent(book_id)}/attachments/${encodeURIComponent(attachment)}`,
 
   /** An account's reconciliations (and balance checks from imported books), newest first. */
   reconciliations: (book_id: string, account: string): Promise<Reconciliations> =>

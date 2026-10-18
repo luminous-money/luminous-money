@@ -14,6 +14,7 @@
 import { DatabaseSync } from "node:sqlite";
 
 export type { DatabaseSync } from "node:sqlite";
+export { Sealer } from "./sealer.js";
 
 /** CREATE TABLE with the required timestamp columns. Table constraints (composite keys and the
  * like) go in `constraints`, since SQL wants them after every column. */

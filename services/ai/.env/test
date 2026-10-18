@@ -1,0 +1,4 @@
+# The e2e stack (APP_ENV=test): the fake provider (no model, no outside calls), and a fixed key
+# for its made-up credentials.
+AI_PROVIDERS=claude,fake
+AI_ENCRYPTION_KEY=tRMhsbQiv39GhpzK7FCNlIoxTHJqPSEn7qnwcfLk/rA=

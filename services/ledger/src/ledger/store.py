@@ -15,9 +15,12 @@ its version: edits name the version they read, and a write against any other ver
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
+import os
 import sqlite3
 import threading
+import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -56,6 +59,8 @@ class Store:
 
     def __init__(self, path: str):
         self._path = path
+        # Attachments' bytes (M16), beside the database on the data volume.
+        self._files = os.path.join(os.path.dirname(os.path.abspath(path)), "attachments")
         self._local = threading.local()
         self._lock = threading.RLock()
         with self._lock:
@@ -287,14 +292,67 @@ class Store:
             )
             self._conn.execute("DELETE FROM posting WHERE directive_id = ?", (directive_id,))
             self._conn.execute("DELETE FROM price WHERE directive_id = ?", (directive_id,))
+            for attachment in self.attachments_of(book_id, [directive_id]):
+                self.delete_attachment(book_id, attachment["id"])
             deleted.append(directive_id)
         return deleted
+
+    # Attachments (M16)
+
+    def _file(self, book_id: str, attachment_id: str) -> str:
+        return os.path.join(self._files, book_id, attachment_id)
+
+    def add_attachment(self, book_id: str, directive_id: str, filename: str, content_type: str, data: bytes) -> sqlite3.Row:
+        """Keep a file for a transaction: its bytes on the volume, what's known of it here."""
+        attachment_id = uuid.uuid4().hex
+        path = self._file(book_id, attachment_id)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(data)
+        stamp = now()
+        self._conn.execute(
+            "INSERT INTO attachment (id, book_id, directive_id, filename, content_type, size, sha256, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (attachment_id, book_id, directive_id, filename, content_type, len(data), hashlib.sha256(data).hexdigest(), stamp, stamp),
+        )
+        return self.attachment(book_id, attachment_id)
+
+    def attachment(self, book_id: str, attachment_id: str) -> sqlite3.Row | None:
+        return self._conn.execute(
+            "SELECT * FROM attachment WHERE book_id = ? AND id = ?", (book_id, attachment_id)
+        ).fetchone()
+
+    def attachment_bytes(self, book_id: str, attachment_id: str) -> bytes:
+        with open(self._file(book_id, attachment_id), "rb") as f:
+            return f.read()
+
+    def attachments_of(self, book_id: str, directive_ids: list[str]) -> list[sqlite3.Row]:
+        """These transactions' attachments, oldest first."""
+        marks = ",".join("?" * len(directive_ids))
+        return self._conn.execute(
+            f"SELECT * FROM attachment WHERE book_id = ? AND directive_id IN ({marks}) ORDER BY created_at, id",
+            (book_id, *directive_ids),
+        ).fetchall() if directive_ids else []
+
+    def delete_attachment(self, book_id: str, attachment_id: str) -> bool:
+        gone = self._conn.execute(
+            "DELETE FROM attachment WHERE book_id = ? AND id = ?", (book_id, attachment_id)
+        ).rowcount > 0
+        try:
+            os.remove(self._file(book_id, attachment_id))
+        except FileNotFoundError:
+            pass
+        return gone
 
     def check_version(self, book_id: str, directive_id: str, expected: str) -> None:
         """Refuse a write that read an older version. Call inside the write's transaction."""
         row = self.get(book_id, directive_id)
         if row is not None and row.updated_at != expected:
             raise StaleVersion(directive_id, row.updated_at)
+
+    def book_of(self, directive_id: str) -> str | None:
+        row = self._conn.execute("SELECT book_id FROM directive WHERE id = ?", (directive_id,)).fetchone()
+        return row["book_id"] if row else None
 
     def get(self, book_id: str, directive_id: str) -> Row | None:
         row = self._conn.execute(

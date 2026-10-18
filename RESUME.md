@@ -1,19 +1,27 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-17._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-18._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
 
-**M1 through M15 are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M16 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
-accounts), M11 (budgets), M12 (reports), M13 (sharing books), M14 (reconciliation) and M15 (divided
-accounts) are described in their plans. The milestones ahead (M16–M20, then Polish) are in
-[docs/PLAN.md](docs/PLAN.md).
+accounts), M11 (budgets), M12 (reports), M13 (sharing books), M14 (reconciliation), M15 (divided
+accounts) and M16 (receipt capture) are described in their plans. The milestones ahead
+(M17–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What a user can do now:
+- **Receipts (M16):** Menu → AI turns a book's AI on (Claude, with an API key kept encrypted;
+  itemize by default; whether the AI may open accounts, how eagerly, with what guidance). Once
+  it's ready, the masthead's **camera** opens Capture receipt: the live camera (or Upload
+  instead), the account it was paid from (the page you came from), Itemize?, and anything you
+  know (total, date, payee, note). **Create transaction** has it read and lands on it in review;
+  confirming or skipping it goes back to where you were. If it can't be read (AI off, down, or
+  it failed), the transaction is made from what you typed, saying why. **Attachments:** any
+  transaction's page has them (Open camera, or Upload; 5 MB each), new transactions too.
 - **Divided accounts (M15):** an asset or liability account's editor has **Divide…**: name the
   main part (where new money lands, and what's left) and the others with what they start with;
   the account keeps its name, bank link, statements and history (now its main part's). Its page
@@ -82,8 +90,8 @@ What a user can do now:
   - **Manage books:** create a book (empty, or from a Beancount file such as an export), open,
     rename, export, set the time zone, and delete (type the name; Export offered). Names are
     unique per user.
-- **Menu:** the book's Home, Review, Accounts, Budgets, Schedules, Rules, Commodities and Bank
-  connections; Manage books; Your account; Log out.
+- **Menu:** the book's Home, Review, Accounts, Budgets, Reports, Schedules, Rules,
+  Commodities, Bank connections and AI; Manage books; Your account; Log out.
 - **Schedules:** a transaction plus a rule (every N days/weeks/months/years, days of the month,
   weekends moved or kept, an optional end), made new or with "Repeat…" on any transaction.
   - Due occurrences are staged (at startup, after saves, and daily after midnight in the book's
@@ -146,23 +154,31 @@ How it's put together:
   schedules (`src/shared/schedule.ts` for rules, `src/server/schedules.ts` for the generator), and
   categorization (`src/server/categorize`: the chain, context, `rules`, `history`, external
   providers; the external API's types in `src/shared/categorizer-api.ts`), in `app.sqlite`.
-- **`packages/db`** (TypeScript migrations and timestamps, with a lint check) and
+- **`services/ai`** (TypeScript, M16): each book's AI settings and sealed credential
+  (`ai.sqlite`), the providers (`src/providers`: `claude`, and `fake` for test stacks, chosen
+  by `AI_PROVIDERS`), and `POST /books/:book/receipts/read`. It reads; `app` stages
+  (`src/server/receipts.ts`), and the ledger keeps the files (attachments, migration 10). Their
+  shared types are `packages/ai-api`.
+- **`packages/db`** (TypeScript migrations and timestamps, the sealer, with a lint check) and
   **`packages/csv-import`** (parsing, guessing profiles, reading rows; shared by the browser and
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 174 tests, including the table lint
-    - auth: 20; app: 164; db: 10; csv-import: 22
+    - ledger: 176 tests, including the table lint
+    - auth: 20; app: 169; ai: 3; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 83 API tests and 88 browser tests (with Mailpit and a fake SimpleFIN server)
+  - `pnpm e2e`: 86 API tests and 89 browser tests (with Mailpit, a fake SimpleFIN server and
+    the fake AI provider)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps
 
-1. **M16 (receipt capture):** see [its plan](docs/milestones/m16-receipt-capture/PLAN.md).
-2. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
+1. **M16's questions** (end of [its plan](docs/milestones/m16-receipt-capture/PLAN.md)): the
+   placeholder for an unknown base account, a cheaper model per book, PDFs.
+2. **M17 (transaction tagging):** see [its plan](docs/milestones/m17-transaction-tagging/PLAN.md).
+3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
 
 ## The ledger-graphs libraries
@@ -206,9 +222,15 @@ How it's put together:
   profiles, rules, schedules and bank links are left pointing at the old name.
 - **SimpleFIN's budget:** about 24 requests a day per connection at the Bridge; the app stops at
   20 (UTC days). Linking a long history takes several; "Sync now" takes one or two.
-- **The dev stack needs `SIMPLEFIN_ENCRYPTION_KEY`** (app won't start without it): it's in the
-  repo root's `.env` (gitignored), which Compose reads. Keep it: stored SimpleFIN connections
-  can't be opened without it.
+- **The dev stack needs `SIMPLEFIN_ENCRYPTION_KEY` and `AI_ENCRYPTION_KEY`** (app and ai won't
+  start without them): they're in the repo root's `.env` (gitignored), which Compose reads. Keep
+  them: stored SimpleFIN connections and AI keys can't be opened without them.
+- **Traefik's routes are a Compose config,** fixed when its container is created: after
+  changing `deploy/traefik/routes.yml`, `docker compose up -d --force-recreate traefik` (a new
+  service's API is a 404 until then).
+- **Receipts need the `ai` service:** without it (or a book that isn't ready) the camera isn't
+  offered, and `app`'s receipt route still makes the transaction from the hints. Test stacks
+  offer the `fake` provider (`AI_PROVIDERS=claude,fake`); production only `claude`.
 - **`auth` and `app` read settings through `@wymp/config-simple`** (`src/config.ts`, plus
   `.env/<APP_ENV>` files in each service). Its `configValue` reads a third argument that's an
   array as validators, not a default: give list defaults as a string and split them.
@@ -222,13 +244,15 @@ How it's put together:
 - **The dev stack has no test logins:** compose doesn't pass `AUTH_TEST_USERS` through, and
   only `APP_ENV=test` turns it on. To poke at the UI (or take screenshots) without touching the
   dev stack's data, start the e2e stack under its own project, `docker compose -p
-  fava-beans-e2e -f compose.yaml -f compose.e2e.yaml up -d traefik auth ledger app mailpit
+  fava-beans-e2e -f compose.yaml -f compose.e2e.yaml up -d traefik auth ledger app ai mailpit
   simplefin-fake`, and run Playwright (the `mcr.microsoft.com/playwright:v1.63.0-noble` image)
   on its network, `fava-beans-e2e_default`, at `http://traefik`. `pnpm e2e` tears it down.
 - **A mutation's per-call `onSuccess` doesn't run if its component unmounted first,** and a
   hook-level `onSuccess` that returns an invalidation is awaited before it: a form keyed on
   what that refetch changes is gone by then. Await `mutateAsync` instead (Reconcile's Finish,
   the account editor's names).
+- **The PWA's URLs keep account names' colons** (`/accounts/Assets:Bank:Checking`): browser
+  tests compare decoded paths, not `encodeURIComponent`'s.
 - **An effect must return a function or nothing:** `useEffect(() => cond && set(x))` returns
   `false`, which React later calls as a cleanup ("l is not a function" in production).
 - **`pnpm seed` skips a book that already exists,** because the demo gets new IDs on every run

@@ -732,6 +732,51 @@ same money in through another's, a day or so later. Both would sit in review, un
   running balance says which way a file runs on a single day, and whether a card's balance is
   shown owed or as stored.
 
+### Attachments (M16)
+
+- **Files belong with the transactions they're about,** so the ledger keeps them: an
+  `attachment` row (book, transaction, filename, content type, size, SHA-256; ledger migration
+  10) and the bytes on the data volume (`attachments/<book>/<id>`). Deleting the transaction or
+  its book deletes them. A transaction says how many it has (`attachments`).
+- **The body is the file** (`POST …/transactions/{t}/attachments?filename=`, its
+  `Content-Type` the type), not multipart: one file per request, and the ledger stays free of
+  form parsing. 5 MB each (413 above); the PWA shrinks photos (JPEG, at most 2,000 px a side)
+  before sending them.
+- **Exports and backups don't carry them yet:** they're Beancount text. Noted for later.
+
+### Receipts and AI (M16)
+
+- **One `ai` service owns everything AI** (`/api/ai/v1`, TypeScript): each book's AI settings
+  and its credential, the providers, and reading. Nothing else talks to a model, so M19's AI
+  categorization lands in the same place, with the same key and guidance.
+- **It reads; it doesn't write books.** A reading is a pure function of the receipt and the
+  context `app` sends (the chart, the hints, today); `app` checks it and stages it, as it stages
+  imports. So staged transactions keep one writer, and the AI service needs no write access to
+  the ledger. Roles come from the ledger: read sees the settings, manage changes them, write
+  reads receipts.
+- **Its health is how the rest knows it's there:** the PWA offers AI (the masthead's camera)
+  only when `GET /api/ai/v1/health` answers and the book is **ready** (enabled, a provider, and
+  a credential). With the service down, nothing AI shows and the rest is unchanged.
+- **Credentials are sealed** with `AI_ENCRYPTION_KEY` (the sealer SimpleFIN uses, now in
+  `@fava-beans/db`) and never sent back: the settings say only that one is set and its last four
+  characters. Claude takes an API key (it has no OAuth for third-party apps).
+- **A capture always makes something:** `app`'s `POST /books/:book/receipts` reads through
+  `ai`, and if AI is off, down, or can't read it, makes the transaction from what was typed (a
+  zero total if nothing), with the receipt attached and `receipt-note:` saying why. A reading is
+  checked against the books: a base account must be an asset or liability (a divided account's
+  main part, as for imports), else `Expenses:Uncategorized` / `Income:Uncategorized` by
+  direction, as the notes ask; splits are kept only if they're on accounts that exist (or that
+  the reader proposed and the book lets it open) and sum to the total, else one split goes to
+  the reader's category. Staged unconfirmed with `source: "receipt"`, it's then found by the
+  matcher when the bank's copy arrives.
+- **Providers are a small interface** (`read(input, credential) → reading`, or `ReadFailed`):
+  `claude` (the official SDK, structured output against the reading's JSON Schema, checked again
+  with zod; `claude-opus-5` unless `AI_CLAUDE_MODEL` says otherwise; the server-side fallback on a
+  refusal) and `fake` (deterministic, for test stacks: `AI_PROVIDERS` lists what a stack
+  offers). Prompts and their tuning are later work.
+- **Review takes one item** (`?only=<id>&back=…`), so a capture lands on its transaction and
+  confirming or skipping it returns to where the capture started.
+
 ### Bank feeds: SimpleFIN (M9)
 
 [SimpleFIN](https://www.simplefin.org/protocol.html), usually through the SimpleFIN Bridge, is the
@@ -1011,6 +1056,7 @@ The design separates four things:
 | `auth` | TypeScript | Sign-up, login, sessions and tokens, accounts, and the verify endpoint for forwardAuth. Owns users and their identities. |
 | `ledger` | Python | System of record for all books. Runs the Beancount engine (booking, validation, BQL). Owns Beancount import/export, the change log and backup chunks. |
 | `app` | TypeScript | Serves the PWA (React + Vite + `vite-plugin-pwa`) and its API (Hono): CSV profiles and imports. Hosts the participants, the context builder and the resolver chain, and owns import history (later schedules too). Modules get split into their own services only when there's a reason. |
+| `ai` | TypeScript | Everything AI (M16): each book's AI settings and sealed credential, the providers (Claude; a fake for tests), and reading receipts for `app` to stage. Reads; never writes books. |
 
 ## The review app
 

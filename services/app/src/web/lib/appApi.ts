@@ -244,6 +244,22 @@ export const accountChanges = {
     ),
 };
 
+/** Receipts (M16): the file and the hints, read by the ai service if the book has it, staged
+ * unconfirmed with the receipt attached. */
+export const receipts = {
+  capture: async (
+    book: string,
+    file: Blob,
+    filename: string,
+    hints: Record<string, string | null | undefined>
+  ): Promise<{ transaction_id: string; read: boolean; note: string | null }> => {
+    const form = new FormData();
+    form.set("file", file, filename);
+    for (const [key, value] of Object.entries(hints)) if (value) form.set(key, value);
+    return json(await apiFetch(`${base(book)}/receipts`, { method: "POST", body: form }));
+  },
+};
+
 /** Reconciling an account (M14): the screen's view, saving for later, finishing. */
 export const reconciling = {
   view: async (book: string, account: string, through?: string): Promise<ReconcileView> =>

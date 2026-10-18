@@ -21,6 +21,11 @@ http:
       entryPoints: [web]
       service: app
       middlewares: [session]
+    ai-api:
+      rule: PathPrefix(`/api/ai/v1`)
+      entryPoints: [web]
+      service: ai
+      middlewares: [session]
     app-ui:
       rule: PathPrefix(`/ui`)
       entryPoints: [web]
@@ -52,3 +57,7 @@ http:
       loadBalancer:
         servers:
           - url: http://app:3000
+    ai:
+      loadBalancer:
+        servers:
+          - url: http://ai:3000

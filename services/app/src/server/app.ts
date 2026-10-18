@@ -9,6 +9,7 @@ import { createApi, type SimplefinServices } from "./api.js";
 import type { AppDb } from "./db.js";
 import type { Categorizer } from "./categorize/types.js";
 import type { LedgerPort } from "./ledger.js";
+import type { AiPort } from "./ai.js";
 
 export function createApp(
   webRoot: string,
@@ -17,6 +18,7 @@ export function createApp(
     ledgerFor: (userId: string) => LedgerPort;
     categorizers?: Categorizer[];
     simplefin?: SimplefinServices;
+    aiFor?: (userId: string) => AiPort;
   }
 ) {
   const app = new Hono();

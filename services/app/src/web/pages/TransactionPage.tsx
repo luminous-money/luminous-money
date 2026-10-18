@@ -2,6 +2,7 @@ import type { Transaction } from "@fava-beans/ledger-client";
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 
+import { Attachments, type Pending } from "../components/Attachments.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
 import { PartChoice } from "../components/PartChoice.js";
@@ -13,10 +14,12 @@ import {
   explain,
   useAccountCreation,
   useAccounts,
+  useCanWrite,
   useCreateTransaction,
   useEditTransaction,
   useTransaction,
 } from "../lib/queries.js";
+import { api } from "../lib/ledger.js";
 import { simple } from "../lib/split.js";
 
 /** Its postings' reconciliations (M14): which account's statement, of which day. */
@@ -67,6 +70,7 @@ export function NewTransactionPage({ book }: { book: string }) {
     id: "",
     created_at: "",
     updated_at: "",
+    attachments: 0,
     date: today(),
     flag: "*",
     payee: null,
@@ -117,6 +121,9 @@ function Editor({
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
   const names = accounts.data ? postable(accounts.data, date) : [];
   const staged = t.flag === "!";
+  const canWrite = useCanWrite(book);
+  // A new transaction's attachments wait for it to be saved (M16).
+  const [pending, setPending] = useState<Pending[]>([]);
   // Reconciled: saving a change to its splits asks first (it can break the statement). Its
   // date can change freely: statements hold by what's reconciled with them, not by dates.
   const reconciled = isNew ? [] : reconciliations(t);
@@ -130,7 +137,8 @@ function Editor({
     try {
       const changes = { date, flag, payee: payee.trim() || null, narration, postings, meta };
       if (isNew) {
-        await add.mutateAsync({ ...changes, tags: [], links: [] });
+        const created = await add.mutateAsync({ ...changes, tags: [], links: [] });
+        for (const file of pending) await api.attach(book, created.id, file.blob, file.name);
         return navigate(back);
       }
       await edit.mutateAsync(changes);
@@ -193,6 +201,14 @@ function Editor({
       <PartChoice book={book} postings={splits.rows} onChange={(rows) => splits.setRows(rows)} />
       <SplitsFieldset splits={splits} accounts={names} create={create} />
       <ExcludeFromBudget meta={meta} onChange={setMeta} />
+
+      <Attachments
+        book={book}
+        transaction={t.id}
+        canWrite={canWrite}
+        pending={pending}
+        onPending={setPending}
+      />
 
       {message && <p className={message.kind === "error" ? "error" : "ok"}>{message.text}</p>}
       {confirming && (

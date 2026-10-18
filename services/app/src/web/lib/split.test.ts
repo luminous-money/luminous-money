@@ -14,6 +14,7 @@ const card: Transaction = {
   id: "t1",
   created_at: "2026-09-18T00:00:00.000000Z",
   updated_at: "2026-09-18T00:00:00.000000Z",
+  attachments: 0,
   date: "2026-09-18",
   flag: "!",
   payee: "Kin Soy",

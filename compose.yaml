@@ -63,6 +63,20 @@ services:
       - data:/data
     deploy: *restart
 
+  # AI (M16): each book's AI settings and provider credential (sealed with AI_ENCRYPTION_KEY),
+  # and reading receipts. Optional: without it, the app works as before and offers nothing AI.
+  ai:
+    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/ai:${FAVA_BEANS_VERSION:-dev}
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      # Required: encrypts each book's provider API key. 32 random bytes, base64:
+      # `openssl rand -base64 32`.
+      - AI_ENCRYPTION_KEY
+      - AI_CLAUDE_MODEL
+    volumes:
+      - data:/data
+    deploy: *restart
+
 configs:
   traefik-static:
     file: ./deploy/traefik/traefik.yml

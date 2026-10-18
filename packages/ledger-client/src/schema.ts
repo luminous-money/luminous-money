@@ -423,6 +423,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/attachments/{attachment_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Attachment File
+     * @description An attachment's file, as it was attached.
+     */
+    get: operations["attachment_file_api_ledger_v1_books__book_id__attachments__attachment_id__get"];
+    put?: never;
+    post?: never;
+    /** Detach */
+    delete: operations["detach_api_ledger_v1_books__book_id__attachments__attachment_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/budgets": {
     parameters: {
       query?: never;
@@ -846,6 +867,30 @@ export interface paths {
     patch: operations["patch_transaction_api_ledger_v1_books__book_id__transactions__directive_id__patch"];
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/transactions/{directive_id}/attachments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Attachments
+     * @description The files a transaction holds, oldest first.
+     */
+    get: operations["attachments_api_ledger_v1_books__book_id__transactions__directive_id__attachments_get"];
+    put?: never;
+    /**
+     * Attach
+     * @description Attach a file (at most 5 MB): the body is the file, its `Content-Type` its type.
+     */
+    post: operations["attach_api_ledger_v1_books__book_id__transactions__directive_id__attachments_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1114,6 +1159,26 @@ export interface components {
       deleted: number;
       /** Put */
       put: number;
+    };
+    /**
+     * Attachment
+     * @description A file a transaction holds (M16). Its bytes: `GET /books/{b}/attachments/{id}`.
+     */
+    Attachment: {
+      /** Content Type */
+      content_type: string;
+      /** Created At */
+      created_at: string;
+      /** Filename */
+      filename: string;
+      /** Id */
+      id: string;
+      /** Sha256 */
+      sha256: string;
+      /** Size */
+      size: number;
+      /** Transaction Id */
+      transaction_id: string;
     };
     /** Backup */
     Backup: {
@@ -2119,6 +2184,12 @@ export interface components {
     };
     /** Transaction */
     Transaction: {
+      /**
+       * Attachments
+       * @description How many files it holds (M16): a receipt, say.
+       * @default 0
+       */
+      attachments: number;
       /** Created At */
       created_at: string;
       /**
@@ -3386,6 +3457,68 @@ export interface operations {
       };
     };
   };
+  attachment_file_api_ledger_v1_books__book_id__attachments__attachment_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        attachment_id: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The file. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/octet-stream": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  detach_api_ledger_v1_books__book_id__attachments__attachment_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        attachment_id: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   list_budgets_api_ledger_v1_books__book_id__budgets_get: {
     parameters: {
       query?: never;
@@ -4421,6 +4554,84 @@ export interface operations {
       };
       /** @description Stale version */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  attachments_api_ledger_v1_books__book_id__transactions__directive_id__attachments_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        directive_id: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Attachment"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  attach_api_ledger_v1_books__book_id__transactions__directive_id__attachments_post: {
+    parameters: {
+      query?: {
+        /** @description The file's name, as it was. */
+        filename?: string;
+      };
+      header?: never;
+      path: {
+        directive_id: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/octet-stream": string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Attachment"];
+        };
+      };
+      /** @description Over 5 MB */
+      413: {
         headers: {
           [name: string]: unknown;
         };

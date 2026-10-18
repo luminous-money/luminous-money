@@ -6,6 +6,7 @@ import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { AppDb } from "./db.js";
 import { httpLedger } from "./ledger.js";
+import { httpAi } from "./ai.js";
 import { external, providersFrom } from "./categorize/external.js";
 import { history } from "./categorize/history.js";
 import { rules } from "./categorize/rules.js";
@@ -29,7 +30,7 @@ const categorizers = [
 // Bank feeds: credentials sealed with SIMPLEFIN_ENCRYPTION_KEY (required: config.ts).
 const simplefin = {
   store: new SimplefinStore(db.db),
-  sealer: new Sealer(config.simplefin.encryptionKey),
+  sealer: new Sealer(config.simplefin.encryptionKey, "SIMPLEFIN_ENCRYPTION_KEY"),
   policy: { hosts: config.simplefin.hosts, allowInsecure: config.simplefin.allowInsecure },
 };
 if (simplefin.policy.allowInsecure)
@@ -38,7 +39,16 @@ if (simplefin.policy.allowInsecure)
   );
 
 serve(
-  { fetch: createApp(webRoot, { db, ledgerFor, categorizers, simplefin }).fetch, port },
+  {
+    fetch: createApp(webRoot, {
+      db,
+      ledgerFor,
+      categorizers,
+      simplefin,
+      aiFor: (user) => httpAi(config.aiUrl, user),
+    }).fetch,
+    port,
+  },
   (info) => {
     console.log(`app listening on :${info.port} (${config.env}), serving the PWA from ${webRoot}`);
     startDaily([

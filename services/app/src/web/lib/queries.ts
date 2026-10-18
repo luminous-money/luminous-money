@@ -29,10 +29,12 @@ import {
 import { useEffect, useRef } from "react";
 
 import type { AccountCreation } from "../components/AccountPicker.js";
+import { aiApi, type AiSettingsPatch } from "./ai.js";
 import {
   accountChanges,
   appApi,
   bankFeeds,
+  receipts,
   reconciling,
   type LinkRequest,
   type BookInfo,
@@ -1027,6 +1029,85 @@ export function usePatchSettings(book: string) {
     mutationFn: (patch: Parameters<typeof appApi.patchSettings>[1]) =>
       appApi.patchSettings(book, patch),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+// AI and receipts (M16)
+
+/** The ai service's health: null when it can't be reached (then nothing AI is offered). */
+export function useAiHealth() {
+  return useQuery({ queryKey: ["ai", "health"], queryFn: aiApi.health, staleTime: 60_000 });
+}
+
+export function useAiSettings(book: string, enabled = true) {
+  return useQuery({
+    queryKey: ["book", book, "ai"],
+    queryFn: () => aiApi.settings(book),
+    enabled,
+    retry: false,
+  });
+}
+
+/** Whether receipts can be captured into the book: the service up, the book's AI ready, and
+ * the caller able to change the book. */
+export function useReceiptsReady(book: string | undefined): boolean {
+  const health = useAiHealth();
+  const settings = useAiSettings(book ?? "", !!book && !!health.data);
+  const canWrite = useCanWrite(book ?? "");
+  return !!book && !!health.data && !!settings.data?.ready && canWrite;
+}
+
+function useAiChange<A>(book: string, fn: (args: A) => Promise<unknown>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (settings) => client.setQueryData(["book", book, "ai"], settings),
+  });
+}
+export const usePatchAi = (book: string) =>
+  useAiChange(book, (patch: AiSettingsPatch) => aiApi.patch(book, patch));
+export const useSetAiKey = (book: string) =>
+  useAiChange(book, (key: string) => aiApi.setKey(book, key));
+export const useClearAiKey = (book: string) => useAiChange(book, () => aiApi.clearKey(book));
+
+export function useCaptureReceipt(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      file,
+      filename,
+      hints,
+    }: {
+      file: Blob;
+      filename: string;
+      hints: Record<string, string | null | undefined>;
+    }) => receipts.capture(book, file, filename, hints),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+export function useAttachments(book: string, transaction: string, enabled = true) {
+  return useQuery({
+    queryKey: [...keys.transaction(book, transaction), "attachments"],
+    queryFn: () => api.attachments(book, transaction),
+    enabled: enabled && !!transaction,
+  });
+}
+
+export function useAttach(book: string, transaction: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ file, filename }: { file: Blob; filename: string }) =>
+      api.attach(book, transaction, file, filename),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.transaction(book, transaction) }),
+  });
+}
+
+export function useDetach(book: string, transaction: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (attachment: string) => api.detach(book, attachment),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.transaction(book, transaction) }),
   });
 }
 

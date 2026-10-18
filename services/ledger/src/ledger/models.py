@@ -90,6 +90,19 @@ class Transaction(TransactionIn):
     id: str
     created_at: str
     updated_at: str = Field(description="Changes on every write; send it back with edits.")
+    attachments: int = Field(0, description="How many files it holds (M16): a receipt, say.")
+
+
+class Attachment(Api):
+    """A file a transaction holds (M16). Its bytes: `GET /books/{b}/attachments/{id}`."""
+
+    id: str
+    transaction_id: str
+    filename: str
+    content_type: str
+    size: int
+    sha256: str
+    created_at: str
 
 
 class TransactionUpdate(TransactionIn):

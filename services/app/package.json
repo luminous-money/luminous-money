@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fava-beans/ai-api": "workspace:*",
     "@fava-beans/csv-import": "workspace:*",
     "@fava-beans/db": "workspace:*",
     "@fava-beans/ledger-client": "workspace:*",

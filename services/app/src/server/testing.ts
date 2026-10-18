@@ -357,6 +357,21 @@ export class FakeLedger implements LedgerPort {
       .reduce((total, t) => add(total, this.posting(t, account)!.units!.number), "0");
   }
 
+  attachments: { transaction: string; name: string; type: string; size: number }[] = [];
+  async attach(
+    _book: string,
+    transaction: string,
+    file: { name: string; type: string; bytes: Uint8Array }
+  ) {
+    this.attachments.push({
+      transaction,
+      name: file.name,
+      type: file.type,
+      size: file.bytes.length,
+    });
+    return { id: `a${this.attachments.length}` };
+  }
+
   /** Divide a leaf (M15), as the ledger does: its postings to the main part, the parts given
    * their amounts by one transfer. */
   async divide(

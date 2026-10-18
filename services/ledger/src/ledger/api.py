@@ -23,10 +23,10 @@ import re
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Body, Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
 from . import budgets, chart, engine, investments, models, reconcile
-from .service import Ledger, NameTaken, NotFound
+from .service import Ledger, NameTaken, NotFound, TooLarge
 from .store import Row, StaleVersion, Store
 
 BeancountText = Annotated[str, Body(media_type="text/plain")]
@@ -119,6 +119,10 @@ def create_app(ledger: Ledger) -> FastAPI:
     @app.exception_handler(reconcile.ReconcileRefused)
     async def reconcile_refused(_, exc: reconcile.ReconcileRefused):
         return JSONResponse({"detail": str(exc)}, status_code=422)
+
+    @app.exception_handler(TooLarge)
+    async def too_large(_, exc: TooLarge):
+        return JSONResponse({"detail": str(exc)}, status_code=413)
 
     @app.exception_handler(NameTaken)
     async def name_taken(_, exc: NameTaken):
@@ -482,6 +486,57 @@ def create_app(ledger: Ledger) -> FastAPI:
     def patch_transaction(book_id: MemberBook, directive_id: str, patch: models.TransactionPatch) -> models.Transaction:
         ledger.patch_transaction(book_id, directive_id, patch)
         return ledger.transaction(book_id, directive_id)
+
+    # Attachments (M16)
+
+    @api.get("/books/{book_id}/transactions/{directive_id}/attachments")
+    def attachments(book_id: MemberBook, directive_id: str) -> list[models.Attachment]:
+        """The files a transaction holds, oldest first."""
+        return ledger.attachments(book_id, directive_id)
+
+    @api.post(
+        "/books/{book_id}/transactions/{directive_id}/attachments",
+        status_code=201,
+        responses={413: {"description": "Over 5 MB"}},
+        openapi_extra={
+            "requestBody": {
+                "required": True,
+                "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}},
+            }
+        },
+    )
+    async def attach(
+        book_id: MemberBook,
+        directive_id: str,
+        request: Request,
+        filename: Annotated[str, Query(description="The file's name, as it was.")] = "attachment",
+    ) -> models.Attachment:
+        """Attach a file (at most 5 MB): the body is the file, its `Content-Type` its type."""
+        declared = int(request.headers.get("content-length") or 0)
+        if declared > Ledger.ATTACHMENT_LIMIT:
+            raise TooLarge("an attachment is at most 5 MB")
+        data = await request.body()
+        content_type = request.headers.get("content-type") or "application/octet-stream"
+        return ledger.attach(book_id, directive_id, filename, content_type.split(";")[0].strip(), data)
+
+    @api.get(
+        "/books/{book_id}/attachments/{attachment_id}",
+        response_class=Response,
+        responses={200: {"content": {"application/octet-stream": {}}, "description": "The file."}},
+    )
+    def attachment_file(book_id: MemberBook, attachment_id: str) -> Response:
+        """An attachment's file, as it was attached."""
+        found, data = ledger.attachment(book_id, attachment_id)
+        safe = re.sub(r'["\\\r\n]', "", found.filename) or "attachment"
+        return Response(
+            content=data,
+            media_type=found.content_type,
+            headers={"Content-Disposition": f'inline; filename="{safe}"', "Cache-Control": "private, max-age=3600"},
+        )
+
+    @api.delete("/books/{book_id}/attachments/{attachment_id}", status_code=204)
+    def detach(book_id: MemberBook, attachment_id: str) -> None:
+        ledger.detach(book_id, attachment_id)
 
     # Any directive, as Beancount text
 

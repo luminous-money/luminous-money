@@ -13,6 +13,9 @@ import { BankConnections } from "./pages/BankConnections.js";
 import { ResetPassword, VerifyEmail } from "./pages/EmailLinks.js";
 import { AccountLedger } from "./pages/AccountLedger.js";
 import { Reconcile } from "./pages/Reconcile.js";
+import { AiSettings } from "./pages/AiSettings.js";
+import { CaptureReceipt } from "./pages/CaptureReceipt.js";
+import { ReceiptButton } from "./components/ReceiptButton.js";
 import { AddAccount } from "./pages/AddAccount.js";
 import { Books } from "./pages/Books.js";
 import { Budgets } from "./pages/Budgets.js";
@@ -155,6 +158,12 @@ function Gate() {
               <TradePage key={account} book={id} account={decodeURIComponent(account)} />
             )}
           </Route>
+          <Route path="/books/:book/receipt">
+            {({ book: id }) => <CaptureReceipt key={id} book={id} />}
+          </Route>
+          <Route path="/books/:book/ai">
+            {({ book: id }) => <AiSettings key={id} book={id} />}
+          </Route>
           <Route path="/books/:book/accounts/:account/reconcile">
             {({ book: id, account }) => (
               <Reconcile key={account} book={id} account={decodeURIComponent(account)} />
@@ -232,6 +241,7 @@ function Masthead({ books, book }: { books?: BookInfo[]; book?: BookInfo }) {
       </Link>
       {books && (
         <div className="masthead-end">
+          {book && <ReceiptButton book={book.id} />}
           <BookSwitcher books={books} book={book} />
           <Menu />
         </div>

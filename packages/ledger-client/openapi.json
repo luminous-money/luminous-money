@@ -654,6 +654,50 @@
         "title": "Applied",
         "type": "object"
       },
+      "Attachment": {
+        "description": "A file a transaction holds (M16). Its bytes: `GET /books/{b}/attachments/{id}`.",
+        "properties": {
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "transaction_id": {
+            "title": "Transaction Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "transaction_id",
+          "filename",
+          "content_type",
+          "size",
+          "sha256",
+          "created_at"
+        ],
+        "title": "Attachment",
+        "type": "object"
+      },
       "Backup": {
         "properties": {
           "chunks": {
@@ -3040,6 +3084,12 @@
       "Transaction": {
         "additionalProperties": false,
         "properties": {
+          "attachments": {
+            "default": 0,
+            "description": "How many files it holds (M16): a receipt, say.",
+            "title": "Attachments",
+            "type": "integer"
+          },
           "created_at": {
             "title": "Created At",
             "type": "string"
@@ -5331,6 +5381,90 @@
         "summary": "Unarchive Account"
       }
     },
+    "/api/ledger/v1/books/{book_id}/attachments/{attachment_id}": {
+      "delete": {
+        "operationId": "detach_api_ledger_v1_books__book_id__attachments__attachment_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "title": "Attachment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Detach"
+      },
+      "get": {
+        "description": "An attachment's file, as it was attached.",
+        "operationId": "attachment_file_api_ledger_v1_books__book_id__attachments__attachment_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "title": "Attachment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {}
+            },
+            "description": "The file."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attachment File"
+      }
+    },
     "/api/ledger/v1/books/{book_id}/budgets": {
       "get": {
         "description": "Every version of every budget, by account, then start.",
@@ -7059,6 +7193,132 @@
           }
         },
         "summary": "Replace Transaction"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/transactions/{directive_id}/attachments": {
+      "get": {
+        "description": "The files a transaction holds, oldest first.",
+        "operationId": "attachments_api_ledger_v1_books__book_id__transactions__directive_id__attachments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "directive_id",
+            "required": true,
+            "schema": {
+              "title": "Directive Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Attachment"
+                  },
+                  "title": "Response Attachments Api Ledger V1 Books  Book Id  Transactions  Directive Id  Attachments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attachments"
+      },
+      "post": {
+        "description": "Attach a file (at most 5 MB): the body is the file, its `Content-Type` its type.",
+        "operationId": "attach_api_ledger_v1_books__book_id__transactions__directive_id__attachments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "directive_id",
+            "required": true,
+            "schema": {
+              "title": "Directive Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The file's name, as it was.",
+            "in": "query",
+            "name": "filename",
+            "required": false,
+            "schema": {
+              "default": "attachment",
+              "description": "The file's name, as it was.",
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attachment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "413": {
+            "description": "Over 5 MB"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attach"
       }
     }
   }

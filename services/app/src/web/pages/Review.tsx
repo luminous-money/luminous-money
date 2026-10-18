@@ -1,6 +1,6 @@
 import type { Transaction } from "@fava-beans/ledger-client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
 import { SelectBar } from "../components/SelectBar.js";
@@ -13,7 +13,7 @@ import { add, formatMoney, isNegative, isZero, negate } from "../lib/decimal.js"
 import { appApi, type ProposalSummary, type ProposedMatch } from "../lib/appApi.js";
 import { bookHome } from "../lib/books.js";
 import { today } from "../lib/format.js";
-import { withBack } from "../lib/navigation.js";
+import { useBack, useParam, withBack } from "../lib/navigation.js";
 import { useSelection } from "../lib/selection.js";
 import { similarUnconfirmed } from "../lib/similar.js";
 import {
@@ -43,6 +43,10 @@ import { simple, UNCATEGORIZED, withCounterpart } from "../lib/split.js";
  * many at once.
  */
 export function Review({ book }: { book: string }) {
+  const [, navigate] = useLocation();
+  // Just one transaction (a receipt just captured, M16): confirming or skipping it goes `back`.
+  const only = useParam("only");
+  const back = useBack(`/books/${book}/review`);
   const queue = useReviewQueue(book);
   const accounts = useAccounts(book);
   const create = useAccountCreation(book);
@@ -58,7 +62,13 @@ export function Review({ book }: { book: string }) {
   useEffect(() => writeSkipped(book, skipped), [book, skipped]);
 
   // Oldest first; skipped items go to the end, most recently skipped last.
-  const items = queue.items ?? [];
+  const items = (queue.items ?? []).filter((i) => !only || i.transaction.id === only);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    if (!only || !queue.items) return;
+    if (items.length) setSeen(true);
+    else if (seen) navigate(back);
+  }, [only, queue.items, items.length, seen, back, navigate]);
   const ordered = [
     ...items.filter((i) => !skipped.includes(i.transaction.id)),
     ...skipped.flatMap((id) => items.filter((i) => i.transaction.id === id)),
@@ -94,8 +104,8 @@ export function Review({ book }: { book: string }) {
   return (
     <main>
       <header className="page-head">
-        <Link href={bookHome(book)} className="back">
-          ‹ Books
+        <Link href={only ? back : bookHome(book)} className="back">
+          {only ? "‹ Back" : "‹ Books"}
         </Link>
         <h1>Review</h1>
         <p className="muted">
@@ -170,7 +180,9 @@ export function Review({ book }: { book: string }) {
               onSelect={() => selection.toggle(t.id)}
               accounts={accounts.data ? postable(accounts.data, t.date) : []}
               create={create}
-              onSkip={() => setSkipped((s) => [...s.filter((x) => x !== t.id), t.id])}
+              onSkip={() =>
+                only ? navigate(back) : setSkipped((s) => [...s.filter((x) => x !== t.id), t.id])
+              }
             />
           </li>
         ))}

@@ -115,6 +115,12 @@ export interface LedgerPort {
   budgetStatus(book: string, on: string, basis: "period" | "month"): Promise<BudgetStatus>;
   /** Fetch the latest prices of commodities still held that name a source. */
   fetchPrices(book: string): Promise<FetchResult>;
+  /** Attach a file to a transaction (M16; at most 5 MB). */
+  attach(
+    book: string,
+    transaction: string,
+    file: { name: string; type: string; bytes: Uint8Array }
+  ): Promise<{ id: string }>;
   /** Divide an account (M15): a divided account of the same name, its history in its main part. */
   divide(book: string, account: string, d: DivideIn): Promise<Account>;
   /** Change an account's settings (only those given), against its version. */
@@ -334,6 +340,24 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
           body: { ...changes, update: changes.update ?? [] },
         })
       ),
+    async attach(book, transaction, file) {
+      // The body is the file itself (no multipart), so this goes around the typed client.
+      const response = await fetch(
+        `${baseUrl}/api/ledger/v1/books/${encodeURIComponent(book)}/transactions/${encodeURIComponent(transaction)}/attachments?filename=${encodeURIComponent(file.name)}`,
+        {
+          method: "POST",
+          headers: { "X-User-Id": userId, "content-type": file.type || "application/octet-stream" },
+          body: file.bytes,
+        }
+      );
+      const body = (await response.json().catch(() => ({}))) as { id?: string; detail?: unknown };
+      if (!response.ok || !body.id)
+        throw new LedgerError(
+          response.status,
+          typeof body.detail === "string" ? body.detail : "couldn't attach the file"
+        );
+      return { id: body.id };
+    },
     divide: (book, account, d) =>
       unwrap(
         client.POST("/api/ledger/v1/books/{book_id}/accounts/{account}/divide", {

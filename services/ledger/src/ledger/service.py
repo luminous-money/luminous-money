@@ -23,6 +23,10 @@ class NotFound(KeyError):
     pass
 
 
+class TooLarge(Exception):
+    """A file over the limit (413)."""
+
+
 class NameTaken(ValueError):
     """A book name the owner already uses: the input's problem (422), not a conflict (409)."""
 
@@ -303,6 +307,37 @@ class Ledger:
             raise NotFound(directive_id)
         return found[0]
 
+    # Attachments (M16)
+
+    ATTACHMENT_LIMIT = 5 * 1024 * 1024
+
+    def attach(self, book_id: str, transaction_id: str, filename: str, content_type: str, data: bytes) -> models.Attachment:
+        """Keep a file for a transaction (at most 5 MB)."""
+        if self.get(book_id, transaction_id).kind != "transaction":
+            raise NotFound(transaction_id)
+        if len(data) > self.ATTACHMENT_LIMIT:
+            raise TooLarge("an attachment is at most 5 MB")
+        if not data:
+            raise engine.ParseFailure(["the file is empty"])
+        with self.store.transaction():
+            row = self.store.add_attachment(book_id, transaction_id, filename or "attachment", content_type, data)
+        return _attachment(row)
+
+    def attachments(self, book_id: str, transaction_id: str) -> list[models.Attachment]:
+        self.get(book_id, transaction_id)
+        return [_attachment(r) for r in self.store.attachments_of(book_id, [transaction_id])]
+
+    def attachment(self, book_id: str, attachment_id: str) -> tuple[models.Attachment, bytes]:
+        row = self.store.attachment(book_id, attachment_id)
+        if row is None:
+            raise NotFound(attachment_id)
+        return _attachment(row), self.store.attachment_bytes(book_id, attachment_id)
+
+    def detach(self, book_id: str, attachment_id: str) -> None:
+        with self.store.transaction():
+            if not self.store.delete_attachment(book_id, attachment_id):
+                raise NotFound(attachment_id)
+
     def transactions(self, book_id: str, **filters) -> list[models.Transaction]:
         """Transactions matching `Store.find` filters, structured, in ledger order."""
         self._header(book_id)
@@ -310,11 +345,17 @@ class Ledger:
 
     def _with_versions(self, rows: list[Row]) -> list[models.Transaction]:
         by_id = {r.id: r for r in rows}
+        held: dict[str, int] = {}
+        if rows:
+            book_id = self.store.book_of(rows[0].id)
+            for a in self.store.attachments_of(book_id, list(by_id)) if book_id else []:
+                held[a["directive_id"]] = held.get(a["directive_id"], 0) + 1
         return [
             models.Transaction(
                 id=directive_id,
                 created_at=by_id[directive_id].created_at,
                 updated_at=by_id[directive_id].updated_at,
+                attachments=held.get(directive_id, 0),
                 **body.model_dump(),
             )
             for directive_id, body in engine.transactions([r.text for r in rows])
@@ -827,6 +868,18 @@ class Ledger:
 
     def query(self, book_id: str, bql: str) -> tuple[list[str], list[list]]:
         return engine.query(self.load(book_id), bql)
+
+
+def _attachment(row) -> models.Attachment:
+    return models.Attachment(
+        id=row["id"],
+        transaction_id=row["directive_id"],
+        filename=row["filename"],
+        content_type=row["content_type"],
+        size=row["size"],
+        sha256=row["sha256"],
+        created_at=row["created_at"],
+    )
 
 
 def _parts(text: str | None) -> list[models.CompactPosting]:

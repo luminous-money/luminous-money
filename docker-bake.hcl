@@ -17,7 +17,7 @@ variable "VERSION" {
 }
 
 group "default" {
-  targets = ["auth", "ledger", "app"]
+  targets = ["auth", "ledger", "app", "ai"]
 }
 
 group "test" {
@@ -25,7 +25,7 @@ group "test" {
 }
 
 group "release" {
-  targets = ["auth-release", "ledger-release", "app-release"]
+  targets = ["auth-release", "ledger-release", "app-release", "ai-release"]
 }
 
 # Service images
@@ -51,6 +51,16 @@ target "app" {
     workspace = "target:workspace"
   }
   tags = ["${REGISTRY}/app:${VERSION}"]
+}
+
+# AI (M16): a book's AI settings and credential, and reading receipts.
+target "ai" {
+  context    = "."
+  dockerfile = "services/ai/Dockerfile"
+  contexts = {
+    workspace = "target:workspace"
+  }
+  tags = ["${REGISTRY}/ai:${VERSION}"]
 }
 
 # The TypeScript workspace, installed once and shared by every TypeScript image
@@ -133,4 +143,8 @@ target "auth-release" {
 
 target "app-release" {
   inherits = ["app", "_release"]
+}
+
+target "ai-release" {
+  inherits = ["ai", "_release"]
 }

@@ -128,7 +128,11 @@ milestone starts.
       new money lands in, Divide for an account you already have (its link, statements and
       history kept), the parts on screen with Move money, choosing a transaction's part, and
       rules that land what they match in a part.
-- [ ] **M16: Receipt capture.** Take a picture of a receipt, and AI makes a transaction from it.
+- [x] **M16: Receipt capture.** Take a picture of a receipt, and AI makes a transaction from it.
+      [Built](milestones/m16-receipt-capture/PLAN.md) 2026-10-18: the `ai` service (per-book AI
+      settings and a sealed key; Claude, and a fake for tests), Capture receipt (camera or
+      upload, hints, itemizing) into review and back, attachments on any transaction, and a
+      capture that always makes a transaction, read or not.
 - [ ] **M17: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
       tag.
 - [ ] **M18: Suggested recurring transactions.** Nightly, analyze each account's last 14 months
@@ -224,6 +228,10 @@ elaborated.
 - **Email, once there's an email system:** invitations sent by email (M13), and accounts
   required to verify their email (M8's question 1).
 - **Transferring a book's ownership** to a manager (M13).
+- **Attachments in exports and backups** (M16): they're Beancount text today, so receipts and
+  other files stay behind.
+- **Receipts, more** (M16): tuning the reading (prompts, evals), other providers, a cheaper
+  model per book, several receipts at once, and receipts by email.
 - **Auth (M8's other questions):** session lifetime (proposed: 60 days unused, a year at most),
   passkeys and two-factor (a milestone of their own), and which OIDC providers first (Google,
   Apple, GitHub, or any OIDC issuer).

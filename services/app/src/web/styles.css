@@ -260,7 +260,8 @@ button.icon {
   font-size: 1.3rem;
 }
 
-input {
+input,
+textarea {
   font: inherit;
   color: inherit;
   min-height: 2.75rem;
@@ -271,7 +272,13 @@ input {
   width: 100%;
 }
 
+textarea {
+  padding: 0.6rem 0.75rem;
+  resize: vertical;
+}
+
 input:focus,
+textarea:focus,
 button:focus-visible,
 .button:focus-visible {
   outline: 2px solid var(--green);
@@ -1704,7 +1711,8 @@ button.chart-more {
 
 /* Below 16px, iOS zooms in on focus. */
 .editor label input,
-.editor label select {
+.editor label select,
+.editor label textarea {
   font-size: 1rem;
 }
 
@@ -2387,4 +2395,199 @@ details.divide summary {
 
 .stacked-bar .s3 {
   background: #7a9cc6;
+}
+
+/* Receipts and attachments (M16). Capture receipt: the camera (or the photo) on top, the form
+   in a drawer below, opened and closed by its handle. */
+
+.receipt-button,
+.camera-button {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--ink);
+}
+
+.capture {
+  display: grid;
+  grid-template-rows: minmax(40vh, 1fr) auto;
+  gap: 0;
+  margin: 0 -1rem;
+  min-height: calc(100dvh - 6rem);
+}
+
+.capture-view {
+  position: relative;
+  display: grid;
+  place-items: center;
+  background: #000;
+  overflow: hidden;
+  min-height: 40vh;
+}
+
+.capture-view img,
+.camera video {
+  width: 100%;
+  height: 100%;
+  max-height: 50vh;
+  object-fit: contain;
+}
+
+.capture-file {
+  color: #fff;
+  padding: 1rem;
+  text-align: center;
+}
+
+.retake {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  font-size: 1.4rem;
+}
+
+.camera {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.camera-error {
+  color: #fff;
+  padding: 1rem;
+  text-align: center;
+}
+
+.shutter {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4rem;
+  height: 4rem;
+  border-radius: 999px;
+  border: 4px solid #fff;
+  background: transparent;
+  padding: 0;
+}
+
+.shutter span {
+  display: block;
+  margin: 0.25rem;
+  height: calc(100% - 0.5rem);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.drawer {
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  border-radius: 1rem 1rem 0 0;
+  margin-top: -1rem;
+  padding: 0 1rem max(1rem, env(safe-area-inset-bottom));
+  position: relative;
+}
+
+.drawer-handle {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 2.25rem;
+  border: 0;
+  background: none;
+  padding: 0;
+}
+
+.drawer-handle span {
+  width: 2.75rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.drawer .editor {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.check-row {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.receipt-hints > label + label {
+  margin-top: 0.6rem;
+}
+
+.receipt-hints summary {
+  cursor: pointer;
+  color: var(--green);
+  font-weight: 600;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+}
+
+.attachments {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.attachment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.attachment {
+  display: grid;
+  justify-items: start;
+  gap: 0.2rem;
+}
+
+.attachment img {
+  width: 5.5rem;
+  height: 5.5rem;
+  object-fit: cover;
+  border-radius: 0.6rem;
+  border: 1px solid var(--line);
+}
+
+.attachment .file-name {
+  display: inline-block;
+  max-width: 10rem;
+  overflow-wrap: anywhere;
+}
+
+.attach-choices {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.camera-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: #000;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.camera-dialog > button {
+  margin: 0.75rem;
 }

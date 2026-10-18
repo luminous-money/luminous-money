@@ -17,6 +17,10 @@ services:
       - APP_ENV=test
     depends_on: [simplefin-fake]
 
+  ai:
+    environment:
+      - APP_ENV=test
+
   simplefin-fake:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/simplefin-fake:${FAVA_BEANS_VERSION:-dev}
 
@@ -26,10 +30,10 @@ services:
   e2e:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/e2e:${FAVA_BEANS_VERSION:-dev}
     profiles: [tests]
-    depends_on: [traefik, auth, ledger, app, mailpit, simplefin-fake]
+    depends_on: [traefik, auth, ledger, app, ai, mailpit, simplefin-fake]
 
   ui:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/ui-tests:${FAVA_BEANS_VERSION:-dev}
     profiles: [tests]
-    depends_on: [traefik, auth, ledger, app, mailpit, simplefin-fake]
+    depends_on: [traefik, auth, ledger, app, ai, mailpit, simplefin-fake]
     ipc: host # Chromium needs more shared memory than Docker's default

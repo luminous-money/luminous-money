@@ -203,6 +203,24 @@ MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
     # 9: reconciliation (M14). Each posting's `reconciled:` mark, the statement date it was
     # reconciled with, so ledgers and reconciling read it with SQL.
     ["ALTER TABLE posting ADD COLUMN reconciled TEXT", _backfill_reconciled],
+    # 10: attachments (M16): files a transaction holds (a receipt's photo, say). The bytes are on
+    # the data volume beside the database (`attachments/<book>/<id>`); this is what's known of
+    # each.
+    [
+        create_table(
+            "attachment",
+            [
+                "id TEXT PRIMARY KEY",
+                "book_id TEXT NOT NULL",
+                "directive_id TEXT NOT NULL",
+                "filename TEXT NOT NULL",
+                "content_type TEXT NOT NULL",
+                "size INTEGER NOT NULL",
+                "sha256 TEXT NOT NULL",
+            ],
+        ),
+        "CREATE INDEX attachment_directive ON attachment(book_id, directive_id)",
+    ],
 ]
 
 

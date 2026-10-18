@@ -1,0 +1,6 @@
+# Production-safe settings for ai (APP_ENV=production, the default). AI_ENCRYPTION_KEY has no
+# default and must come from the environment.
+PORT=3000
+AI_DATA_DIR=/data
+LEDGER_URL=http://ledger:8000
+AI_PROVIDERS=claude
