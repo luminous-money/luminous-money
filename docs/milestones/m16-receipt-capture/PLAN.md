@@ -1,10 +1,10 @@
 M16: Receipt capture: plan
 ==================================================================================================
 
-> **Status: built (2026-10-18).** No open questions changed the architecture; the minor ones
-> are [at the end](#questions). The brief, from [the plan](../../PLAN.md): take a picture of a
-> receipt, and AI makes a transaction from it. Its spec is the notes beside this plan
-> ([notes.md](notes.md)).
+> **Status: first pass built (2026-10-18); the [second pass](#the-second-pass-extract-then-categorize)
+> (reading in two steps, payment cards, categorizing splits) planned 2026-10-18 and being
+> built.** The brief, from [the plan](../../PLAN.md): take a picture of a receipt, and AI makes
+> a transaction from it. Its spec is the notes beside this plan ([notes.md](notes.md)).
 
 ## What M16 is
 
@@ -90,25 +90,12 @@ so the PWA makes one request:
 1. **The hints:** the base account (the account page you came from, if it's an asset or
    liability; else none), itemize (yes / no), and anything else you typed: total, date, payee,
    a note.
-2. **`ai` reads it** (`POST /api/ai/v1/books/:book/receipts/read`): the image (or PDF), the
-   hints, the chart of accounts (names, types, display names), today; the book's settings
-   decide itemizing (unless the hint says), account creation, eagerness and guidance. The
-   provider returns:
-   - **the base account** (the hint is a hint: "Visa 9499" on the receipt is your
-     `Liabilities:Amazon-Visa-9499`), or none
-   - **the total**, signed as it moves the base account (an expense is negative; a refund
-     positive), the **date**, the **payee**, a **narration**
-   - **a global category** (Jewel → `Expenses:Groceries`): the fallback for any split it can't
-     place
-   - **splits,** categorized, summing to the total (one, when not itemizing)
-   - **new accounts** it would open (only with account creation on), and a short note
-3. **`app` checks and stages it,** unconfirmed, with the receipt attached and `source: "receipt"`:
-   - an account that doesn't exist is opened if the AI proposed it and creation is on, else
-     the split falls back to the global category, else to uncategorized
-   - splits that don't sum to the total are replaced by one split of the total to the global
-     category
-   - **no base account:** `Assets:Unknown`, a system account opened when it's first needed;
-     review asks "Paid from" (or "Into") before it can be confirmed, as it asks for a category
+2. **`ai` reads it, and `app` stages it:** in the first pass, one call returned a whole
+   proposed transaction. The [second pass](#the-second-pass-extract-then-categorize) splits
+   that into extracting the receipt's facts and categorizing its splits, with `app` putting the
+   transaction together between them.
+3. **No base account:** `Assets:Unknown`, a system account opened when it's first needed;
+   review asks "Paid from" (or "Into") before it can be confirmed, as it asks for a category.
 4. **It always makes something:** if the AI is off, down, or can't read it, the transaction is
    made from what you typed (or a zero amount, "Receipt: couldn't read it"), with the receipt
    attached and a note saying why, so nothing is lost.
@@ -117,16 +104,13 @@ so the PWA makes one request:
 
 ### The Claude provider
 
-- **The official SDK** (`@anthropic-ai/sdk`), the **Messages API**: the receipt as an image
-  block (JPEG, PNG, WebP, GIF) or a document block (PDF), base64; the chart of accounts and the
-  hints as text; the book's guidance and eagerness in the system prompt.
-- **Structured output:** `output_config.format` with a JSON schema of the reading, validated
-  again on arrival (zod).
-- **Model:** `claude-opus-5` by default (`AI_CLAUDE_MODEL` overrides it), adaptive thinking,
-  and the server-side **fallback** on a refusal (`fallbacks: "default"`); a refusal or an error
-  is "couldn't read it", not a failure of the capture.
-- **Mechanics later:** prompts, evals and tuning aren't this milestone's; its job is the
-  structure, inputs and outputs, and a capture that always yields something.
+- **The official SDK** (`@anthropic-ai/sdk`), the **Messages API**, structured output
+  (`output_config.format`, a JSON schema, validated again on arrival with zod), adaptive
+  thinking. A refusal or an error is "couldn't read it", not a failure of the capture. Its two
+  operations and their models are the second pass's.
+- **Mechanics later:** evals and tuning aren't this milestone's; its job is the structure, the
+  inputs and outputs, and a capture that always yields something. The one place it invests in
+  the prompt now is the total (below).
 
 ### In the PWA
 
@@ -144,7 +128,126 @@ so the PWA makes one request:
   replace; never shown), itemize by default, account creation with its eagerness and guidance.
   Managers change them; members see them.
 
-## How it gets built
+## The second pass: extract, then categorize
+
+Decided with Kael, 2026-10-18. Reading a receipt is two narrow operations composed, and
+categorizing works on a transaction's unconfirmed **splits**, so a receipt is staged the way
+an import is.
+
+### Payment cards on accounts
+
+- **An asset or liability account can list its cards:** each a brand (optional: Visa,
+  Mastercard, Amex, Discover, other) and the last four digits. One account may have several
+  (a card held by two people has two numbers). A divided account holds them on the whole, like
+  its bank link; its parts can't.
+- **Kept on the account's `open`** (`cards: "visa 9499, visa 0417"`: Beancount metadata has no
+  lists), so exports carry them; set through the account's settings (`cards` on its PATCH),
+  edited in the account editor. A card (brand and last four) is one account's in a book: the
+  ledger refuses a second.
+- **Which account paid:** the receipt's card, matched by its last four (and its brand, when two
+  accounts share the digits), else the page you came from (the hint), else `Assets:Unknown`.
+  Nothing guesses it from account names. A divided account takes it in its main part.
+
+### Split flags: what's unconfirmed is a split
+
+- **A transaction's flag keeps its meaning:** `!` in review, `*` confirmed. Review's queue,
+  budgets' unconfirmed amounts, ledgers, reconciling, schedules, transfer pairing and the bank
+  mirror are unchanged.
+- **A proposed split carries its own flag:** what's staged for categorizing is `! Expenses:…`
+  (Beancount's posting flag); the side that's known (the bank's, a matched card's, or one you
+  chose) has none. So a split proposed as Groceries is still unconfirmed, and can be asked
+  about again.
+- **Confirming a transaction confirms its splits:** the ledger clears posting flags whenever a
+  transaction is written as `*`, through any route (JSON writes, the flag alone, reconciling).
+  Text imports and restores keep what the text says.
+- **Choosing an account yourself confirms that split** (review's pickers, Select mode's
+  "Categorize as…", the transaction's page), though the transaction still waits for Confirm.
+- **Confirmable:** a flagged split on a real account can be confirmed (that accepts the
+  proposal); one on Uncategorized or `Assets:Unknown` can't.
+- **For SQL:** the posting's flag and its `memo:` become derived columns (ledger migration 11),
+  and the compact history carries them, for item history.
+- **What's already in review** (unflagged): its Uncategorized splits are still undecided; a
+  proposed one counts as decided. No backfill.
+
+### Categorizing splits
+
+- **The unit of work** is a transaction's unconfirmed splits (index, amount, memo), with the
+  transaction around them as context: date, payee, description, the known splits. A bank row is
+  a transaction with one; an itemized receipt has several (tax and tip are splits like the
+  rest).
+- **A proposal** names accounts for specific splits, and/or a **fallback** for the rest. Each
+  split takes the best proposal for it, else the best fallback, else Uncategorized.
+- **Who says what:** rules and payee history match the transaction, so their answer is a
+  fallback (Jewel → Groceries). **Item history** (new) matches a split: an item confirmed
+  before at the same payee ("Eggs Hppy 18" at Jewel) gets that account again. The AI answers
+  per split, with a fallback, and may propose accounts to open (with account creation on).
+- **Settling:** a proposal for a split at 0.9 or more settles it. A fallback settles a
+  transaction only when it has one split: so bank rows settle as they do today, and a
+  "Jewel → Groceries" rule doesn't stop a Jewel receipt being itemized; it catches what's
+  missed.
+- **External categorizers (API v1)** keep their contract: they're asked about one-split
+  transactions as now; for several, their one-posting answer counts as the fallback.
+- **"Suggest categories" and re-applying a rule** act on flagged splits (and Uncategorized
+  ones), instead of guessing what the user hasn't decided from the stored proposal.
+- **The AI categorizer runs for receipts only** (it's reading the receipt anyway); whether
+  imports call it is M19's to decide.
+- **Receipts never confirm automatically,** whatever a rule says: you land on them in review.
+
+### The ai service's two operations
+
+- **`POST /books/:book/receipts/extract`** (Claude: `claude-sonnet-5`,
+  `AI_CLAUDE_EXTRACT_MODEL`): the receipt in; out, what it says and nothing about the book:
+  the payee, date, currency, the **total** with the text it was read from, whether it's a
+  refund, how it was paid (a card's brand and last four, or cash), the splits (each as printed
+  and spelled out, with its amount; subtotal lines left out, tax, tip, fees and discounts in),
+  and a note.
+- **Getting the total right:** the system prompt defines it as what was charged to the payment
+  and works through the traps (a signed slip's handwritten tip, "you saved" and coupon lines,
+  cash tendered and change, split tender, gift card balances, returns, foreign currency); the
+  answer quotes where it read the total (the payment line's amount should agree); and the
+  service checks that the splits sum to the total, and if they don't, answers once in the same
+  conversation ("your items sum to 21.98, the total is 23.50: read it again") before giving
+  up and saying by how much. A total you typed wins over the receipt's, and the note says so.
+- **`POST /books/:book/categorize`** (Claude: `claude-opus-5`, `AI_CLAUDE_CATEGORIZE_MODEL`,
+  with the server-side fallback on a refusal): transactions with their unconfirmed splits, the
+  chart, the history that bears on them, and the book's guidance and creation settings in; out,
+  an account per split, a fallback per transaction, the accounts it would open, and a reason.
+  Text only. M19 calls the same thing.
+- **The fake provider** does both deterministically, for test stacks.
+
+### A receipt, end to end
+
+1. **Extract** (if the book's AI is ready; else the hints alone).
+2. **Build the transaction:** the paying account (card, hint, `Assets:Unknown`); itemized, the
+   splits as flagged splits on Uncategorized (with their `memo:`), plus one for any difference
+   from the total; not itemized, one flagged split of the total.
+3. **Categorize** through the chain: rules, history, item history, then the AI.
+4. **Stage** unconfirmed, the receipt attached, opening any accounts the AI proposed (with
+   creation on); then review, as before.
+
+### In review
+
+- **A transaction with several unconfirmed splits** shows each on its card: what it is, its
+  amount, and its account to pick ("fallback" when that's where it came from), rather than
+  only "Open".
+
+### How the second pass gets built
+
+1. **Ledger:** cards (on `open`, validated, unique, kept with a divided account's whole);
+   posting flags cleared on confirm; migration 11 (posting flag and memo), in the compact
+   history; tests; `pnpm generate`.
+2. **`ai`:** the two operations and their types (`packages/ai-api`); Claude's extract (with
+   the correction turn) and categorize; the fake's; the old read route goes; tests.
+3. **`app`:** the chain over splits (fallbacks, settling, item history, the external adapter,
+   the AI categorizer); staging with split flags; Suggest and rules over flagged splits; card
+   matching; receipts rebuilt on extract, build, categorize, stage; tests.
+4. **PWA:** cards in the account editor; choosing an account clears its split's flag; review's
+   split rows.
+5. **Tests and docs:** API e2e (cards; a receipt paid by a known card; an itemized receipt's
+   flagged splits; staged imports' flags; confirming clears them), browser (cards; picking a
+   receipt's splits in review), design.md, the categorizer API doc, PLAN.md, RESUME.md.
+
+## How it gets built (the first pass)
 
 1. **`@fava-beans/db`:** the sealer, moved from `app` (which uses it from there).
 2. **Ledger:** attachments (migration 10, the files, the routes, cleanup with transactions and
@@ -173,8 +276,6 @@ so the PWA makes one request:
 1. **No base account:** the notes asked for `Expenses:Uncategorized` / `Income:Uncategorized`,
    which made a transaction between two expense accounts. **Answered (2026-10-18):** a system
    account, `Assets:Unknown`, chosen in review ("Paid from") before it can be confirmed.
-2. **The model:** `claude-opus-5` by default (the most capable widely available). Receipts may
-   not need it. **Proposed by Kael (2026-10-18):** two passes that share no context: extracting
-   what the receipt says (Sonnet), then categorizing it and proposing accounts (Opus). Still
-   open.
+2. **The model:** **Answered (2026-10-18):** two passes that share no context, extracting
+   (Sonnet 5) then categorizing (Opus 5): [the second pass](#the-second-pass-extract-then-categorize).
 3. **PDFs:** accepted (statements and e-receipts are often PDFs). **Answered:** yes.
