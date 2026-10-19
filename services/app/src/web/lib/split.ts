@@ -58,13 +58,20 @@ export function toInput(t: Transaction): TransactionIn {
   return { date, flag, payee, narration, tags, links, meta, postings };
 }
 
+/** A posting moved to the account you chose: it's yours now, so its flag (`!`, a split still to
+ * confirm) goes (M16). */
+export const chosen = <P extends { account: string; flag?: string | null }>(
+  { flag: _flag, ...p }: P,
+  account: string
+) => ({ ...p, account }) as P;
+
 /** Recategorize the happy path: same amounts, the counterpart moved to another account. */
 export function withCounterpart(t: TransactionIn, account: string): TransactionIn {
   const view = simple(t);
   if (!view) throw new Error("not a simple transaction");
   return {
     ...t,
-    postings: t.postings.map((p, i) => (i === view.counterpartIndex ? { ...p, account } : p)),
+    postings: t.postings.map((p, i) => (i === view.counterpartIndex ? chosen(p, account) : p)),
   };
 }
 
@@ -123,5 +130,5 @@ export function withOtherSide(
   const mine = (name: string) => name === own || name.startsWith(`${own}:`);
   const index = mine(t.postings[0]!.account) ? 1 : mine(t.postings[1]!.account) ? 0 : -1;
   if (index === -1) return null;
-  return { ...t, postings: t.postings.map((p, i) => (i === index ? { ...p, account } : p)) };
+  return { ...t, postings: t.postings.map((p, i) => (i === index ? chosen(p, account) : p)) };
 }

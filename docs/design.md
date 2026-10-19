@@ -747,37 +747,80 @@ same money in through another's, a day or so later. Both would sit in review, un
 ### Receipts and AI (M16)
 
 - **One `ai` service owns everything AI** (`/api/ai/v1`, TypeScript): each book's AI settings
-  and its credential, the providers, and reading. Nothing else talks to a model, so M19's AI
-  categorization lands in the same place, with the same key and guidance.
-- **It reads; it doesn't write books.** A reading is a pure function of the receipt and the
-  context `app` sends (the chart, the hints, today); `app` checks it and stages it, as it stages
-  imports. So staged transactions keep one writer, and the AI service needs no write access to
-  the ledger. Roles come from the ledger: read sees the settings, manage changes them, write
-  reads receipts.
+  and its credential, the providers, and two narrow operations `app` composes. Nothing else
+  talks to a model, so M19's AI categorization lands in the same place, with the same key and
+  guidance.
+- **Two operations that share no context** (Unix-style: small, composed):
+  - **extract** (`claude-sonnet-5`): a receipt's facts, knowing nothing of the book: payee,
+    date, the total with the receipt's words for it, refund or not, the card (brand, last
+    four), and the lines that make up the total (tax, tip, fees and discounts are lines like
+    the rest; subtotals aren't). The image goes only to the cheaper model.
+  - **categorize** (`claude-opus-5`): where transactions' unconfirmed splits belong, from the
+    chart, the history and the book's guidance; text only, the chart cached in the system
+    prompt.
+  Each is tested and tuned on its own, and a failure of either still leaves a transaction.
+- **The total is the one place the prompt invests now:** defined as what was charged to the
+  payment, with the usual traps spelled out (a signed slip's handwritten tip, savings lines,
+  cash and change, split tender, holds, returns); the answer quotes where it read it; and if
+  the lines don't sum to it, the service tells the model so once, in the same conversation,
+  before reporting by how much it's off. A total typed by the person wins.
+- **It answers; it doesn't write books.** `app` puts the transaction together and stages it, as
+  it stages imports, so staged transactions keep one writer and the AI service needs no write
+  access to the ledger. Roles come from the ledger: read sees the settings, manage changes them,
+  write uses the operations.
 - **Its health is how the rest knows it's there:** the PWA offers AI (the masthead's camera)
   only when `GET /api/ai/v1/health` answers and the book is **ready** (enabled, a provider, and
   a credential). With the service down, nothing AI shows and the rest is unchanged.
 - **Credentials are sealed** with `AI_ENCRYPTION_KEY` (the sealer SimpleFIN uses, now in
   `@fava-beans/db`) and never sent back: the settings say only that one is set and its last four
   characters. Claude takes an API key (it has no OAuth for third-party apps).
-- **A capture always makes something:** `app`'s `POST /books/:book/receipts` reads through
-  `ai`, and if AI is off, down, or can't read it, makes the transaction from what was typed (a
-  zero total if nothing), with the receipt attached and `receipt-note:` saying why. A reading is
-  checked against the books: a base account must be an asset or liability (a divided account's
-  main part, as for imports), else `Assets:Unknown`, a system account opened when it's first
-  needed: review asks "Paid from" before it can be confirmed, as it asks for a category (a base
-  account on an expense account would be a transaction between two categories, which the bank's
-  copy could never match); splits are kept only if they're on accounts that exist (or that
-  the reader proposed and the book lets it open) and sum to the total, else one split goes to
-  the reader's category. Staged unconfirmed with `source: "receipt"`, it's then found by the
-  matcher when the bank's copy arrives.
-- **Providers are a small interface** (`read(input, credential) → reading`, or `ReadFailed`):
-  `claude` (the official SDK, structured output against the reading's JSON Schema, checked again
-  with zod; `claude-opus-5` unless `AI_CLAUDE_MODEL` says otherwise; the server-side fallback on a
-  refusal) and `fake` (deterministic, for test stacks: `AI_PROVIDERS` lists what a stack
-  offers). Prompts and their tuning are later work.
+- **The paying account is matched, not guessed:** asset and liability accounts list their
+  **payment cards** (brand optional, last four; on the `open`, so exports keep them; a card is
+  one account's), and the receipt's card names the account; else the page it was captured from;
+  else `Assets:Unknown`, a system account review asks to replace ("Paid from") before it can be
+  confirmed (a paying side on an expense account would be a transaction between two categories,
+  which the bank's copy could never match). A divided account takes it in its main part.
+- **A capture always makes something:** if AI is off, down, or can't read it, the transaction
+  is made from what was typed (a zero total if nothing), with the receipt attached and
+  `receipt-note:` saying why. Staged unconfirmed with `source: "receipt"`, it never confirms
+  itself, and the matcher finds it when the bank's copy arrives.
+- **Providers are a small interface** (`extract`, `categorize`, or `ReadFailed`): `claude` (the
+  official SDK, structured output against JSON Schemas checked again with zod;
+  `AI_CLAUDE_EXTRACT_MODEL` and `AI_CLAUDE_CATEGORIZE_MODEL` override the models; the server-side
+  fallback on a refusal for the models that have one) and `fake` (deterministic, for test
+  stacks: `AI_PROVIDERS` lists what a stack offers).
 - **Review takes one item** (`?only=<id>&back=…`), so a capture lands on its transaction and
   confirming or skipping it returns to where the capture started.
+
+### Split flags and categorizing splits (M16)
+
+- **What's unconfirmed is a split:** a proposed split carries Beancount's posting flag
+  (`! Expenses:Groceries`); the side that's known (the bank's, a matched card's, one you chose)
+  has none. The transaction's flag keeps its meaning (`!` in review), so the queue, budgets,
+  ledgers, reconciling, schedules and pairing are unchanged.
+- **Confirming confirms its splits:** the ledger drops posting flags whenever a transaction is
+  written `*`, by any JSON route, the flag alone or reconciling (one rule in the engine, so no
+  caller can forget). Text imports and restores keep what the text says. Choosing an account
+  yourself drops that split's flag (review, Select mode, the transaction's page).
+- **The flag replaces a guess:** "Suggest categories" and re-applying a rule used to infer what
+  the user hadn't decided (the other side uncategorized, or still exactly as proposed); now they
+  act on flagged and uncategorized splits. The posting's flag and `memo:` are derived columns
+  (ledger migration 11), so the compact history carries them.
+- **The chain works on splits:** a transaction to categorize carries its splits to place (a bank
+  row has one, the whole amount). A proposal places particular splits and/or gives a
+  **fallback**, one account for the rest. A split takes its best proposal, else the best
+  fallback, else stays uncategorized; a fallback never replaces a split placed by name.
+  - **Settling:** a split is settled by a proposal for it at 0.9; a fallback settles a
+    transaction only when it has one split. So bank rows settle exactly as before, and a payee
+    rule ("Jewel → Groceries") doesn't stop a receipt being itemized: it catches what's missed.
+  - **Who answers at which level:** rules and payee history match the transaction (a fallback);
+    **item history** (`items`) matches a split's memo against confirmed splits, at the same
+    payee first; the AI answers per split, with a fallback, and may propose accounts to open
+    (with the book's account creation on).
+  - **External categorizers keep API v1:** they get one-split transactions as before (no
+    `splits`, no memos); with several splits their one-posting answer is the fallback.
+  - **The AI is in the chain for receipts only** (it reads the receipt anyway); whether imports
+    call it is M19's.
 
 ### Bank feeds: SimpleFIN (M9)
 

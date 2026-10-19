@@ -133,6 +133,10 @@ milestone starts.
       settings and a sealed key; Claude, and a fake for tests), Capture receipt (camera or
       upload, hints, itemizing) into review and back, attachments on any transaction, and a
       capture that always makes a transaction, read or not.
+      Its second pass (2026-10-19): reading in two narrow steps (extract with Sonnet 5,
+      categorize with Opus 5), payment cards on accounts naming the paying account, and
+      categorizing by **split**: posting flags mark what's unconfirmed, fallbacks and item
+      history in the chain, and review's split pickers.
 - [ ] **M17: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
       tag.
 - [ ] **M18: Suggested recurring transactions.** Nightly, analyze each account's last 14 months

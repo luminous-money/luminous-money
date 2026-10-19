@@ -248,8 +248,8 @@ class Store:
             self._conn.executemany(
                 "INSERT INTO posting"
                 " (directive_id, idx, account, number, currency, amount, amount_currency, reconciled,"
-                " created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " flag, memo, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     (
                         d.id,
@@ -260,6 +260,8 @@ class Store:
                         None if p.amount is None else str(p.amount),
                         p.amount_currency,
                         p.reconciled.isoformat() if p.reconciled else None,
+                        p.flag,
+                        p.memo,
                         stamp,
                         stamp,
                     )
@@ -428,13 +430,13 @@ class Store:
 
     def compact(self, book_id: str, date_from: str) -> list[sqlite3.Row]:
         """Every live transaction dated `date_from` or later, oldest first, one row per posting:
-        the directive's id, date, flag, payee, narration and `budgeted`, and the posting's account
-        and amount (NULL where only booking could say). For resolvers' context and reports: plain
-        SQL, no parsing."""
+        the directive's id, date, flag, payee, narration and `budgeted`, and the posting's account,
+        amount (NULL where only booking could say), mark, flag and memo. For resolvers' context and
+        reports: plain SQL, no parsing."""
         return self._conn.execute(
             """
             SELECT d.id, d.date, d.flag, d.payee, d.narration, d.budgeted, p.idx, p.account, p.amount,
-                   p.amount_currency, p.reconciled
+                   p.amount_currency, p.reconciled, p.flag AS posting_flag, p.memo
             FROM directive d JOIN posting p ON p.directive_id = d.id
             WHERE d.book_id = ? AND d.deleted = 0 AND d.kind = 'transaction' AND d.date >= ?
             ORDER BY d.date, d.ordinal, p.idx

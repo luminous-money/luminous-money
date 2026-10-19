@@ -14,7 +14,12 @@ import type { Provider } from "./providers/types.js";
 
 const db = new AiDb(join(config.dataDir, "ai.sqlite"));
 const providers: Provider[] = config.providers.map((name) =>
-  name === "claude" ? claude(config.claudeModel) : fake
+  name === "claude"
+    ? claude({
+        extractModel: config.claudeExtractModel,
+        categorizeModel: config.claudeCategorizeModel,
+      })
+    : fake
 );
 if (config.providers.includes("fake"))
   console.warn("AI_PROVIDERS includes fake: receipts read without a model. Test stacks only.");

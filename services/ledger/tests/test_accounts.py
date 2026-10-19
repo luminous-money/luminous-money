@@ -49,6 +49,7 @@ def test_opened_accounts_are_leaves_with_their_open_close_and_constraints(book):
         "revalue_every": None,
         "divided": False,
         "main_part": None,
+        "cards": [],
     }
     assert accounts["Assets:Brokerage"].currencies == ["VTI", "USD"]
     assert accounts["Assets:Cash"].close == datetime.date(2020, 12, 31)

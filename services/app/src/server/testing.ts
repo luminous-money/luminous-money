@@ -29,6 +29,12 @@ import {
   type TreeAccount,
 } from "./ledger.js";
 
+/** As the ledger does: a confirmed transaction's splits lose their flags (M16). */
+function confirmed<T extends Pick<TransactionIn, "flag" | "postings">>(t: T): T {
+  if (t.flag === "*") t.postings = t.postings.map(({ flag: _f, ...p }) => p);
+  return t;
+}
+
 export class FakeLedger implements LedgerPort {
   books = new Map<string, Book>();
   accountList: (Account & { as_of?: string })[] = [];
@@ -60,12 +66,12 @@ export class FakeLedger implements LedgerPort {
   }
 
   addTransaction(t: TransactionIn): Transaction {
-    const created = {
+    const created = confirmed({
       ...t,
       id: `t${this.next++}`,
       created_at: "",
       updated_at: "v1",
-    } as Transaction;
+    } as Transaction);
     this.transactions.push(created);
     return created;
   }
@@ -269,7 +275,12 @@ export class FakeLedger implements LedgerPort {
         payee: t.payee ?? null,
         narration: t.narration ?? null,
         budgeted: t.meta?.budget !== false,
-        postings: t.postings.map((p) => ({ account: p.account, amount: p.units ?? null })),
+        postings: t.postings.map((p) => ({
+          account: p.account,
+          amount: p.units ?? null,
+          flag: p.flag ?? null,
+          memo: typeof p.meta?.["memo"] === "string" ? (p.meta["memo"] as string) : null,
+        })),
       }));
   }
 
@@ -281,7 +292,7 @@ export class FakeLedger implements LedgerPort {
   ) {
     const found = await this.transaction(book, id);
     Object.assign(found, changes);
-    return found;
+    return confirmed(found);
   }
 
   fetched = 0;

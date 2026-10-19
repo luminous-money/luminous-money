@@ -244,6 +244,8 @@ export function createApi({
         await captureReceipt({
           ledger: ledgerFor(c.get("user")),
           ai: aiFor?.(c.get("user")),
+          db,
+          categorizers,
           book,
           file: {
             name: file.name,

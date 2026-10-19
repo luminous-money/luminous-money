@@ -85,6 +85,24 @@ def _backfill_reconciled(conn: sqlite3.Connection) -> None:
                 )
 
 
+def _backfill_split_flags(conn: sqlite3.Connection) -> None:
+    """Fill in migration 11's columns for postings written before it: those with a flag or a
+    memo (a flagged posting prints as `  ! Account`)."""
+    from . import engine
+
+    rows = conn.execute(
+        "SELECT id, text FROM directive WHERE deleted = 0 AND kind = 'transaction'"
+        " AND (text LIKE '%memo:%' OR text LIKE '%' || char(10) || '  _ %')"
+    ).fetchall()
+    for row in rows:
+        for idx, p in enumerate(engine.parse_one(row[1], row[0]).postings):
+            if p.flag or p.memo:
+                conn.execute(
+                    "UPDATE posting SET flag = ?, memo = ? WHERE directive_id = ? AND idx = ?",
+                    (p.flag, p.memo, row[0], idx),
+                )
+
+
 def _backfill_prices(conn: sqlite3.Connection) -> None:
     """Fill in migration 4's price table from the price directives written before it."""
     from . import engine
@@ -221,6 +239,9 @@ MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
         ),
         "CREATE INDEX attachment_directive ON attachment(book_id, directive_id)",
     ],
+    # 11: split flags (M16). Each posting's flag (`!`: a split still to confirm) and `memo:` (what
+    # it is, a receipt's line), so categorizers' history reads them with SQL.
+    ["ALTER TABLE posting ADD COLUMN flag TEXT", "ALTER TABLE posting ADD COLUMN memo TEXT", _backfill_split_flags],
 ]
 
 

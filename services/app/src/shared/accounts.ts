@@ -4,6 +4,11 @@
  */
 import { partOf } from "./divided.js";
 
+/** Where money in or out goes until it's categorized. */
+export const UNCATEGORIZED = { out: "Expenses:Uncategorized", in: "Income:Uncategorized" };
+export const isUncategorized = (account: string) =>
+  account === UNCATEGORIZED.out || account === UNCATEGORIZED.in;
+
 /** Where a receipt's money came from until someone says (M16): opened when it's needed, and
  * chosen in review before the transaction can be confirmed. */
 export const UNKNOWN = "Assets:Unknown";

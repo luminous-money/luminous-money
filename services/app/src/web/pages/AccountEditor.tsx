@@ -94,6 +94,11 @@ export function AccountEditor({ book, account }: { book: string; account: string
           (!found.protected && !found.revalue_every)) && (
           <Divided book={book} account={found} accounts={tree.data!} />
         )}
+      {!found.close &&
+        !found.protected &&
+        (found.type === "asset" || found.type === "liability") &&
+        ((found.kind === "leaf" && !found.implicit && !partOf(tree.data!, found.name)) ||
+          found.divided) && <Cards book={book} account={found} />}
       {!found.close && found.type && <BudgetCard book={book} account={found} />}
       {found.close && <Unarchive book={book} account={found} />}
       {!isRoot && (!found.close || !found.protected) && (
@@ -221,6 +226,94 @@ function Settings({ book, account }: { book: string; account: string }) {
  * say) that the accounts under it divide. It's reconciled and linked as one; they aren't on
  * their own. An account under one says so.
  */
+const BRANDS: [CardBrand, string][] = [
+  ["visa", "Visa"],
+  ["mastercard", "Mastercard"],
+  ["amex", "Amex"],
+  ["discover", "Discover"],
+  ["other", "Other"],
+];
+type CardBrand = "visa" | "mastercard" | "amex" | "discover" | "other";
+type Card = { brand?: CardBrand | null; last_four: string };
+
+/** The payment cards an asset or liability account is paid with (M16), so a receipt's card
+ * names its account: a brand (optional) and the last four. A divided account's are the
+ * whole's; a card is one account's. */
+function Cards({ book, account }: { book: string; account: TreeAccount }) {
+  const set = useSetAccount(book, account.name);
+  const [brand, setBrand] = useState<CardBrand | "">("");
+  const [last, setLast] = useState("");
+  const cards: Card[] = account.cards ?? [];
+  const valid = /^\d{4}$/.test(last);
+  const save = (next: Card[]) =>
+    set.mutateAsync({ updated_at: account.updated_at!, cards: next } as never);
+  const label = (c: Card) =>
+    `${BRANDS.find(([b]) => b === c.brand)?.[1] ?? "Card"} ending ${c.last_four}`;
+  return (
+    <section className="card editor" aria-label="Payment cards">
+      <h2 className="section-title">Payment cards</h2>
+      <p className="small muted">
+        A receipt paid with one of these is this account&apos;s: a card held by two people has two.
+      </p>
+      {cards.length > 0 && (
+        <ul className="card-list">
+          {cards.map((c) => (
+            <li key={`${c.brand}-${c.last_four}`}>
+              <span>{label(c)}</span>
+              <button
+                type="button"
+                className="plain small"
+                aria-label={`Remove the ${label(c)}`}
+                disabled={set.isPending}
+                onClick={() => void save(cards.filter((x) => x !== c)).catch(() => undefined)}
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form
+        className="inline-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!valid) return;
+          save([...cards, { brand: brand || null, last_four: last }]).then(
+            () => (setLast(""), setBrand("")),
+            () => undefined
+          );
+        }}
+      >
+        <label>
+          Brand
+          <select value={brand} onChange={(e) => setBrand(e.target.value as CardBrand | "")}>
+            <option value="">Any</option>
+            {BRANDS.map(([value, name]) => (
+              <option key={value} value={value}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Last four
+          <input
+            inputMode="numeric"
+            maxLength={4}
+            value={last}
+            onChange={(e) => setLast(e.target.value.replace(/\D/g, ""))}
+            placeholder="0000"
+          />
+        </label>
+        <button type="submit" disabled={!valid || set.isPending}>
+          Add card
+        </button>
+      </form>
+      {set.error && <p className="error small">{explain(set.error)}</p>}
+    </section>
+  );
+}
+
 function Divided({
   book,
   account,

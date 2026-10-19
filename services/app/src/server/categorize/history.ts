@@ -16,22 +16,18 @@
  * Past transactions are seen from their balance-sheet side (an asset or liability), where an
  * import comes from.
  */
-import type {
-  CategorizeRequest,
-  HistoryTransaction,
-  IncomingTransaction,
-} from "../../shared/categorizer-api.js";
+import type { IncomingTransaction } from "../../shared/categorizer-api.js";
 import { keySimilarity, payeeKey, SIMILAR } from "../../shared/payees.js";
-import type { Categorizer, InternalProposal } from "./types.js";
+import type { Categorizer, History, InternalProposal, Request } from "./types.js";
 
 /** Accounts staging falls back to: never learned as a category. */
 const UNCATEGORIZED = new Set(["Expenses:Uncategorized", "Income:Uncategorized"]);
 
-type Past = { t: HistoryTransaction; key: string; account: string; other: string };
+type Past = { t: History[number]; key: string; account: string; other: string };
 
 /** The confirmed, categorized two-posting transactions in the context, with their keys, seen
  * from their balance-sheet side (where an import comes from). */
-function learnable(history: HistoryTransaction[], balanceSheet: Set<string>): Past[] {
+function learnable(history: History, balanceSheet: Set<string>): Past[] {
   return history.flatMap((t) => {
     if (t.flag !== "*" || t.postings.length !== 2) return [];
     const key = payeeKey(t.narration || t.payee || "");
@@ -83,7 +79,7 @@ function propose(row: IncomingTransaction, past: Past[]): InternalProposal | nul
 
 export const history: Categorizer = {
   name: "history",
-  async categorize(request: CategorizeRequest) {
+  async categorize(request: Request) {
     const balanceSheet = new Set(
       request.context.accounts
         .filter(

@@ -1,14 +1,15 @@
 /**
  * The `rules` categorizer: the user's own rules (src/shared/rules.ts). A matching rule proposes
- * its category and payee with full confidence, so the transaction is settled, and it may
- * confirm the transaction automatically: the only way anything skips review.
+ * its category and payee with full confidence, so a bank row is settled (a receipt with several
+ * splits takes it as the fallback), and it may confirm the transaction automatically: the only
+ * way anything skips review.
  */
-import type { CategorizeRequest, IncomingTransaction } from "../../shared/categorizer-api.js";
+import type { IncomingTransaction } from "../../shared/categorizer-api.js";
 import { add, isNegative, negate } from "../../shared/decimal.js";
 import { payeeKey } from "../../shared/payees.js";
 import { specificity, type CategoryRule, type CategoryRuleIn } from "../../shared/rules.js";
 import type { Account } from "@fava-beans/ledger-client";
-import type { Categorizer } from "./types.js";
+import type { Categorizer, Request } from "./types.js";
 
 /** a ≤ b, for decimal strings. */
 const atMost = (a: string, b: string) => !isNegative(add(b, negate(a)));
@@ -39,7 +40,7 @@ export function ruleFor(rules: CategoryRule[], t: IncomingTransaction): Category
 export function rules(load: (book: string) => CategoryRule[]): Categorizer {
   return {
     name: "rules",
-    async categorize(request: CategorizeRequest) {
+    async categorize(request: Request) {
       const all = load(request.book.id);
       return {
         proposals: request.transactions.flatMap((t) => {

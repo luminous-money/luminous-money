@@ -15,6 +15,14 @@
             "description": "How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); None: the book's default.",
             "title": "Booking"
           },
+          "cards": {
+            "description": "An asset or liability account's payment cards (M16): a receipt's card names it.",
+            "items": {
+              "$ref": "#/components/schemas/Card"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
           "close": {
             "anyOf": [
               {
@@ -302,6 +310,22 @@
             "description": "FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by fava-beans); None: the book's default.",
             "title": "Booking"
           },
+          "cards": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Card"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An asset or liability account's payment cards (a divided account's on the whole); each card is one account's.",
+            "title": "Cards"
+          },
           "display_name": {
             "anyOf": [
               {
@@ -426,6 +450,14 @@
             ],
             "description": "How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); None: the book's default.",
             "title": "Booking"
+          },
+          "cards": {
+            "description": "An asset or liability account's payment cards (M16): a receipt's card names it.",
+            "items": {
+              "$ref": "#/components/schemas/Card"
+            },
+            "title": "Cards",
+            "type": "array"
           },
           "close": {
             "anyOf": [
@@ -1147,6 +1179,41 @@
         "title": "BudgetSummary",
         "type": "object"
       },
+      "Card": {
+        "additionalProperties": false,
+        "description": "A payment card an account is paid with (M16), so a receipt's card names its account.",
+        "properties": {
+          "brand": {
+            "anyOf": [
+              {
+                "enum": [
+                  "visa",
+                  "mastercard",
+                  "amex",
+                  "discover",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None: any brand (the last four alone).",
+            "title": "Brand"
+          },
+          "last_four": {
+            "pattern": "^\\d{4}$",
+            "title": "Last Four",
+            "type": "string"
+          }
+        },
+        "required": [
+          "last_four"
+        ],
+        "title": "Card",
+        "type": "object"
+      },
       "CommodityIn": {
         "additionalProperties": false,
         "properties": {
@@ -1304,6 +1371,30 @@
               }
             ],
             "description": "The posting's change to its account; None if only booking could say."
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`!`: a split still to confirm (M16).",
+            "title": "Flag"
+          },
+          "memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the split is, in words (a receipt's line) (M16).",
+            "title": "Memo"
           },
           "reconciled": {
             "anyOf": [
@@ -3695,6 +3786,14 @@
             ],
             "description": "How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); None: the book's default.",
             "title": "Booking"
+          },
+          "cards": {
+            "description": "An asset or liability account's payment cards (M16): a receipt's card names it.",
+            "items": {
+              "$ref": "#/components/schemas/Card"
+            },
+            "title": "Cards",
+            "type": "array"
           },
           "close": {
             "anyOf": [

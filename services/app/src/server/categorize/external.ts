@@ -13,7 +13,7 @@ import type {
   CategorizeResponse,
   FeedbackRequest,
 } from "../../shared/categorizer-api.js";
-import type { Categorizer } from "./types.js";
+import type { Categorizer, Request } from "./types.js";
 
 export type ProviderConfig = {
   /** Unique; shown in review as where a proposal came from. */
@@ -63,8 +63,21 @@ export function external(config: ProviderConfig, fetchImpl: typeof fetch = fetch
   };
   return {
     name: config.name,
-    async categorize(request: CategorizeRequest) {
-      const answer = (await (await call("/v1/categorize", request)).json()) as CategorizeResponse;
+    async categorize(request: Request) {
+      // The API's request (v1): the transactions without their splits, the history without
+      // memos. With several splits to place, a one-posting answer is the fallback.
+      const v1: CategorizeRequest = {
+        ...request,
+        transactions: request.transactions.map(({ splits: _s, ...t }) => t),
+        context: {
+          ...request.context,
+          history: request.context.history.map((t) => ({
+            ...t,
+            postings: t.postings.map(({ account, amount }) => ({ account, amount })),
+          })),
+        },
+      };
+      const answer = (await (await call("/v1/categorize", v1)).json()) as CategorizeResponse;
       if (!Array.isArray(answer?.proposals)) throw new Error("the answer has no proposals list");
       // Only what the API allows: a provider can't auto-confirm.
       return {

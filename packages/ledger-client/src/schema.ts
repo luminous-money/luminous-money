@@ -902,6 +902,11 @@ export interface components {
        * @description How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); None: the book's default.
        */
       booking?: string | null;
+      /**
+       * Cards
+       * @description An asset or liability account's payment cards (M16): a receipt's card names it.
+       */
+      cards?: components["schemas"]["Card"][];
       /** Close */
       close?: string | null;
       /**
@@ -1016,6 +1021,11 @@ export interface components {
        */
       booking?: ("FIFO" | "LIFO" | "HIFO" | "STRICT" | "NONE") | null;
       /**
+       * Cards
+       * @description An asset or liability account's payment cards (a divided account's on the whole); each card is one account's.
+       */
+      cards?: components["schemas"]["Card"][] | null;
+      /**
        * Display Name
        * @description A human name; None or "": the name's last part.
        */
@@ -1071,6 +1081,11 @@ export interface components {
        * @description How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); None: the book's default.
        */
       booking?: string | null;
+      /**
+       * Cards
+       * @description An asset or liability account's payment cards (M16): a receipt's card names it.
+       */
+      cards?: components["schemas"]["Card"][];
       /** Close */
       close?: string | null;
       /**
@@ -1388,6 +1403,19 @@ export interface components {
       month_start: string;
       spent: components["schemas"]["Amount"];
     };
+    /**
+     * Card
+     * @description A payment card an account is paid with (M16), so a receipt's card names its account.
+     */
+    Card: {
+      /**
+       * Brand
+       * @description None: any brand (the last four alone).
+       */
+      brand?: ("visa" | "mastercard" | "amex" | "discover" | "other") | null;
+      /** Last Four */
+      last_four: string;
+    };
     /** CommodityIn */
     CommodityIn: {
       /** Name */
@@ -1439,6 +1467,16 @@ export interface components {
       account: string;
       /** @description The posting's change to its account; None if only booking could say. */
       amount: components["schemas"]["Amount"] | null;
+      /**
+       * Flag
+       * @description `!`: a split still to confirm (M16).
+       */
+      flag?: string | null;
+      /**
+       * Memo
+       * @description What the split is, in words (a receipt's line) (M16).
+       */
+      memo?: string | null;
       /**
        * Reconciled
        * @description The statement it was reconciled with (M14).
@@ -2416,6 +2454,11 @@ export interface components {
        * @description How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); None: the book's default.
        */
       booking?: string | null;
+      /**
+       * Cards
+       * @description An asset or liability account's payment cards (M16): a receipt's card names it.
+       */
+      cards?: components["schemas"]["Card"][];
       /** Close */
       close?: string | null;
       /**

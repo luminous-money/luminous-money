@@ -18,9 +18,10 @@ COFFEE = {
     ],
 }
 
+# Staged (`!`), so its split's flag survives: a confirmed transaction's splits lose theirs (M16).
 RICH = {
     "date": "2024-03-02",
-    "flag": "*",
+    "flag": "!",
     "payee": "Broker",
     "narration": "Buy with \"quotes\"",
     "tags": ["invest", "q1"],

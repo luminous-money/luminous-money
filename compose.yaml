@@ -72,7 +72,8 @@ services:
       # Required: encrypts each book's provider API key. 32 random bytes, base64:
       # `openssl rand -base64 32`.
       - AI_ENCRYPTION_KEY
-      - AI_CLAUDE_MODEL
+      - AI_CLAUDE_EXTRACT_MODEL
+      - AI_CLAUDE_CATEGORIZE_MODEL
     volumes:
       - data:/data
     deploy: *restart

@@ -146,6 +146,15 @@ class TransactionChanges(Strict):
 
 AccountType = Literal["asset", "liability", "equity", "income", "expense"]
 AccountKind = Literal["leaf", "node"]
+CardBrand = Literal["visa", "mastercard", "amex", "discover", "other"]
+
+
+class Card(Strict):
+    """A payment card an account is paid with (M16), so a receipt's card names its account."""
+
+    brand: CardBrand | None = Field(None, description="None: any brand (the last four alone).")
+    last_four: str = Field(pattern=r"^\d{4}$")
+
 
 
 class Account(Api):
@@ -174,6 +183,9 @@ class Account(Api):
     )
     main_part: str | None = Field(
         None, description="A divided account's part that what comes in from the bank or a file lands in (M15)."
+    )
+    cards: list[Card] = Field(
+        default_factory=list, description="An asset or liability account's payment cards (M16): a receipt's card names it."
     )
     updated_at: str | None = Field(None, description="Its `open` directive's version; send it back to change settings.")
 
@@ -356,6 +368,12 @@ class AccountPatch(Strict):
     main_part: str | None = Field(
         None, description="A divided account's main part: one of its parts, where what comes in lands."
     )
+    cards: list[Card] | None = Field(
+        None,
+        max_length=20,
+        description="An asset or liability account's payment cards (a divided account's on the whole); "
+        "each card is one account's.",
+    )
 
 
 class OpeningHolding(Strict):
@@ -380,6 +398,8 @@ class CompactPosting(Api):
     account: str
     amount: Amount | None = Field(description="The posting's change to its account; None if only booking could say.")
     reconciled: datetime.date | None = Field(None, description="The statement it was reconciled with (M14).")
+    flag: str | None = Field(None, description="`!`: a split still to confirm (M16).")
+    memo: str | None = Field(None, description="What the split is, in words (a receipt's line) (M16).")
 
 
 class CompactTransaction(Api):

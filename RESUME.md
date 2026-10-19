@@ -1,7 +1,7 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-18._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-19._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
@@ -18,11 +18,18 @@ What a user can do now:
   itemize by default; whether the AI may open accounts, how eagerly, with what guidance). Once
   it's ready, the masthead's **camera** opens Capture receipt: the live camera (or Upload
   instead), the account it was paid from (the page you came from), Itemize?, and anything you
-  know (total, date, payee, note). **Create transaction** has it read and lands on it in review;
-  confirming or skipping it goes back to where you were. If it can't be read (AI off, down, or
-  it failed), the transaction is made from what you typed, saying why. One that doesn't say what
-  paid it is on `Assets:Unknown`, and review asks "Paid from" before it can be confirmed. **Attachments:** any
-  transaction's page has them (Open camera, or Upload; 5 MB each), new transactions too.
+  know (total, date, payee, note). **Create transaction** reads it (what it says, then where its
+  splits belong: rules, history, items bought before, then the AI) and lands on it in review;
+  itemized, each line is a split with its own account to pick. Confirming or skipping goes back
+  to where you were. The account that paid is the one holding the receipt's **card** (an asset
+  or liability's editor lists its **Payment cards**: brand and last four), else the page you
+  came from, else `Assets:Unknown`, which review asks to replace ("Paid from"). If it can't be
+  read (AI off, down, or it failed), the transaction is made from what you typed, saying why.
+  **Attachments:** any transaction's page has them (Open camera, or Upload; 5 MB each), new
+  transactions too.
+- **Split flags (M16):** what's proposed and not yet confirmed is marked on the split (`!` on
+  the posting): imports stage their categorized side that way, choosing an account yourself or
+  confirming clears it, and Suggest categories and rules act on what's still flagged.
 - **Divided accounts (M15):** an asset or liability account's editor has **Divide…**: name the
   main part (where new money lands, and what's left) and the others with what they start with;
   the account keeps its name, bank link, statements and history (now its main part's). Its page
@@ -157,18 +164,19 @@ How it's put together:
   providers; the external API's types in `src/shared/categorizer-api.ts`), in `app.sqlite`.
 - **`services/ai`** (TypeScript, M16): each book's AI settings and sealed credential
   (`ai.sqlite`), the providers (`src/providers`: `claude`, and `fake` for test stacks, chosen
-  by `AI_PROVIDERS`), and `POST /books/:book/receipts/read`. It reads; `app` stages
-  (`src/server/receipts.ts`), and the ledger keeps the files (attachments, migration 10). Their
-  shared types are `packages/ai-api`.
+  by `AI_PROVIDERS`), and two operations: `receipts/extract` (a receipt's facts; Claude Sonnet
+  5) and `categorize` (where splits belong; Claude Opus 5). It answers; `app` composes and stages
+  (`src/server/receipts.ts`, the chain in `src/server/categorize`, its AI step `ai.ts`), and the
+  ledger keeps the files (attachments, migration 10). Their shared types are `packages/ai-api`.
 - **`packages/db`** (TypeScript migrations and timestamps, the sealer, with a lint check) and
   **`packages/csv-import`** (parsing, guessing profiles, reading rows; shared by the browser and
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 176 tests, including the table lint
-    - auth: 20; app: 169; ai: 3; db: 10; csv-import: 22
+    - ledger: 180 tests, including the table lint
+    - auth: 20; app: 176; ai: 7; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 86 API tests and 90 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 88 API tests and 92 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
@@ -176,8 +184,9 @@ How it's put together:
 
 ## Next steps
 
-1. **M16's open question** (end of [its plan](docs/milestones/m16-receipt-capture/PLAN.md)):
-   reading a receipt in two passes, extracting (Sonnet) then categorizing (Opus).
+1. **Production readiness and deployment docs** (Kael, 2026-10-19): upgrades and migrations,
+   backups, logs, health; docs and scripts from GitHub to a laptop or a public server; later,
+   releases with opt-in upgrades and a system page for admins.
 2. **M17 (transaction tagging):** see [its plan](docs/milestones/m17-transaction-tagging/PLAN.md).
 3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
@@ -205,9 +214,9 @@ How it's put together:
   transfer two banks date apart can't satisfy both sides by date.
 - **Loans and withheld taxes:** how to record them is in [docs/loans-and-taxes.md](docs/loans-and-taxes.md).
 - **The first browser tests of a cold e2e stack** can time out waiting for review to load (seen
-  once, 2026-10-17: three of accounts.spec, passing on a rerun). Also seen once each, passing on
-  a rerun: m1.spec's "a file in another layout" (no import results) and m3.spec's time zone
-  (reloaded before the save landed).
+  once, 2026-10-17: three of accounts.spec, passing on a rerun). Also seen once, passing on a
+  rerun: m1.spec's "a file in another layout" (no import results). m3.spec's time zone raced
+  the PWA giving a new book the browser's zone in the background; the test now waits for it.
 
 - **Fetching prices needs the network** (beanprice's sources: Yahoo and friends, which change
   now and then). A commodity's source is its `commodity` directive's `price:` metadata;
@@ -229,6 +238,13 @@ How it's put together:
 - **Traefik's routes are a Compose config,** fixed when its container is created: after
   changing `deploy/traefik/routes.yml`, `docker compose up -d --force-recreate traefik` (a new
   service's API is a 404 until then).
+- **A confirmed transaction has no split flags:** the ledger drops them on any `*` write
+  (`engine.confirmed`), and `FakeLedger` does the same, so tests see what production does.
+  Don't confirm by editing text if the flags matter: text keeps what it says.
+- **Claude's models are set per operation:** `AI_CLAUDE_EXTRACT_MODEL` (default
+  `claude-sonnet-5`) and `AI_CLAUDE_CATEGORIZE_MODEL` (default `claude-opus-5`); the old
+  `AI_CLAUDE_MODEL` is gone. The server-side refusal fallback is only sent for Opus 5 and Fable
+  5 models.
 - **Receipts need the `ai` service:** without it (or a book that isn't ready) the camera isn't
   offered, and `app`'s receipt route still makes the transaction from the hints. Test stacks
   offer the `fake` provider (`AI_PROVIDERS=claude,fake`); production only `claude`.

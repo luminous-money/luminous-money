@@ -383,7 +383,8 @@ class Ledger:
     def set_account(self, book_id: str, name: str, patch: models.AccountPatch) -> models.Account:
         """Change an account's settings (only those given), against its version: how its sales
         pick lots, whether it's a revalued asset (and how often), its display name, and whether
-        it's a divided account (an implicit node is opened for that) and its main part."""
+        it's a divided account (an implicit node is opened for that) and its main part, and its
+        payment cards."""
         changes = patch.model_dump(exclude_unset=True, exclude={"updated_at"})
         accounts = {a.name: a for a in self.accounts(book_id)}
         opened_now = False
@@ -409,6 +410,9 @@ class Ledger:
             changes["main_part"] = parts[0]
         if "divided" in changes and not changes["divided"]:
             changes["main_part"] = None
+        if "cards" in changes:
+            changes["cards"] = patch.cards or []
+            self._check_cards(accounts, name, changes["cards"], divided)
         row = next(r for r in self.store.find(book_id, kind="open", limit=None) if engine.opened(r.text) == name)
         directive = engine.reopened(
             row.text,
@@ -421,6 +425,7 @@ class Ledger:
                 else {}
             ),
             **({"main_part": changes["main_part"]} if "main_part" in changes else {}),
+            **({"cards": changes["cards"]} if "cards" in changes else {}),
         )
         self._put(book_id, engine.parse_one(directive.text, row.id), None if opened_now else patch.updated_at)
         return self._account(book_id, name)
@@ -431,6 +436,29 @@ class Ledger:
     def reconciling_roots(self, header: list[str]) -> list[str]:
         """The top-level accounts whose accounts are reconciled: assets and liabilities."""
         return [root for root, type_ in engine.root_types(header).items() if type_ in self.RECONCILED_TYPES]
+
+    def _check_cards(self, accounts: dict[str, models.Account], name: str, cards: list[models.Card], divided: bool) -> None:
+        """Cards go on an asset or liability account that's a real account (a leaf, or a divided
+        account; not one's part), and a card is one account's: the same last four with the same
+        brand, or with either brand left open."""
+        if not cards:
+            return
+        account = accounts[name]
+        if account.type not in self.RECONCILED_TYPES or (account.kind == "node" and not divided):
+            raise engine.ParseFailure(["only an asset or liability account takes payment cards"])
+        whole = next((a.name for a in accounts.values() if a.divided and name.startswith(a.name + ":")), None)
+        if whole:
+            raise engine.ParseFailure([f"it's part of {whole}: its cards go on {whole}"])
+
+        def same(a: models.Card, b: models.Card) -> bool:
+            return a.last_four == b.last_four and (a.brand is None or b.brand is None or a.brand == b.brand)
+
+        for i, card in enumerate(cards):
+            if any(same(card, other) for other in cards[:i]):
+                raise engine.ParseFailure([f"the card ending {card.last_four} is listed twice"])
+            for other in accounts.values():
+                if other.name != name and any(same(card, theirs) for theirs in other.cards):
+                    raise engine.ParseFailure([f"the card ending {card.last_four} is {other.name}'s already"])
 
     def _check_divided(self, accounts: dict[str, models.Account], name: str) -> None:
         """Only an asset or liability node is divided, and not one with a divided account above
@@ -566,7 +594,11 @@ class Ledger:
             amount = (
                 models.Amount(number=r["amount"], currency=r["amount_currency"]) if r["amount"] is not None else None
             )
-            out[-1].postings.append(models.CompactPosting(account=r["account"], amount=amount, reconciled=r["reconciled"]))
+            out[-1].postings.append(
+                models.CompactPosting(
+                    account=r["account"], amount=amount, reconciled=r["reconciled"], flag=r["posting_flag"], memo=r["memo"]
+                )
+            )
         return out
 
     def summary(self, book_id: str, names: list[str]) -> list[models.AccountSummary]:

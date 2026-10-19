@@ -1,24 +1,34 @@
 /**
  * Receipts (M16): a photo (or a PDF) and whatever the person typed become an unconfirmed
- * transaction in review, the receipt attached. The ai service reads it, if the book has AI set
- * up; `app` checks the reading against the books and stages it, as it stages imports:
+ * transaction in review, the receipt attached, staged the way an import is:
  *
- * - **the base account** is the reader's, else the hint's (a divided account's main part, as for
- *   imports), else `Assets:Unknown`, to be chosen in review
- * - **splits** are kept when they're all on accounts that exist (or that the reader proposed and
- *   the book lets it open) and sum to minus the total; otherwise one split of the total goes to
- *   the reader's category, else uncategorized
- * - **it always makes something:** with no reading (AI off, down, or it couldn't read it), the
- *   transaction is made from the hints (a zero total if none), and says why
+ * 1. **Extract** what the receipt says (the ai service, if the book's AI is ready).
+ * 2. **Build** the transaction. The paying account is the one holding the receipt's card, else
+ *    the hint (the page it was captured from; a divided account's main part, as for imports),
+ *    else `Assets:Unknown`, chosen in review. What was typed wins over what was read, the total
+ *    above all. Itemized, each line is a split to place (its `memo:` the line as printed), with
+ *    one more for any difference from the total; else one split of the whole.
+ * 3. **Categorize** the splits through the chain (rules, history, item history, then the book's
+ *    AI). Every split is staged flagged `!`, still to confirm.
+ * 4. **Stage** it, opening the accounts the AI proposed (with the book's account creation on),
+ *    and attach the receipt. It never confirms itself.
+ *
+ * It always makes something: with no reading (AI off, down, or it couldn't), it's made from the
+ * hints (a zero total if none), and says why.
  */
-import type { ChartAccount, ReceiptHints, ReceiptReading } from "@fava-beans/ai-api";
+import type { ReceiptFacts, ReceiptHints } from "@fava-beans/ai-api";
 import type { Account, TransactionIn } from "@fava-beans/ledger-client";
 
+import { isUncategorized, UNCATEGORIZED, UNKNOWN } from "../shared/accounts.js";
 import { add, isNegative, isZero, negate } from "../shared/decimal.js";
-import { UNKNOWN } from "../shared/accounts.js";
 import { landsIn } from "../shared/divided.js";
 import type { AiPort } from "./ai.js";
-import { UNCATEGORIZED } from "./imports.js";
+import { aiCategorizer } from "./categorize/ai.js";
+import { categorize, placed, representative } from "./categorize/chain.js";
+import { buildRequest } from "./categorize/context.js";
+import { proposalRecord } from "./categorize/service.js";
+import type { Categorizer, Incoming } from "./categorize/types.js";
+import type { AppDb } from "./db.js";
 import type { LedgerPort } from "./ledger.js";
 
 export const RECEIPT_LIMIT = 5 * 1024 * 1024;
@@ -38,25 +48,44 @@ export type Captured = {
   transaction_id: string;
   /** Whether the AI read it (else it was made from the hints). */
   read: boolean;
-  /** What to tell the person: why it wasn't read, or the reader's own note. */
+  /** What to tell the person: why it wasn't read, or what the reading said. */
   note: string | null;
 };
 
 const ACCEPTED = /^(image\/(jpeg|png|gif|webp)|application\/pdf)$/;
-const NAME = /^(Expenses|Income)(:[\p{Lu}\p{Nd}][\p{L}\p{Nd}-]*)+$/u;
 
-/** Turn a reading (or none) and the hints into the transaction to stage, and the accounts it
- * needs opened. Pure, so it's tested on its own. */
+/** The open account holding the card the receipt was paid with: the same last four, and the
+ * same brand when both say one. Two accounts holding it is no answer. */
+export function paidWith(
+  accounts: Account[],
+  payment: ReceiptFacts["payment"] | null | undefined
+): string | null {
+  if (!payment?.last_four) return null;
+  const holders = accounts.filter(
+    (a) =>
+      !a.close &&
+      (a.cards ?? []).some(
+        (c) =>
+          c.last_four === payment.last_four &&
+          (!c.brand || !payment.brand || c.brand === payment.brand)
+      )
+  );
+  return holders.length === 1 ? holders[0]!.name : null;
+}
+
+/** The transaction to stage from what was read (or nothing) and typed, its splits still to
+ * place, and anything worth saying. Pure, so it's tested on its own. */
 export function receiptTransaction(
-  reading: ReceiptReading | null,
+  facts: ReceiptFacts | null,
   hints: ReceiptHints,
   accounts: Account[],
-  { createAccounts, today, currency }: { createAccounts: boolean; today: string; currency: string }
-): { transaction: TransactionIn; open: string[] } {
+  { itemize, today, currency }: { itemize: boolean; today: string; currency: string }
+): { transaction: TransactionIn; incoming: Incoming; notes: string[] } {
+  const notes: string[] = [];
   const leaves = new Set(
     accounts.filter((a) => a.kind === "leaf" && !a.implicit && !a.close).map((a) => a.name)
   );
-  // The base account is an asset or liability that takes postings: a leaf (a part, if named),
+  // The paying account is an asset or liability that takes postings: a leaf (a part, if named),
   // or a divided account's main part. Never the placeholder: that's for when there's none.
   const types = new Map(accounts.map((a) => [a.name, a.type]));
   const base = (name: string | null | undefined) => {
@@ -66,56 +95,78 @@ export function receiptTransaction(
     const into = landsIn(accounts, name);
     return into && leaves.has(into) ? into : null;
   };
-  const total = reading?.total ?? hints.total ?? "0";
+  const account = base(paidWith(accounts, facts?.payment)) ?? base(hints.account) ?? UNKNOWN;
+
+  // As stored for the paying account: negative for a purchase, positive for a refund.
+  const read = facts?.total ? (facts.refund ? facts.total : negate(facts.total)) : null;
+  const total = hints.total ?? read ?? "0";
+  if (hints.total && read && !isZero(add(hints.total, negate(read))))
+    notes.push(`The receipt says ${facts!.total}; the total you gave was used.`);
   const out = isNegative(total) || isZero(total);
-  const fallback = out ? UNCATEGORIZED.out : UNCATEGORIZED.in;
-  const account = base(reading?.account) ?? base(hints.account) ?? UNKNOWN;
+  const other = out ? UNCATEGORIZED.out : UNCATEGORIZED.in;
+  // A line as printed is positive for what was paid for: spent, it's an expense's increase.
+  const signed = (amount: string) => (out ? amount : negate(amount));
+  const units = (number: string) => ({ number, currency: facts?.currency ?? currency });
 
-  const creatable = new Set(
-    createAccounts
-      ? (reading?.new_accounts ?? []).filter((n) => NAME.test(n) && !leaves.has(n))
-      : []
+  const lines = itemize ? (facts?.lines ?? []) : [];
+  const splits: (TransactionIn["postings"][number] & { description?: string | null })[] = lines.map(
+    (line) => ({
+      account: other,
+      units: units(signed(line.amount)),
+      flag: "!",
+      meta: { memo: line.text },
+      description: line.description,
+    })
   );
-  const usable = (name: string | null | undefined) =>
-    !!name && name !== account && (leaves.has(name) || creatable.has(name));
-  const category = usable(reading?.category) ? reading!.category! : fallback;
-  const splits = reading?.splits ?? [];
-  const sum = splits.reduce((n, s) => add(n, s.amount), "0");
-  const itemized =
-    splits.length > 0 && splits.every((s) => usable(s.account)) && isZero(add(sum, total));
+  const rest = splits.reduce((left, s) => add(left, negate(s.units!.number)), negate(total));
+  if (!splits.length || !isZero(rest)) {
+    splits.push({ account: other, units: units(rest), flag: "!", meta: {} });
+    if (lines.length) notes.push(`The lines don't add up to the total: ${rest} is left over.`);
+  }
+  if (facts?.note) notes.push(facts.note);
 
-  const units = (number: string) => ({ number, currency: reading?.currency ?? currency });
-  const postings: TransactionIn["postings"] = [
+  const payee = hints.payee ?? facts?.payee ?? null;
+  const postings = [
     { account, units: units(total) },
-    ...(itemized
-      ? splits.map((s) => ({
-          account: s.account,
-          units: units(s.amount),
-          ...(s.memo ? { meta: { memo: s.memo } } : {}),
-        }))
-      : [{ account: category, units: units(negate(total)) }]),
+    ...splits.map(({ description: _d, ...s }) => s),
   ];
-  const used = new Set(postings.map((p) => p.account));
   return {
     transaction: {
-      date: reading?.date ?? hints.date ?? today,
+      date: hints.date ?? facts?.date ?? today,
       flag: "!",
-      payee: reading?.payee ?? hints.payee ?? null,
-      narration:
-        reading?.narration ?? hints.note ?? (reading ? "Receipt" : "Receipt: couldn't read it"),
+      payee,
+      // Not "Receipt" when there's a payee: history learns from the description first.
+      narration: hints.note ?? (payee ? "" : facts ? "Receipt" : "Receipt: couldn't read it"),
       tags: [],
       links: [],
       meta: { source: "receipt" },
       postings,
     },
-    open: [...used].filter((n) => !leaves.has(n)),
+    incoming: {
+      id: "receipt",
+      date: hints.date ?? facts?.date ?? today,
+      account,
+      amount: units(total),
+      description: payee ?? hints.note ?? "",
+      payee,
+      splits: splits.map((s, i) => ({
+        index: i + 1,
+        amount: s.units!,
+        memo: typeof s.meta?.["memo"] === "string" ? (s.meta["memo"] as string) : null,
+        description: s.description ?? null,
+      })),
+    },
+    notes,
   };
 }
 
-/** Capture a receipt: read it (if the book has AI), stage the transaction, attach the file. */
+/** Capture a receipt: read it (if the book has AI), build it, categorize it, stage it, attach
+ * the file. */
 export async function captureReceipt({
   ledger,
   ai,
+  db,
+  categorizers = [],
   book,
   file,
   hints,
@@ -123,6 +174,10 @@ export async function captureReceipt({
 }: {
   ledger: LedgerPort;
   ai?: AiPort;
+  /** Where proposals are recorded (for review and acceptance), if anywhere. */
+  db?: AppDb;
+  /** The chain before the AI: rules, history, item history. */
+  categorizers?: Categorizer[];
   book: string;
   file: ReceiptFile;
   hints: ReceiptHints;
@@ -133,44 +188,76 @@ export async function captureReceipt({
     throw new ReceiptProblem(415, "a receipt is a photo (JPEG, PNG, WebP, GIF) or a PDF");
   const [info, accounts] = await Promise.all([ledger.book(book), ledger.accounts(book)]);
   if (!info) throw new ReceiptProblem(422, "there's no such book");
+  const currency = info.currency ?? "USD";
   const settings = ai ? await ai.settings(book) : null;
+  const ready = !!(ai && settings?.ready);
 
-  let reading: ReceiptReading | null = null;
-  let note: string | null = null;
-  if (!ai || !settings) note = "AI isn't available right now, so it wasn't read";
-  else if (!settings.ready) note = "The book's AI isn't set up, so it wasn't read";
+  const notes: string[] = [];
+  let facts: ReceiptFacts | null = null;
+  if (!ai || !settings) notes.push("AI isn't available right now, so it wasn't read.");
+  else if (!settings.ready) notes.push("The book's AI isn't set up, so it wasn't read.");
   else {
-    const chart: ChartAccount[] = accounts
-      .filter(
-        (a) => !a.close && a.name !== UNKNOWN && ((a.kind === "leaf" && !a.implicit) || a.divided)
-      )
-      .map((a) => ({ name: a.name, type: a.type, display_name: a.display_name ?? null }));
-    const result = await ai.read(book, {
+    const answer = await ai.extract(book, {
       file: {
         data: Buffer.from(file.bytes).toString("base64"),
         media_type: file.type,
         filename: file.name,
       },
-      hints,
-      accounts: chart,
       today,
-      currency: info.currency,
+      currency,
     });
-    if ("reading" in result) {
-      reading = result.reading;
-      note = result.reading.note;
-    } else note = `It couldn't be read: ${result.failed}`;
+    if ("ok" in answer) facts = answer.ok;
+    else notes.push(`It couldn't be read: ${answer.failed}.`);
   }
 
-  const { transaction, open } = receiptTransaction(reading, hints, accounts, {
-    createAccounts: !!settings?.create_accounts,
+  const built = receiptTransaction(facts, hints, accounts, {
+    itemize: hints.itemize ?? settings?.itemize ?? false,
     today,
-    currency: info.currency,
+    currency,
   });
-  for (const name of open) await ledger.createAccount(book, name);
+  notes.push(...built.notes);
+  const { incoming } = built;
+
+  // Categorize its splits: the chain, then the book's AI.
+  const chain = [
+    ...categorizers,
+    ...(ready ? [aiCategorizer(ai!, book, currency, !!settings!.create_accounts)] : []),
+  ];
+  const request = await buildRequest(ledger, { id: book, name: info.name }, [incoming]);
+  const decision = chain.length ? ((await categorize(chain, request)).get(incoming.id) ?? {}) : {};
+  const postings = placed(built.transaction.postings, incoming, decision);
+
+  // Open what it posts to that isn't there yet: the placeholders, and (with account creation
+  // on) the accounts the AI proposed.
+  const proposed = new Set(
+    [decision.category, ...(decision.splits?.values() ?? [])].flatMap((c) => c?.opens ?? [])
+  );
+  const existing = new Set(accounts.filter((a) => !a.implicit).map((a) => a.name));
+  for (const name of new Set(postings.map((p) => p.account)))
+    if (!existing.has(name) && (name === UNKNOWN || isUncategorized(name) || proposed.has(name)))
+      await ledger.createAccount(book, name);
+
   const [created] = await ledger.createTransactions(book, [
-    { ...transaction, meta: { ...transaction.meta, ...(note ? { "receipt-note": note } : {}) } },
+    {
+      ...built.transaction,
+      payee: decision.payee?.payee ?? built.transaction.payee,
+      postings: postings as TransactionIn["postings"],
+      meta: {
+        ...built.transaction.meta,
+        ...(notes.length ? { "receipt-note": notes.join(" ") } : {}),
+      },
+    },
   ]);
-  await ledger.attach(book, created!.id, file);
-  return { transaction_id: created!.id, read: !!reading, note };
+  const id = created!.id;
+  await ledger.attach(book, id, file);
+  const lead = representative(decision, postings, incoming);
+  if (db && (lead || decision.payee))
+    db.saveProposals([
+      proposalRecord(
+        { transaction: id, book, request: request.request_id, incoming: incoming.id },
+        lead,
+        decision.payee
+      ),
+    ]);
+  return { transaction_id: id, read: !!facts, note: notes.join(" ") || null };
 }

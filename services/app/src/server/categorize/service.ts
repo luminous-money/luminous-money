@@ -3,83 +3,104 @@
  * re-applying a changed rule, and settling proposals once their transactions are confirmed
  * (acceptance tracking, and feedback to providers that want it).
  *
- * An unconfirmed transaction is **open to categorizing** when it's simple (two postings) and the
- * user hasn't decided its category: its other side is uncategorized, or still exactly what was
- * proposed for it. Its first posting is its own side (where it came from), as imports and
- * schedules stage them.
+ * An unconfirmed transaction is **open to categorizing** when it has splits still to place:
+ * flagged `!` (proposed, not chosen by the user: M16) or uncategorized. Its first posting is its
+ * own side (where it came from), as imports, schedules and receipts stage them; transactions
+ * with lots or prices aren't categorized.
  */
 import type { Transaction } from "@fava-beans/ledger-client";
 
-import type { FeedbackRequest, IncomingTransaction } from "../../shared/categorizer-api.js";
+import type { FeedbackRequest } from "../../shared/categorizer-api.js";
+import { isUncategorized } from "../../shared/accounts.js";
+import { negate } from "../../shared/decimal.js";
 import type { CategoryRule } from "../../shared/rules.js";
 import type { AppDb, StoredProposal } from "../db.js";
-import { UNCATEGORIZED } from "../imports.js";
 import type { LedgerPort } from "../ledger.js";
-import { categorize, stagedPostings } from "./chain.js";
+import { categorize, placed, representative } from "./chain.js";
 import { buildRequest } from "./context.js";
 import { matches } from "./rules.js";
-import type { Categorizer, Chosen } from "./types.js";
-
-const FALLBACKS = new Set([UNCATEGORIZED.out, UNCATEGORIZED.in]);
+import type { Categorizer, Chosen, Decision, Incoming } from "./types.js";
 
 /** The unconfirmed transaction as a categorizer sees it, if it's open to categorizing. */
-function openToCategorizing(t: Transaction, proposal: StoredProposal | undefined) {
-  if (t.postings.length !== 2) return undefined;
-  const [own, other] = t.postings as [Transaction["postings"][0], Transaction["postings"][0]];
-  if (!own.units) return undefined;
-  const untouched =
-    FALLBACKS.has(other.account) ||
-    (proposal?.postings?.length === 1 && proposal.postings[0]!.account === other.account);
-  if (!untouched) return undefined;
-  const incoming: IncomingTransaction = {
+export function openToCategorizing(t: Transaction): Incoming | undefined {
+  const [own, ...rest] = t.postings;
+  if (!own?.units || t.postings.some((p) => p.cost || p.price)) return undefined;
+  const splits = rest.flatMap((p, i) => {
+    if (p.flag !== "!" && !isUncategorized(p.account)) return [];
+    // A bank row's other side has no amount of its own: it's the rest.
+    const amount =
+      p.units ?? (rest.length === 1 ? { ...own.units!, number: negate(own.units!.number) } : null);
+    const memo = typeof p.meta?.["memo"] === "string" ? (p.meta["memo"] as string) : null;
+    return amount ? [{ index: i + 1, amount, memo }] : [];
+  });
+  if (!splits.length) return undefined;
+  return {
     id: t.id,
     date: t.date,
     account: own.account,
     amount: own.units,
     description: t.narration || t.payee || "",
     payee: t.payee ?? null,
+    splits,
   };
-  return incoming;
 }
 
 type Services = { db: AppDb; ledger: LedgerPort; book: { id: string; name: string } };
+
+/** What's stored of a decision for a transaction (review shows it; acceptance is measured
+ * against it): the proposal standing for its category, and its payee's. */
+export function proposalRecord(
+  ids: { transaction: string; book: string; request: string; incoming: string },
+  lead: Chosen | undefined,
+  payee: Chosen | undefined
+): Parameters<AppDb["saveProposals"]>[0][number] {
+  const { auto_confirm: _a, rule_id: _r, categorizer: _c, ...given } = lead ?? ({} as Chosen);
+  return {
+    transaction_id: ids.transaction,
+    book_id: ids.book,
+    request_id: ids.request,
+    incoming_id: ids.incoming,
+    categorizer: lead?.categorizer ?? null,
+    confidence: lead?.confidence ?? null,
+    reason: lead?.reason ?? payee?.reason ?? null,
+    postings: lead?.postings ?? null,
+    payee: payee?.payee ?? null,
+    payee_categorizer: payee?.categorizer ?? null,
+    proposal: lead ? given : null,
+  };
+}
+
+/** Receipts never confirm automatically, whatever a rule says: you land on them in review. */
+const mayAutoConfirm = (t: Pick<Transaction, "meta">) => t.meta?.["source"] !== "receipt";
 
 /** Write a decision to an unconfirmed transaction, and record the proposal. */
 async function apply(
   { db, ledger, book }: Services,
   t: Transaction,
-  incoming: IncomingTransaction,
-  category: Chosen | undefined,
-  payee: Chosen | undefined,
+  incoming: Incoming,
+  decision: Decision,
   requestId: string
 ) {
-  if (!category && !payee) return false;
-  const fallback = t.postings[1]!.account;
+  const { payee } = decision;
+  const postings = placed(t.postings, incoming, decision);
+  const lead = representative(decision, postings, incoming);
+  if (!lead && !payee) return false;
   await ledger.patch(
     book.id,
     t.id,
     {
-      postings: stagedPostings(incoming.account, incoming.amount, category, fallback),
+      postings: postings as Transaction["postings"],
       ...(payee?.payee ? { payee: payee.payee } : {}),
-      ...(category?.auto_confirm ? { flag: "*" } : {}),
+      ...(lead?.auto_confirm && mayAutoConfirm(t) ? { flag: "*" } : {}),
     },
     t.updated_at
   );
-  const { auto_confirm: _a, rule_id: _r, categorizer: _c, ...given } = category ?? ({} as Chosen);
   db.saveProposals([
-    {
-      transaction_id: t.id,
-      book_id: book.id,
-      request_id: requestId,
-      incoming_id: incoming.id,
-      categorizer: category?.categorizer ?? null,
-      confidence: category?.confidence ?? null,
-      reason: category?.reason ?? payee?.reason ?? null,
-      postings: category?.postings ?? null,
-      payee: payee?.payee ?? null,
-      payee_categorizer: payee?.categorizer ?? null,
-      proposal: category ? given : null,
-    },
+    proposalRecord(
+      { transaction: t.id, book: book.id, request: requestId, incoming: incoming.id },
+      lead,
+      payee
+    ),
   ]);
   return true;
 }
@@ -93,7 +114,7 @@ export async function suggestUnconfirmed(
   const unconfirmed = await ledger.unconfirmed(book.id);
   const inScope = (name: string) => !account || name === account || name.startsWith(`${account}:`);
   const open = unconfirmed.flatMap((t) => {
-    const incoming = openToCategorizing(t, db.proposal(book.id, t.id));
+    const incoming = openToCategorizing(t);
     return incoming && inScope(incoming.account) ? [{ t, incoming }] : [];
   });
   if (!open.length || !categorizers.length) return 0;
@@ -106,46 +127,56 @@ export async function suggestUnconfirmed(
   const uses = new Map<string, number>();
   let n = 0;
   for (const { t, incoming } of open) {
-    const { category, payee } = decisions.get(t.id) ?? {};
-    if (await apply(services, t, incoming, category, payee, request.request_id)) n++;
-    if (category?.rule_id) uses.set(category.rule_id, (uses.get(category.rule_id) ?? 0) + 1);
+    const decision = decisions.get(t.id) ?? {};
+    if (await apply(services, t, incoming, decision, request.request_id)) n++;
+    const rule = decision.category?.rule_id;
+    if (rule) uses.set(rule, (uses.get(rule) ?? 0) + 1);
   }
   db.countRuleUses(uses);
   return n;
 }
 
-/** The unconfirmed transactions a rule covers that are open to categorizing (not already its). */
+/** A rule's proposal for a transaction. */
+const ruleProposal = (rule: CategoryRule, t: Transaction): Chosen => ({
+  id: t.id,
+  postings: [{ account: rule.account }],
+  ...(rule.payee ? { payee: rule.payee } : {}),
+  confidence: 1,
+  reason: `Rule "${rule.name}"`,
+  auto_confirm: rule.auto_confirm,
+  rule_id: rule.id,
+  categorizer: "rules",
+  ...(rule.part ? { part: rule.part } : {}),
+});
+
+/** The unconfirmed transactions a rule covers that are open to categorizing, and that it would
+ * change. */
 export async function coveredBy(services: Services, rule: CategoryRule) {
-  const { db, ledger, book } = services;
+  const { ledger, book } = services;
   return (await ledger.unconfirmed(book.id)).flatMap((t) => {
-    const incoming = openToCategorizing(t, db.proposal(book.id, t.id));
+    const incoming = openToCategorizing(t);
     if (!incoming || !matches(rule, incoming)) return [];
-    if (
-      t.postings[1]!.account === rule.account &&
-      (!rule.payee || t.payee === rule.payee) &&
-      (!rule.part || t.postings[0]!.account === rule.part)
-    )
-      return [];
-    return [{ t, incoming }];
+    const after = placed(t.postings, incoming, { category: ruleProposal(rule, t) });
+    const unchanged =
+      after.length === t.postings.length &&
+      after.every((p, i) => p.account === t.postings[i]!.account) &&
+      (!rule.payee || t.payee === rule.payee);
+    return unchanged ? [] : [{ t, incoming }];
   });
 }
 
-/** Re-apply a rule to the unconfirmed transactions it covers that the user hasn't touched. */
+/** Re-apply a rule to the unconfirmed transactions it covers that the user hasn't decided. */
 export async function applyRule(services: Services, rule: CategoryRule): Promise<number> {
   const covered = await coveredBy(services, rule);
   for (const { t, incoming } of covered) {
-    const proposal: Chosen = {
-      id: t.id,
-      postings: [{ account: rule.account }],
-      ...(rule.payee ? { payee: rule.payee } : {}),
-      confidence: 1,
-      reason: `Rule "${rule.name}"`,
-      auto_confirm: rule.auto_confirm,
-      rule_id: rule.id,
-      categorizer: "rules",
-      ...(rule.part ? { part: rule.part } : {}),
-    };
-    await apply(services, t, incoming, proposal, rule.payee ? proposal : undefined, "rule");
+    const proposal = ruleProposal(rule, t);
+    await apply(
+      services,
+      t,
+      incoming,
+      { category: proposal, ...(rule.payee ? { payee: proposal } : {}) },
+      "rule"
+    );
   }
   services.db.countRuleUses(new Map([[rule.id, covered.length]]));
   return covered.length;

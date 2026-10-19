@@ -9,6 +9,7 @@ import { httpLedger } from "./ledger.js";
 import { httpAi } from "./ai.js";
 import { external, providersFrom } from "./categorize/external.js";
 import { history } from "./categorize/history.js";
+import { items } from "./categorize/items.js";
 import { rules } from "./categorize/rules.js";
 import { startDaily } from "./daily.js";
 import { pricesJob } from "./prices.js";
@@ -20,10 +21,12 @@ import { simplefinJob } from "./simplefin/sync.js";
 const { port, webRoot } = config;
 const db = new AppDb(join(config.dataDir, "app.sqlite"));
 const ledgerFor = (user: string) => httpLedger(config.ledgerUrl, user);
-// The categorization chain: the user's rules, then history, then any configured providers.
+// The categorization chain: the user's rules, then history (payees, then items), then any
+// configured providers. Receipts add the book's AI at the end (M16).
 const categorizers = [
   rules((book) => db.rules(book)),
   history,
+  items,
   ...providersFrom(config.categorizers).map((p) => external(p)),
 ];
 

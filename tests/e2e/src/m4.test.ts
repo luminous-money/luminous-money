@@ -112,6 +112,7 @@ describe("categorization", () => {
       [
         ["rules", 0],
         ["history", 1],
+        ["items", 0],
       ]
     );
   });

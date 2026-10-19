@@ -5,12 +5,9 @@
  */
 import { randomUUID } from "node:crypto";
 
-import {
-  CATEGORIZER_API_VERSION,
-  type CategorizeRequest,
-  type IncomingTransaction,
-} from "../../shared/categorizer-api.js";
+import { CATEGORIZER_API_VERSION } from "../../shared/categorizer-api.js";
 import type { LedgerPort } from "../ledger.js";
+import type { Incoming, Request } from "./types.js";
 
 export const CONTEXT_MONTHS = 14;
 
@@ -28,8 +25,8 @@ export function monthsBefore(date: string, months: number): string {
 export async function buildRequest(
   ledger: LedgerPort,
   book: { id: string; name: string },
-  transactions: IncomingTransaction[]
-): Promise<CategorizeRequest> {
+  transactions: Incoming[]
+): Promise<Request> {
   const earliest = transactions.map((t) => t.date).sort()[0]!;
   const from = monthsBefore(earliest, CONTEXT_MONTHS);
   const [accounts, history] = await Promise.all([
@@ -56,7 +53,11 @@ export async function buildRequest(
         flag: t.flag,
         payee: t.payee ?? null,
         narration: t.narration ?? null,
-        postings: t.postings.map((p) => ({ account: p.account, amount: p.amount ?? null })),
+        postings: t.postings.map((p) => ({
+          account: p.account,
+          amount: p.amount ?? null,
+          memo: p.memo ?? null,
+        })),
       })),
     },
   };

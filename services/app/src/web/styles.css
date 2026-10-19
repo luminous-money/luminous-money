@@ -393,6 +393,35 @@ button:focus-visible,
   gap: 0.5rem;
 }
 
+/* A split still to place (M16): what it is above, its picker taking the room, its amount beside
+   it. */
+.splits .open-split {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.splits .open-split .split-memo {
+  grid-column: 1 / -1;
+}
+
+.card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.card-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .done {
   text-align: center;
   padding: 2rem 1rem;

@@ -1,7 +1,8 @@
-/** M16: setting a book's AI up, capturing a receipt from a file, and reviewing it. */
+/** M16: setting a book's AI up, capturing a receipt from a file, and reviewing it (its splits
+ * too); an account's payment cards. */
 import { expect, test } from "@playwright/test";
 
-import { setUpUser } from "./support.js";
+import { accounts, setUpUser, stored } from "./support.js";
 
 // A tiny JPEG (a white pixel), as a file to upload.
 const JPEG = Buffer.from(
@@ -78,5 +79,65 @@ test("a receipt that isn't read waits in review for the account it was paid from
   await page.keyboard.press("Enter");
   await expect(confirm).toBeEnabled();
   await confirm.click();
+  await expect(page).toHaveURL((url) => url.pathname.endsWith(`/books/${book.id}`));
+});
+
+test("an account's payment cards are added and removed in its editor", async ({ page }) => {
+  const { book, account } = await setUpUser(page);
+  await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}/edit`);
+  const cards = page.getByRole("region", { name: "Payment cards" });
+  await cards.getByRole("combobox", { name: "Brand" }).selectOption("visa");
+  await cards.getByLabel("Last four").fill("4242");
+  await cards.getByRole("button", { name: "Add card" }).click();
+  await expect(cards.getByRole("listitem")).toHaveText([/Visa ending 4242/]);
+  await expect
+    .poll(async () => (await accounts(book.id)).find((a) => a.name === account)?.cards)
+    .toEqual([{ brand: "visa", last_four: "4242" }]);
+
+  await cards.getByRole("button", { name: "Remove the Visa ending 4242" }).click();
+  await expect(cards.getByRole("listitem")).toHaveCount(0);
+});
+
+test("an itemized receipt's splits are each placed in review", async ({ page }) => {
+  const { session, book, account } = await setUpUser(page);
+  for (const name of ["Expenses:Food:Groceries", "Expenses:Food:Restaurant"])
+    await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+      params: { path: { book_id: book.id } },
+      body: { name, kind: "leaf" },
+    });
+  await page.goto(`/ui/books/${book.id}/ai`);
+  const use = page.getByLabel("Use AI in this book");
+  await use.click();
+  await expect(use).toBeChecked();
+  await page.getByRole("combobox", { name: "Provider" }).selectOption("fake");
+  await expect(page.getByText(/Ready: the camera/)).toBeVisible();
+
+  await page.goto(`/ui/books/${book.id}/receipt?account=${encodeURIComponent(account)}`);
+  await page.getByLabel("Upload a receipt").setInputFiles({
+    name: "jewel.jpg",
+    mimeType: "image/jpeg",
+    buffer: JPEG,
+  });
+  await page.getByRole("radio", { name: "Yes" }).click();
+  await page.getByRole("button", { name: "Create transaction" }).click();
+
+  // Each line is a split, placed by the (fake) AI, to change as you like.
+  const item = page.getByRole("article").filter({ hasText: "Fake Store" });
+  await expect(item.getByRole("button", { name: /^FIRST ITEM/ })).toContainText("Groceries");
+  await expect(item.getByRole("button", { name: /^SECOND ITEM/ })).toContainText("Groceries");
+  await item.getByRole("button", { name: /^FIRST ITEM/ }).click();
+  await item.getByRole("combobox", { name: "FIRST ITEM" }).fill("rest");
+  await page.keyboard.press("Enter");
+  const id = new URL(page.url()).searchParams.get("only")!;
+  // Chosen, it's yours: no longer a split to confirm. The other still is.
+  await expect
+    .poll(async () => (await stored(book.id, id)).postings.map((p) => [p.account, p.flag ?? null]))
+    .toEqual([
+      [account, null],
+      ["Expenses:Food:Restaurant", null],
+      ["Expenses:Food:Groceries", "!"],
+    ]);
+  await item.getByRole("button", { name: "Confirm" }).click();
+  // Opened without a way back, it goes home.
   await expect(page).toHaveURL((url) => url.pathname.endsWith(`/books/${book.id}`));
 });

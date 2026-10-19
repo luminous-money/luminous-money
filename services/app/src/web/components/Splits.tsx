@@ -6,7 +6,8 @@ import { checkBalance, unresolved } from "../lib/split.js";
 import { AccountPicker, type AccountCreation } from "./AccountPicker.js";
 
 /** A posting being edited. The amount stays a raw string until it's valid; anything the form
- * doesn't edit (cost, price, flag, metadata) rides along untouched in `original`. */
+ * doesn't edit (cost, price, flag, metadata) rides along untouched in `original`, except that a
+ * split whose account you change is yours: its flag (`!`, still to confirm) goes. */
 type Row = {
   key: number;
   account: string;
@@ -35,8 +36,9 @@ function toRows(postings: Split[], currency: string): Row[] {
 }
 
 function toPostings(rows: Row[]): Split[] {
-  return rows.map((r) => ({
-    ...r.original,
+  return rows.map(({ original: { flag, ...original }, ...r }) => ({
+    ...original,
+    ...(flag && r.account === original.account ? { flag } : {}),
     account: r.account,
     units: r.number.trim() ? { number: r.number.trim(), currency: r.currency.trim() } : null,
     ...(r.tolerance.trim() ? { tolerance: r.tolerance.trim() } : {}),

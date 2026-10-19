@@ -1,10 +1,11 @@
 M16: Receipt capture: plan
 ==================================================================================================
 
-> **Status: first pass built (2026-10-18); the [second pass](#the-second-pass-extract-then-categorize)
-> (reading in two steps, payment cards, categorizing splits) planned 2026-10-18 and being
-> built.** The brief, from [the plan](../../PLAN.md): take a picture of a receipt, and AI makes
-> a transaction from it. Its spec is the notes beside this plan ([notes.md](notes.md)).
+> **Status: built (first pass 2026-10-18; the
+> [second pass](#the-second-pass-extract-then-categorize), reading in two steps, payment cards and
+> categorizing splits, 2026-10-19).** The brief, from [the plan](../../PLAN.md): take a picture
+> of a receipt, and AI makes a transaction from it. Its spec is the notes beside this plan
+> ([notes.md](notes.md)).
 
 ## What M16 is
 
@@ -166,6 +167,8 @@ an import is.
   proposal); one on Uncategorized or `Assets:Unknown` can't.
 - **For SQL:** the posting's flag and its `memo:` become derived columns (ledger migration 11),
   and the compact history carries them, for item history.
+- **Not built:** review marking a split "fallback" (where its account came from isn't kept per
+  split); it shows each open split's line, amount and account.
 - **What's already in review** (unflagged): its Uncategorized splits are still undecided; a
   proposed one counts as decided. No backfill.
 

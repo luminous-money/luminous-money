@@ -2,7 +2,8 @@
  * The ai service's API, at /api/ai/v1 (M16). Every route but health needs the caller (X-User-Id,
  * set by Traefik after checking the session); what they may do in a book is the ledger's call:
  * a member reads a book's AI settings, a manager changes them (and its credential), a writer
- * reads receipts into it. The credential is sealed at rest and never sent back.
+ * uses its two operations (extract a receipt's facts, categorize splits). The credential is
+ * sealed at rest and never sent back.
  */
 import { Hono, type Context } from "hono";
 
@@ -11,8 +12,9 @@ import {
   EAGERNESS,
   type AiHealth,
   type AiSettingsPatch,
+  type CategorizeIn,
+  type ExtractIn,
   type ProviderName,
-  type ReceiptReadIn,
 } from "@fava-beans/ai-api";
 
 import { StaleVersion, type AiDb } from "./db.js";
@@ -127,38 +129,65 @@ export function createApi({
     return c.json(db.settings(book, names));
   });
 
-  /** Read a receipt into a proposed transaction (`app` stages it). 409 when the book's AI isn't
-   * set up; 422 when the provider couldn't read it (`app` falls back). */
-  api.post("/books/:book/receipts/read", async (c) => {
+  /** The book's provider and its credential, once the caller may use them: a refusal
+   * otherwise (409 when the book's AI isn't set up). */
+  const ready = async (c: Context<Env>) => {
     const refused = await allowed(c, "write");
-    if (refused) return refused;
-    const book = c.req.param("book");
+    if (refused) return { refused };
+    const book = c.req.param("book")!;
     const settings = db.settings(book, names);
-    if (!settings.ready) return c.json({ detail: "the book's AI isn't set up" }, 409);
-    const input = (await c.req.json().catch(() => null)) as ReceiptReadIn | null;
-    if (!input?.file?.data || !input.file.media_type || !Array.isArray(input.accounts))
-      return c.json({ detail: "send the receipt, the hints and the accounts" }, 422);
-    if (input.file.data.length > MAX_BASE64)
-      return c.json({ detail: "a receipt is at most 5 MB" }, 413);
-    const provider = providers.find((p) => p.name === settings.provider)!;
+    if (!settings.ready) return { refused: c.json({ detail: "the book's AI isn't set up" }, 409) };
     const sealed = db.credential(book);
+    return {
+      refused: null,
+      settings,
+      provider: providers.find((p) => p.name === settings.provider)!,
+      credential: sealed ? sealer.open(sealed) : null,
+    };
+  };
+
+  /** Run a provider's operation; 422 when it couldn't answer (`app` carries on without it). */
+  const answer = async <T>(c: Context<Env>, run: () => Promise<T>) => {
     try {
-      const reading = await provider.read(
-        {
-          ...input,
-          hints: input.hints ?? {},
-          itemize: input.hints?.itemize ?? settings.itemize,
-          creation: settings.create_accounts
-            ? { eagerness: settings.eagerness, guidance: settings.guidance }
-            : null,
-        },
-        sealed ? sealer.open(sealed) : null
-      );
-      return c.json(reading);
+      return c.json(await run());
     } catch (error) {
       if (error instanceof ReadFailed) return c.json({ detail: error.message }, 422);
       throw error;
     }
+  };
+
+  /** What a receipt says: its facts, nothing about the book. */
+  api.post("/books/:book/receipts/extract", async (c) => {
+    const use = await ready(c);
+    if (use.refused) return use.refused;
+    const input = (await c.req.json().catch(() => null)) as ExtractIn | null;
+    if (!input?.file?.data || !input.file.media_type || !input.today || !input.currency)
+      return c.json({ detail: "send the receipt, today and the currency" }, 422);
+    if (input.file.data.length > MAX_BASE64)
+      return c.json({ detail: "a receipt is at most 5 MB" }, 413);
+    return answer(c, () => use.provider.extract(input, use.credential));
+  });
+
+  /** Where transactions' unconfirmed splits belong, with the book's guidance (and its
+   * account creation, if it's on). */
+  api.post("/books/:book/categorize", async (c) => {
+    const use = await ready(c);
+    if (use.refused) return use.refused;
+    const input = (await c.req.json().catch(() => null)) as CategorizeIn | null;
+    if (!Array.isArray(input?.transactions) || !Array.isArray(input.accounts) || !input.currency)
+      return c.json({ detail: "send the transactions, the accounts and the currency" }, 422);
+    const { settings } = use;
+    return answer(c, () =>
+      use.provider.categorize(
+        {
+          ...input,
+          history: input.history ?? [],
+          guidance: settings.guidance,
+          creation: settings.create_accounts ? { eagerness: settings.eagerness } : null,
+        },
+        use.credential
+      )
+    );
   });
 
   /** Forget a book: its owner, or anyone once the ledger no longer has it (`app` calls this

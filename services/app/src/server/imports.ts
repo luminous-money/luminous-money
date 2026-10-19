@@ -32,11 +32,13 @@ import type {
   Outcome,
   ProposalSummary,
 } from "../shared/imports.js";
+import { UNCATEGORIZED } from "../shared/accounts.js";
 import { add, isZero, negate } from "../shared/decimal.js";
 import { partOf } from "../shared/divided.js";
 import { categorize, stagedPostings } from "./categorize/chain.js";
 import { buildRequest } from "./categorize/context.js";
-import type { Categorizer, Chosen, Decision } from "./categorize/types.js";
+import { proposalRecord } from "./categorize/service.js";
+import type { Categorizer, Decision } from "./categorize/types.js";
 import type { AppDb } from "./db.js";
 import type { LedgerPort } from "./ledger.js";
 import { assign } from "./pipeline/assign.js";
@@ -45,7 +47,7 @@ import { runChain } from "./pipeline/chain.js";
 import { DEFAULT_WINDOW_DAYS, matcher } from "./pipeline/matcher.js";
 import type { Incoming } from "./pipeline/types.js";
 
-export const UNCATEGORIZED = { out: "Expenses:Uncategorized", in: "Income:Uncategorized" };
+export { UNCATEGORIZED };
 
 /** Something the user needs to fix before importing: no profile yet, or a file that doesn't fit. */
 export class ImportProblem extends Error {
@@ -67,7 +69,8 @@ export type Stageable = {
 };
 
 /** A row as a transaction in `account`: unconfirmed, with the category and payee the chain
- * decided (confirmed if a rule says so), or uncategorized on the other side. */
+ * decided (confirmed if a rule says so), or uncategorized on the other side; that side flagged
+ * `!`, a split still to confirm (M16). */
 export function stagedTransaction(
   account: string,
   currency: string,
@@ -86,7 +89,7 @@ export function stagedTransaction(
     tags: [],
     links: [],
     meta: { source, "import-batch": batchId, "import-id": row.fingerprint },
-    postings: stagedPostings(account, amount, decision.category, fallback),
+    postings: stagedPostings(account, amount, decision, fallback) as TransactionIn["postings"],
   };
 }
 
@@ -149,6 +152,10 @@ export async function prepareStage({
     amount: { number: row.amount, currency },
     description: row.description,
     payee: row.payee,
+    // One split to place: the other side, all of it.
+    splits: [
+      { index: 1, amount: { number: negate(row.amount), currency }, memo: null as string | null },
+    ],
   }));
   const request = categorizers.length ? await buildRequest(ledger, book, incoming) : undefined;
   const decisions = request ? await categorize(categorizers, request) : new Map<string, Decision>();
@@ -169,27 +176,8 @@ export async function prepareStage({
       const { category, payee } = decided[i]!;
       if (category?.rule_id) uses.set(category.rule_id, (uses.get(category.rule_id) ?? 0) + 1);
       if (!category && !payee) return [];
-      const {
-        auto_confirm: _a,
-        rule_id: _r,
-        categorizer: _c,
-        ...given
-      } = category ?? ({} as Chosen);
-      return [
-        {
-          transaction_id: id,
-          book_id: book.id,
-          request_id: request!.request_id,
-          incoming_id: incoming[i]!.id,
-          categorizer: category?.categorizer ?? null,
-          confidence: category?.confidence ?? null,
-          reason: category?.reason ?? payee?.reason ?? null,
-          postings: category?.postings ?? null,
-          payee: payee?.payee ?? null,
-          payee_categorizer: payee?.categorizer ?? null,
-          proposal: category ? given : null,
-        },
-      ];
+      const ids = { transaction: id, book: book.id, request: request!.request_id };
+      return [proposalRecord({ ...ids, incoming: incoming[i]!.id }, category, payee)];
     });
     db.saveProposals(stored);
     db.countRuleUses(uses);

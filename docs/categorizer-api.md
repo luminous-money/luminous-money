@@ -145,6 +145,12 @@ transactions). It's the user's financial history: run providers you trust with i
 
 A proposal with only a `payee` is fine: it's merged with another categorizer's postings.
 
+**Transactions with several splits to place** (an itemized receipt, M16) are asked about with
+the same fields: the transaction's account and amount as a whole. A proposal for one is taken
+as its **fallback**, the account for any split nothing else places: it must be one posting
+without an amount, and it doesn't settle the transaction (fava-beans' own item history and AI
+place the splits themselves). Nothing about the API changed for them: it's still version 1.
+
 ### What fava-beans checks
 
 A proposal is dropped (and logged) if it names a transaction that wasn't asked about, gives a

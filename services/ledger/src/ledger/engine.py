@@ -50,6 +50,13 @@ SOURCE_KEY = "source"
 # part what comes in from the bank or a file lands in (M15).
 DIVIDED_KEY = "divided"
 MAIN_PART_KEY = "main-part"
+# On an asset or liability account's open: the payment cards it's paid with (M16), so a
+# receipt's card names its account: "visa 9499, 0417" (the brand optional). One value, since
+# Beancount metadata has no lists.
+CARDS_KEY = "cards"
+CARD_BRANDS = ("visa", "mastercard", "amex", "discover", "other")
+# On a posting: what it is, in words ("Eggs Hppy 18", a receipt's line) (M16).
+MEMO_KEY = "memo"
 NODE = "node"
 ROOT_OPTIONS = (
     ("name_assets", "asset"),
@@ -84,6 +91,8 @@ class Posting:
     amount: Decimal | None = None
     amount_currency: str | None = None
     reconciled: datetime.date | None = None  # its `reconciled:` statement date (M14)
+    flag: str | None = None  # `!`: a split still to confirm (M16)
+    memo: str | None = None  # its `memo:` (M16)
 
 
 @dataclass(frozen=True)
@@ -192,6 +201,8 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
                 amount=amount[0] if amount else None,
                 amount_currency=amount[1] if amount else None,
                 reconciled=_mark(p.meta),
+                flag=p.flag,
+                memo=_memo(p.meta),
             )
             for p, amount in zip(entry.postings, amounts)
         )
@@ -207,6 +218,36 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
         price=(entry.currency, entry.amount.number, entry.amount.currency) if isinstance(entry, data.Price) else None,
         budgeted=not (isinstance(entry, data.Transaction) and entry.meta.get(BUDGET_KEY) is False),
     )
+
+
+def _memo(meta: dict | None) -> str | None:
+    value = (meta or {}).get(MEMO_KEY)
+    return value if isinstance(value, str) and value else None
+
+
+def confirmed(entry: data.Transaction) -> data.Transaction:
+    """Confirming a transaction confirms its splits (M16): a `*` transaction's postings lose
+    their flags, whoever wrote it, so nothing confirmed still says a split is unconfirmed."""
+    if entry.flag != "*" or not any(p.flag for p in entry.postings):
+        return entry
+    return entry._replace(postings=[p._replace(flag=None) for p in entry.postings])
+
+
+def cards_of(meta: dict) -> list[models.Card]:
+    """An open's `cards:`, as cards (anything unreadable in it skipped)."""
+    value = meta.get(CARDS_KEY)
+    cards = []
+    for part in value.split(",") if isinstance(value, str) else []:
+        words = part.split()
+        if not words or not re.fullmatch(r"\d{4}", words[-1]):
+            continue
+        brand = words[0].lower() if len(words) > 1 else None
+        cards.append(models.Card(brand=(brand if brand in CARD_BRANDS else "other") if brand else None, last_four=words[-1]))
+    return cards
+
+
+def cards_text(cards: list[models.Card]) -> str:
+    return ", ".join(f"{c.brand} {c.last_four}" if c.brand else c.last_four for c in cards)
 
 
 def _mark(meta: dict | None) -> datetime.date | None:
@@ -306,7 +347,7 @@ def transaction_directive(t: models.TransactionIn, directive_id: str | None = No
             for p in t.postings
         ],
     )
-    directive = to_directive(entry, directive_id)
+    directive = to_directive(confirmed(entry), directive_id)
     return parse_one(directive.text, directive.id)
 
 
@@ -352,6 +393,7 @@ def accounts(header: list[str], texts: list[str], versions: dict[str, str] | Non
                 revalue_every=int(entry.meta[REVALUE_EVERY_KEY]) if REVALUE_EVERY_KEY in entry.meta else None,
                 divided=entry.meta.get(DIVIDED_KEY) is True,
                 main_part=entry.meta[MAIN_PART_KEY] if isinstance(entry.meta.get(MAIN_PART_KEY), str) else None,
+                cards=cards_of(entry.meta),
             )
     for entry in entries:
         if isinstance(entry, data.Close) and entry.account in found:
@@ -420,10 +462,11 @@ def reopened(
     display_name: object = _KEEP,
     divided: object = _KEEP,
     main_part: object = _KEEP,
+    cards: object = _KEEP,
 ) -> Directive:
     """An `open` directive with its booking method and `revalue-every` set (None: removed), and
-    its `display-name` (None or "": removed) and `divided` (False: removed) set
-    if given, kept if not."""
+    its `display-name` (None or "": removed), `divided` (False: removed), main part and cards
+    (none: removed) set if given, kept if not."""
     entries, errors, _ = parser.parse_string(text)
     if errors or len(entries) != 1 or not isinstance(entries[0], data.Open):
         raise ParseFailure(["not an open directive"])
@@ -443,6 +486,10 @@ def reopened(
         meta.pop(MAIN_PART_KEY, None)
         if main_part:
             meta[MAIN_PART_KEY] = str(main_part)
+    if cards is not _KEEP:
+        meta.pop(CARDS_KEY, None)
+        if cards:
+            meta[CARDS_KEY] = cards_text(cards)  # type: ignore[arg-type]
     return to_directive(entry._replace(meta=meta, booking=data.Booking[booking] if booking else None))
 
 
@@ -490,16 +537,21 @@ def with_accounts(
 def divided_opens(text: str, main: str) -> tuple[Directive, Directive]:
     """Dividing an account (M15): its `open` becomes a divided node's (the same directive: kind
     node, divided, `main` its main part, its display name kept), and `main` opens as it was (the
-    same date, currencies and booking), to take everything that was the account's."""
+    same date, currencies and booking), to take everything that was the account's. Its cards stay
+    with the whole: they're the real account's."""
     entries, errors, _ = parser.parse_string(text)
     if errors or len(entries) != 1 or not isinstance(entries[0], data.Open):
         raise ParseFailure(["not an open directive"])
     entry = entries[0]
-    kept = {k: v for k, v in entry.meta.items() if k in (ID_KEY, DISPLAY_NAME_KEY)}
+    kept = {k: v for k, v in entry.meta.items() if k in (ID_KEY, DISPLAY_NAME_KEY, CARDS_KEY)}
     node = entry._replace(
         meta={**kept, KIND_KEY: NODE, DIVIDED_KEY: True, MAIN_PART_KEY: main}, currencies=None, booking=None
     )
-    rest = {k: v for k, v in entry.meta.items() if k not in ("filename", "lineno", ID_KEY, DISPLAY_NAME_KEY, KIND_KEY)}
+    rest = {
+        k: v
+        for k, v in entry.meta.items()
+        if k not in ("filename", "lineno", ID_KEY, DISPLAY_NAME_KEY, KIND_KEY, CARDS_KEY)
+    }
     part = entry._replace(account=main, meta=rest)
     return to_directive(node), parse_one(to_directive(part, new_id()).text)
 
@@ -687,7 +739,7 @@ def rewritten(
             meta[RECONCILED_KEY] = mark
         postings[i] = postings[i]._replace(meta=meta or None)
     entry = entry._replace(postings=postings, date=date or entry.date, flag=flag or entry.flag)
-    return to_directive(entry)
+    return to_directive(confirmed(entry))
 
 
 @dataclass(frozen=True)
@@ -756,7 +808,7 @@ def with_flag(text: str, flag: str) -> Directive:
     entries, errors, _ = parser.parse_string(text)
     if errors or len(entries) != 1 or not isinstance(entries[0], data.Transaction):
         raise ParseFailure(["only transactions carry a flag"])
-    return to_directive(entries[0]._replace(flag=flag))
+    return to_directive(confirmed(entries[0]._replace(flag=flag)))
 
 
 def tombstone(directive_id: str, date: datetime.date) -> str:

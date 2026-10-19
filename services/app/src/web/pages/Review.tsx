@@ -34,7 +34,7 @@ import {
   useSuggest,
   writeSkipped,
 } from "../lib/queries.js";
-import { simple, UNCATEGORIZED, unresolved, withCounterpart } from "../lib/split.js";
+import { chosen, simple, UNCATEGORIZED, unresolved, withCounterpart } from "../lib/split.js";
 
 /**
  * The review queue: unconfirmed transactions to categorize and confirm, and imported rows matched
@@ -214,6 +214,10 @@ type ItemProps = {
   onSkip: () => void;
 };
 
+/** A split's `memo:`, what it is (a receipt's line). */
+const memoOf = (p: { meta?: Record<string, unknown> | null }) =>
+  typeof p.meta?.["memo"] === "string" ? (p.meta["memo"] as string) : null;
+
 function QueueItem({
   book,
   transaction: t,
@@ -388,12 +392,32 @@ function QueueItem({
             </div>
           ) : (
             <ul className="splits">
-              {t.postings.map((p, i) => (
-                <li key={i}>
-                  <AccountName name={p.account} />
-                  <span>{p.units ? formatMoney(p.units.number, p.units.currency) : "auto"}</span>
-                </li>
-              ))}
+              {t.postings.map((p, i) =>
+                // A split still to place (M16): what it is, its amount, and its account to pick.
+                i > 0 && (p.flag === "!" || unresolved(p.account)) ? (
+                  <li key={i} className={`open-split${unresolved(p.account) ? " needs" : ""}`}>
+                    <span className="split-memo small muted">{memoOf(p) ?? "The rest"}</span>
+                    <AccountPicker
+                      label={memoOf(p) ?? `Split ${i}`}
+                      accounts={accounts}
+                      value={unresolved(p.account) ? "" : p.account}
+                      prefer={preferredRoots(!p.units || !isNegative(p.units.number))}
+                      create={create}
+                      onChange={(account) =>
+                        void save({
+                          postings: t.postings.map((q, j) => (j === i ? chosen(q, account) : q)),
+                        })
+                      }
+                    />
+                    <span>{p.units ? formatMoney(p.units.number, p.units.currency) : "auto"}</span>
+                  </li>
+                ) : (
+                  <li key={i}>
+                    <AccountName name={p.account} />
+                    <span>{p.units ? formatMoney(p.units.number, p.units.currency) : "auto"}</span>
+                  </li>
+                )
+              )}
             </ul>
           )}
 

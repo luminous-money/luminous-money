@@ -145,7 +145,15 @@ test("a schedule's splits take a match tolerance; a book's time zone can be set"
 
   await page.goto("/ui/books");
   const zone = page.getByRole("combobox", { name: "Time zone" });
+  // A book with no time zone is given the browser's in the background: let that land first, or
+  // it can overwrite the choice. Then wait for the choice itself to be saved.
+  await expect(zone).toBeEnabled();
+  await expect(zone).not.toHaveValue("");
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === "PUT" && r.url().endsWith("/settings") && r.ok()
+  );
   await zone.selectOption("America/Chicago");
+  await saved;
   await page.reload();
   await expect(zone).toHaveValue("America/Chicago");
 });

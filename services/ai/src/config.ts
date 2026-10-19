@@ -41,8 +41,9 @@ const configDef = {
   encryptionKey: configValue("AI_ENCRYPTION_KEY", "str", REQUIRED, key256),
   /** The providers offered: `claude`, and `fake` (test stacks only). */
   providers: configValue("AI_PROVIDERS", "str", "claude", providers),
-  /** Claude's model for reading receipts. */
-  claudeModel: configValue("AI_CLAUDE_MODEL", "str", "claude-opus-5"),
+  /** Claude's models: reading what a receipt says, and categorizing splits. */
+  claudeExtractModel: configValue("AI_CLAUDE_EXTRACT_MODEL", "str", "claude-sonnet-5"),
+  claudeCategorizeModel: configValue("AI_CLAUDE_CATEGORIZE_MODEL", "str", "claude-opus-5"),
 };
 
 const checked = validate(configDef);

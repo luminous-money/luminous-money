@@ -6,21 +6,18 @@ import { join } from "node:path";
 import { guessProfile } from "@fava-beans/csv-import";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type {
-  CategorizeRequest,
-  HistoryTransaction,
-  IncomingTransaction,
-} from "../../shared/categorizer-api.js";
+import type { CategorizeRequest, HistoryTransaction } from "../../shared/categorizer-api.js";
 import type { RuleConditions } from "../../shared/rules.js";
 import { AppDb } from "../db.js";
 import { importFile } from "../imports.js";
 import { FakeLedger } from "../testing.js";
-import { categorize, SETTLE } from "./chain.js";
+import { categorize, placed, SETTLE } from "./chain.js";
 import { external, providersFrom } from "./external.js";
 import { history } from "./history.js";
+import { items } from "./items.js";
 import { rules } from "./rules.js";
 import { applyRule, coveredBy, settle, suggestUnconfirmed } from "./service.js";
-import type { Categorizer } from "./types.js";
+import type { Categorizer, Incoming, Request } from "./types.js";
 
 const CHECKING = "Assets:Bank:Checking";
 const usd = (number: string) => ({ number, currency: "USD" });
@@ -50,19 +47,17 @@ const past = (
   ],
 });
 
-const row = (description: string, account = CHECKING): IncomingTransaction => ({
+const row = (description: string, account = CHECKING): Incoming => ({
   id: `r${next++}`,
   date: "2024-03-01",
   account,
   amount: usd("-4.50"),
   description,
   payee: null,
+  splits: [{ index: 1, amount: usd("4.50"), memo: null }],
 });
 
-const request = (
-  rows: IncomingTransaction[],
-  historyRows: HistoryTransaction[] = []
-): CategorizeRequest => ({
+const request = (rows: Incoming[], historyRows: HistoryTransaction[] = []): Request => ({
   api_version: "1",
   request_id: "q",
   book: { id: "b", name: "Book" },
@@ -70,7 +65,7 @@ const request = (
   context: { from: "2023-01-01", accounts: ACCOUNTS, history: historyRows },
 });
 
-const fixed = (name: string, proposals: (t: IncomingTransaction) => object[]): Categorizer => ({
+const fixed = (name: string, proposals: (t: Incoming) => object[]): Categorizer => ({
   name,
   async categorize(r) {
     return { proposals: r.transactions.flatMap((t) => proposals(t)) as never };
@@ -171,7 +166,7 @@ describe("the chain", () => {
 });
 
 describe("history", () => {
-  const propose = async (t: IncomingTransaction, h: HistoryTransaction[]) =>
+  const propose = async (t: Incoming, h: HistoryTransaction[]) =>
     (await history.categorize(request([t], h))).proposals[0];
 
   it("proposes what the same payee was confirmed as, more sure with more agreement", async () => {
@@ -315,6 +310,8 @@ describe("external providers", () => {
     expect((received[0]!.body as CategorizeRequest).transactions[0]!.description).toBe(
       "CORNER CAFE"
     );
+    // The API's own shape (v1): no splits.
+    expect((received[0]!.body as CategorizeRequest).transactions[0]).not.toHaveProperty("splits");
     expect(decided.get(t.id)!.category).toMatchObject({ categorizer: "llm", confidence: 0.8 });
     expect(decided.get(t.id)!.category!.auto_confirm).toBeUndefined();
   });
@@ -393,6 +390,8 @@ describe("importing with categorization", () => {
       "Corner Cafe",
       "Expenses:Food:Coffee",
     ]);
+    // The side proposed is a split still to confirm; the bank's isn't (M16).
+    expect(staged.postings.map((p) => p.flag ?? null)).toEqual([null, "!"]);
     expect(
       ledger.transactions.find((t) => t.id === mystery!.transaction_id)!.postings[1]!.account
     ).toBe("Expenses:Uncategorized");
@@ -413,6 +412,7 @@ describe("importing with categorization", () => {
 
     const staged = ledger.transactions.find((t) => t.id === result.rows[1]!.transaction_id)!;
     expect([staged.flag, staged.payee]).toEqual(["*", "Mystery Shop"]);
+    expect(staged.postings.some((p) => p.flag)).toBe(false); // confirmed: its splits too
     expect(db.rule("b", id)!.applied).toBe(1);
   });
 });
@@ -461,6 +461,21 @@ describe("unconfirmed transactions", () => {
     expect(decided.postings[1]!.account).toBe("Expenses:Food:Groceries");
   });
 
+  it("Suggest categories asks again about a split still flagged, not one the user chose", async () => {
+    const proposed = ledger.addTransaction({
+      date: "2024-03-05",
+      flag: "!",
+      narration: "CORNER CAFE",
+      postings: [
+        { account: CHECKING, units: usd("-4.50") },
+        { account: "Expenses:Food:Groceries", flag: "!" },
+      ],
+    });
+
+    expect(await suggestUnconfirmed({ db, ledger, book, categorizers: [history] })).toBe(1);
+    expect(proposed.postings[1]).toMatchObject({ account: "Expenses:Food:Coffee", flag: "!" });
+  });
+
   it("a rule re-applies to what it covers that hasn't been touched, and counts", async () => {
     const open = unconfirmed("TEA HOUSE");
     const id = db.addRule("b", {
@@ -506,6 +521,128 @@ describe("unconfirmed transactions", () => {
         final: expect.objectContaining({
           postings: [{ account: "Expenses:Food:Groceries", amount: null }],
         }),
+      }),
+    ]);
+  });
+});
+
+describe("splits (M16)", () => {
+  const receipt = (): Incoming => ({
+    id: `r${next++}`,
+    date: "2024-03-01",
+    account: "Liabilities:Card",
+    amount: usd("-23.50"),
+    description: "Jewel-Osco",
+    payee: "Jewel-Osco",
+    splits: [
+      { index: 1, amount: usd("9.99"), memo: "EGGS HPPY 18" },
+      { index: 2, amount: usd("9.99"), memo: "MILK FRD ORG GAL" },
+      { index: 3, amount: usd("3.52"), memo: "TAX" },
+    ],
+  });
+  const postings = (t: Incoming) => [
+    { account: t.account, units: t.amount },
+    ...t.splits.map((s) => ({ account: "Expenses:Uncategorized", units: s.amount })),
+  ];
+
+  it("a fallback settles no split; each takes its own proposal, else the fallback", async () => {
+    const t = receipt();
+    const asked: number[][] = [];
+    const watching = (name: string, propose: (t: Incoming) => object[]) => ({
+      ...fixed(name, propose),
+      async categorize(r: Request) {
+        asked.push(r.transactions[0]!.splits.map((s) => s.index));
+        return { proposals: r.transactions.flatMap((x) => propose(x)) as never };
+      },
+    });
+    const chain = [
+      watching("rules", (x) => [
+        { id: x.id, postings: [{ account: "Expenses:Food:Groceries" }], confidence: 1, reason: "" },
+      ]),
+      watching("items", (x) => [
+        {
+          id: x.id,
+          splits: [{ index: 1, account: "Expenses:Food:Coffee" }],
+          confidence: 0.95,
+          reason: "",
+        },
+      ]),
+      watching("ai", (x) => [
+        {
+          id: x.id,
+          splits: [{ index: 2, account: "Expenses:Food:Coffee" }],
+          confidence: 0.6,
+          reason: "",
+        },
+      ]),
+    ];
+
+    const decision = (await categorize(chain, request([t]))).get(t.id)!;
+
+    // The rule's answer didn't stop the others; a confident split was settled.
+    expect(asked).toEqual([
+      [1, 2, 3],
+      [1, 2, 3],
+      [2, 3],
+    ]);
+    expect(placed(postings(t), t, decision).map((p) => [p.account, p.flag ?? null])).toEqual([
+      ["Liabilities:Card", null],
+      ["Expenses:Food:Coffee", "!"],
+      ["Expenses:Food:Coffee", "!"],
+      ["Expenses:Food:Groceries", "!"],
+    ]);
+  });
+
+  it("a fallback fills what's uncategorized, never a split placed by name", () => {
+    const t = receipt();
+    const before = postings(t).map((p, i) =>
+      i === 1 ? { ...p, account: "Expenses:Food:Coffee" } : p
+    );
+    const fallback = {
+      id: t.id,
+      postings: [{ account: "Expenses:Food:Groceries" }],
+      confidence: 1,
+      reason: "",
+      categorizer: "rules",
+    };
+
+    expect(placed(before, t, { category: fallback }).map((p) => p.account)).toEqual([
+      "Liabilities:Card",
+      "Expenses:Food:Coffee",
+      "Expenses:Food:Groceries",
+      "Expenses:Food:Groceries",
+    ]);
+  });
+
+  it("item history places an item as it was confirmed before, at the same payee first", async () => {
+    const bought = (payee: string, account: string) => ({
+      id: `h${next++}`,
+      date: "2024-01-01",
+      flag: "*",
+      payee,
+      narration: "",
+      postings: [
+        { account: "Liabilities:Card", amount: usd("-9.99") },
+        { account, amount: usd("9.99"), memo: "Eggs Hppy 18" },
+      ],
+    });
+    const t = receipt();
+    const { proposals } = await items.categorize({
+      ...request([t]),
+      context: {
+        from: "2023-01-01",
+        accounts: ACCOUNTS,
+        history: [
+          bought("Jewel-Osco", "Expenses:Food:Groceries"),
+          bought("Mariano's", "Expenses:Food:Coffee"),
+        ],
+      },
+    });
+
+    expect(proposals).toEqual([
+      expect.objectContaining({
+        splits: [{ index: 1, account: "Expenses:Food:Groceries" }],
+        confidence: 0.5,
       }),
     ]);
   });
