@@ -1,7 +1,7 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-19._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-21._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
@@ -12,6 +12,13 @@ M2 (credit cards, really "any account, and matching"), M3 (scheduled transaction
 accounts), M11 (budgets), M12 (reports), M13 (sharing books), M14 (reconciliation), M15 (divided
 accounts) and M16 (receipt capture) are described in their plans. The milestones ahead
 (M17–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+
+What an operator can do now (production readiness, phase 1; [docs/deploying.md](docs/deploying.md)):
+`fava-beans install` sets a deployment up (a laptop, or a public server with built-in HTTPS),
+then `status`, `upgrade` (backing up first), `backup` / `restore` (every database, the
+attachments and the keys, online), `logs`, `report` (for bug reports, secrets hidden) and
+`config`. Every service has `/health` and an image healthcheck; `/api/health` is public for
+uptime monitors. Nothing is published yet: there's no GitHub repository or release.
 
 What a user can do now:
 - **Receipts (M16):** Menu → AI turns a book's AI on (Claude, with an API key kept encrypted;
@@ -168,25 +175,30 @@ How it's put together:
   5) and `categorize` (where splits belong; Claude Opus 5). It answers; `app` composes and stages
   (`src/server/receipts.ts`, the chain in `src/server/categorize`, its AI step `ai.ts`), and the
   ledger keeps the files (attachments, migration 10). Their shared types are `packages/ai-api`.
-- **`packages/db`** (TypeScript migrations and timestamps, the sealer, with a lint check) and
+- **Deploying:** `deploy/gateway` (the gateway image: Traefik pinned, the routes, its static
+  config written at start by `entrypoint.sh`), `deploy/env.example`, `scripts/fava-beans` (the
+  operator's command; its test is `scripts/cli-test.sh`), `ledger.snapshot` (whole-system
+  backup and restore), and `.github/workflows` (CI; a release on a `v*` tag).
+- **`packages/db`** (TypeScript migrations and timestamps, the sealer, `health`, with a lint check) and
   **`packages/csv-import`** (parsing, guessing profiles, reading rows; shared by the browser and
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 180 tests, including the table lint
-    - auth: 20; app: 176; ai: 7; db: 10; csv-import: 22
+    - ledger: 183 tests, including the table lint
+    - auth: 20; app: 178; ai: 7; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
   - `pnpm e2e`: 88 API tests and 92 browser tests (with Mailpit, a fake SimpleFIN server and
-    the fake AI provider)
+    the fake AI provider), then the `fava-beans` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps
 
-1. **Production readiness and deployment docs** (Kael, 2026-10-19): upgrades and migrations,
-   backups, logs, health; docs and scripts from GitHub to a laptop or a public server; later,
-   releases with opt-in upgrades and a system page for admins.
+1. **Production readiness, phase 2** ([its plan](docs/milestones/production-readiness/PLAN.md)):
+   its questions first (upgrading from the app, where it's published, a license, built-in HTTPS,
+   who may sign up); then admins by email and the system page, update checks, `auto-upgrade`.
+   Publishing needs Kael: a GitHub repository, a license, then a `v0.1.0` tag.
 2. **M17 (transaction tagging):** see [its plan](docs/milestones/m17-transaction-tagging/PLAN.md).
 3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
@@ -214,8 +226,10 @@ How it's put together:
   transfer two banks date apart can't satisfy both sides by date.
 - **Loans and withheld taxes:** how to record them is in [docs/loans-and-taxes.md](docs/loans-and-taxes.md).
 - **The first browser tests of a cold e2e stack** can time out waiting for review to load (seen
-  once, 2026-10-17: three of accounts.spec, passing on a rerun). Also seen once, passing on a
-  rerun: m1.spec's "a file in another layout" (no import results). m3.spec's time zone raced
+  once, 2026-10-17: three of accounts.spec, passing on a rerun). Also seen twice (2026-10-17,
+  2026-10-21), passing on a rerun: m1.spec's "a file in another layout" (no import results within
+  5 seconds of "Save and import"). It passed 15 of 15 alone and 276 of 276 in three whole-suite
+  runs, so it's load or a cold stack: worth a look if it shows up in CI. m3.spec's time zone raced
   the PWA giving a new book the browser's zone in the background; the test now waits for it.
 
 - **Fetching prices needs the network** (beanprice's sources: Yahoo and friends, which change
@@ -235,9 +249,11 @@ How it's put together:
 - **The dev stack needs `SIMPLEFIN_ENCRYPTION_KEY` and `AI_ENCRYPTION_KEY`** (app and ai won't
   start without them): they're in the repo root's `.env` (gitignored), which Compose reads. Keep
   them: stored SimpleFIN connections and AI keys can't be opened without them.
-- **Traefik's routes are a Compose config,** fixed when its container is created: after
-  changing `deploy/traefik/routes.yml`, `docker compose up -d --force-recreate traefik` (a new
-  service's API is a 404 until then).
+- **The gateway's routes are inside its image** (`deploy/gateway/routes.yml`): after changing
+  them, `docker buildx bake gateway` (or `pnpm build`) and `docker compose up -d`. Its static
+  config is written at start from the environment, so edit `entrypoint.sh`, not a YAML file.
+- **The HTTPS port is random without a domain** (`FAVA_BEANS_HTTPS_PORT` unset): nothing
+  listens on it then, and two stacks on one machine don't collide.
 - **A confirmed transaction has no split flags:** the ledger drops them on any `*` write
   (`engine.confirmed`), and `FakeLedger` does the same, so tests see what production does.
   Don't confirm by editing text if the flags matter: text keeps what it says.
@@ -297,6 +313,6 @@ How it's put together:
 
 ```sh
 pnpm test                 # unit tests, contract drift, typechecks, formatting, lint
-pnpm e2e                  # whole stack, end to end (API and browser)
+pnpm e2e                  # whole stack, end to end (API, browser, the fava-beans command)
 docker compose up -d      # then open http://localhost:8080/ and log in
 ```

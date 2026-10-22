@@ -8,21 +8,38 @@ x-restart: &restart
   restart_policy:
     condition: any
 
+# Every service's log is capped (5 files of 10 MB), so a long-running server doesn't fill its
+# disk. `fava-beans logs` (or `docker compose logs`) reads them.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
+  # The gateway (deploy/gateway): Traefik with fava-beans' routes inside. Plain HTTP on
+  # FAVA_BEANS_PORT; with FAVA_BEANS_DOMAIN (and FAVA_BEANS_ACME_EMAIL), HTTPS too, with a Let's
+  # Encrypt certificate: then publish 80 and 443 (FAVA_BEANS_PORT=80, FAVA_BEANS_HTTPS_PORT=443).
+  # FAVA_BEANS_BIND=127.0.0.1 keeps it to this machine.
   traefik:
-    image: traefik:v3
-    command: ["--configFile=/etc/traefik/traefik.yml"]
+    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/gateway:${FAVA_BEANS_VERSION:-dev}
     ports:
-      - "${FAVA_BEANS_PORT:-8080}:80"
-    configs:
-      - source: traefik-static
-        target: /etc/traefik/traefik.yml
-      - source: traefik-routes
-        target: /etc/traefik/routes.yml
+      - "${FAVA_BEANS_BIND:-0.0.0.0}:${FAVA_BEANS_PORT:-8080}:80"
+      # Unset (no domain): any free port, so stacks side by side don't collide over it.
+      - "${FAVA_BEANS_BIND:-0.0.0.0}:${FAVA_BEANS_HTTPS_PORT:-}:443"
+    environment:
+      - FAVA_BEANS_DOMAIN
+      - FAVA_BEANS_ACME_EMAIL
+      - FAVA_BEANS_TRUSTED_PROXIES
+    volumes:
+      - certs:/certs # its certificate, with FAVA_BEANS_DOMAIN
+    logging: *logging
     deploy: *restart
 
   # Every service keeps its database on the one data volume (ledger.sqlite, auth.sqlite,
-  # app.sqlite), so backing up the volume backs up everything. All run as UID 1000.
+  # app.sqlite, ai.sqlite, and the attachments), so it's all `fava-beans backup` needs. All run as
+  # UID 1000. Each says its health at /health (their images' healthchecks), and app sums them up
+  # publicly at /api/health.
   #
   # auth and app read their settings through @wymp/config-simple: APP_ENV picks the
   # production-safe defaults baked into each image (services/*/.env/<APP_ENV>), and anything set
@@ -40,14 +57,17 @@ services:
       - FAVA_BEANS_PUBLIC_URL
       # New passwords are checked against Have I Been Pwned (by hash prefix only); default true.
       - AUTH_BREACHED_PASSWORDS
+      - AUTH_SIGNUPS_PER_HOUR
     volumes:
       - data:/data
+    logging: *logging
     deploy: *restart
 
   ledger:
     image: ${FAVA_BEANS_REGISTRY:-fava-beans}/ledger:${FAVA_BEANS_VERSION:-dev}
     volumes:
       - data:/data # the system of record: back this up (or use the backup API)
+    logging: *logging
     deploy: *restart
 
   app:
@@ -57,10 +77,13 @@ services:
       # Required: encrypts stored bank-feed (SimpleFIN) credentials. 32 random bytes, base64:
       # `openssl rand -base64 32`. app won't start without it.
       - SIMPLEFIN_ENCRYPTION_KEY
+      # The SimpleFIN servers setup tokens may point to (default: the SimpleFIN Bridge's).
+      - SIMPLEFIN_HOSTS
       # External categorization providers (docs/categorizer-api.md).
       - CATEGORIZERS
     volumes:
       - data:/data
+    logging: *logging
     deploy: *restart
 
   # AI (M16): each book's AI settings and provider credential (sealed with AI_ENCRYPTION_KEY),
@@ -76,13 +99,9 @@ services:
       - AI_CLAUDE_CATEGORIZE_MODEL
     volumes:
       - data:/data
+    logging: *logging
     deploy: *restart
-
-configs:
-  traefik-static:
-    file: ./deploy/traefik/traefik.yml
-  traefik-routes:
-    file: ./deploy/traefik/routes.yml
 
 volumes:
   data:
+  certs:

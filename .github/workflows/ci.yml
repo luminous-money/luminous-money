@@ -1,0 +1,17 @@
+# Every push and pull request: the test suites and contract checks, then the whole stack end to
+# end (API, browser, and the `fava-beans` command), as `pnpm test` and `pnpm e2e` run them.
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Unit tests and checks
+        run: docker buildx bake test
+      - name: End to end
+        run: ./scripts/e2e.sh

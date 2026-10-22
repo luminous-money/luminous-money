@@ -137,6 +137,14 @@ milestone starts.
       categorize with Opus 5), payment cards on accounts naming the paying account, and
       categorizing by **split**: posting flags mark what's unconfirmed, fallbacks and item
       history in the chain, and review's split pickers.
+- [ ] **Production readiness** (before M17; Kael, 2026-10-19): ready for production, and simple
+      to deploy from GitHub to a laptop or a public server: upgrades and migrations, whole-system
+      backups, logs, health; releases on GitHub; admins (by email, in config) with a system page,
+      and upgrades on the admin's terms. [Its plan](milestones/production-readiness/PLAN.md).
+      Phase 1 built 2026-10-21: versions and health everywhere, the gateway image (with optional
+      HTTPS), whole-system backups, the `fava-beans` command, the release workflow,
+      [docs/deploying.md](deploying.md). Phase 2 (admins, the system page, update checks) waits
+      on its questions.
 - [ ] **M17: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
       tag.
 - [ ] **M18: Suggested recurring transactions.** Nightly, analyze each account's last 14 months

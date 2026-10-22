@@ -2,7 +2,7 @@
 
 Accounts, sessions and tokens, at `/api/auth/v1`. Every other API is behind Traefik's
 forwardAuth, which asks this service's `GET /verify` first. The decisions behind it are in
-design.md ("Routing and auth"); running it is in docs/operating.md.
+design.md ("Routing and auth"); running it is in docs/deploying.md.
 
 | Route | What it does |
 |---|---|

@@ -197,8 +197,44 @@ into the code. Supporting it means:
 A prebuilt Raspberry Pi image, or other packaging, can come later as a thin wrapper around the
 Compose file (e.g. OS + Docker + Compose file + first-boot setup), not as a separate build.
 
-**TLS, public hostnames and external reverse proxies are the operator's job.** The stack exposes
-one HTTP port (Traefik) and nothing else.
+**TLS is optional and built in** (production readiness, 2026-10-19): by default the stack
+exposes one plain-HTTP port, right for a laptop, a LAN, a tunnel or a proxy the operator already
+has; given a domain, the gateway gets its own Let's Encrypt certificate and serves HTTPS, so a
+small company's public server needs nothing in front of it. (Before, TLS was always the
+operator's job; that's still one choice of three.)
+
+### Operating it: releases, upgrades, backups, logs, health
+
+From production readiness ([its plan](milestones/production-readiness/PLAN.md)). The aim: from
+finding it on GitHub to running it, on a laptop or a public server, in one command.
+
+- **Releases are version tags:** CI builds every image for both architectures onto GitHub's
+  registry and attaches the **bundle** (`compose.yaml`, `env.example`, the `fava-beans` command)
+  to a GitHub release. A deployment pins its version in `.env`; nothing changes until its operator
+  changes it.
+- **The gateway is our image** (Traefik, pinned, with the routes inside): routes belong to a
+  version (M16 added one), so they ship with it, and a deployment is just `compose.yaml` and
+  `.env`. Its static configuration is written at start from the environment (HTTP only, or
+  HTTPS for a domain; which proxies to trust).
+- **One command for the host** (`scripts/fava-beans`, bash 3.2 and Docker, nothing else): install,
+  status, up/down, upgrade, backup, restore, logs, report, config. It's tested end to end in
+  `pnpm e2e` (`scripts/cli-test.sh`).
+- **Upgrades back up first,** then pin, pull, restart and wait for health. Migrations stay
+  automatic and forward-only (each service migrates as it starts and refuses a newer database),
+  so going back is restoring the pre-upgrade backup with the old version: simpler and safer than
+  down-migrations nobody exercises.
+- **Whole-system backups are online and consistent:** a one-off container of the ledger's image
+  (it has Python's SQLite) copies every database on the volume with SQLite's backup API while the
+  services run, plus the attachments (written once, never changed), plus `.env` (its keys open
+  what's stored: a backup without them can't be fully restored). Restoring takes the backup's
+  keys too. The per-user Beancount backup API stays, for people's own copies.
+- **Logs go to standard output,** capped by Docker (5 × 10 MB per service); `report` bundles them
+  with status and the settings (every secret hidden) for bug reports.
+- **Health is layered:** each service's `/health` (status, version, schema; read from its
+  database, so it says the database answers), each image's healthcheck on it (so Compose can
+  wait for healthy, and swarm can restart), and a public `/api/health` from `app` that says only
+  up or down per service, for uptime monitors.
+- **Every service knows its version** (a build argument baked in), for `/health` and support.
 
 ### TypeScript where we write code, existing tools where they already exist
 

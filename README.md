@@ -6,15 +6,29 @@ A self-hostable, database-driven, double-entry accounting system. It uses
 format, and has a mobile-first app built for fast review and categorization. One server hosts many
 books, each independent: switching books is like switching profiles.
 
-> **Status: early build.** M1 is built: log in, set up a book and a bank account, import its CSV,
-> and work through its ledger and the review queue. Nothing here touches real money yet: the plan is to build and polish the UI against test
-> data first, and only then hydrate with real finances.
+> **Status: early build, not released yet.** Milestones M1 to M16 are built (books, imports, bank
+> feeds, budgets, reports, sharing, reconciliation, receipts): see [RESUME.md](RESUME.md). The
+> first release (`v0.1.0`) comes with [production readiness](docs/milestones/production-readiness/PLAN.md).
+
+## Run it
+
+On a laptop, a home server or a public server, with Docker:
+
+```sh
+curl -fsSL https://github.com/luminous-money/fava-beans/releases/latest/download/fava-beans -o fava-beans
+bash fava-beans install
+```
+
+It asks a couple of questions (this machine, or a public server with a domain and HTTPS), starts
+everything, and tells you where to open it; create your account there. Upgrading, backups, logs,
+health, every setting, and running it behind a proxy you already have:
+**[docs/deploying.md](docs/deploying.md)**.
+
+## Work on it
 
 - **[RESUME.md](RESUME.md):** where work stands and what to do next. Start here.
 - **[docs/PLAN.md](docs/PLAN.md):** the roadmap, deferred items and open questions.
 - **[docs/design.md](docs/design.md):** the decisions behind the system and its architecture.
-
-## Quick start
 
 You need Docker with buildx, plus Node 24 and pnpm 11 (via corepack) for the TypeScript
 workspace.
@@ -29,15 +43,12 @@ Then open `http://localhost:8080/`, which redirects to the app at `/ui/`, and **
 account** (anyone can). For demo data, make an API token on "Your account" and run
 `FAVA_BEANS_TOKEN=fb_… pnpm seed`, which gives your account two demo books.
 
-Running it for real (HTTPS, email for password resets, backups, the operator's commands) is in
-[docs/operating.md](docs/operating.md).
-
 | Path | What |
 |---|---|
 | `/ui/` | The PWA: books, then each book's review queue |
 | `/api/auth/v1` | Sign up, log in, sessions and API tokens; every other API needs a session or token |
 | `/api/ledger/v1/docs` | The ledger API's interactive docs |
-| `/api/app/v1/health` | The app API |
+| `/api/health` | The stack's health, public (for uptime monitors) |
 
 ## Everyday commands
 
@@ -45,12 +56,13 @@ Running it for real (HTTPS, email for password resets, backups, the operator's c
 |---|---|
 | `pnpm build` | Build every service image for this machine |
 | `pnpm test` | Every test suite and contract check, in Docker (`docker buildx bake test`) |
-| `pnpm e2e` | Build everything and run the end-to-end suites (API and browser) against a throwaway stack |
+| `pnpm e2e` | Build everything and run the end-to-end suites (API, browser, and the `fava-beans` command) against throwaway stacks |
+| `pnpm test:cli` | Just the `fava-beans` command's test (images built already) |
 | `pnpm e2e:local` | Run both end-to-end suites against an already-running stack (start it with `AUTH_TEST_USERS=true`) |
 | `pnpm test:unit` | The TypeScript unit tests on the host (no Docker) |
 | `pnpm seed [book]` | Seed a demo book with recent purchases staged for review (default: `demo`, plus the small `demo-household`) |
 | `pnpm generate` | Regenerate `packages/ledger-client` after changing the ledger's API |
-| `pnpm release` | Build `linux/amd64` + `linux/arm64` images and push them (set `REGISTRY`, `VERSION`) |
+| `pnpm release` | Build `linux/amd64` + `linux/arm64` images and push them (set `REGISTRY`, `VERSION`). Releases normally come from a `v*` tag, through `.github/workflows/release.yml` |
 | `pnpm --filter @fava-beans/app dev` | Vite dev server for the PWA, proxying `/api` to a running stack |
 
 ## Repository layout
@@ -63,19 +75,23 @@ compose.yaml          the product: the whole stack (works with compose and swarm
 compose.e2e.yaml      overlay that adds the end-to-end runner
 docker-bake.hcl       every image, test target and release platform
 node.Dockerfile       the shared TypeScript workspace stage, its checks, and the e2e image
+.github/workflows/    CI on every push; a release (images and the bundle) on every v* tag
 deploy/
-  traefik/            routing (file provider): /api/* and /ui/*
+  gateway/            the gateway image: Traefik, its routes (/api/*, /ui/*), optional HTTPS
+  env.example         every setting a deployment has
 services/
   auth/               TypeScript: accounts, sessions and tokens          → /api/auth/v1
   ledger/             Python: system of record, Beancount engine      → /api/ledger/v1
-  app/                TypeScript: PWA, CSV imports, the pipeline       → /ui, /api/app/v1
+  app/                TypeScript: PWA, imports, the pipeline           → /ui, /api/app/v1
+  ai/                 TypeScript: AI settings, reading receipts         → /api/ai/v1
 packages/
   ledger-client/      typed client generated from the ledger's OpenAPI schema
-  db/                 SQLite for the TypeScript services: migrations, timestamps, lint
+  ai-api/             the ai service's types, shared with app and the PWA
+  db/                 SQLite for the TypeScript services: migrations, timestamps, health, lint
   csv-import/         bank CSVs: parsing, guessing a profile, reading rows
 tests/
-  e2e/                API end-to-end tests through Traefik
-  ui/                 browser end-to-end tests (Playwright) through Traefik
-scripts/              helper scripts behind the pnpm commands
-docs/                 design
+  e2e/                API end-to-end tests through the gateway
+  ui/                 browser end-to-end tests (Playwright) through the gateway
+scripts/              fava-beans (the deployment command), and the scripts behind pnpm's
+docs/                 design, plans, deploying
 ```

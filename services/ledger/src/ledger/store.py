@@ -66,6 +66,10 @@ class Store:
         with self._lock:
             migrate(self._conn)
 
+    def schema_version(self) -> int:
+        """The database's schema (its migrations applied): a read, so it also says it's readable."""
+        return self._conn.execute("PRAGMA user_version").fetchone()[0]
+
     @property
     def _conn(self) -> sqlite3.Connection:
         conn = getattr(self._local, "conn", None)

@@ -1,5 +1,6 @@
 # Routing by top-level prefix: /api for every API, /ui for the PWA. Services serve under their
-# full prefix, so nothing is stripped.
+# full prefix, so nothing is stripped. Routers take the default entry points (HTTP, and HTTPS
+# when the gateway has a domain: entrypoint.sh).
 #
 # Every API route except auth's own goes through the `session` middleware: Traefik asks auth's
 # verify endpoint first, refuses the request (401) if there's no valid session, and otherwise
@@ -9,30 +10,28 @@ http:
   routers:
     auth-api:
       rule: PathPrefix(`/api/auth/v1`)
-      entryPoints: [web]
       service: auth
     ledger-api:
       rule: PathPrefix(`/api/ledger/v1`)
-      entryPoints: [web]
       service: ledger
       middlewares: [session]
     app-api:
       rule: PathPrefix(`/api/app/v1`)
-      entryPoints: [web]
       service: app
       middlewares: [session]
     ai-api:
       rule: PathPrefix(`/api/ai/v1`)
-      entryPoints: [web]
       service: ai
       middlewares: [session]
+    # The stack's health, for uptime monitors: public, so no session (app answers it).
+    health:
+      rule: Path(`/api/health`)
+      service: app
     app-ui:
       rule: PathPrefix(`/ui`)
-      entryPoints: [web]
       service: app
     root:
       rule: Path(`/`)
-      entryPoints: [web]
       service: app
       middlewares: [to-ui]
   middlewares:

@@ -1,4 +1,7 @@
 import { serve } from "@hono/node-server";
+import { Hono } from "hono";
+
+import { health } from "@fava-beans/db";
 
 import { createApp } from "./app.js";
 import { booksOverHttp } from "./books.js";
@@ -34,6 +37,11 @@ const app = createApp({
   limits: { account: 5, ip: 20, signups: config.signupsPerHour, resets: 5 },
 });
 
-serve({ fetch: app.fetch, port: config.port }, (info) =>
+// Its health, beside the API (not routed outside): for the stack's healthchecks and app's summary.
+const root = new Hono();
+root.get("/health", (c) => c.json(health("auth", services.db)));
+root.route("/", app);
+
+serve({ fetch: root.fetch, port: config.port }, (info) =>
   console.log(`auth listening on :${info.port} (${config.env})`)
 );

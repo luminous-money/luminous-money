@@ -5,11 +5,14 @@
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 
+import { health } from "@fava-beans/db";
+
 import { createApi, type SimplefinServices } from "./api.js";
 import type { AppDb } from "./db.js";
 import type { Categorizer } from "./categorize/types.js";
 import type { LedgerPort } from "./ledger.js";
 import type { AiPort } from "./ai.js";
+import { stackHealth, type Peers } from "./health.js";
 
 export function createApp(
   webRoot: string,
@@ -19,9 +22,21 @@ export function createApp(
     categorizers?: Categorizer[];
     simplefin?: SimplefinServices;
     aiFor?: (userId: string) => AiPort;
+    /** The other services, for the stack's public health (`/api/health`). */
+    peers?: Peers;
   }
 ) {
   const app = new Hono();
+
+  // Its own health (not routed outside), and the stack's (public, for uptime monitors).
+  app.get("/health", (c) => c.json(health("app", services.db.db)));
+  const { peers } = services;
+  if (peers)
+    app.get("/api/health", async (c) => {
+      const stack = await stackHealth(peers);
+      c.header("Cache-Control", "no-store");
+      return c.json(stack, stack.status === "down" ? 503 : 200);
+    });
 
   app.route("/", createApi(services));
 

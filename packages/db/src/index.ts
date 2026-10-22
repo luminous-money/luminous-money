@@ -81,6 +81,19 @@ export function transaction<T>(db: DatabaseSync, work: () => T): T {
   }
 }
 
+/** A service's health, its `/health` (not routed outside, so it needs no session): up, its
+ * version (baked into its image at build), and its database's schema, read from the database,
+ * so it also says the database answers. */
+export function health(service: string, db: DatabaseSync) {
+  const { user_version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+  return {
+    status: "ok" as const,
+    service,
+    version: process.env["FAVA_BEANS_VERSION"] ?? "dev",
+    schema: user_version,
+  };
+}
+
 /** Bring the database up to date. Returns the schema version. */
 export function migrate(db: DatabaseSync, migrations: Migration[]): number {
   const version = (db.prepare("PRAGMA user_version").get() as { user_version: number })

@@ -17,7 +17,7 @@ variable "VERSION" {
 }
 
 group "default" {
-  targets = ["auth", "ledger", "app", "ai"]
+  targets = ["gateway", "auth", "ledger", "app", "ai"]
 }
 
 group "test" {
@@ -25,14 +25,22 @@ group "test" {
 }
 
 group "release" {
-  targets = ["auth-release", "ledger-release", "app-release", "ai-release"]
+  targets = ["gateway-release", "auth-release", "ledger-release", "app-release", "ai-release"]
 }
 
 # Service images
 
+# The gateway: Traefik with the routes inside (deploy/gateway).
+target "gateway" {
+  context = "deploy/gateway"
+  tags    = ["${REGISTRY}/gateway:${VERSION}"]
+  args    = { VERSION = VERSION }
+}
+
 target "ledger" {
   context = "services/ledger"
   tags    = ["${REGISTRY}/ledger:${VERSION}"]
+  args    = { VERSION = VERSION }
 }
 
 target "auth" {
@@ -42,6 +50,7 @@ target "auth" {
     workspace = "target:workspace"
   }
   tags = ["${REGISTRY}/auth:${VERSION}"]
+  args = { VERSION = VERSION }
 }
 
 target "app" {
@@ -51,6 +60,7 @@ target "app" {
     workspace = "target:workspace"
   }
   tags = ["${REGISTRY}/app:${VERSION}"]
+  args = { VERSION = VERSION }
 }
 
 # AI (M16): a book's AI settings and credential, and reading receipts.
@@ -61,6 +71,7 @@ target "ai" {
     workspace = "target:workspace"
   }
   tags = ["${REGISTRY}/ai:${VERSION}"]
+  args = { VERSION = VERSION }
 }
 
 # The TypeScript workspace, installed once and shared by every TypeScript image
@@ -131,6 +142,10 @@ target "ui-tests" {
 target "_release" {
   platforms = ["linux/amd64", "linux/arm64"]
   output    = ["type=registry"]
+}
+
+target "gateway-release" {
+  inherits = ["gateway", "_release"]
 }
 
 target "ledger-release" {

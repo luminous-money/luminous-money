@@ -17,6 +17,21 @@ def client(ledger):
     return http(ledger)
 
 
+def test_health_says_its_version_and_schema_without_a_session(ledger):
+    from fastapi.testclient import TestClient
+
+    from ledger.api import create_app
+
+    answer = TestClient(create_app(ledger)).get("/health")  # no X-User-Id
+    assert answer.status_code == 200
+    assert answer.json() == {
+        "status": "ok",
+        "service": "ledger",
+        "version": "dev",
+        "schema": ledger.store.schema_version(),
+    }
+
+
 def test_review_flow_over_http(client):
     assert client.post("/api/ledger/v1/books/kael/import", content=LEDGER, headers=TEXT).json() == {"put": 2, "deleted": 0}
 

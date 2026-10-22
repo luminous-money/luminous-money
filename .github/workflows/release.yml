@@ -1,0 +1,48 @@
+# A version tag (`v0.1.0`) makes a release: the tests first, then every image for amd64 and arm64
+# on GitHub's registry (ghcr.io/<owner>/<repo>/<service>:<version>, and :latest), then a GitHub
+# release with the bundle a deployment needs: compose.yaml, env.example and the `fava-beans`
+# command (docs/deploying.md). A red build publishes nothing.
+name: Release
+on:
+  push:
+    tags: ["v*.*.*"]
+permissions:
+  contents: write # the release
+  packages: write # the images
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: docker buildx bake test
+      - run: ./scripts/e2e.sh
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3 # arm64 (a Raspberry Pi, say) on an amd64 runner
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Images
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          registry="ghcr.io/${GITHUB_REPOSITORY,,}"
+          REGISTRY="$registry" VERSION="$version" docker buildx bake release
+          for image in gateway auth ledger app ai; do
+            docker buildx imagetools create -t "$registry/$image:latest" "$registry/$image:$version"
+          done
+      - name: Release, with the bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir bundle
+          cp compose.yaml scripts/fava-beans deploy/env.example bundle/
+          gh release create "$GITHUB_REF_NAME" bundle/* --title "fava-beans ${GITHUB_REF_NAME#v}" \
+            --generate-notes --verify-tag

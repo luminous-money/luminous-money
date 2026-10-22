@@ -96,6 +96,17 @@ def create_app(ledger: Ledger) -> FastAPI:
     app.state.ledger = ledger
     api = APIRouter(prefix="/api/ledger/v1")
 
+    @app.get("/health", include_in_schema=False)
+    def health():
+        """Up, which version, and its database's schema: for the stack's healthchecks and `app`'s
+        public summary. Not routed outside, so it needs no session."""
+        return {
+            "status": "ok",
+            "service": "ledger",
+            "version": os.environ.get("FAVA_BEANS_VERSION", "dev"),
+            "schema": ledger.store.schema_version(),
+        }
+
     @app.exception_handler(NotFound)
     async def not_found(_, exc: NotFound):
         return JSONResponse({"detail": f"not found: {exc.args[0]}"}, status_code=404)

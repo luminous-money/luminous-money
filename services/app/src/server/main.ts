@@ -49,6 +49,7 @@ serve(
       categorizers,
       simplefin,
       aiFor: (user) => httpAi(config.aiUrl, user),
+      peers: { auth: config.authUrl, ledger: config.ledgerUrl, ai: config.aiUrl },
     }).fetch,
     port,
   },

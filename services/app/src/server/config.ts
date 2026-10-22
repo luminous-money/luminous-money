@@ -32,6 +32,8 @@ const configDef = {
   dataDir: configValue("APP_DATA_DIR", "str", "/data"),
   webRoot: configValue("WEB_ROOT", "str", fileURLToPath(new URL("../web", import.meta.url))),
   ledgerUrl: configValue("LEDGER_URL", "str", "http://ledger:8000"),
+  /** auth, asked for its health only (Traefik checks sessions with it). */
+  authUrl: configValue("AUTH_URL", "str", "http://auth:3000"),
   /** The ai service (M16): optional; receipts are made unread without it. */
   aiUrl: configValue("AI_URL", "str", "http://ai:3000"),
   /** External categorization providers, a JSON list (docs/categorizer-api.md). */

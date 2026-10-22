@@ -1,8 +1,9 @@
 import { join } from "node:path";
 
 import { serve } from "@hono/node-server";
+import { Hono } from "hono";
 
-import { Sealer } from "@fava-beans/db";
+import { health, Sealer } from "@fava-beans/db";
 
 import { createApi } from "./api.js";
 import { config } from "./config.js";
@@ -31,7 +32,12 @@ const api = createApi({
   roleOf: rolesFrom(config.ledgerUrl),
 });
 
-serve({ fetch: api.fetch, port: config.port }, (info) =>
+// Its health, beside the API (not routed outside): for the stack's healthchecks and app's summary.
+const root = new Hono();
+root.get("/health", (c) => c.json(health("ai", db.db)));
+root.route("/", api);
+
+serve({ fetch: root.fetch, port: config.port }, (info) =>
   console.log(
     `ai listening on :${info.port} (${config.env}), providers: ${config.providers.join(", ")}`
   )
