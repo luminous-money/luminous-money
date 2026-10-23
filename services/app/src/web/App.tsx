@@ -231,13 +231,14 @@ function NotFound() {
   );
 }
 
-/** The brand; once you're in, the book switcher and the menu. */
+/** The brand; once you're in, the book switcher and the menu (and on a phone, the logo alone:
+ * they need the room). */
 function Masthead({ books, book }: { books?: BookInfo[]; book?: BookInfo }) {
   return (
     <header className="masthead">
-      <Link href="/" className="brand">
+      <Link href="/" className={`brand${books ? " signed-in" : ""}`} aria-label="Luminous Money">
         <img src="/ui/icon.svg" alt="" className="logo" />
-        <span className="wordmark">fava-beans</span>
+        <span className="wordmark">Luminous Money</span>
       </Link>
       {books && (
         <div className="masthead-end">

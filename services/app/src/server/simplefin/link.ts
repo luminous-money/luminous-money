@@ -29,12 +29,12 @@
  */
 import { randomUUID } from "node:crypto";
 
-import type { LedgerRow, TransactionIn } from "@fava-beans/ledger-client";
+import type { LedgerRow, TransactionIn } from "@luminous-money/ledger-client";
 
 import { add, isZero, negate } from "../../shared/decimal.js";
 import { isInternal, landsIn, partOf, within } from "../../shared/divided.js";
 import type { ImportRow } from "../../shared/imports.js";
-import { now } from "@fava-beans/db";
+import { now } from "@luminous-money/db";
 import type { LedgerPort, TransactionEdit } from "../ledger.js";
 import { assign } from "../pipeline/assign.js";
 import { runChain } from "../pipeline/chain.js";

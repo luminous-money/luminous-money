@@ -16,7 +16,7 @@
  * A schedule whose transactions the ledger refuses keeps the error, and is retried on the next
  * run; the others carry on.
  */
-import type { Account, TransactionIn } from "@fava-beans/ledger-client";
+import type { Account, TransactionIn } from "@luminous-money/ledger-client";
 
 import {
   addDays,

@@ -1,6 +1,6 @@
 /** Everything `auth` runs on, from its database and configuration: shared by the server and
  * the operator's CLI. */
-import { open } from "@fava-beans/db";
+import { open } from "@luminous-money/db";
 import { join } from "node:path";
 
 import type { Config } from "./config.js";

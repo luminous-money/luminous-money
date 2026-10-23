@@ -12,7 +12,7 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { now, transaction, type DatabaseSync } from "@fava-beans/db";
+import { now, transaction, type DatabaseSync } from "@luminous-money/db";
 
 import type { SfAccount, SfError, SfHolding, SfTransaction } from "./client.js";
 

@@ -8,7 +8,7 @@
  * own side (where it came from), as imports, schedules and receipts stage them; transactions
  * with lots or prices aren't categorized.
  */
-import type { Transaction } from "@fava-beans/ledger-client";
+import type { Transaction } from "@luminous-money/ledger-client";
 
 import type { FeedbackRequest } from "../../shared/categorizer-api.js";
 import { isUncategorized } from "../../shared/accounts.js";

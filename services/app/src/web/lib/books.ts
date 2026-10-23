@@ -6,7 +6,7 @@ import { useLocation } from "wouter";
 
 import type { BookInfo } from "./appApi.js";
 
-const key = (user: string) => `fava-beans:last-book:${user}`;
+const key = (user: string) => `luminous-money:last-book:${user}`;
 
 /** The book ID in the current path, if any. */
 export function useBookInPath(): string | undefined {

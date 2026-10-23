@@ -16,8 +16,8 @@
  * It always makes something: with no reading (AI off, down, or it couldn't), it's made from the
  * hints (a zero total if none), and says why.
  */
-import type { ReceiptFacts, ReceiptHints } from "@fava-beans/ai-api";
-import type { Account, TransactionIn } from "@fava-beans/ledger-client";
+import type { ReceiptFacts, ReceiptHints } from "@luminous-money/ai-api";
+import type { Account, TransactionIn } from "@luminous-money/ledger-client";
 
 import { isUncategorized, UNCATEGORIZED, UNKNOWN } from "../shared/accounts.js";
 import { add, isNegative, isZero, negate } from "../shared/decimal.js";

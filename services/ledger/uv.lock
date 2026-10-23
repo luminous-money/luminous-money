@@ -224,7 +224,7 @@ wheels = [
 ]
 
 [[package]]
-name = "fava-beans-ledger"
+name = "luminous-money-ledger"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

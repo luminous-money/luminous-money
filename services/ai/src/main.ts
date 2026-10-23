@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 
-import { health, Sealer } from "@fava-beans/db";
+import { health, Sealer } from "@luminous-money/db";
 
 import { createApi } from "./api.js";
 import { config } from "./config.js";

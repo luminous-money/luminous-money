@@ -39,7 +39,7 @@ describe("routing through Traefik", () => {
       const body = (await schema.json()) as { info: { title: string } };
 
       assert.equal(schema.status, 200);
-      assert.equal(body.info.title, "fava-beans ledger");
+      assert.equal(body.info.title, "luminous-money ledger");
     });
 
     it("routes /api/app/v1 to the app service", async () => {

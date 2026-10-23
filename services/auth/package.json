@@ -1,6 +1,7 @@
 {
-  "name": "@fava-beans/auth",
+  "name": "@luminous-money/auth",
   "version": "0.1.0",
+  "license": "GPL-2.0-or-later",
   "private": true,
   "description": "Users, sign-up and sessions: short-lived access tokens with rotating refresh, API tokens, and the verify endpoint behind Traefik's forwardAuth.",
   "type": "module",
@@ -16,7 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fava-beans/db": "workspace:*",
+    "@luminous-money/db": "workspace:*",
     "@hono/node-server": "^2.1.3",
     "@wymp/config-simple": "^1.1.0",
     "dotenv": "^18.0.8",

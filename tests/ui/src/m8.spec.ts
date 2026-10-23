@@ -92,11 +92,11 @@ test("the session refreshes itself when the access token is gone", async ({ page
   await signUp(page);
   await addBook(page);
 
-  await context.clearCookies({ name: "fb_access" });
+  await context.clearCookies({ name: "lm_access" });
   await page.reload();
 
   await expect(page.getByRole("heading", { name: "Personal" })).toBeVisible();
-  expect((await context.cookies()).some((c) => c.name === "fb_access")).toBe(true);
+  expect((await context.cookies()).some((c) => c.name === "lm_access")).toBe(true);
 });
 
 test("a forgotten password is reset from the emailed link", async ({ page }) => {
@@ -142,7 +142,7 @@ test("your account: confirm the email, see devices, make an API token, delete it
   const tokens = page.getByRole("region", { name: "API tokens" });
   await tokens.getByRole("textbox", { name: "Token name" }).fill("backups");
   await tokens.getByRole("button", { name: "Create token" }).click();
-  await expect(tokens.getByRole("status")).toContainText(/fb_[\w-]{20,}/);
+  await expect(tokens.getByRole("status")).toContainText(/lm_[\w-]{20,}/);
   await expect(tokens.getByRole("listitem")).toContainText("backups");
 
   await page.getByRole("button", { name: "Delete account…" }).click();

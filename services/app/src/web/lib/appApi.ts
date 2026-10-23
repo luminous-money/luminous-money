@@ -9,7 +9,7 @@ import {
 } from "../../shared/schedule.js";
 import type { CategoryRule, CategoryRuleIn, CategoryRulePatch } from "../../shared/rules.js";
 import type { ProposalSummary } from "../../shared/imports.js";
-import type { Book } from "@fava-beans/ledger-client";
+import type { Book } from "@luminous-money/ledger-client";
 
 import type {
   BankConnection,

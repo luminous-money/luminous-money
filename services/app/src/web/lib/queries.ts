@@ -15,7 +15,7 @@ import type {
   AccountIn,
   Transaction,
   TransactionIn,
-} from "@fava-beans/ledger-client";
+} from "@luminous-money/ledger-client";
 import {
   MutationCache,
   QueryCache,
@@ -812,7 +812,7 @@ export function explain(error: unknown): string {
   return (error as Error).message;
 }
 
-const skippedKey = (book: string) => `fava-beans:skipped:${book}`;
+const skippedKey = (book: string) => `luminous-money:skipped:${book}`;
 
 /** Skipped IDs, last skipped last. They stay skipped for the browser session. */
 export function readSkipped(book: string): string[] {

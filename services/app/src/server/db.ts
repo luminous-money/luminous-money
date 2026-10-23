@@ -10,7 +10,7 @@ import {
   transaction,
   type DatabaseSync,
   type Migration,
-} from "@fava-beans/db";
+} from "@luminous-money/db";
 
 import type {
   CsvProfile,
@@ -19,7 +19,7 @@ import type {
   ImportSource,
   ProposalSummary,
 } from "../shared/imports.js";
-import type { FetchResult, TransactionIn } from "@fava-beans/ledger-client";
+import type { FetchResult, TransactionIn } from "@luminous-money/ledger-client";
 
 import type { CategoryRule, CategoryRuleIn, RuleConditions } from "../shared/rules.js";
 import type { ReconcileDraft } from "../shared/reconcile.js";

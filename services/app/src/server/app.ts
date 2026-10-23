@@ -5,7 +5,7 @@
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 
-import { health } from "@fava-beans/db";
+import { health } from "@luminous-money/db";
 
 import { createApi, type SimplefinServices } from "./api.js";
 import type { AppDb } from "./db.js";

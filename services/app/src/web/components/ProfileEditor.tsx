@@ -4,8 +4,8 @@ import {
   parseCsv,
   type CsvProfile,
   type DateFormat,
-} from "@fava-beans/csv-import";
-import type { Account } from "@fava-beans/ledger-client";
+} from "@luminous-money/csv-import";
+import type { Account } from "@luminous-money/ledger-client";
 import { useMemo, useState } from "react";
 
 import { shown, shownInverted } from "../lib/accounts.js";

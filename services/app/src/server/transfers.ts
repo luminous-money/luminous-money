@@ -16,7 +16,7 @@
  *
  * It runs after every import (a file, or a bank's sync), over the whole book's review.
  */
-import type { Transaction, TransactionIn } from "@fava-beans/ledger-client";
+import type { Transaction, TransactionIn } from "@luminous-money/ledger-client";
 
 import { negate } from "../shared/decimal.js";
 import type { PairedTransfer } from "../shared/transfers.js";

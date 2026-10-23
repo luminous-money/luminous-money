@@ -10,7 +10,7 @@ test("a book is shared by link, and the person who accepts it can open it", asyn
   const { book } = await setUpUser(page, { name: "Our house" });
   const theirs = await browser.newContext({
     ...devices["Pixel 7"],
-    baseURL: process.env.FAVA_BEANS_URL ?? "http://localhost:8080",
+    baseURL: process.env.LUMINOUS_MONEY_URL ?? "http://localhost:8080",
   });
   const partner = await theirs.newPage();
   const { email } = await logIn(partner);

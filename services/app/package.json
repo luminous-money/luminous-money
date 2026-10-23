@@ -1,6 +1,7 @@
 {
-  "name": "@fava-beans/app",
+  "name": "@luminous-money/app",
   "version": "0.1.0",
+  "license": "GPL-2.0-or-later",
   "private": true,
   "description": "The review app: serves the PWA at /ui and its API at /api/app/v1.",
   "type": "module",
@@ -17,10 +18,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fava-beans/ai-api": "workspace:*",
-    "@fava-beans/csv-import": "workspace:*",
-    "@fava-beans/db": "workspace:*",
-    "@fava-beans/ledger-client": "workspace:*",
+    "@luminous-money/ai-api": "workspace:*",
+    "@luminous-money/csv-import": "workspace:*",
+    "@luminous-money/db": "workspace:*",
+    "@luminous-money/ledger-client": "workspace:*",
     "@hono/node-server": "^2.1.3",
     "@luminous-money/ledger-graphs-api": "^0.1.1",
     "@luminous-money/ledger-graphs-ui": "^0.1.1",
@@ -30,7 +31,7 @@
     "hono": "^4.13.13"
   },
   "devDependencies": {
-    "@fava-beans/simplefin-fake": "workspace:*",
+    "@luminous-money/simplefin-fake": "workspace:*",
     "@tanstack/react-query": "^5.104.1",
     "@types/node": "^24.10.1",
     "@types/react": "^19.3.0",

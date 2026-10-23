@@ -15,7 +15,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 
-import type { CategorizeOut, ExtractIn, ReceiptFacts, ReceiptFile } from "@fava-beans/ai-api";
+import type { CategorizeOut, ExtractIn, ReceiptFacts, ReceiptFile } from "@luminous-money/ai-api";
 
 import {
   checkedFacts,

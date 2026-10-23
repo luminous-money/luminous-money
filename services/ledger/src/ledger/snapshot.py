@@ -1,5 +1,5 @@
 """Whole-system backups: every database on the data volume and the attachments, while the
-services run. The host's `fava-beans backup` and `restore` run these in a one-off container of
+services run. The host's `luminous-money backup` and `restore` run these in a one-off container of
 the ledger's image (it has Python's SQLite) on the data volume:
 
     python -m ledger.snapshot backup  > backup.tar     a tar on standard output
@@ -31,7 +31,7 @@ import tarfile
 import tempfile
 
 DATA = os.environ.get("LEDGER_DATA_DIR", "/data")
-VERSION = os.environ.get("FAVA_BEANS_VERSION", "dev")
+VERSION = os.environ.get("LUMINOUS_MONEY_VERSION", "dev")
 MANIFEST = "manifest.json"
 MARKER = "last-backup.json"
 
@@ -78,7 +78,7 @@ def restore(source, data: str = DATA) -> dict:
         members = iter(tar)
         first = next(members, None)
         if first is None or first.name != MANIFEST:
-            raise SystemExit("not a fava-beans backup: it doesn't start with its manifest")
+            raise SystemExit("not a luminous-money backup: it doesn't start with its manifest")
         manifest = json.load(tar.extractfile(first))
         for name in os.listdir(data):
             if name.endswith((".sqlite", ".sqlite-wal", ".sqlite-shm")) or name == MARKER:

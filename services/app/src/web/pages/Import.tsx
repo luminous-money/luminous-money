@@ -1,4 +1,4 @@
-import { guessProfile, type CsvProfile } from "@fava-beans/csv-import";
+import { guessProfile, type CsvProfile } from "@luminous-money/csv-import";
 import { useState, type DragEvent } from "react";
 import { Link } from "wouter";
 

@@ -31,8 +31,8 @@ describe("sessions", () => {
     });
     const [access, refresh] = response.headers.getSetCookie();
 
-    assert.match(access ?? "", /^fb_access=.*HttpOnly.*SameSite=Strict/i);
-    assert.match(refresh ?? "", /^fb_refresh=.*Path=\/api\/auth\/v1\/token.*HttpOnly/i);
+    assert.match(access ?? "", /^lm_access=.*HttpOnly.*SameSite=Strict/i);
+    assert.match(refresh ?? "", /^lm_refresh=.*Path=\/api\/auth\/v1\/token.*HttpOnly/i);
     const cookie = [access, refresh].map((c) => c!.split(";")[0]).join("; ");
     const me = await fetch(`${BASE_URL}/api/auth/v1/me`, { headers: { cookie } });
     assert.equal(((await me.json()) as { id: string }).id, user.id);

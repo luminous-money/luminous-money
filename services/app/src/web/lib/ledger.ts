@@ -16,7 +16,7 @@ import {
   type LedgerPage,
   type Transaction,
   type TransactionIn,
-} from "@fava-beans/ledger-client";
+} from "@luminous-money/ledger-client";
 
 import { apiFetch } from "./session.js";
 

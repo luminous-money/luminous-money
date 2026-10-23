@@ -2,27 +2,27 @@
 # Seed a demo book into a running stack: realistic history from bean-example, with recent
 # purchases staged for review (services/ledger/src/ledger/demo.py). The default also seeds a
 # small second book, "Demo Household" (`--household`), to switch to. The books go to whoever
-# FAVA_BEANS_TOKEN belongs to: make an API token on the "Your account" page.
+# LUMINOUS_MONEY_TOKEN belongs to: make an API token on the "Your account" page.
 #
-#   FAVA_BEANS_TOKEN=fb_... pnpm seed
+#   LUMINOUS_MONEY_TOKEN=lm_... pnpm seed
 #   pnpm seed                         books "demo" and "demo-household" on http://localhost:8080
 #   pnpm seed other --years 5         another book; extra options go to `python -m ledger.demo`
-#   FAVA_BEANS_URL=http://pi:8080 pnpm seed
+#   LUMINOUS_MONEY_URL=http://pi:8080 pnpm seed
 set -eu
 cd "$(dirname "$0")/.."
 
 book="${1:-demo}"
 [ $# -gt 0 ] && shift
-url="${FAVA_BEANS_URL:-http://localhost:8080}"
-image="${FAVA_BEANS_REGISTRY:-fava-beans}/ledger:${FAVA_BEANS_VERSION:-dev}"
+url="${LUMINOUS_MONEY_URL:-http://localhost:8080}"
+image="${LUMINOUS_MONEY_REGISTRY:-luminous-money}/ledger:${LUMINOUS_MONEY_VERSION:-dev}"
 
-if [ -z "${FAVA_BEANS_TOKEN:-}" ]; then
-  echo "set FAVA_BEANS_TOKEN to an API token (Your account → API tokens) for the account to seed" >&2
+if [ -z "${LUMINOUS_MONEY_TOKEN:-}" ]; then
+  echo "set LUMINOUS_MONEY_TOKEN to an API token (Your account → API tokens) for the account to seed" >&2
   exit 1
 fi
-auth="authorization: Bearer $FAVA_BEANS_TOKEN"
+auth="authorization: Bearer $LUMINOUS_MONEY_TOKEN"
 
-tz="${FAVA_BEANS_TZ:-$(cat /etc/timezone 2>/dev/null || echo UTC)}"
+tz="${LUMINOUS_MONEY_TZ:-$(cat /etc/timezone 2>/dev/null || echo UTC)}"
 
 # seed BOOK STARRED-ACCOUNTS [demo options...]: import the generated book, star the accounts the
 # home page shows, and set its time zone (what "today" is for schedules and the price run).

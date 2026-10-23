@@ -10,7 +10,7 @@ const ROOTS = ["Assets", "Liabilities", "Equity", "Income", "Expenses"];
 
 /** Which nodes are open, per book and device. Top-level accounts start open. */
 function useExpanded(book: string) {
-  const key = `fava-beans:chart:${book}`;
+  const key = `luminous-money:chart:${book}`;
   const [open, setOpen] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem(key);

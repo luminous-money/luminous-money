@@ -1,5 +1,5 @@
 /** What the ai service asks the ledger: the caller's role in a book (acting as them). */
-import { createLedgerClient } from "@fava-beans/ledger-client";
+import { createLedgerClient } from "@luminous-money/ledger-client";
 
 import type { Role, RoleOf } from "./api.js";
 

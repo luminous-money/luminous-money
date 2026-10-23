@@ -4,14 +4,14 @@
  * database, and publishes the public keys (`jwks`), so any service could check tokens itself.
  * Rotating adds a key and retires the old one, which keeps verifying until its tokens expire.
  */
-import { after, now, type DatabaseSync } from "@fava-beans/db";
+import { after, now, type DatabaseSync } from "@luminous-money/db";
 import { exportJWK, generateKeyPair, importJWK, jwtVerify, SignJWT, type JWK } from "jose";
 
 import { later } from "./secrets.js";
 
 export const ACCESS_TTL_SECONDS = 10 * 60;
-export const ISSUER = "fava-beans";
-export const AUDIENCE = "fava-beans";
+export const ISSUER = "luminous-money";
+export const AUDIENCE = "luminous-money";
 const ALG = "EdDSA";
 
 type KeyRow = { kid: string; private_jwk: string; public_jwk: string; retired_at: string | null };

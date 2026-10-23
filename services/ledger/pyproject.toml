@@ -1,7 +1,8 @@
 [project]
-name = "fava-beans-ledger"
+name = "luminous-money-ledger"
 version = "0.1.0"
-description = "System of record for fava-beans books, with Beancount as the accounting engine."
+description = "System of record for Luminous Money books, with Beancount as the accounting engine."
+license = "GPL-2.0-or-later"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "beancount>=3.2,<3.3",

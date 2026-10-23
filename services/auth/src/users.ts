@@ -5,7 +5,7 @@
  */
 import { createHash } from "node:crypto";
 
-import { after, migrate, now, transaction, type DatabaseSync } from "@fava-beans/db";
+import { after, migrate, now, transaction, type DatabaseSync } from "@luminous-money/db";
 
 import { MIGRATIONS } from "./schema.js";
 import { newId } from "./secrets.js";

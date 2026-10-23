@@ -7,7 +7,7 @@
  *   JWT) and a refresh token that rotates on every use (`/token`). `/token/revoke` logs out.
  * - **In the browser** both are HttpOnly cookies (the refresh token's scoped to `/token`), so the
  *   PWA never handles them. Other clients ask for them in the body (`"delivery": "body"`) and
- *   send `Authorization: Bearer`. API tokens (`fb_…`) work as Bearer tokens too.
+ *   send `Authorization: Bearer`. API tokens (`lm_…`) work as Bearer tokens too.
  * - **`GET /verify`** is Traefik's forwardAuth check for every other API: 200 with `X-User-Id`
  *   (which Traefik copies onto the forwarded request, replacing anything a client sent), or 401.
  *   It checks the token's session in the database, so logging out takes effect at once.
@@ -89,8 +89,8 @@ export function createApp(services: Services) {
   // Behind a TLS-terminating proxy, cookies are Secure (and the access cookie gets the __Host-
   // prefix); on plain HTTP (a local network) they can't be, or the browser would drop them.
   const secure = (c: Context) => c.req.header("x-forwarded-proto") === "https";
-  const accessCookie = (c: Context) => (secure(c) ? "__Host-fb_access" : "fb_access");
-  const refreshCookie = (c: Context) => (secure(c) ? "__Secure-fb_refresh" : "fb_refresh");
+  const accessCookie = (c: Context) => (secure(c) ? "__Host-lm_access" : "lm_access");
+  const refreshCookie = (c: Context) => (secure(c) ? "__Secure-lm_refresh" : "lm_refresh");
   const clientIp = (c: Context) =>
     c.req.header("x-forwarded-for")?.split(",").at(-1)?.trim() || "local";
   const bearer = (c: Context) => c.req.header("authorization")?.match(/^Bearer (.+)$/i)?.[1];

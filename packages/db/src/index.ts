@@ -89,7 +89,7 @@ export function health(service: string, db: DatabaseSync) {
   return {
     status: "ok" as const,
     service,
-    version: process.env["FAVA_BEANS_VERSION"] ?? "dev",
+    version: process.env["LUMINOUS_MONEY_VERSION"] ?? "dev",
     schema: user_version,
   };
 }

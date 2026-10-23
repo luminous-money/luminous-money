@@ -1,4 +1,4 @@
-import type { Amount } from "@fava-beans/ledger-client";
+import type { Amount } from "@luminous-money/ledger-client";
 
 import type { UpcomingOccurrence } from "./appApi.js";
 import { add, negate } from "./decimal.js";

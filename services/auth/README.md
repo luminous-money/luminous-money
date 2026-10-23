@@ -13,7 +13,7 @@ design.md ("Routing and auth"); running it is in docs/deploying.md.
 | `GET /me`, `PATCH /me`, `DELETE /me` | You; your name and email (`updated_at`; a new email needs `password`); deleting your account and its books. |
 | `POST /me/password`, `POST /me/verify-email` | Change your password (ends your other sessions); resend the confirmation email. |
 | `GET /sessions`, `DELETE /sessions/:id`, `POST /sessions/end-others` | Your devices. |
-| `GET /tokens`, `POST /tokens`, `DELETE /tokens/:id` | Your API tokens (`fb_…`). |
+| `GET /tokens`, `POST /tokens`, `DELETE /tokens/:id` | Your API tokens (`lm_…`). |
 | `POST /password/forgot`, `POST /password/reset`, `POST /email/verify` | Email links. |
 | `GET /config`, `GET /.well-known/jwks.json` | What the server supports; the access tokens' public keys. |
 | `GET /verify` | For Traefik: 200 with `X-User-Id`, or 401. |
@@ -27,7 +27,7 @@ Have I Been Pwned.
 | Variable | Default | Purpose |
 |---|---|---|
 | `AUTH_DATA_DIR` | `/data` | Holds `auth.sqlite`, including the signing keys. |
-| `SMTP_URL`, `MAIL_FROM`, `FAVA_BEANS_PUBLIC_URL` | (none) | Email for reset and confirmation links, and where the links point. |
+| `SMTP_URL`, `MAIL_FROM`, `LUMINOUS_MONEY_PUBLIC_URL` | (none) | Email for reset and confirmation links, and where the links point. |
 | `AUTH_BREACHED_PASSWORDS` | `true` | Check new passwords against Have I Been Pwned. |
 | `AUTH_SIGNUPS_PER_HOUR` | `20` | Sign-ups allowed per client IP per hour. |
 | `LEDGER_URL`, `APP_URL` | `http://ledger:8000`, `http://app:3000` | Where deleting an account deletes its books. |
@@ -40,6 +40,6 @@ Have I Been Pwned.
 ## Development
 
 ```sh
-pnpm --filter @fava-beans/auth test        # unit tests (Node 24)
+pnpm --filter @luminous-money/auth test        # unit tests (Node 24)
 docker buildx bake auth                    # the image
 ```

@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 
-import type { Account } from "@fava-beans/ledger-client";
+import type { Account } from "@luminous-money/ledger-client";
 
 import type { FileBalanceCheck } from "../../shared/imports.js";
 import type { Candidate, ImportResult, Outcome } from "../lib/appApi.js";

@@ -13,7 +13,7 @@ import {
   type ExtractIn,
   type ProviderName,
   type ReceiptFacts,
-} from "@fava-beans/ai-api";
+} from "@luminous-money/ai-api";
 
 export type CategorizeInput = CategorizeIn & {
   /** The book's own words about its accounts, if any. */

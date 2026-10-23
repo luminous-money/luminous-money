@@ -4,7 +4,7 @@ Builds the book from several `bean-example` histories (different seeds), each un
 account subtree, so the transaction count scales without duplicating data. Run it on the target
 hardware:
 
-    docker run --rm fava-beans-ledger:test python bench/bench.py --years 20 --copies 5
+    docker run --rm luminous-money-ledger:test python bench/bench.py --years 20 --copies 5
 """
 
 from __future__ import annotations

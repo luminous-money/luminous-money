@@ -100,7 +100,7 @@ describe("M6: books", () => {
       404
     );
     assert.deepEqual(after?.deleted_books, [book.id]);
-    assert.match(after?.chunks[book.id] ?? "", /custom "fava-beans" "deleted"/);
+    assert.match(after?.chunks[book.id] ?? "", /custom "luminous-money" "deleted"/);
     assert.equal((await create(me, { name: "Doomed" })).status, 201);
   });
 });

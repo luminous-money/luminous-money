@@ -356,7 +356,7 @@ class AccountPatch(Strict):
     updated_at: str
     display_name: str | None = Field(None, max_length=100, description="A human name; None or \"\": the name's last part.")
     booking: Booking | None = Field(
-        None, description="FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by fava-beans); "
+        None, description="FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by luminous-money); "
         "None: the book's default."
     )
     revalue_every: int | None = Field(None, ge=1, description="A revalued asset: days its value stays current; None: not one.")

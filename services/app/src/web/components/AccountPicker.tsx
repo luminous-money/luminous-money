@@ -1,4 +1,4 @@
-import type { Account } from "@fava-beans/ledger-client";
+import type { Account } from "@luminous-money/ledger-client";
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { search, suggestName } from "../lib/accounts.js";

@@ -11,9 +11,9 @@ import {
   type LedgerClient,
   type Transaction,
   type TransactionIn,
-} from "@fava-beans/ledger-client";
+} from "@luminous-money/ledger-client";
 
-const BASE_URL = process.env.FAVA_BEANS_URL ?? "http://localhost:8080";
+const BASE_URL = process.env.LUMINOUS_MONEY_URL ?? "http://localhost:8080";
 
 export type Session = { email: string; token: string; ledger: LedgerClient };
 

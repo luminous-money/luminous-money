@@ -4,7 +4,7 @@
  * hashes. How someone proves who they are (`identity`) is kept apart from who they are
  * (`user`), so OIDC providers can be added as identities next to passwords.
  */
-import { createTable, type Migration } from "@fava-beans/db";
+import { createTable, type Migration } from "@luminous-money/db";
 
 export const MIGRATIONS: Migration[] = [
   // 1: users (M1: the stub, and test users).

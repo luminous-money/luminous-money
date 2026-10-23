@@ -1,13 +1,13 @@
 /**
- * Shared setup for the end-to-end suite. Everything goes through Traefik at FAVA_BEANS_URL, the
+ * Shared setup for the end-to-end suite. Everything goes through Traefik at LUMINOUS_MONEY_URL, the
  * same single entry point an operator exposes, using the generated ledger client.
  */
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 
-import { createLedgerClient, type TransactionIn } from "@fava-beans/ledger-client";
+import { createLedgerClient, type TransactionIn } from "@luminous-money/ledger-client";
 
-export const BASE_URL = process.env.FAVA_BEANS_URL ?? "http://localhost:8080";
+export const BASE_URL = process.env.LUMINOUS_MONEY_URL ?? "http://localhost:8080";
 
 /**
  * A session for the suite: logged in once, lazily, as a shared test user (the e2e stack runs

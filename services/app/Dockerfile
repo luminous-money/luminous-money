@@ -3,8 +3,8 @@
 # named context, so every TypeScript service reuses one cached install of the workspace.
 
 FROM workspace AS build
-RUN pnpm --filter "@fava-beans/app..." build \
-  && pnpm --filter @fava-beans/app deploy --prod --legacy /out
+RUN pnpm --filter "@luminous-money/app..." build \
+  && pnpm --filter @luminous-money/app deploy --prod --legacy /out
 
 FROM node:24-slim AS runtime
 WORKDIR /srv
@@ -18,5 +18,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --start-interval=2s -
   CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 # The release it is (docker-bake.hcl passes VERSION), for /health and the system page.
 ARG VERSION=dev
-ENV FAVA_BEANS_VERSION=${VERSION}
+ENV LUMINOUS_MONEY_VERSION=${VERSION}
 CMD ["node", "--disable-warning=ExperimentalWarning", "dist/server/main.js"]

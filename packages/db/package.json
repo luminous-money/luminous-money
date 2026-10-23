@@ -1,6 +1,7 @@
 {
-  "name": "@fava-beans/db",
+  "name": "@luminous-money/db",
   "version": "0.1.0",
+  "license": "GPL-2.0-or-later",
   "description": "SQLite for the TypeScript services: migrations, required timestamps, versions.",
   "type": "module",
   "sideEffects": false,

@@ -1,6 +1,6 @@
 # Design
 
-The durable decisions behind fava-beans and the architecture they add up to. What's being built
+The durable decisions behind Luminous Money and the architecture they add up to. What's being built
 next lives in [PLAN.md](PLAN.md); where work stands right now lives in
 [RESUME.md](../RESUME.md).
 
@@ -122,7 +122,7 @@ and the Python behind it. One convention everywhere.
 
 ### Accounts: leaves hold transactions, nodes hold sub-accounts
 
-Beancount has no notion of node accounts, so fava-beans layers one on, using only ordinary
+Beancount has no notion of node accounts, so Luminous Money layers one on, using only ordinary
 Beancount:
 
 - **A leaf** is a plain `open` directive. It holds transactions and can't have sub-accounts.
@@ -209,14 +209,14 @@ From production readiness ([its plan](milestones/production-readiness/PLAN.md)).
 finding it on GitHub to running it, on a laptop or a public server, in one command.
 
 - **Releases are version tags:** CI builds every image for both architectures onto GitHub's
-  registry and attaches the **bundle** (`compose.yaml`, `env.example`, the `fava-beans` command)
+  registry and attaches the **bundle** (`compose.yaml`, `env.example`, the `luminous-money` command)
   to a GitHub release. A deployment pins its version in `.env`; nothing changes until its operator
   changes it.
 - **The gateway is our image** (Traefik, pinned, with the routes inside): routes belong to a
   version (M16 added one), so they ship with it, and a deployment is just `compose.yaml` and
   `.env`. Its static configuration is written at start from the environment (HTTP only, or
   HTTPS for a domain; which proxies to trust).
-- **One command for the host** (`scripts/fava-beans`, bash 3.2 and Docker, nothing else): install,
+- **One command for the host** (`scripts/luminous-money`, bash 3.2 and Docker, nothing else): install,
   status, up/down, upgrade, backup, restore, logs, report, config. It's tested end to end in
   `pnpm e2e` (`scripts/cli-test.sh`).
 - **Upgrades back up first,** then pin, pull, restart and wait for health. Migrations stay
@@ -234,6 +234,11 @@ finding it on GitHub to running it, on a laptop or a public server, in one comma
   database, so it says the database answers), each image's healthcheck on it (so Compose can
   wait for healthy, and swarm can restart), and a public `/api/health` from `app` that says only
   up or down per service, for uptime monitors.
+- **The certificate is watched,** when the gateway serves HTTPS itself: `app` reads its expiry
+  from the gateway's Prometheus metrics (`traefik_tls_certs_not_after`, on the internal port
+  only) rather than the certificate store, which holds the private key. Traefik renews at 30 days
+  left, so under 14 is a renewal that's been failing for two weeks (`degraded`, time to fix it);
+  expired or missing is `down`. `status` adds the last day's Let's Encrypt errors from the log.
 - **Every service knows its version** (a build argument baked in), for `/health` and support.
 
 ### TypeScript where we write code, existing tools where they already exist
@@ -266,7 +271,7 @@ separate repos and connect over HTTP.)
 
 ### Front-end data: TanStack Query over a generated client
 
-- **`openapi-fetch`** with the generated `@fava-beans/ledger-client` types is the transport.
+- **`openapi-fetch`** with the generated `@luminous-money/ledger-client` types is the transport.
 - **TanStack Query** handles caching, refetching and mutations. Reads are queries, and edits are
   mutations that update every cached copy of what they change.
 - **Edits to one transaction share a mutation scope,** so they run one at a time in order. Each
@@ -347,7 +352,7 @@ The Pi 3 hasn't been measured yet. Expect it to be roughly an order of magnitude
 A backup request says "since cursor *N*" and gets back:
 
 - **A Beancount chunk:** the current version of every directive changed since *N*, each with its
-  ID in metadata. Deletions appear as tombstones (`custom "fava-beans" "deleted" "<id>"`, which is
+  ID in metadata. Deletions appear as tombstones (`custom "luminous-money" "deleted" "<id>"`, which is
   valid Beancount syntax). Chunks stay readable without this application.
 - **Non-ledger state:** a dump of the app and auth databases. They're small and rarely change, so
   dumping them whole is simpler than computing diffs.
@@ -397,7 +402,7 @@ How auth works (M8; the shape is M1's):
 - **Services trust `X-User-Id`,** since they're only reachable through Traefik on the internal
   network. `app` passes it on when it calls the ledger as that user; `auth` does the same to
   delete an account's books.
-- **No special accounts.** fava-beans may run as a public service, so anyone can sign up, and
+- **No special accounts.** Luminous Money may run as a public service, so anyone can sign up, and
   there's nothing global to administer: everyone is an ordinary user, including whoever runs the
   server. Operator tasks (reset links, disabling an account, key rotation) go through `auth`'s
   command line (`node dist/cli.js`), not an admin role.
@@ -428,10 +433,10 @@ How auth works (M8; the shape is M1's):
     refreshes ahead of expiry.
   - `auth` refuses writes whose `Origin` isn't its own.
 - **Other clients** get tokens in the body (`"delivery": "body"`) and send `Authorization:
-  Bearer`. **API tokens** (`fb_…`, hashed, optionally expiring) serve scripts and backups; they
+  Bearer`. **API tokens** (`lm_…`, hashed, optionally expiring) serve scripts and backups; they
   reach every API but can't manage the account.
 - **Email is optional** (`SMTP_URL`): with it, verification and reset links (to
-  `FAVA_BEANS_PUBLIC_URL`, never the request's Host). Without it, resets go through the CLI.
+  `LUMINOUS_MONEY_PUBLIC_URL`, never the request's Host). Without it, resets go through the CLI.
 - **Deleting an account** deletes every book it owns, through `app`'s book deletion.
 - **Test stacks** (`AUTH_TEST_USERS=true`) let login take an email alone, so tests don't share
   state. It's off by default, and `pnpm e2e` turns it on.
@@ -500,7 +505,7 @@ How auth works (M8; the shape is M1's):
 - **Booking follows tax reporting:** per account, matching what the broker reports (1099-B);
   new books default to FIFO. FIFO, LIFO, HIFO and specific lots (STRICT) are Beancount's.
   **Average cost** isn't (Beancount 3 refuses `AVERAGE`), so such accounts use `NONE` booking
-  and fava-beans reduces at the average cost (shown as one average lot).
+  and Luminous Money reduces at the average cost (shown as one average lot).
 - **Trades are built by the ledger** from a form's description: a buy is a lot at cost; a sale
   writes each lot it draws on explicitly (by the account's method), with the gain per lot
   split into `Income:Capital-Gains:Short-Term` and `:Long-Term` (held more than a year); a
@@ -808,7 +813,7 @@ same money in through another's, a day or so later. Both would sit in review, un
   only when `GET /api/ai/v1/health` answers and the book is **ready** (enabled, a provider, and
   a credential). With the service down, nothing AI shows and the rest is unchanged.
 - **Credentials are sealed** with `AI_ENCRYPTION_KEY` (the sealer SimpleFIN uses, now in
-  `@fava-beans/db`) and never sent back: the settings say only that one is set and its last four
+  `@luminous-money/db`) and never sent back: the settings say only that one is set and its last four
   characters. Claude takes an API key (it has no OAuth for third-party apps).
 - **The paying account is matched, not guessed:** asset and liability accounts list their
   **payment cards** (brand optional, last four; on the `open`, so exports keep them; a card is

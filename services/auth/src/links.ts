@@ -2,7 +2,7 @@
  * Single-use links, sent by email or printed by the operator's CLI: password resets (an hour,
  * or a day when the CLI makes one) and email verification (a week).
  */
-import { now, type DatabaseSync } from "@fava-beans/db";
+import { now, type DatabaseSync } from "@luminous-money/db";
 
 import { DAY, hashSecret, later, newSecret } from "./secrets.js";
 

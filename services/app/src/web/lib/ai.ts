@@ -3,12 +3,12 @@
  * offering anything AI), each book's AI settings and credential. Receipts go through `app`
  * (appApi.ts), which stages what the service reads.
  */
-import type { AiHealth, AiSettings, AiSettingsPatch } from "@fava-beans/ai-api";
+import type { AiHealth, AiSettings, AiSettingsPatch } from "@luminous-money/ai-api";
 
 import { ApiError } from "./ledger.js";
 import { apiFetch } from "./session.js";
 
-export type { AiHealth, AiSettings, AiSettingsPatch, Eagerness } from "@fava-beans/ai-api";
+export type { AiHealth, AiSettings, AiSettingsPatch, Eagerness } from "@luminous-money/ai-api";
 
 const base = (book: string) => `/api/ai/v1/books/${encodeURIComponent(book)}`;
 

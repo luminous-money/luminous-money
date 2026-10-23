@@ -13,7 +13,7 @@
  * - **Money-market core positions** (a price of 1, like Fidelity's SPAXX) count as cash, not as
  *   holdings: buys and sells move through them every day.
  */
-import type { Holding, TransactionIn } from "@fava-beans/ledger-client";
+import type { Holding, TransactionIn } from "@luminous-money/ledger-client";
 
 import { add, isNegative, isZero, negate } from "../../shared/decimal.js";
 import { ensureUncategorized, UNCATEGORIZED } from "../imports.js";

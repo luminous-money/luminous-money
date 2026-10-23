@@ -1,4 +1,4 @@
-import type { Account } from "@fava-beans/ledger-client";
+import type { Account } from "@luminous-money/ledger-client";
 
 import { formatAmount } from "../lib/format.js";
 import { useTypicalReport } from "../lib/queries.js";

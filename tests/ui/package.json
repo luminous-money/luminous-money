@@ -1,6 +1,7 @@
 {
-  "name": "@fava-beans/ui-tests",
+  "name": "@luminous-money/ui-tests",
   "version": "0.1.0",
+  "license": "GPL-2.0-or-later",
   "private": true,
   "description": "Browser tests of the PWA against a running stack. Playwright's version is pinned to the image in node.Dockerfile.",
   "type": "module",
@@ -9,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "@fava-beans/ledger-client": "workspace:*",
+    "@luminous-money/ledger-client": "workspace:*",
     "@playwright/test": "1.63.0",
     "@types/node": "^24.10.1",
     "typescript": "^5.9.3"

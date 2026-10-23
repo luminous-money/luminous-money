@@ -79,7 +79,10 @@ export async function passwordProblem(
   if (length < MIN_LENGTH) return `use at least ${MIN_LENGTH} characters`;
   if (length > MAX_LENGTH) return `use at most ${MAX_LENGTH} characters`;
   const lower = normalize(password).toLowerCase();
-  if (lower === email.toLowerCase() || lower === "fava-beans" || lower === "favabeans")
+  if (
+    lower === email.toLowerCase() ||
+    ["luminous money", "luminous-money", "luminousmoney"].includes(lower)
+  )
     return "choose a password that isn't your email or this app's name";
   if (breached && (await breached(password)))
     return "that password has appeared in a data breach; choose another";

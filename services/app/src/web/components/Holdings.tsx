@@ -1,4 +1,4 @@
-import type { AccountSummary, Holding } from "@fava-beans/ledger-client";
+import type { AccountSummary, Holding } from "@luminous-money/ledger-client";
 import { useState } from "react";
 import { Link } from "wouter";
 

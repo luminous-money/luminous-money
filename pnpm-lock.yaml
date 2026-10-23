@@ -64,13 +64,13 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.135.0
         version: 0.135.0(zod@4.6.7)
-      '@fava-beans/ai-api':
+      '@luminous-money/ai-api':
         specifier: workspace:*
         version: link:../../packages/ai-api
-      '@fava-beans/db':
+      '@luminous-money/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@fava-beans/ledger-client':
+      '@luminous-money/ledger-client':
         specifier: workspace:*
         version: link:../../packages/ledger-client
       '@hono/node-server':
@@ -101,16 +101,16 @@ importers:
 
   services/app:
     dependencies:
-      '@fava-beans/ai-api':
+      '@luminous-money/ai-api':
         specifier: workspace:*
         version: link:../../packages/ai-api
-      '@fava-beans/csv-import':
+      '@luminous-money/csv-import':
         specifier: workspace:*
         version: link:../../packages/csv-import
-      '@fava-beans/db':
+      '@luminous-money/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@fava-beans/ledger-client':
+      '@luminous-money/ledger-client':
         specifier: workspace:*
         version: link:../../packages/ledger-client
       '@hono/node-server':
@@ -135,7 +135,7 @@ importers:
         specifier: ^4.13.13
         version: 4.13.13
     devDependencies:
-      '@fava-beans/simplefin-fake':
+      '@luminous-money/simplefin-fake':
         specifier: workspace:*
         version: link:../../tests/simplefin-fake
       '@tanstack/react-query':
@@ -177,7 +177,7 @@ importers:
 
   services/auth:
     dependencies:
-      '@fava-beans/db':
+      '@luminous-money/db':
         specifier: workspace:*
         version: link:../../packages/db
       '@hono/node-server':
@@ -214,7 +214,7 @@ importers:
 
   tests/e2e:
     dependencies:
-      '@fava-beans/ledger-client':
+      '@luminous-money/ledger-client':
         specifier: workspace:*
         version: link:../../packages/ledger-client
     devDependencies:
@@ -243,7 +243,7 @@ importers:
 
   tests/ui:
     devDependencies:
-      '@fava-beans/ledger-client':
+      '@luminous-money/ledger-client':
         specifier: workspace:*
         version: link:../../packages/ledger-client
       '@playwright/test':

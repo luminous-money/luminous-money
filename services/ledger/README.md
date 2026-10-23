@@ -23,7 +23,7 @@ service that writes book data. Served at `/api/ledger/v1`.
   them.
 - **Import and restore are the same operation.** Both apply Beancount text in which:
   - directives are upserted by `id`, or get a new ID if they don't have one
-  - `custom "fava-beans" "deleted" "<id>"` lines delete
+  - `custom "luminous-money" "deleted" "<id>"` lines delete
 
   A backup chunk is exactly such text, one per changed book, with the directives in ordinal order.
 
@@ -47,12 +47,12 @@ checking purchases are staged (`!`, `source: "demo-import"`), about half of them
 Everything runs in Docker; nothing needs installing on the host.
 
 ```sh
-docker build --target test -t fava-beans-ledger:test .   # build with dev dependencies
-docker run --rm fava-beans-ledger:test                   # run the tests
-docker run --rm fava-beans-ledger:test python bench/bench.py --years 20 --copies 5
+docker build --target test -t luminous-money-ledger:test .   # build with dev dependencies
+docker run --rm luminous-money-ledger:test                   # run the tests
+docker run --rm luminous-money-ledger:test python bench/bench.py --years 20 --copies 5
 
-docker build -t fava-beans-ledger .                      # runtime image
-docker run --rm -p 8000:8000 -v ledger-data:/data fava-beans-ledger
+docker build -t luminous-money-ledger .                      # runtime image
+docker run --rm -p 8000:8000 -v ledger-data:/data luminous-money-ledger
 # API docs: http://localhost:8000/api/ledger/v1/docs
 ```
 
@@ -60,8 +60,8 @@ To update dependencies, edit `pyproject.toml`, then refresh the lockfile with th
 toolchain:
 
 ```sh
-docker build --target uv -t fava-beans-uv .
-docker run --rm -u "$(id -u):$(id -g)" -e UV_CACHE_DIR=/tmp/uvc -v "$PWD":/w -w /w fava-beans-uv uv lock
+docker build --target uv -t luminous-money-uv .
+docker run --rm -u "$(id -u):$(id -g)" -e UV_CACHE_DIR=/tmp/uvc -v "$PWD":/w -w /w luminous-money-uv uv lock
 ```
 
 To build for the Pi (or both architectures):

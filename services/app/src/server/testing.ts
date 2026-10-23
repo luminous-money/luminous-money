@@ -9,7 +9,7 @@ import type {
   TradeIn,
   Transaction,
   TransactionIn,
-} from "@fava-beans/ledger-client";
+} from "@luminous-money/ledger-client";
 
 import { add, isZero, negate } from "../shared/decimal.js";
 import {

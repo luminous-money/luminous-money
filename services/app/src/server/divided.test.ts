@@ -4,7 +4,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { guessProfile } from "@fava-beans/csv-import";
+import { guessProfile } from "@luminous-money/csv-import";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { rules } from "./categorize/rules.js";

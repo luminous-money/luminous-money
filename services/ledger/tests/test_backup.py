@@ -58,7 +58,7 @@ def test_deletions_travel_as_tombstones(ledger, tmp_path):
 
     increment = ledger.backup(full.cursor)
 
-    assert f'custom "fava-beans" "deleted" "{created.id}"' in increment.chunks["book"]
+    assert f'custom "luminous-money" "deleted" "{created.id}"' in increment.chunks["book"]
     assert created.id not in restore(tmp_path, full, increment).export("book")
 
 

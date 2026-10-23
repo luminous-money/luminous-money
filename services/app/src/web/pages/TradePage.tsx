@@ -1,4 +1,4 @@
-import type { TradeIn, TradePreview } from "@fava-beans/ledger-client";
+import type { TradeIn, TradePreview } from "@luminous-money/ledger-client";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 

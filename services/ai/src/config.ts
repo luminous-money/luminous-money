@@ -8,7 +8,7 @@ import { existsSync } from "node:fs";
 import { configValue, REQUIRED, validate, Validators, type ConfigError } from "@wymp/config-simple";
 import * as dotenv from "dotenv";
 
-import { PROVIDERS, type ProviderName } from "@fava-beans/ai-api";
+import { PROVIDERS, type ProviderName } from "@luminous-money/ai-api";
 
 export const ENVS = ["production", "development", "test"] as const;
 export type Env = (typeof ENVS)[number];

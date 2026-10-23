@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { AiSettings, CategorizeIn, CategorizeOut, ReceiptFacts } from "@fava-beans/ai-api";
+import type { AiSettings, CategorizeIn, CategorizeOut, ReceiptFacts } from "@luminous-money/ai-api";
 
 import type { AiPort, Answer } from "./ai.js";
 import type { Categorizer } from "./categorize/types.js";

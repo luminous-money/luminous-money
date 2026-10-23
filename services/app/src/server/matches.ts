@@ -14,7 +14,7 @@
  * are one atomic write; then the rows are updated. Every row touched is left proposed, since it
  * changed, until it's confirmed in review.
  */
-import type { TransactionIn } from "@fava-beans/ledger-client";
+import type { TransactionIn } from "@luminous-money/ledger-client";
 
 import type { ProposedMatch } from "../shared/imports.js";
 import type { AppDb, HeldRow } from "./db.js";

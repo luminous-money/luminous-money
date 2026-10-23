@@ -74,7 +74,7 @@ export function VerifyEmail({ token }: { token: string }) {
         {state === "checking" && "Checking…"}
         {state === "done" && "Your email address is confirmed."}
         {state !== "checking" && state !== "done" && <span className="error">{state}</span>}{" "}
-        {state !== "checking" && <Link href="/">Go to fava-beans</Link>}
+        {state !== "checking" && <Link href="/">Go to Luminous Money</Link>}
       </p>
     </main>
   );

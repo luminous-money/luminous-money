@@ -10,14 +10,14 @@
  *   log the user out.
  * - **API tokens** are long-lived bearer tokens for scripts, named, optionally expiring.
  */
-import { after, now, transaction, type DatabaseSync } from "@fava-beans/db";
+import { after, now, transaction, type DatabaseSync } from "@luminous-money/db";
 
 import { DAY, hashSecret, later, newId, newSecret } from "./secrets.js";
 
 export const IDLE_MS = 60 * DAY;
 export const MAX_AGE_MS = 365 * DAY;
 export const GRACE_MS = 10_000;
-export const API_TOKEN_PREFIX = "fb_";
+export const API_TOKEN_PREFIX = "lm_";
 
 export type Session = {
   id: string;

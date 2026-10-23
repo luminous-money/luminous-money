@@ -1,4 +1,4 @@
-import type { Book } from "@fava-beans/ledger-client";
+import type { Book } from "@luminous-money/ledger-client";
 import { Link } from "wouter";
 
 import { AccountValueNote, headline } from "../components/AccountValue.js";

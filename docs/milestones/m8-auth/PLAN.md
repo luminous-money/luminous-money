@@ -11,7 +11,7 @@ M8: Auth: plan
 ## Answers (2026-10-14)
 
 - **No special accounts.** There's nothing global to administer: everyone is an ordinary user,
-  including the person running the server. fava-beans may run as a **public service**, so
+  including the person running the server. Luminous Money may run as a **public service**, so
   anyone can create an account, with no admin step.
 - **Current best practice:** short-lived access tokens with refresh, and room for **OpenID
   Connect providers** later.
@@ -72,7 +72,7 @@ permissions on your books are M13.
   - It's k-anonymous: only the first 5 characters of the password's SHA-1 leave the server.
   - On by default; `AUTH_BREACHED_PASSWORDS=false` turns it off.
   - If HIBP can't be reached, the check passes.
-  - Passwords equal to the email, or to "fava-beans", are refused too.
+  - Passwords equal to the email, or to "Luminous Money", are refused too.
 - **Hashing: Argon2id,** from Node's own `crypto` (Node 24 LTS, which the images move to).
   - Parameters: OWASP's 19 MiB, 2 passes, 1 lane, about 25 ms on this machine.
   - Stored as a PHC string, so the parameters can be raised; an old hash is redone at the next
@@ -124,13 +124,13 @@ permissions on your books are M13.
 
 ### API tokens
 
-- **Named personal tokens:** `fb_` plus 32 random bytes.
+- **Named personal tokens:** `lm_` plus 32 random bytes.
   - Shown once, stored hashed, optionally expiring, and listed with when each was last used.
   - Revoked from the account page.
 - **They act as their user** through the same `/verify`. That check is a database lookup, but
-  only for tokens with the `fb_` prefix.
+  only for tokens with the `lm_` prefix.
   - **Proposed: full access;** scoped and read-only tokens later.
-- **Uses:** `pnpm seed` (`FAVA_BEANS_TOKEN`), scheduled backups pulling `/backup`, your own
+- **Uses:** `pnpm seed` (`LUMINOUS_MONEY_TOKEN`), scheduled backups pulling `/backup`, your own
   scripts.
 
 ### Email, when the server can send it
@@ -179,7 +179,7 @@ permissions on your books are M13.
 - **The stub is no longer created at startup.** A stack that has one keeps its data until
   `claim-stub <email>` hands it to an account.
   - On the dev stack, that's how Kael's account takes over the demo books.
-- **`pnpm seed`** reads `FAVA_BEANS_TOKEN`.
+- **`pnpm seed`** reads `LUMINOUS_MONEY_TOKEN`.
 - **Unit tests in `auth`:**
   - hashing and normalization
   - the breach check (with a fake HIBP)
@@ -232,7 +232,7 @@ permissions on your books are M13.
 - Logging in with OIDC providers (the identity model is ready for them).
 - Passkeys and two-factor authentication. They're the next step up, and the identity model has
   room for them too; passkeys want HTTPS on a fixed hostname.
-- fava-beans as an OAuth/OIDC provider for third-party apps.
+- Luminous Money as an OAuth/OIDC provider for third-party apps.
 - Scoped API tokens.
 - CAPTCHA (rate limits first).
 - Terms and privacy pages for a public service.

@@ -1,4 +1,4 @@
-import type { Posting } from "@fava-beans/ledger-client";
+import type { Posting } from "@luminous-money/ledger-client";
 import { useEffect, useState } from "react";
 
 import { formatMoney, isDecimal } from "../lib/decimal.js";

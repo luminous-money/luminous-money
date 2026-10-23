@@ -1,6 +1,6 @@
 /**
  * Sending email, when the server is set up for it (`SMTP_URL`, `MAIL_FROM`, and
- * `FAVA_BEANS_PUBLIC_URL` for the links, never taken from a request's Host). Without it, nothing
+ * `LUMINOUS_MONEY_PUBLIC_URL` for the links, never taken from a request's Host). Without it, nothing
  * is sent: password resets go through the operator's CLI.
  */
 import { createTransport } from "nodemailer";
@@ -23,11 +23,11 @@ export function smtpMailer(url: string, from: string): Mailer {
 /** The emails `auth` sends. */
 export const emails = {
   verify: (link: string): Omit<Message, "to"> => ({
-    subject: "Confirm your email for fava-beans",
-    text: `Confirm this is your email address by opening this link:\n\n${link}\n\nIt works for a week. If you didn't sign up for fava-beans, ignore this email.\n`,
+    subject: "Confirm your email for Luminous Money",
+    text: `Confirm this is your email address by opening this link:\n\n${link}\n\nIt works for a week. If you didn't sign up for Luminous Money, ignore this email.\n`,
   }),
   reset: (link: string): Omit<Message, "to"> => ({
-    subject: "Reset your fava-beans password",
-    text: `Someone asked to reset the password for your fava-beans account. To choose a new one, open this link:\n\n${link}\n\nIt works for an hour, once. If it wasn't you, ignore this email: your password hasn't changed.\n`,
+    subject: "Reset your Luminous Money password",
+    text: `Someone asked to reset the password for your Luminous Money account. To choose a new one, open this link:\n\n${link}\n\nIt works for an hour, once. If it wasn't you, ignore this email: your password hasn't changed.\n`,
   }),
 };

@@ -89,7 +89,7 @@ def create_app(ledger: Ledger) -> FastAPI:
     books the caller owns (see `owned_book`)."""
 
     app = FastAPI(
-        title="fava-beans ledger",
+        title="luminous-money ledger",
         docs_url="/api/ledger/v1/docs",
         openapi_url="/api/ledger/v1/openapi.json",
     )
@@ -103,7 +103,7 @@ def create_app(ledger: Ledger) -> FastAPI:
         return {
             "status": "ok",
             "service": "ledger",
-            "version": os.environ.get("FAVA_BEANS_VERSION", "dev"),
+            "version": os.environ.get("LUMINOUS_MONEY_VERSION", "dev"),
             "schema": ledger.store.schema_version(),
         }
 

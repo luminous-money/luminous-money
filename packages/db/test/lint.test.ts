@@ -55,7 +55,7 @@ it("creates tables only through createTable", () => {
     .filter((dir) => statSync(dir, { throwIfNoEntry: false })?.isDirectory())
     .flatMap((dir) => sources(dir).flatMap((f) => offenders(f)));
 
-  expect(found, "create tables with createTable from @fava-beans/db, not raw CREATE TABLE").toEqual(
+  expect(found, "create tables with createTable from @luminous-money/db, not raw CREATE TABLE").toEqual(
     []
   );
 });

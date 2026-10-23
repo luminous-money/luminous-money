@@ -75,7 +75,7 @@ Kept by the `ai` service (`ai.sqlite`, `ai_setting`), versioned like every edit:
 
 - **Enabled** (default off), **provider** (`claude`; `fake` in test stacks only), and its
   **credential**: an API key (Claude has no OAuth for third-party apps), sealed at rest with
-  `AI_ENCRYPTION_KEY` (the sealer `app` uses for SimpleFIN, moved to `@fava-beans/db`), never
+  `AI_ENCRYPTION_KEY` (the sealer `app` uses for SimpleFIN, moved to `@luminous-money/db`), never
   sent back: the settings say only that one is set, and its last four characters.
 - **Itemize receipts by default** (yes / no).
 - **Account creation:** off by default; when on, **eagerness** (`reluctant`, `average`,
@@ -252,7 +252,7 @@ an import is.
 
 ## How it gets built (the first pass)
 
-1. **`@fava-beans/db`:** the sealer, moved from `app` (which uses it from there).
+1. **`@luminous-money/db`:** the sealer, moved from `app` (which uses it from there).
 2. **Ledger:** attachments (migration 10, the files, the routes, cleanup with transactions and
    books, the count on transactions); tests.
 3. **`ai`:** the service (config, `ai.sqlite`, health, settings and credential with roles, the

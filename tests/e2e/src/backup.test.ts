@@ -44,7 +44,7 @@ describe("backups", () => {
 
     assert.match(
       increment.chunks[book_id] ?? "",
-      new RegExp(`custom "fava-beans" "deleted" "${entry.id}"`)
+      new RegExp(`custom "luminous-money" "deleted" "${entry.id}"`)
     );
   });
 });

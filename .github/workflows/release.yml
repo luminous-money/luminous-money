@@ -1,6 +1,6 @@
 # A version tag (`v0.1.0`) makes a release: the tests first, then every image for amd64 and arm64
 # on GitHub's registry (ghcr.io/<owner>/<repo>/<service>:<version>, and :latest), then a GitHub
-# release with the bundle a deployment needs: compose.yaml, env.example and the `fava-beans`
+# release with the bundle a deployment needs: compose.yaml, env.example and the `luminous-money`
 # command (docs/deploying.md). A red build publishes nothing.
 name: Release
 on:
@@ -43,6 +43,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir bundle
-          cp compose.yaml scripts/fava-beans deploy/env.example bundle/
-          gh release create "$GITHUB_REF_NAME" bundle/* --title "fava-beans ${GITHUB_REF_NAME#v}" \
+          cp compose.yaml scripts/luminous-money deploy/env.example bundle/
+          gh release create "$GITHUB_REF_NAME" bundle/* --title "luminous-money ${GITHUB_REF_NAME#v}" \
             --generate-notes --verify-tag

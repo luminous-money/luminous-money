@@ -1,6 +1,7 @@
 {
-  "name": "@fava-beans/simplefin-fake",
+  "name": "@luminous-money/simplefin-fake",
   "version": "0.1.0",
+  "license": "GPL-2.0-or-later",
   "private": true,
   "description": "A fake SimpleFIN server, scripted by tests: in process for unit tests, and as a service in the e2e stack.",
   "type": "module",

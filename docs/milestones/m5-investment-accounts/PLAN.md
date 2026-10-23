@@ -21,7 +21,7 @@ M5: Investment accounts: plan
   - **FIFO, LIFO, HIFO,** or **specific lots** (Beancount's STRICT: the Sell form asks which
     lots) are Beancount's own.
   - **Average cost** isn't: Beancount 3 refuses `AVERAGE` ("not supported", checked). For such
-    accounts, fava-beans books sales itself: the account uses Beancount's `NONE` booking, and
+    accounts, Luminous Money books sales itself: the account uses Beancount's `NONE` booking, and
     the Sell form reduces at the account's current average cost per unit, which keeps units and
     total cost basis right. (Its own small piece of code, with tests against hand-worked
     examples.)

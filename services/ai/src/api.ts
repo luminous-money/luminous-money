@@ -7,7 +7,7 @@
  */
 import { Hono, type Context } from "hono";
 
-import type { Sealer } from "@fava-beans/db";
+import type { Sealer } from "@luminous-money/db";
 import {
   EAGERNESS,
   type AiHealth,
@@ -15,7 +15,7 @@ import {
   type CategorizeIn,
   type ExtractIn,
   type ProviderName,
-} from "@fava-beans/ai-api";
+} from "@luminous-money/ai-api";
 
 import { StaleVersion, type AiDb } from "./db.js";
 import { ReadFailed, type Provider } from "./providers/types.js";

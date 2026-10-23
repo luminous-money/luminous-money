@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { stackHealth } from "./health.js";
+import { certificateOf, stackHealth } from "./health.js";
 
 const peers = { auth: "http://auth:3000", ledger: "http://ledger:8000", ai: "http://ai:3000" };
 
@@ -35,6 +35,63 @@ describe("the stack's health", () => {
     expect(down).toEqual({
       status: "down",
       services: { auth: "up", ledger: "down", app: "up", ai: "up" },
+    });
+  });
+
+  it("watches the gateway's certificate when it serves HTTPS for a domain", async () => {
+    const now = new Date("2026-10-23T12:00:00Z");
+    const expiring = Date.parse("2026-11-01T12:00:00Z") / 1000;
+    const fetchImpl = (async (url: string) =>
+      new Response(
+        url.endsWith("/metrics")
+          ? `# TYPE traefik_tls_certs_not_after gauge\ntraefik_tls_certs_not_after{cn="books.example.com",sans="books.example.com",serial="1"} ${expiring}\n`
+          : "{}"
+      )) as never;
+
+    const health = await stackHealth(
+      { ...peers, gateway: "http://traefik:8082", domain: "books.example.com" },
+      fetchImpl,
+      now
+    );
+
+    expect(health.status).toBe("degraded");
+    expect(health.certificate).toEqual({
+      domain: "books.example.com",
+      status: "expiring",
+      expires: "2026-11-01T12:00:00.000Z",
+      days_left: 9,
+    });
+  });
+});
+
+describe("a certificate in the gateway's metrics", () => {
+  const now = new Date("2026-10-23T00:00:00Z");
+  const line = (names: string, at: string) =>
+    `traefik_tls_certs_not_after{cn="other.example.com",sans="${names}",serial="9"} ${Date.parse(at) / 1000}`;
+
+  it("is the latest one naming the domain, among its alternative names too", () => {
+    const metrics = [
+      line("other.example.com,books.example.com", "2026-11-30T00:00:00Z"),
+      line("books.example.com", "2027-01-15T00:00:00Z"), // renewed: the newer counts
+      line("elsewhere.example.com", "2030-01-01T00:00:00Z"),
+    ].join("\n");
+    expect(certificateOf(metrics, "Books.Example.com", now)).toMatchObject({
+      status: "ok",
+      expires: "2027-01-15T00:00:00.000Z",
+      days_left: 84,
+    });
+  });
+
+  it("is expired, or missing, when there isn't a good one", () => {
+    expect(
+      certificateOf(line("books.example.com", "2026-10-01T00:00:00Z"), "books.example.com", now)
+        .status
+    ).toBe("expired");
+    expect(certificateOf("", "books.example.com", now)).toEqual({
+      domain: "books.example.com",
+      status: "missing",
+      expires: null,
+      days_left: null,
     });
   });
 });

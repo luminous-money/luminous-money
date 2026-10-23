@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { Sealer } from "@fava-beans/db";
-import type { AiSettings, CategorizeIn, CategorizeOut, ReceiptFacts } from "@fava-beans/ai-api";
+import { Sealer } from "@luminous-money/db";
+import type { AiSettings, CategorizeIn, CategorizeOut, ReceiptFacts } from "@luminous-money/ai-api";
 
 import { createApi, type Role } from "../src/api.js";
 import { AiDb } from "../src/db.js";

@@ -1,4 +1,4 @@
-import type { Transaction } from "@fava-beans/ledger-client";
+import type { Transaction } from "@luminous-money/ledger-client";
 
 import { payeeKey } from "../../shared/payees.js";
 import type { ProposalSummary } from "./appApi.js";

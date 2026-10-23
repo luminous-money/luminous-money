@@ -1,6 +1,7 @@
 {
-  "name": "@fava-beans/monorepo",
+  "name": "@luminous-money/luminous-money",
   "version": "0.1.0",
+  "license": "GPL-2.0-or-later",
   "private": true,
   "description": "Self-hostable, database-driven double-entry accounting with Beancount as the engine.",
   "engines": {
@@ -13,7 +14,7 @@
     "test:unit": "pnpm -r --filter \"./packages/**\" --filter \"./services/**\" test",
     "e2e": "./scripts/e2e.sh",
     "test:cli": "./scripts/cli-test.sh",
-    "e2e:local": "pnpm --filter \"./tests/**...\" build && pnpm --filter @fava-beans/e2e test && ./scripts/ui-local.sh",
+    "e2e:local": "pnpm --filter \"./tests/**...\" build && pnpm --filter @luminous-money/e2e test && ./scripts/ui-local.sh",
     "seed": "./scripts/seed-demo.sh",
     "generate": "docker buildx bake generate && pnpm -r generate",
     "release": "docker buildx bake release",

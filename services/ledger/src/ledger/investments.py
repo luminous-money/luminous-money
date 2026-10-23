@@ -237,7 +237,7 @@ def holdings(ledger, book_id: str, account: str, on: datetime.date | None = None
 
 
 def _lots_shown(lots, units: Decimal, cost: Decimal | None, cost_amount) -> list[models.Lot]:
-    """The lots, oldest first. Average-cost accounts (booked by fava-beans: sales are negative
+    """The lots, oldest first. Average-cost accounts (booked by luminous-money: sales are negative
     lots at the average) show as one lot at the average cost."""
     if any(p.units.number < 0 for p in lots) and cost is not None and units:
         return [

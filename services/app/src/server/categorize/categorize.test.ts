@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { guessProfile } from "@fava-beans/csv-import";
+import { guessProfile } from "@luminous-money/csv-import";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { CategorizeRequest, HistoryTransaction } from "../../shared/categorizer-api.js";

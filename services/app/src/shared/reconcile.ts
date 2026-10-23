@@ -1,5 +1,5 @@
 /** Reconciliation (M14) as the app API shows it: shared by the server and the PWA. */
-import type { components } from "@fava-beans/ledger-client";
+import type { components } from "@luminous-money/ledger-client";
 
 export type ReconcileState = components["schemas"]["ReconcileState"];
 export type ReconcileItem = components["schemas"]["ReconcileItem"];

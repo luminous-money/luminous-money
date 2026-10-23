@@ -5,7 +5,7 @@
  * confirmed ones from the same payees, the most recent first. For receipts, for now; whether
  * imports call it is M19's to decide.
  */
-import type { CategorizeHistory } from "@fava-beans/ai-api";
+import type { CategorizeHistory } from "@luminous-money/ai-api";
 
 import { UNKNOWN } from "../../shared/accounts.js";
 import { payeeKey } from "../../shared/payees.js";

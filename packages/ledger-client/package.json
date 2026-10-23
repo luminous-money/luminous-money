@@ -1,6 +1,7 @@
 {
-  "name": "@fava-beans/ledger-client",
+  "name": "@luminous-money/ledger-client",
   "version": "0.1.0",
+  "license": "GPL-2.0-or-later",
   "description": "Typed client for the ledger service, generated from its OpenAPI schema.",
   "type": "module",
   "sideEffects": false,

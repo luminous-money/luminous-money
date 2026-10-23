@@ -77,8 +77,8 @@ function Connect() {
     >
       <h2 className="section-title">Connect</h2>
       <p className="small muted">
-        At SimpleFIN Bridge, connect your banks, then make a setup token for fava-beans and paste it
-        here. It works once.
+        At SimpleFIN Bridge, connect your banks, then make a setup token for luminous-money and
+        paste it here. It works once.
       </p>
       <label>
         Setup token
@@ -164,7 +164,7 @@ function ConnectionCard({
           onClick={() => {
             if (
               window.confirm(
-                "Disconnect? Its links stop syncing; everything brought in stays. To revoke access entirely, also remove fava-beans at SimpleFIN Bridge."
+                "Disconnect? Its links stop syncing; everything brought in stays. To revoke access entirely, also remove luminous-money at SimpleFIN Bridge."
               )
             )
               disconnect.mutate(connection.id);

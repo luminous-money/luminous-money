@@ -1,4 +1,4 @@
-import type { Transaction } from "@fava-beans/ledger-client";
+import type { Transaction } from "@luminous-money/ledger-client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 

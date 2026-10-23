@@ -3,5 +3,5 @@ AUTH_TEST_USERS=true
 AUTH_BREACHED_PASSWORDS=false
 AUTH_SIGNUPS_PER_HOUR=100000
 SMTP_URL=smtp://mailpit:1025
-MAIL_FROM=fava-beans <books@fava-beans.test>
-FAVA_BEANS_PUBLIC_URL=http://traefik
+MAIL_FROM=luminous-money <books@luminous-money.test>
+LUMINOUS_MONEY_PUBLIC_URL=http://traefik

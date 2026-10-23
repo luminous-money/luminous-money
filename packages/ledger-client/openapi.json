@@ -307,7 +307,7 @@
                 "type": "null"
               }
             ],
-            "description": "FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by fava-beans); None: the book's default.",
+            "description": "FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by luminous-money); None: the book's default.",
             "title": "Booking"
           },
           "cards": {
@@ -4006,7 +4006,7 @@
     }
   },
   "info": {
-    "title": "fava-beans ledger",
+    "title": "luminous-money ledger",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",

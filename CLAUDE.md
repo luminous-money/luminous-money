@@ -1,4 +1,4 @@
-# fava-beans: working agreements
+# Luminous Money: working agreements
 
 - **Read [RESUME.md](RESUME.md) first.** It says where work stands and what's next.
   [docs/PLAN.md](docs/PLAN.md) is the roadmap; [docs/design.md](docs/design.md) holds the decisions and
@@ -12,7 +12,7 @@
   stack, routing or the UI.** UI behavior gets a browser test in `tests/ui`. If the ledger's API
   changed, run `pnpm generate` and commit the result; the check fails otherwise.
 - **Every table is created through the migration helper:** `migrations.create_table` in the
-  ledger (Python), `createTable` from `@fava-beans/db` in the TypeScript services. Both add
+  ledger (Python), `createTable` from `@luminous-money/db` in the TypeScript services. Both add
   `created_at` and `updated_at`, and lint checks in `pnpm test` enforce it. Schema changes are new migrations,
   never edits to shipped ones.
 - **Every edit is versioned:** the client sends the `updated_at` it read, and the server refuses a

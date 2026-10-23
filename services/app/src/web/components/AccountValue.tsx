@@ -1,4 +1,4 @@
-import type { AccountSummary } from "@fava-beans/ledger-client";
+import type { AccountSummary } from "@luminous-money/ledger-client";
 
 import { shown } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";

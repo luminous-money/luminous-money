@@ -1,4 +1,4 @@
-fava-beans
+Luminous Money
 ==================================================================================================
 
 A self-hostable, database-driven, double-entry accounting system. It uses
@@ -15,8 +15,8 @@ books, each independent: switching books is like switching profiles.
 On a laptop, a home server or a public server, with Docker:
 
 ```sh
-curl -fsSL https://github.com/luminous-money/fava-beans/releases/latest/download/fava-beans -o fava-beans
-bash fava-beans install
+curl -fsSL https://github.com/luminous-money/luminous-money/releases/latest/download/luminous-money -o luminous-money
+bash luminous-money install
 ```
 
 It asks a couple of questions (this machine, or a public server with a domain and HTTPS), starts
@@ -36,12 +36,12 @@ workspace.
 ```sh
 pnpm install         # TypeScript workspace, for editors and host-side scripts
 pnpm build           # build every service image (docker buildx bake)
-docker compose up -d # run the stack on http://localhost:8080 (FAVA_BEANS_PORT to change)
+docker compose up -d # run the stack on http://localhost:8080 (LUMINOUS_MONEY_PORT to change)
 ```
 
 Then open `http://localhost:8080/`, which redirects to the app at `/ui/`, and **create an
 account** (anyone can). For demo data, make an API token on "Your account" and run
-`FAVA_BEANS_TOKEN=fb_… pnpm seed`, which gives your account two demo books.
+`LUMINOUS_MONEY_TOKEN=lm_… pnpm seed`, which gives your account two demo books.
 
 | Path | What |
 |---|---|
@@ -56,14 +56,14 @@ account** (anyone can). For demo data, make an API token on "Your account" and r
 |---|---|
 | `pnpm build` | Build every service image for this machine |
 | `pnpm test` | Every test suite and contract check, in Docker (`docker buildx bake test`) |
-| `pnpm e2e` | Build everything and run the end-to-end suites (API, browser, and the `fava-beans` command) against throwaway stacks |
-| `pnpm test:cli` | Just the `fava-beans` command's test (images built already) |
+| `pnpm e2e` | Build everything and run the end-to-end suites (API, browser, and the `luminous-money` command) against throwaway stacks |
+| `pnpm test:cli` | Just the `luminous-money` command's test (images built already) |
 | `pnpm e2e:local` | Run both end-to-end suites against an already-running stack (start it with `AUTH_TEST_USERS=true`) |
 | `pnpm test:unit` | The TypeScript unit tests on the host (no Docker) |
 | `pnpm seed [book]` | Seed a demo book with recent purchases staged for review (default: `demo`, plus the small `demo-household`) |
 | `pnpm generate` | Regenerate `packages/ledger-client` after changing the ledger's API |
 | `pnpm release` | Build `linux/amd64` + `linux/arm64` images and push them (set `REGISTRY`, `VERSION`). Releases normally come from a `v*` tag, through `.github/workflows/release.yml` |
-| `pnpm --filter @fava-beans/app dev` | Vite dev server for the PWA, proxying `/api` to a running stack |
+| `pnpm --filter @luminous-money/app dev` | Vite dev server for the PWA, proxying `/api` to a running stack |
 
 ## Repository layout
 
@@ -92,6 +92,12 @@ packages/
 tests/
   e2e/                API end-to-end tests through the gateway
   ui/                 browser end-to-end tests (Playwright) through the gateway
-scripts/              fava-beans (the deployment command), and the scripts behind pnpm's
+scripts/              luminous-money (the deployment command), and the scripts behind pnpm's
 docs/                 design, plans, deploying
 ```
+
+## License
+
+[GPL-2.0-or-later](LICENSE). The ledger uses [Beancount](https://github.com/beancount/beancount),
+which is GPL-2.0-only, so this is the most recent GPL that can be combined with it; "or later"
+leaves room for a newer GPL if Beancount ever allows one.

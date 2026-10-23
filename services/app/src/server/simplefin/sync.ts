@@ -9,7 +9,7 @@
  *   now, at most 90 days a request. What the overlap sends again is a duplicate by fingerprint.
  * - **History:** `backfill` walks windows back until `QUIET_DAYS` of them in a row are empty.
  */
-import type { Row } from "@fava-beans/csv-import";
+import type { Row } from "@luminous-money/csv-import";
 
 import type { ImportResult } from "../../shared/imports.js";
 import type { Categorizer } from "../categorize/types.js";

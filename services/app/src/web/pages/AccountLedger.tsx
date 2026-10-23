@@ -39,7 +39,7 @@ import {
   useUpcoming,
 } from "../lib/queries.js";
 import { upcomingFor } from "../lib/upcoming.js";
-import type { LedgerRow } from "@fava-beans/ledger-client";
+import type { LedgerRow } from "@luminous-money/ledger-client";
 
 /**
  * One account's ledger: every transaction, newest first, 200 at a time, more loading as you

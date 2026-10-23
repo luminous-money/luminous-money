@@ -1,10 +1,18 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-21._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-23._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
+
+**This is Luminous Money** (renamed from fava-beans on 2026-10-23, when it became the Luminous
+Money product). The original Luminous Money attempt (`luminous-money/system` and its service
+repositories) is archived on GitHub and kept locally in `../.archive/system`. Everything says
+`luminous-money` now: packages (`@luminous-money/*`), images, the `luminous-money` command,
+`LUMINOUS_MONEY_*` settings, the `lm_` token and cookie prefix, and the tombstone type
+(`custom "luminous-money" "deleted"`). The dev databases were wiped for the rename. License:
+GPL-2.0-or-later (Beancount is GPL-2.0-only).
 
 **M1 through M16 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
@@ -14,7 +22,7 @@ accounts) and M16 (receipt capture) are described in their plans. The milestones
 (M17–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What an operator can do now (production readiness, phase 1; [docs/deploying.md](docs/deploying.md)):
-`fava-beans install` sets a deployment up (a laptop, or a public server with built-in HTTPS),
+`luminous-money install` sets a deployment up (a laptop, or a public server with built-in HTTPS),
 then `status`, `upgrade` (backing up first), `backup` / `restore` (every database, the
 attachments and the keys, online), `logs`, `report` (for bug reports, secrets hidden) and
 `config`. Every service has `/health` and an image healthcheck; `/api/health` is public for
@@ -176,7 +184,7 @@ How it's put together:
   (`src/server/receipts.ts`, the chain in `src/server/categorize`, its AI step `ai.ts`), and the
   ledger keeps the files (attachments, migration 10). Their shared types are `packages/ai-api`.
 - **Deploying:** `deploy/gateway` (the gateway image: Traefik pinned, the routes, its static
-  config written at start by `entrypoint.sh`), `deploy/env.example`, `scripts/fava-beans` (the
+  config written at start by `entrypoint.sh`), `deploy/env.example`, `scripts/luminous-money` (the
   operator's command; its test is `scripts/cli-test.sh`), `ledger.snapshot` (whole-system
   backup and restore), and `.github/workflows` (CI; a release on a `v*` tag).
 - **`packages/db`** (TypeScript migrations and timestamps, the sealer, `health`, with a lint check) and
@@ -185,20 +193,20 @@ How it's put together:
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 183 tests, including the table lint
-    - auth: 20; app: 178; ai: 7; db: 10; csv-import: 22
+    - auth: 20; app: 181; ai: 7; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
   - `pnpm e2e`: 88 API tests and 92 browser tests (with Mailpit, a fake SimpleFIN server and
-    the fake AI provider), then the `fava-beans` command's test (`pnpm test:cli` alone)
+    the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps
 
-1. **Production readiness, phase 2** ([its plan](docs/milestones/production-readiness/PLAN.md)):
-   its questions first (upgrading from the app, where it's published, a license, built-in HTTPS,
-   who may sign up); then admins by email and the system page, update checks, `auto-upgrade`.
-   Publishing needs Kael: a GitHub repository, a license, then a `v0.1.0` tag.
+1. **Production readiness, phase 2** ([its plan](docs/milestones/production-readiness/PLAN.md);
+   its questions are answered): admins by email and the system page, update checks,
+   `auto-upgrade`. Publishing needs Kael: create `luminous-money/luminous-money` on GitHub, push,
+   tag `v0.1.0`, then make the images on ghcr.io public.
 2. **M17 (transaction tagging):** see [its plan](docs/milestones/m17-transaction-tagging/PLAN.md).
 3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
@@ -252,7 +260,7 @@ How it's put together:
 - **The gateway's routes are inside its image** (`deploy/gateway/routes.yml`): after changing
   them, `docker buildx bake gateway` (or `pnpm build`) and `docker compose up -d`. Its static
   config is written at start from the environment, so edit `entrypoint.sh`, not a YAML file.
-- **The HTTPS port is random without a domain** (`FAVA_BEANS_HTTPS_PORT` unset): nothing
+- **The HTTPS port is random without a domain** (`LUMINOUS_MONEY_HTTPS_PORT` unset): nothing
   listens on it then, and two stacks on one machine don't collide.
 - **A confirmed transaction has no split flags:** the ledger drops them on any `*` write
   (`engine.confirmed`), and `FakeLedger` does the same, so tests see what production does.
@@ -269,7 +277,7 @@ How it's put together:
   array as validators, not a default: give list defaults as a string and split them.
 - **Auth keeps its signing keys in `auth.sqlite`;** `AUTH_JWT_SECRET` is gone (auth warns if
   it's still set). Wiping the volume logs everyone out, as well as deleting them.
-- **`FAVA_BEANS_PUBLIC_URL` must be the address users reach,** when set: `auth` refuses writes
+- **`LUMINOUS_MONEY_PUBLIC_URL` must be the address users reach,** when set: `auth` refuses writes
   from any other origin (so a LAN IP and a hostname can't both be used).
 - **The host's Node may be older than the images' (24).** `auth`'s unit tests need Node 24
   (built-in Argon2id); `pnpm test` runs them in Docker, or run
@@ -277,9 +285,9 @@ How it's put together:
 - **The dev stack has no test logins:** compose doesn't pass `AUTH_TEST_USERS` through, and
   only `APP_ENV=test` turns it on. To poke at the UI (or take screenshots) without touching the
   dev stack's data, start the e2e stack under its own project, `docker compose -p
-  fava-beans-e2e -f compose.yaml -f compose.e2e.yaml up -d traefik auth ledger app ai mailpit
+  luminous-money-e2e -f compose.yaml -f compose.e2e.yaml up -d traefik auth ledger app ai mailpit
   simplefin-fake`, and run Playwright (the `mcr.microsoft.com/playwright:v1.63.0-noble` image)
-  on its network, `fava-beans-e2e_default`, at `http://traefik`. `pnpm e2e` tears it down.
+  on its network, `luminous-money-e2e_default`, at `http://traefik`. `pnpm e2e` tears it down.
 - **A mutation's per-call `onSuccess` doesn't run if its component unmounted first,** and a
   hook-level `onSuccess` that returns an invalidation is awaited before it: a form keyed on
   what that refetch changes is gone by then. Await `mutateAsync` instead (Reconcile's Finish,
@@ -313,6 +321,6 @@ How it's put together:
 
 ```sh
 pnpm test                 # unit tests, contract drift, typechecks, formatting, lint
-pnpm e2e                  # whole stack, end to end (API, browser, the fava-beans command)
+pnpm e2e                  # whole stack, end to end (API, browser, the luminous-money command)
 docker compose up -d      # then open http://localhost:8080/ and log in
 ```

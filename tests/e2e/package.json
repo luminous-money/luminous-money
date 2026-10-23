@@ -1,6 +1,7 @@
 {
-  "name": "@fava-beans/e2e",
+  "name": "@luminous-money/e2e",
   "version": "0.1.0",
+  "license": "GPL-2.0-or-later",
   "private": true,
   "description": "End-to-end tests against a running stack, through Traefik.",
   "type": "module",
@@ -9,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@fava-beans/ledger-client": "workspace:*"
+    "@luminous-money/ledger-client": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

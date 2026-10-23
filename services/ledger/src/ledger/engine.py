@@ -67,7 +67,7 @@ ROOT_OPTIONS = (
 )
 
 NodePostingError = collections.namedtuple("NodePostingError", "source message entry")
-TOMBSTONE_TYPE = "fava-beans"
+TOMBSTONE_TYPE = "luminous-money"
 TOMBSTONE_VALUE = "deleted"
 
 _HEADER_LINE = re.compile(r"^(?:option|plugin)\s.*$", re.MULTILINE)
@@ -113,7 +113,7 @@ class Directive:
 class Parsed:
     header: list[str]
     directives: list[Directive]  # canonical order: date, then directive type, then input order
-    tombstones: list[str]  # IDs deleted by `custom "fava-beans" "deleted" "<id>"`
+    tombstones: list[str]  # IDs deleted by `custom "luminous-money" "deleted" "<id>"`
 
 
 @dataclass(frozen=True)

@@ -47,7 +47,7 @@ export type ApiToken = {
 const AUTH = "/api/auth/v1";
 
 /** Fired when the session has ended and can't be refreshed. */
-export const LOGGED_OUT = "fava-beans:logged-out";
+export const LOGGED_OUT = "luminous-money:logged-out";
 
 let refreshing: Promise<boolean> | undefined;
 let refreshedAt = Date.now();
@@ -58,7 +58,7 @@ export function refresh(): Promise<boolean> {
     const run = async () => (await fetch(`${AUTH}/token`, { method: "POST" })).ok;
     try {
       const ok = navigator.locks
-        ? await navigator.locks.request("fava-beans:refresh", run)
+        ? await navigator.locks.request("luminous-money:refresh", run)
         : await run();
       if (ok) refreshedAt = Date.now();
       return ok;

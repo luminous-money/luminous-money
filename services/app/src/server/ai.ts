@@ -9,7 +9,7 @@ import type {
   CategorizeOut,
   ExtractIn,
   ReceiptFacts,
-} from "@fava-beans/ai-api";
+} from "@luminous-money/ai-api";
 
 /** An answer, or why there isn't one. */
 export type Answer<T> = { ok: T } | { failed: string };

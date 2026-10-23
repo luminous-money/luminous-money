@@ -1,4 +1,4 @@
-import type { Transaction } from "@fava-beans/ledger-client";
+import type { Transaction } from "@luminous-money/ledger-client";
 import { expect, it } from "vitest";
 
 import { similarUnconfirmed } from "./similar.js";

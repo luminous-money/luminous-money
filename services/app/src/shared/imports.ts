@@ -2,7 +2,7 @@
  * The app API's import types, shared by the server and the PWA. (The ledger's API has generated
  * types; the app API is small enough to share hand-written ones instead.)
  */
-export type { CsvProfile } from "@fava-beans/csv-import";
+export type { CsvProfile } from "@luminous-money/csv-import";
 
 /** What became of one CSV row. */
 export type Outcome =

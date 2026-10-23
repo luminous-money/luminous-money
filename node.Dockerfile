@@ -24,21 +24,21 @@ RUN pnpm -r build && pnpm -r typecheck && pnpm test:unit && pnpm prettier
 # plain Node, and the browser suite on Playwright's image, whose version must match
 # tests/ui/package.json.
 FROM workspace AS e2e
-RUN pnpm --filter "@fava-beans/e2e..." build
-ENV FAVA_BEANS_URL=http://traefik
-CMD ["pnpm", "--filter", "@fava-beans/e2e", "test"]
+RUN pnpm --filter "@luminous-money/e2e..." build
+ENV LUMINOUS_MONEY_URL=http://traefik
+CMD ["pnpm", "--filter", "@luminous-money/e2e", "test"]
 
 FROM mcr.microsoft.com/playwright:v1.63.0-noble AS ui
 WORKDIR /repo
 COPY --from=workspace /repo /repo
-RUN corepack enable && pnpm --filter "@fava-beans/ui-tests..." build
-ENV FAVA_BEANS_URL=http://traefik
-CMD ["pnpm", "--filter", "@fava-beans/ui-tests", "test"]
+RUN corepack enable && pnpm --filter "@luminous-money/ui-tests..." build
+ENV LUMINOUS_MONEY_URL=http://traefik
+CMD ["pnpm", "--filter", "@luminous-money/ui-tests", "test"]
 
 # A fake SimpleFIN server (tests/simplefin-fake), for the e2e stack.
 FROM workspace AS simplefin-fake-build
-RUN pnpm --filter "@fava-beans/simplefin-fake..." build \
-  && pnpm --filter @fava-beans/simplefin-fake deploy --prod --legacy /out
+RUN pnpm --filter "@luminous-money/simplefin-fake..." build \
+  && pnpm --filter @luminous-money/simplefin-fake deploy --prod --legacy /out
 
 FROM node:24-slim AS simplefin-fake
 WORKDIR /srv

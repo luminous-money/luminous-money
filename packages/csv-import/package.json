@@ -1,6 +1,7 @@
 {
-  "name": "@fava-beans/csv-import",
+  "name": "@luminous-money/csv-import",
   "version": "0.1.0",
+  "license": "GPL-2.0-or-later",
   "description": "Bank CSVs: parsing, guessing a profile (which column is what), and normalizing rows with it.",
   "type": "module",
   "sideEffects": false,

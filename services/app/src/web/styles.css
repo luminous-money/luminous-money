@@ -69,6 +69,15 @@ body {
   font-weight: 700;
   font-size: 1.15rem;
   letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* Signed in, on a phone, the logo alone: the camera, the book switcher and the menu need the
+   room. */
+@media (max-width: 34rem) {
+  .brand.signed-in .wordmark {
+    display: none;
+  }
 }
 
 .hero h1 {

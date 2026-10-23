@@ -5,7 +5,7 @@
  */
 import { Hono, type Context, type Next } from "hono";
 
-import type { CsvProfile } from "@fava-beans/csv-import";
+import type { CsvProfile } from "@luminous-money/csv-import";
 
 import type { AppDb, Invite } from "./db.js";
 import { ImportProblem, importFile } from "./imports.js";

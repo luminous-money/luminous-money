@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createFakeSimplefin } from "@fava-beans/simplefin-fake";
+import { createFakeSimplefin } from "@luminous-money/simplefin-fake";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { AppDb } from "../db.js";

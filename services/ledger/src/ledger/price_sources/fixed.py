@@ -1,6 +1,6 @@
 """A price source with fixed prices, for demos and tests: no network.
 
-Prices come from `FAVA_BEANS_FIXED_PRICES` (JSON: ticker to price), else 100 for any ticker.
+Prices come from `LUMINOUS_MONEY_FIXED_PRICES` (JSON: ticker to price), else 100 for any ticker.
 """
 
 import datetime
@@ -13,7 +13,7 @@ from beanprice import source
 
 class Source(source.Source):
     def get_latest_price(self, ticker: str) -> source.SourcePrice | None:
-        prices = json.loads(os.environ.get("FAVA_BEANS_FIXED_PRICES", "{}"))
+        prices = json.loads(os.environ.get("LUMINOUS_MONEY_FIXED_PRICES", "{}"))
         return source.SourcePrice(
             Decimal(str(prices.get(ticker, 100))), datetime.datetime.now(datetime.timezone.utc), "USD"
         )

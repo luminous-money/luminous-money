@@ -158,5 +158,5 @@ def test_deleting_a_book_is_versioned_and_leaves_nothing_behind_but_tombstones(l
     assert ledger.store._conn.execute("SELECT count(*) FROM posting p JOIN directive d ON d.id = p.directive_id WHERE d.book_id = 'doomed'").fetchone()[0] == 0
     increment = me.get("/api/ledger/v1/backup", params={"since": full["cursor"]}).json()
     assert increment["deleted_books"] == ["doomed"]
-    assert increment["chunks"]["doomed"].count('custom "fava-beans" "deleted"') == directives
+    assert increment["chunks"]["doomed"].count('custom "luminous-money" "deleted"') == directives
     assert me.post("/api/ledger/v1/books", json={"name": "Feature fixture"}).status_code == 201

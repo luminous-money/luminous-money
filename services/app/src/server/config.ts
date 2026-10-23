@@ -34,6 +34,10 @@ const configDef = {
   ledgerUrl: configValue("LEDGER_URL", "str", "http://ledger:8000"),
   /** auth, asked for its health only (Traefik checks sessions with it). */
   authUrl: configValue("AUTH_URL", "str", "http://auth:3000"),
+  /** The gateway's internal port, where its metrics say when its certificate expires. */
+  gatewayUrl: configValue("GATEWAY_URL", "str", "http://traefik:8082"),
+  /** The domain the gateway serves HTTPS for, if it does: its certificate is watched. */
+  domain: configValue("LUMINOUS_MONEY_DOMAIN", "str"),
   /** The ai service (M16): optional; receipts are made unread without it. */
   aiUrl: configValue("AI_URL", "str", "http://ai:3000"),
   /** External categorization providers, a JSON list (docs/categorizer-api.md). */

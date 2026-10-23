@@ -208,7 +208,7 @@ def test_overselling_is_refused(book):
         trade(book, "sell", date=ON, units="16", price="250")
 
 
-def test_average_cost_accounts_are_booked_by_fava_beans(book):
+def test_average_cost_accounts_are_booked_by_luminous_money(book):
     vti = next(a for a in book.accounts("book") if a.name == "Assets:Broker:VTI")
     book.set_account("book", vti.name, models.AccountPatch(updated_at=vti.updated_at, booking="NONE"))
 
@@ -263,7 +263,7 @@ def test_an_account_can_open_with_holdings_at_cost_or_estimated(ledger):
 
 
 def test_prices_are_fetched_for_held_commodities_with_a_source(book, monkeypatch):
-    monkeypatch.setenv("FAVA_BEANS_FIXED_PRICES", '{"VTI": 251.5}')
+    monkeypatch.setenv("LUMINOUS_MONEY_FIXED_PRICES", '{"VTI": 251.5}')
     listed = {c.currency: c for c in investments.commodity_list(book, "book")}
     investments.set_commodity(
         book, "book", "VTI", models.CommodityIn(name="VTI", price_source="USD:ledger.price_sources.fixed/VTI", updated_at=listed["VTI"].updated_at)

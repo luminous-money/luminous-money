@@ -1,5 +1,5 @@
 # Every push and pull request: the test suites and contract checks, then the whole stack end to
-# end (API, browser, and the `fava-beans` command), as `pnpm test` and `pnpm e2e` run them.
+# end (API, browser, and the `luminous-money` command), as `pnpm test` and `pnpm e2e` run them.
 name: CI
 on:
   push:

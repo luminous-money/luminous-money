@@ -9,7 +9,7 @@
 # The root package.json wraps these as `pnpm build`, `pnpm test`, `pnpm generate`, `pnpm release`.
 
 variable "REGISTRY" {
-  default = "fava-beans"
+  default = "luminous-money"
 }
 
 variable "VERSION" {

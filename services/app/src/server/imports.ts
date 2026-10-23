@@ -21,9 +21,9 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 
-import { applyProfile, fits, type CsvProfile, type Row } from "@fava-beans/csv-import";
-import { now } from "@fava-beans/db";
-import type { Account, TransactionIn } from "@fava-beans/ledger-client";
+import { applyProfile, fits, type CsvProfile, type Row } from "@luminous-money/csv-import";
+import { now } from "@luminous-money/db";
+import type { Account, TransactionIn } from "@luminous-money/ledger-client";
 
 import type {
   ImportResult,

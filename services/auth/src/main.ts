@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 
-import { health } from "@fava-beans/db";
+import { health } from "@luminous-money/db";
 
 import { createApp } from "./app.js";
 import { booksOverHttp } from "./books.js";
@@ -18,7 +18,9 @@ if (process.env.AUTH_JWT_SECRET)
 let mail;
 if (config.mail.smtpUrl) {
   if (!config.publicUrl || !config.mail.from)
-    throw new Error("SMTP_URL needs MAIL_FROM and FAVA_BEANS_PUBLIC_URL (for the links in emails)");
+    throw new Error(
+      "SMTP_URL needs MAIL_FROM and LUMINOUS_MONEY_PUBLIC_URL (for the links in emails)"
+    );
   mail = { mailer: smtpMailer(config.mail.smtpUrl, config.mail.from), publicUrl: config.publicUrl };
 } else {
   console.warn("SMTP_URL isn't set: no email, so password resets go through the CLI (reset-link).");

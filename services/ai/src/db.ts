@@ -7,9 +7,9 @@ import {
   transaction,
   type DatabaseSync,
   type Migration,
-} from "@fava-beans/db";
+} from "@luminous-money/db";
 
-import type { AiSettings, AiSettingsPatch, Eagerness, ProviderName } from "@fava-beans/ai-api";
+import type { AiSettings, AiSettingsPatch, Eagerness, ProviderName } from "@luminous-money/ai-api";
 
 export const MIGRATIONS: Migration[] = [
   // 1: a book's AI (M16): on or off, its provider and credential (sealed), and the AI's settings.
@@ -18,7 +18,7 @@ export const MIGRATIONS: Migration[] = [
       "book_id TEXT PRIMARY KEY",
       "enabled INTEGER NOT NULL DEFAULT 0",
       "provider TEXT NOT NULL DEFAULT 'claude'",
-      "credential TEXT", // sealed (@fava-beans/db Sealer)
+      "credential TEXT", // sealed (@luminous-money/db Sealer)
       "credential_hint TEXT", // its last four characters
       "itemize INTEGER NOT NULL DEFAULT 0",
       "create_accounts INTEGER NOT NULL DEFAULT 0",

@@ -1,8 +1,8 @@
 Production readiness: plan
 ==================================================================================================
 
-> **Status: planned (2026-10-19); phase 1 built (2026-10-21); phase 2 waits on the
-> [questions](#questions).** The brief, from Kael: confirm we're ready
+> **Status: planned (2026-10-19); phase 1 built (2026-10-21); the questions answered
+> (2026-10-23), the certificate watched; phase 2 next.** The brief, from Kael: confirm we're ready
 > for production, and document deploying it, with setup scripts, so going from finding it on
 > GitHub to running it, on a laptop or on a public server, is as simple as it can be. Answer:
 > how one upgrades (and migrates), backs up, reads and exports logs, and knows it's healthy.
@@ -48,30 +48,30 @@ What's missing:
 
 - **A release is a version tag** (`v0.1.0`, semver: 0.x while it's young). A GitHub Actions
   workflow builds every image for amd64 and arm64 and pushes them to GitHub's registry,
-  `ghcr.io/luminous-money/fava-beans-<service>:<version>` (and `:latest`), then makes a GitHub
-  release with the **bundle**: `compose.yaml`, `.env.example` and the `fava-beans` command. The
+  `ghcr.io/luminous-money/luminous-money-<service>:<version>` (and `:latest`), then makes a GitHub
+  release with the **bundle**: `compose.yaml`, `.env.example` and the `luminous-money` command. The
   tests run first (`pnpm test`, `pnpm e2e`); a red build publishes nothing.
-- **A deployment pins its version** (`FAVA_BEANS_VERSION` in its `.env`), so nothing changes
+- **A deployment pins its version** (`LUMINOUS_MONEY_VERSION` in its `.env`), so nothing changes
   until its admin says so.
 
 ### A self-contained stack
 
-- **The gateway is an image of ours** (`fava-beans-gateway`): Traefik at a pinned version with
+- **The gateway is an image of ours** (`luminous-money-gateway`): Traefik at a pinned version with
   our routes baked in. A new version brings its own routes, and `compose.yaml` and `.env` are all
   a deployment has.
-- **HTTPS, optionally, by the gateway itself:** with `FAVA_BEANS_DOMAIN` (and
-  `FAVA_BEANS_ACME_EMAIL`) set, it listens on 80 and 443 and gets its certificate from Let's
+- **HTTPS, optionally, by the gateway itself:** with `LUMINOUS_MONEY_DOMAIN` (and
+  `LUMINOUS_MONEY_ACME_EMAIL`) set, it listens on 80 and 443 and gets its certificate from Let's
   Encrypt (kept on its own volume), redirecting HTTP to HTTPS. Without it, plain HTTP on one port,
   as now: a laptop, a LAN, Tailscale, or behind a proxy you already have.
 - **Log rotation in `compose.yaml`:** every service's log is capped (10 MB × 5 files).
 
-### The `fava-beans` command
+### The `luminous-money` command
 
 One bash script, for the host, needing only Docker (Compose v2) and `openssl`:
 
 | Command | What it does |
 |---|---|
-| `install` | Asks (or takes flags): where (default `~/fava-beans`), laptop or public server, the domain or port, email settings. Downloads the release's `compose.yaml`, writes `.env` (secrets generated), pulls, starts, waits for healthy, prints the address. |
+| `install` | Asks (or takes flags): where (default `~/luminous-money`), laptop or public server, the domain or port, email settings. Downloads the release's `compose.yaml`, writes `.env` (secrets generated), pulls, starts, waits for healthy, prints the address. |
 | `status` | Each service's state, health and version, the version pinned, and the latest release. |
 | `upgrade [version]` | Backs up, pins the new version (default: the latest release), pulls, restarts, waits for healthy; says how to go back if it doesn't come up. |
 | `backup` | A whole-system backup to `backups/` (below); `--keep N` prunes. |
@@ -80,7 +80,7 @@ One bash script, for the host, needing only Docker (Compose v2) and `openssl`:
 | `report` | A bundle for a bug report: the logs since a time, status, versions, and the configuration with every secret removed. |
 | `up`, `down`, `config` | Start, stop, and check `.env`. |
 
-From a clone it's `scripts/fava-beans`; the release has it as a file of its own, and `install`
+From a clone it's `scripts/luminous-money`; the release has it as a file of its own, and `install`
 copies it into the deployment's directory.
 
 ### Upgrades and migrations
@@ -119,7 +119,7 @@ copies it into the deployment's directory.
 
 ### Admins and the system page (phase 2)
 
-- **Admins are named in config:** `FAVA_BEANS_ADMINS` (emails). An admin is a logged-in user
+- **Admins are named in config:** `LUMINOUS_MONEY_ADMINS` (emails). An admin is a logged-in user
   whose email is listed **and confirmed** (so nobody can sign up as an admin's address before
   they do); without email, the operator confirms one with `auth`'s command line. There are no
   admin accounts: the same users, with one more page.
@@ -127,25 +127,26 @@ copies it into the deployment's directory.
   service's version and health, schema versions, the data volume's size, the last backup, the
   update policy, and the latest release with its notes. Nothing about the system shows anywhere
   else, to anyone.
-- **Update checks:** `FAVA_BEANS_UPDATES` is `off`, `notify` (default: `app` asks GitHub for
+- **Update checks:** `LUMINOUS_MONEY_UPDATES` is `off`, `notify` (default: `app` asks GitHub for
   the latest release once a day, and only the system page shows it) or `auto`.
 - **Applying an upgrade happens on the host,** since it replaces the containers: `auto` means a
-  host timer runs `fava-beans upgrade` in a window (`FAVA_BEANS_UPGRADE_WINDOW`), installed by
-  `fava-beans auto-upgrade on`. An "Upgrade now" button on the system page needs a container that
-  can drive Docker, which is root on the host in all but name: [question 1](#questions).
+  host timer runs `luminous-money upgrade` in a window (`LUMINOUS_MONEY_UPGRADE_WINDOW`), installed by
+  `luminous-money auto-upgrade on`. No "Upgrade now" button: it would need a container that can
+  drive Docker, which is root on the host in all but name (decided, [question 1](#questions)). The
+  system page shows what's available and the command to run.
 
 ## How it gets built
 
 **Phase 1 (now):**
 
-1. **Versions:** a `VERSION` build arg baked into every image (`FAVA_BEANS_VERSION`).
+1. **Versions:** a `VERSION` build arg baked into every image (`LUMINOUS_MONEY_VERSION`).
 2. **Health:** `/health` on `auth` and `ledger` (and `app`, `ai` saying their versions and
    schemas); `app`'s public `/api/health`; the gateway's route for it; Compose healthchecks.
 3. **The gateway image:** pinned Traefik, our routes, optional HTTPS; `compose.yaml` uses it,
    with log caps.
 4. **Backups:** `ledger.snapshot` (every database and the attachments, consistently, plus the
    marker).
-5. **`scripts/fava-beans`:** the commands above.
+5. **`scripts/luminous-money`:** the commands above.
 6. **Releases:** the workflow, `.env.example`, the bundle.
 7. **Docs:** `docs/deploying.md` (from GitHub to a laptop, a server, or behind a proxy;
    upgrading, backups, logs, health, troubleshooting), `docs/operating.md` folded into it, the
@@ -153,8 +154,7 @@ copies it into the deployment's directory.
 8. **Tests:** the health routes; a snapshot that restores; the script's commands against a
    throwaway project (`install` from a local bundle, `backup`, `restore`, `status`, `report`).
 
-**Phase 2 (after the questions):** admins and the system page, update checks, `auto-upgrade`,
-and who may sign up.
+**Phase 2 (next):** admins and the system page, update checks, `auto-upgrade`.
 
 **What phase 1 changed from this plan:** without a domain, the HTTPS port is published on any
 free port, not 8443, so two stacks on one machine (development and a live one) don't collide over
@@ -162,24 +162,16 @@ a port neither uses.
 
 ## Questions
 
-1. **"Upgrade now" in the app:** applying an upgrade means replacing containers, which only
-   something with the Docker socket can do (root on the host, in effect). Proposed: upgrades run
-   on the host only (`fava-beans upgrade`, by hand or by its timer), and the system page shows
-   what's available and the command to run. An opt-in `updater` container with the socket, for
-   a button, could come later. Agreed?
-2. **Where it's published:** a public `luminous-money/fava-beans` repository on GitHub, images
-   on `ghcr.io/luminous-money/`. Right? (The registry is one setting, `FAVA_BEANS_REGISTRY`, so
-   it can change.)
-3. **A license:** publishing needs one. Beancount is **GPL-2.0-only** (checked: its package
-   metadata), and the ledger imports it, so the ledger must be licensed compatibly: GPL-2.0
-   (`-only`, or `-or-later`, which combined with Beancount is still GPL-2.0). AGPL-3.0 can't
-   cover the ledger, since GPLv2-only code can't be combined with v3. The TypeScript services are
-   separate programs talking HTTP, so they're free to differ (GPL-2.0-or-later like the rest, or
-   AGPL-3.0 to cover modified hosted copies, or a permissive license). Suggested:
-   GPL-2.0-or-later for the whole repository, one license and simple. Your call.
-4. **Built-in HTTPS:** the gateway getting its own certificate when given a domain. Built as an
-   option (off unless there's a domain). Keep it?
-5. **Who may sign up, on a public server:** today anyone who reaches it can create an account
-   (rate-limited per address). A company would want to say who: proposed `AUTH_SIGNUPS` as
-   `open` (today's), `closed` (accounts made with `auth`'s command line, or by invitation
-   links from an admin) or a list of email domains (`example.com`). Wanted for phase 2?
+All answered by Kael, 2026-10-23.
+
+1. **"Upgrade now" in the app?** No: upgrades run on the host, by hand or by its timer
+   (`luminous-money upgrade`), and the system page says what's available and how.
+2. **Where it's published?** GitHub, as `luminous-money/luminous-money` (fava-beans became
+   Luminous Money the same day: the original Luminous Money attempt, `luminous-money/system` and
+   its service repositories, is archived), with images on `ghcr.io/luminous-money/luminous-money`.
+3. **A license?** The most recent GPL compatible with Beancount's GPL-2.0-only: **GPL-2.0-or-later**,
+   for the whole repository (`LICENSE`, and every package's metadata).
+4. **Built-in HTTPS?** Keep it (it's Traefik's, so it costs little), and surface renewal trouble in
+   the health: built, the certificate watched from the gateway's metrics (`/api/health`, `status`).
+5. **Who may sign up?** Open stays: it's for private use for now; a public deployment would decide
+   then.

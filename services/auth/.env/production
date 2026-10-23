@@ -1,5 +1,5 @@
 # Production-safe settings for auth (APP_ENV=production, the default). Secrets and per-server
-# values (SMTP_URL, MAIL_FROM, FAVA_BEANS_PUBLIC_URL) come from the environment.
+# values (SMTP_URL, MAIL_FROM, LUMINOUS_MONEY_PUBLIC_URL) come from the environment.
 PORT=3000
 AUTH_DATA_DIR=/data
 AUTH_BREACHED_PASSWORDS=true

@@ -1,4 +1,4 @@
-import type { CommodityOut } from "@fava-beans/ledger-client";
+import type { CommodityOut } from "@luminous-money/ledger-client";
 import { useState } from "react";
 
 import { formatMoney } from "../lib/decimal.js";

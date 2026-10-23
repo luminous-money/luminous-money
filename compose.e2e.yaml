@@ -22,18 +22,18 @@ services:
       - APP_ENV=test
 
   simplefin-fake:
-    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/simplefin-fake:${FAVA_BEANS_VERSION:-dev}
+    image: ${LUMINOUS_MONEY_REGISTRY:-luminous-money}/simplefin-fake:${LUMINOUS_MONEY_VERSION:-dev}
 
   mailpit:
     image: axllent/mailpit:v1.27
 
   e2e:
-    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/e2e:${FAVA_BEANS_VERSION:-dev}
+    image: ${LUMINOUS_MONEY_REGISTRY:-luminous-money}/e2e:${LUMINOUS_MONEY_VERSION:-dev}
     profiles: [tests]
     depends_on: [traefik, auth, ledger, app, ai, mailpit, simplefin-fake]
 
   ui:
-    image: ${FAVA_BEANS_REGISTRY:-fava-beans}/ui-tests:${FAVA_BEANS_VERSION:-dev}
+    image: ${LUMINOUS_MONEY_REGISTRY:-luminous-money}/ui-tests:${LUMINOUS_MONEY_VERSION:-dev}
     profiles: [tests]
     depends_on: [traefik, auth, ledger, app, ai, mailpit, simplefin-fake]
     ipc: host # Chromium needs more shared memory than Docker's default

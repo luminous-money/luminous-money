@@ -1,18 +1,18 @@
 The categorizer API (v1)
 ==================================================================================================
 
-How fava-beans asks an outside service, a **categorization provider**, what imported
+How Luminous Money asks an outside service, a **categorization provider**, what imported
 transactions are. A provider might be an LLM (such as Cati), a hosted service, or a script. The
 canonical types are in
 [`services/app/src/shared/categorizer-api.ts`](../services/app/src/shared/categorizer-api.ts);
 this document explains them.
 
-fava-beans is the system of record, so it defines this API. Providers **only propose**: they
+Luminous Money is the system of record, so it defines this API. Providers **only propose**: they
 never write to the books, and what they propose goes through review like anything else.
 
 ## How a provider fits in
 
-When rows are imported (or "Suggest categories" is used in review), fava-beans runs a chain of
+When rows are imported (or "Suggest categories" is used in review), Luminous Money runs a chain of
 categorizers over the transactions it's about to stage:
 
 1. **`rules`** (built in): the user's own rules.
@@ -148,10 +148,10 @@ A proposal with only a `payee` is fine: it's merged with another categorizer's p
 **Transactions with several splits to place** (an itemized receipt, M16) are asked about with
 the same fields: the transaction's account and amount as a whole. A proposal for one is taken
 as its **fallback**, the account for any split nothing else places: it must be one posting
-without an amount, and it doesn't settle the transaction (fava-beans' own item history and AI
+without an amount, and it doesn't settle the transaction (Luminous Money's own item history and AI
 place the splits themselves). Nothing about the API changed for them: it's still version 1.
 
-### What fava-beans checks
+### What Luminous Money checks
 
 A proposal is dropped (and logged) if it names a transaction that wasn't asked about, gives a
 confidence outside 0 to 1, proposes an account that isn't an open leaf (or is the imported
@@ -194,7 +194,7 @@ and failures are only logged.
 
 ## Acceptance
 
-fava-beans records, per categorizer, how many of its applied proposals were confirmed unchanged,
+Luminous Money records, per categorizer, how many of its applied proposals were confirmed unchanged,
 and shows the rate on the Rules page. A provider whose `confidence` doesn't match how often it's
 accepted shows up there as poorly calibrated.
 

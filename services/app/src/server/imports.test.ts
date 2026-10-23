@@ -2,8 +2,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { guessProfile } from "@fava-beans/csv-import";
-import { migrate, open } from "@fava-beans/db";
+import { guessProfile } from "@luminous-money/csv-import";
+import { migrate, open } from "@luminous-money/db";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { AppDb, MIGRATIONS } from "./db.js";

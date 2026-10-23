@@ -31,7 +31,7 @@ const configDef = {
     smtpUrl: configValue("SMTP_URL", "str"),
     from: configValue("MAIL_FROM", "str"),
   },
-  publicUrl: configValue("FAVA_BEANS_PUBLIC_URL", "str"),
+  publicUrl: configValue("LUMINOUS_MONEY_PUBLIC_URL", "str"),
   breachedPasswords: configValue("AUTH_BREACHED_PASSWORDS", "bool", true),
   signupsPerHour: configValue("AUTH_SIGNUPS_PER_HOUR", "num", 20),
   /** Test stacks only: log in by email alone. */

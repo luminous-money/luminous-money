@@ -1,4 +1,4 @@
-import type { Book } from "@fava-beans/ledger-client";
+import type { Book } from "@luminous-money/ledger-client";
 import { useState } from "react";
 import { useLocation } from "wouter";
 

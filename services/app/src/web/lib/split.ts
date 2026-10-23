@@ -6,7 +6,7 @@
  * from. The **counterpart** is the side being categorized. Anything else (more postings, lots,
  * prices) is a split, and is edited in the detail view.
  */
-import type { Posting, Transaction, TransactionIn } from "@fava-beans/ledger-client";
+import type { Posting, Transaction, TransactionIn } from "@luminous-money/ledger-client";
 
 import { UNKNOWN } from "../../shared/accounts.js";
 import { add, isZero, negate } from "./decimal.js";

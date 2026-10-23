@@ -3,13 +3,13 @@ import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
 
 // The PWA is served under /ui by the app service. In development, `pnpm dev` proxies /api to a
-// running stack (FAVA_BEANS_URL, default http://localhost:8080).
+// running stack (LUMINOUS_MONEY_URL, default http://localhost:8080).
 export default defineConfig({
   base: "/ui/",
   build: { outDir: "dist/web", emptyOutDir: true },
   test: { include: ["src/**/*.test.ts"] },
   server: {
-    proxy: { "/api": process.env.FAVA_BEANS_URL ?? "http://localhost:8080" },
+    proxy: { "/api": process.env.LUMINOUS_MONEY_URL ?? "http://localhost:8080" },
   },
   plugins: [
     react(),
@@ -17,8 +17,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["icon.svg", "apple-touch-icon.png"],
       manifest: {
-        name: "fava-beans",
-        short_name: "fava-beans",
+        name: "Luminous Money",
+        short_name: "Luminous",
         description: "Fast review and categorization for double-entry books.",
         start_url: "/ui/",
         scope: "/ui/",

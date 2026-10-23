@@ -8,7 +8,7 @@ import type { IncomingTransaction } from "../../shared/categorizer-api.js";
 import { add, isNegative, negate } from "../../shared/decimal.js";
 import { payeeKey } from "../../shared/payees.js";
 import { specificity, type CategoryRule, type CategoryRuleIn } from "../../shared/rules.js";
-import type { Account } from "@fava-beans/ledger-client";
+import type { Account } from "@luminous-money/ledger-client";
 import type { Categorizer, Request } from "./types.js";
 
 /** a ≤ b, for decimal strings. */

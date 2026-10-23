@@ -2,5 +2,6 @@
 PORT=3000
 APP_DATA_DIR=./.data
 AUTH_URL=http://localhost:3001
+GATEWAY_URL=http://localhost:8082
 LEDGER_URL=http://localhost:8000
 AI_URL=http://localhost:3002

@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { Row } from "@fava-beans/csv-import";
+import type { Row } from "@luminous-money/csv-import";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { AppDb } from "./db.js";

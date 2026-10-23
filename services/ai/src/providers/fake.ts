@@ -8,7 +8,7 @@
  *   (with account creation on, the first split to `Expenses:Fake-Store`, proposed to open), and
  *   that account as the fallback.
  */
-import type { CategorizeOut, ExtractIn, ReceiptFacts } from "@fava-beans/ai-api";
+import type { CategorizeOut, ExtractIn, ReceiptFacts } from "@luminous-money/ai-api";
 
 import type { CategorizeInput, Provider } from "./types.js";
 

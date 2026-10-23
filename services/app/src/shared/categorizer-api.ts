@@ -1,8 +1,8 @@
 /**
- * The external categorizer API, version 1: what fava-beans sends a categorization provider and
+ * The external categorizer API, version 1: what luminous-money sends a categorization provider and
  * what it expects back. These types are the contract; docs/categorizer-api.md explains it.
  *
- * fava-beans is the system of record. A provider only proposes: it never writes to the books,
+ * luminous-money is the system of record. A provider only proposes: it never writes to the books,
  * and everything it proposes goes through review (unless a user's own rule says otherwise).
  * JSON is snake_case; money is decimal strings, never floats; dates are ISO (YYYY-MM-DD).
  */
@@ -80,7 +80,7 @@ export type Proposal = {
   payee?: string | null;
   /**
    * 0 to 1: how likely the user is to accept this unchanged. 0.9 or more settles the
-   * transaction (later providers aren't asked). fava-beans measures acceptance per provider,
+   * transaction (later providers aren't asked). luminous-money measures acceptance per provider,
    * so a poorly calibrated provider shows up as one.
    */
   confidence: number;

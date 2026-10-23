@@ -142,9 +142,11 @@ milestone starts.
       backups, logs, health; releases on GitHub; admins (by email, in config) with a system page,
       and upgrades on the admin's terms. [Its plan](milestones/production-readiness/PLAN.md).
       Phase 1 built 2026-10-21: versions and health everywhere, the gateway image (with optional
-      HTTPS), whole-system backups, the `fava-beans` command, the release workflow,
-      [docs/deploying.md](deploying.md). Phase 2 (admins, the system page, update checks) waits
-      on its questions.
+      HTTPS), whole-system backups, the `luminous-money` command, the release workflow,
+      [docs/deploying.md](deploying.md). Questions answered 2026-10-23 (host-only upgrades,
+      GitHub as luminous-money/luminous-money, GPL-2.0-or-later, HTTPS kept with its certificate
+      watched, open sign-ups). Phase 2 next: admins, the system page, update checks,
+      auto-upgrade.
 - [ ] **M17: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
       tag.
 - [ ] **M18: Suggested recurring transactions.** Nightly, analyze each account's last 14 months

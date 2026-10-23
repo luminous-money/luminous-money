@@ -1,6 +1,7 @@
 {
-  "name": "@fava-beans/ai-api",
+  "name": "@luminous-money/ai-api",
   "version": "0.1.0",
+  "license": "GPL-2.0-or-later",
   "description": "The ai service's API (M16), as types: a book's AI settings, and reading a receipt.",
   "type": "module",
   "sideEffects": false,

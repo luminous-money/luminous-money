@@ -56,6 +56,6 @@ def test_restore_refuses_what_isnt_a_backup_before_touching_anything(tmp_path):
         tar.addfile(info, io.BytesIO(b""))
     junk.seek(0)
 
-    with pytest.raises(SystemExit, match="not a fava-beans backup"):
+    with pytest.raises(SystemExit, match="not a luminous-money backup"):
         snapshot.restore(junk, str(tmp_path))
     assert (tmp_path / "app.sqlite").read_bytes() == b"kept"

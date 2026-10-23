@@ -1,4 +1,4 @@
-import type { AccountSummary } from "@fava-beans/ledger-client";
+import type { AccountSummary } from "@luminous-money/ledger-client";
 import { useState } from "react";
 
 import { explain, useSetAccount } from "../lib/queries.js";

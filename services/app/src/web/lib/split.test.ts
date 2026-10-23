@@ -1,4 +1,4 @@
-import type { Posting, Transaction } from "@fava-beans/ledger-client";
+import type { Posting, Transaction } from "@luminous-money/ledger-client";
 import { describe, expect, it } from "vitest";
 
 import { checkBalance, simple, toInput, withCounterpart, withOtherSide } from "./split.js";

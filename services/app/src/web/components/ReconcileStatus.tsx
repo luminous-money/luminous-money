@@ -1,4 +1,4 @@
-import type { Account } from "@fava-beans/ledger-client";
+import type { Account } from "@luminous-money/ledger-client";
 import { Link } from "wouter";
 
 import { partOf, reconciledItself } from "../../shared/divided.js";

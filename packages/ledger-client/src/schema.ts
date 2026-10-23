@@ -1017,7 +1017,7 @@ export interface components {
     AccountPatch: {
       /**
        * Booking
-       * @description FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by fava-beans); None: the book's default.
+       * @description FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by luminous-money); None: the book's default.
        */
       booking?: ("FIFO" | "LIFO" | "HIFO" | "STRICT" | "NONE") | null;
       /**

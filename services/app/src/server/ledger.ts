@@ -18,7 +18,7 @@ import {
   type TradePreview,
   type Transaction,
   type TransactionIn,
-} from "@fava-beans/ledger-client";
+} from "@luminous-money/ledger-client";
 
 export type Book = components["schemas"]["Book"];
 export type LedgerPage = components["schemas"]["LedgerPage"];

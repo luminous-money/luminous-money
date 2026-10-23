@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { open } from "@fava-beans/db";
+import { open } from "@luminous-money/db";
 import { describe, expect, it } from "vitest";
 
 import { createApp, type Services } from "../src/app.js";
@@ -83,7 +83,9 @@ describe("passwords", () => {
     const breached = async (p: string) => p === BREACHED;
 
     expect(await passwordProblem("short one", "a@b.co", breached)).toMatch(/at least 15/);
-    expect(await passwordProblem("Kael@Example.com", "kael@example.com", breached)).toMatch(/email/);
+    expect(await passwordProblem("Kael@Example.com", "kael@example.com", breached)).toMatch(
+      /email/
+    );
     expect(await passwordProblem(BREACHED, "a@b.co", breached)).toMatch(/breach/);
     expect(await passwordProblem(PASSWORD, "a@b.co", breached)).toBeUndefined();
   });
@@ -99,7 +101,9 @@ describe("passwords", () => {
     expect(await hibp(BREACHED)).toBe(true);
     expect(await hibp(PASSWORD)).toBe(false);
     expect(asked[0]).toBe(`https://api.pwnedpasswords.com/range/${sha1.slice(0, 5)}`);
-    expect(await pwnedPasswords(async () => Promise.reject(new Error("down")))(BREACHED)).toBe(false);
+    expect(await pwnedPasswords(async () => Promise.reject(new Error("down")))(BREACHED)).toBe(
+      false
+    );
   });
 });
 
@@ -114,10 +118,12 @@ describe("signing up and logging in", () => {
 
     expect(response.status).toBe(201);
     const cookies = response.headers.getSetCookie();
-    expect(cookies[0]).toMatch(/^fb_access=.+; Max-Age=600; Path=\/; HttpOnly; SameSite=Strict$/);
-    expect(cookies[1]).toMatch(/^fb_refresh=.+; Path=\/api\/auth\/v1\/token; HttpOnly; SameSite=Strict/);
+    expect(cookies[0]).toMatch(/^lm_access=.+; Max-Age=600; Path=\/; HttpOnly; SameSite=Strict$/);
+    expect(cookies[1]).toMatch(
+      /^lm_refresh=.+; Path=\/api\/auth\/v1\/token; HttpOnly; SameSite=Strict/
+    );
     expect(sent.map((m) => [m.to, m.subject])).toEqual([
-      ["Kael@Example.com", "Confirm your email for fava-beans"],
+      ["Kael@Example.com", "Confirm your email for Luminous Money"],
     ]);
     const access = cookies[0]!.split(";")[0]!;
     const me = await call("/me", { headers: { cookie: access } });
@@ -133,8 +139,8 @@ describe("signing up and logging in", () => {
     });
 
     const cookies = response.headers.getSetCookie();
-    expect(cookies[0]).toMatch(/^__Host-fb_access=.*; Secure/);
-    expect(cookies[1]).toMatch(/^__Secure-fb_refresh=.*; Secure/);
+    expect(cookies[0]).toMatch(/^__Host-lm_access=.*; Secure/);
+    expect(cookies[1]).toMatch(/^__Secure-lm_refresh=.*; Secure/);
   });
 
   it("refuses a taken email (any case), a weak or breached password, and a bad email", async () => {
@@ -182,7 +188,10 @@ describe("tokens", () => {
     const { call, services } = await setup();
     const first = await signUp(call);
 
-    const refreshed = await call("/token", { method: "POST", json: { refresh_token: first.refresh_token } });
+    const refreshed = await call("/token", {
+      method: "POST",
+      json: { refresh_token: first.refresh_token },
+    });
     const second = (await refreshed.json()) as Tokens;
     expect(refreshed.status).toBe(200);
     expect(second.refresh_token).not.toBe(first.refresh_token);
@@ -190,8 +199,13 @@ describe("tokens", () => {
     // Within the grace (two tabs at once), the old one still works.
     expect(services.sessions.refresh(first.refresh_token, Date.now() + 1000)).toBeDefined();
     // Later, it's a stolen copy: the whole session ends.
-    expect(services.sessions.refresh(first.refresh_token, Date.now() + GRACE_MS + 1000)).toBeUndefined();
-    const after = await call("/token", { method: "POST", json: { refresh_token: second.refresh_token } });
+    expect(
+      services.sessions.refresh(first.refresh_token, Date.now() + GRACE_MS + 1000)
+    ).toBeUndefined();
+    const after = await call("/token", {
+      method: "POST",
+      json: { refresh_token: second.refresh_token },
+    });
     expect(after.status).toBe(401);
     expect((await call("/verify", { headers: bearer(second.access_token) })).status).toBe(401);
   });
@@ -221,7 +235,9 @@ describe("tokens", () => {
     expect(payload.exp - payload.iat).toBe(600);
     await keys.rotate();
     expect((await call("/verify", { headers: bearer(tokens.access_token) })).status).toBe(200);
-    expect(((await (await call("/.well-known/jwks.json")).json()) as { keys: unknown[] }).keys).toHaveLength(2);
+    expect(
+      ((await (await call("/.well-known/jwks.json")).json()) as { keys: unknown[] }).keys
+    ).toHaveLength(2);
   });
 
   it("API tokens act as their user for the APIs, but can't manage the account", async () => {
@@ -232,9 +248,12 @@ describe("tokens", () => {
       headers: bearer(tokens.access_token),
       json: { name: "backups" },
     });
-    const { token, secret } = (await created.json()) as { token: { id: string; hint: string }; secret: string };
+    const { token, secret } = (await created.json()) as {
+      token: { id: string; hint: string };
+      secret: string;
+    };
 
-    expect(secret).toMatch(/^fb_/);
+    expect(secret).toMatch(/^lm_/);
     expect(token.hint).toBe(secret.slice(-4));
     const verified = await call("/verify", { headers: bearer(secret) });
     expect(verified.headers.get("x-user-id")).toBe(tokens.user.id);
@@ -253,13 +272,17 @@ describe("your account", () => {
       (await (
         await call("/login", {
           method: "POST",
-          headers: { "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X) Chrome/140 Safari/537" },
+          headers: {
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X) Chrome/140 Safari/537",
+          },
           json: { email: "kael@example.com", password: PASSWORD, delivery: "body" },
         })
       ).json()) as Tokens;
     const laptop = await login();
 
-    const listed = (await (await call("/sessions", { headers: bearer(laptop.access_token) })).json()) as {
+    const listed = (await (
+      await call("/sessions", { headers: bearer(laptop.access_token) })
+    ).json()) as {
       device: string;
       current: boolean;
     }[];
@@ -301,8 +324,12 @@ describe("your account", () => {
 
     const verifyLink = linkIn(sent.at(-1)!);
     expect(sent.at(-1)!.to).toBe("new@example.com");
-    expect((await call("/email/verify", { method: "POST", json: { token: verifyLink } })).status).toBe(204);
-    expect((await call("/email/verify", { method: "POST", json: { token: verifyLink } })).status).toBe(400);
+    expect(
+      (await call("/email/verify", { method: "POST", json: { token: verifyLink } })).status
+    ).toBe(204);
+    expect(
+      (await call("/email/verify", { method: "POST", json: { token: verifyLink } })).status
+    ).toBe(400);
     const after = await call("/me", { headers: bearer(tokens.access_token) });
     expect(await after.json()).toMatchObject({ email_verified: true });
   });
@@ -311,13 +338,19 @@ describe("your account", () => {
     const { call, sent } = await setup();
     const tokens = await signUp(call);
 
-    expect((await call("/password/forgot", { method: "POST", json: { email: "nobody@example.com" } })).status).toBe(202);
+    expect(
+      (await call("/password/forgot", { method: "POST", json: { email: "nobody@example.com" } }))
+        .status
+    ).toBe(202);
     expect(sent).toHaveLength(1); // just the sign-up's verification
     await call("/password/forgot", { method: "POST", json: { email: "KAEL@example.com" } });
     const token = linkIn(sent.at(-1)!);
     expect(sent.at(-1)!.text).toContain("https://books.example/ui/reset/");
 
-    const weak = await call("/password/reset", { method: "POST", json: { token, password: "short" } });
+    const weak = await call("/password/reset", {
+      method: "POST",
+      json: { token, password: "short" },
+    });
     expect(weak.status).toBe(422); // and the link still works
     const reset = await call("/password/reset", {
       method: "POST",
@@ -325,7 +358,14 @@ describe("your account", () => {
     });
     expect(reset.status).toBe(204);
     expect((await call("/verify", { headers: bearer(tokens.access_token) })).status).toBe(401);
-    expect((await call("/password/reset", { method: "POST", json: { token, password: "another passphrase entirely" } })).status).toBe(400);
+    expect(
+      (
+        await call("/password/reset", {
+          method: "POST",
+          json: { token, password: "another passphrase entirely" },
+        })
+      ).status
+    ).toBe(400);
     const login = await call("/login", {
       method: "POST",
       json: { email: "kael@example.com", password: "a whole new passphrase here" },
@@ -335,7 +375,9 @@ describe("your account", () => {
 
   it("without mail, forgot password says to ask whoever runs the server", async () => {
     const { call } = await setup({ mail: undefined });
-    expect((await call("/password/forgot", { method: "POST", json: { email: "a@b.co" } })).status).toBe(503);
+    expect(
+      (await call("/password/forgot", { method: "POST", json: { email: "a@b.co" } })).status
+    ).toBe(503);
     expect(await (await call("/config")).json()).toMatchObject({ mail: false });
   });
 
@@ -360,7 +402,10 @@ describe("your account", () => {
     services.sessions.endAll(tokens.user.id, "account disabled");
 
     expect((await call("/verify", { headers: bearer(tokens.access_token) })).status).toBe(401);
-    const login = await call("/login", { method: "POST", json: { email: "kael@example.com", password: PASSWORD } });
+    const login = await call("/login", {
+      method: "POST",
+      json: { email: "kael@example.com", password: PASSWORD },
+    });
     expect(login.status).toBe(403);
   });
 
@@ -379,7 +424,7 @@ describe("the pre-M8 stub", () => {
   it("is claimed by a real account, keeping its ID (and so its books)", async () => {
     const { call, users, db } = await setup();
     db.prepare(
-      "INSERT INTO user (id, name, email, created_at, updated_at) VALUES (?, 'You', 'you@fava-beans.local', '2026-01-01T00:00:00.000000Z', '2026-01-01T00:00:00.000000Z')"
+      "INSERT INTO user (id, name, email, created_at, updated_at) VALUES (?, 'You', 'you@luminous-money.local', '2026-01-01T00:00:00.000000Z', '2026-01-01T00:00:00.000000Z')"
     ).run(STUB_USER_ID);
 
     users.claimStub("Kael", "kael@example.com", await hashPassword(PASSWORD));
