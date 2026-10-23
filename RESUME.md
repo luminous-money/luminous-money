@@ -12,7 +12,8 @@ repositories) is archived on GitHub and kept locally in `../.archive/system`. Ev
 `luminous-money` now: packages (`@luminous-money/*`), images, the `luminous-money` command,
 `LUMINOUS_MONEY_*` settings, the `lm_` token and cookie prefix, and the tombstone type
 (`custom "luminous-money" "deleted"`). The dev databases were wiped for the rename. License:
-GPL-2.0-or-later (Beancount is GPL-2.0-only).
+GPL-2.0-or-later (Beancount is GPL-2.0-only). It wears the original app's look: its palette
+(light gray and blue; deep blue and cyan in dark mode) and its Lu logo (design.md, "Its look").
 
 **M1 through M16 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
@@ -257,6 +258,10 @@ How it's put together:
 - **The dev stack needs `SIMPLEFIN_ENCRYPTION_KEY` and `AI_ENCRYPTION_KEY`** (app and ai won't
   start without them): they're in the repo root's `.env` (gitignored), which Compose reads. Keep
   them: stored SimpleFIN connections and AI keys can't be opened without them.
+- **Colors are variables** (`--accent`, `--accent-soft`, `--on-accent`, `--paper`, `--card`,
+  `--ink`, `--muted`, `--line`, `--good`, `--bad` in `styles.css`, light and dark): use them, not
+  hex values, and put text on the accent in `--on-accent` (it's dark on the dark mode's cyan).
+- **The PNG icons come from `services/app/public/icon.svg`:** after changing it, `pnpm icons`.
 - **The gateway's routes are inside its image** (`deploy/gateway/routes.yml`): after changing
   them, `docker buildx bake gateway` (or `pnpm build`) and `docker compose up -d`. Its static
   config is written at start from the environment, so edit `entrypoint.sh`, not a YAML file.

@@ -21,12 +21,12 @@ function read(): ChartTheme {
   const style = getComputedStyle(document.documentElement);
   const v = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
   return {
-    text: v("--ink", "#1d2a1f"),
-    muted: v("--muted", "#5d6b5f"),
-    grid: v("--line", "#e2dfd3"),
+    text: v("--ink", "#333333"),
+    muted: v("--muted", "#666666"),
+    grid: v("--line", "#dcdcdc"),
     background: v("--card", "#ffffff"),
     accent: v("--good", "#3c9a4a"),
-    accentSoft: v("--green-soft", "#b5d98a"),
+    accentSoft: v("--accent-soft", "#c8e4f8"),
     positive: v("--good", "#3c9a4a"),
     negative: v("--bad", "#c2453a"),
     palette: PALETTE,

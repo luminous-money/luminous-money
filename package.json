@@ -14,6 +14,7 @@
     "test:unit": "pnpm -r --filter \"./packages/**\" --filter \"./services/**\" test",
     "e2e": "./scripts/e2e.sh",
     "test:cli": "./scripts/cli-test.sh",
+    "icons": "./scripts/icons.sh",
     "e2e:local": "pnpm --filter \"./tests/**...\" build && pnpm --filter @luminous-money/e2e test && ./scripts/ui-local.sh",
     "seed": "./scripts/seed-demo.sh",
     "generate": "docker buildx bake generate && pnpm -r generate",

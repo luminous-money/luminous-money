@@ -1155,6 +1155,25 @@ The main custom build: a mobile-first PWA. Features, in priority order:
 
 It also needs a book switcher (M6).
 
+### Its look: the original Luminous Money's
+
+Reskinned from the original Luminous Money app (2026-10-23; its files are in
+`../.archive/system`): its palette and its Lu logo, on our own layout, in light and dark.
+
+- **Light:** its light gray (`#efefef`) behind white cards, its text gray (`#333`), and its
+  blue (`#0062a8`) as the accent. **Dark:** its deep blue (`#003052`), cards a tenth lighter (as
+  its panels were), white text, and its cyan (`#0ff`) as the accent, with dark text on it
+  (`--on-accent`). Green and red keep their meaning (money in and out), brighter on the blue.
+  The accent is `--accent`, not a color's name, so the next reskin is a change of values.
+- **The Lu logo** (`public/icon.svg`) is the original's two drawings: the filled icon (its blue
+  gradient) on light backgrounds, the outline in white (as its top bar drew it) on dark ones;
+  the SVG switches itself by color scheme, so the favicon follows too. "Lu" is the Dongle font
+  (SIL Open Font License) turned into paths, so nothing depends on the font being there. The
+  PNG icons are rendered from it (`pnpm icons`): full bleed for iOS and Android's masks, which
+  round and crop them.
+- **On a phone, signed in, the logo stands alone:** "Luminous Money" is long, and the camera,
+  the book switcher and the menu need the room.
+
 ### How the review queue works
 
 The queue is every staged (`!`) transaction in a book, oldest first. It's built for the common
