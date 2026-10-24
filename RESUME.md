@@ -32,9 +32,11 @@ Admins (`LUMINOUS_MONEY_ADMINS`, once their email is confirmed) see **System** i
 versions, health, data, the last backup, and whether a newer release is out. **Published**
 (2026-10-24) at [luminous-money/luminous-money](https://github.com/luminous-money/luminous-money):
 a `v*.*.*` tag runs the Release workflow (the tests, then both architectures' images on
-ghcr.io/luminous-money/luminous-money/<service>, then the release with its bundle). The first is
-`v0.1.0`. Its history was rewritten once before it was pushed (an email taken out of RESUME),
-so commit IDs from before then are gone.
+ghcr.io/luminous-money/luminous-money/<service>, then the release with its bundle). The first
+release is **`v0.1.1`** (the `v0.1.0` tag was pushed before CI could build on GitHub: its runner's
+builder didn't load images for e2e, and it has no release); **`v0.1.2`** finds the latest release
+from github.com's redirect, not the API, whose 60-an-hour limit for an address had run out. The history was rewritten once before
+the first push (an email taken out of RESUME), so commit IDs from before then are gone.
 
 What a user can do now:
 - **Receipts (M16):** Menu → AI turns a book's AI on (Claude, with an API key kept encrypted;

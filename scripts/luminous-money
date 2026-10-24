@@ -116,8 +116,16 @@ key() {
   fi
 }
 
-# The latest release's version (without the v), or nothing if it can't be found.
+# The latest release's version (without the v), or nothing if it can't be found: from where
+# github.com's releases/latest goes (no API, so none of its limit of 60 an hour for an address,
+# which a shared address can use up), else from the API.
 latest() {
+  local url
+  url="$(curl -fsSLI -o /dev/null -w '%{url_effective}' --max-time 10 \
+    "https://github.com/$REPO/releases/latest" 2>/dev/null || true)"
+  case "$url" in
+    */releases/tag/v*) echo "${url##*/releases/tag/v}"; return ;;
+  esac
   { curl -fsSL --max-time 10 "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null |
     awk -F'"' '/"tag_name"/ { sub(/^v/, "", $4); print $4; exit }'; } || true
 }
