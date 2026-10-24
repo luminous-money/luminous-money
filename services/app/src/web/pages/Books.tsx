@@ -225,7 +225,7 @@ function NewBook({ books }: { books: BookInfo[] }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           aria-label="New book's name"
-          placeholder='e.g. "Kael and Jess"'
+          placeholder='e.g. "Household"'
         />
       </label>
       <label>

@@ -191,7 +191,7 @@ function InviteForm({ book }: { book: string }) {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="jess@example.com"
+              placeholder="sam@example.com"
               aria-label="Their email"
               autoComplete="off"
             />
@@ -202,7 +202,7 @@ function InviteForm({ book }: { book: string }) {
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder="Jess"
+              placeholder="Sam"
               aria-label="Their name"
             />
           </label>

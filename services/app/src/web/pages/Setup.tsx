@@ -31,7 +31,7 @@ export function Setup({ book, onDone }: { book: Book | undefined; onDone: () => 
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder='e.g. "Kael Personal" or "Kael and Jess"'
+              placeholder='e.g. "Personal" or "Household"'
               autoFocus
             />
           </label>

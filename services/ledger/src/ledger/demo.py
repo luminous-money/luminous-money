@@ -89,7 +89,7 @@ def household_ledger(today: datetime.date, months: int = 4, staged_days: int = 1
             ],
         )
 
-    accounts = ["Equity:Opening-Balances", "Income:Contributions:Kael", "Income:Contributions:Jess",
+    accounts = ["Equity:Opening-Balances", "Income:Contributions:Alex", "Income:Contributions:Sam",
                 "Expenses:Home:Rent", "Expenses:Home:Utilities", "Expenses:Food:Groceries", UNCATEGORIZED]
     texts = [engine.parse_one(f'{begin.isoformat()} open {checking} USD\n  {engine.DISPLAY_NAME_KEY}: "Joint Checking"\n').text]
     texts += [engine.parse_one(f"{begin.isoformat()} open {a}\n").text for a in accounts]
@@ -100,7 +100,7 @@ def household_ledger(today: datetime.date, months: int = 4, staged_days: int = 1
     day = begin
     while day <= today:
         if day.day == 1:
-            for person in ("Kael", "Jess"):
+            for person in ("Alex", "Sam"):
                 batch.append(models.TransactionIn(
                     date=day, flag="*", payee=person, narration="Monthly contribution",
                     postings=[models.Posting(account=checking, units=usd(1600)),
