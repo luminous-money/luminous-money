@@ -157,8 +157,8 @@ describe("the two operations", () => {
   });
 });
 
-/** A stand-in for the SDK's client: answers in turn (an Error is thrown, as the SDK throws),
- * and remembers what it was asked. */
+/** A stand-in for the SDK's client: answers in turn (an Error is thrown, as the SDK throws; one
+ * with a stop_reason is the whole message), and remembers what it was asked. */
 function scripted(...answers: (object | "refusal" | Error)[]) {
   const asked: Record<string, unknown>[] = [];
   const client = {
@@ -170,6 +170,7 @@ function scripted(...answers: (object | "refusal" | Error)[]) {
           return {
             finalMessage: async () => {
               if (answer instanceof Error) throw answer;
+              if (typeof answer === "object" && "stop_reason" in answer) return answer;
               return answer === "refusal"
                 ? { stop_reason: "refusal", content: [] }
                 : {
@@ -243,6 +244,24 @@ describe("Claude", () => {
       }).categorize({ ...CATEGORIZE, guidance: null, creation: null }, "sk-key")
     ).rejects.toBeInstanceOf(ReadFailed);
     expect(sonnet.asked[0]).not.toHaveProperty("fallbacks");
+  });
+
+  it("reads the fallback's answer when Opus declined partway through its own", async () => {
+    const out = { proposals: [], new_accounts: [] };
+    const rescued = scripted({
+      stop_reason: "end_turn",
+      content: [
+        { type: "text", text: '{"propos' },
+        { type: "fallback", from: { model: "claude-opus-5" }, to: { model: "claude-opus-4-8" } },
+        { type: "text", text: JSON.stringify(out) },
+      ],
+    });
+    await expect(
+      claude({ ...models, client: () => rescued.client }).categorize(
+        { ...CATEGORIZE, guidance: null, creation: null },
+        "sk-key"
+      )
+    ).resolves.toMatchObject({ proposals: [] });
   });
 
   it("says what went wrong in Claude's own words: no credit, no model, unreachable", async () => {

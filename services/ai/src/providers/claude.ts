@@ -171,7 +171,9 @@ async function ask(
   }
   if (message.stop_reason === "refusal") throw new ReadFailed("Claude declined");
   if (message.stop_reason === "max_tokens") throw new ReadFailed("the answer ran too long");
-  const text = message.content.find((b) => b.type === "text");
+  // The last text: a model that declined mid-answer leaves its partial text before the
+  // fallback's (`fallbacks: "default"`).
+  const text = message.content.findLast((b) => b.type === "text");
   if (!text || text.type !== "text") throw new ReadFailed("Claude gave no answer");
   try {
     return { message, answer: JSON.parse(text.text) };
