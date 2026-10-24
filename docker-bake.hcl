@@ -16,6 +16,11 @@ variable "VERSION" {
   default = "dev"
 }
 
+# Where the source is: released images say so (ghcr.io links each package to its repository)
+variable "SOURCE" {
+  default = "https://github.com/luminous-money/luminous-money"
+}
+
 group "default" {
   targets = ["gateway", "auth", "ledger", "app", "ai"]
 }
@@ -142,6 +147,11 @@ target "ui-tests" {
 target "_release" {
   platforms = ["linux/amd64", "linux/arm64"]
   output    = ["type=registry"]
+  labels = {
+    "org.opencontainers.image.source"   = SOURCE
+    "org.opencontainers.image.version"  = VERSION
+    "org.opencontainers.image.licenses" = "GPL-2.0-or-later"
+  }
 }
 
 target "gateway-release" {

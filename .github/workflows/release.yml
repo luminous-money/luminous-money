@@ -37,7 +37,8 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           registry="ghcr.io/${GITHUB_REPOSITORY,,}"
-          REGISTRY="$registry" VERSION="$version" docker buildx bake release
+          REGISTRY="$registry" VERSION="$version" SOURCE="https://github.com/$GITHUB_REPOSITORY" \
+            docker buildx bake release
           for image in gateway auth ledger app ai; do
             docker buildx imagetools create -t "$registry/$image:latest" "$registry/$image:$version"
           done
