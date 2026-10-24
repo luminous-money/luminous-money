@@ -200,7 +200,7 @@ How it's put together:
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 185 tests, including the table lint
-    - auth: 20; app: 189; ai: 8; db: 10; csv-import: 22
+    - auth: 20; app: 189; ai: 9; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
   - `pnpm e2e`: 90 API tests and 96 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
