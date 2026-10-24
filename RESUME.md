@@ -95,7 +95,8 @@ What a user can do now:
   it, balances rolled up (one figure each), Find, "Show archived". A node's › opens its editor
   (with "Add an account under it"); a leaf opens its ledger, whose Edit opens the same editor:
   names (display and full: rename or move), an asset's settings (lots, revaluing), archive (with an optional closing
-  transfer), delete or merge into another account. System accounts are protected.
+  transfer), delete or merge into another account, or delete it with all its transactions (a red
+  notice first lists every other account that changes). System accounts are protected.
 - **Bank feeds (M9):** Menu → Bank connections: paste a SimpleFIN Bridge setup token, then link
   each bank account (new, or an existing one reconciled with the bank as the source of truth;
   also "start over" and "from a date"). The history comes in the background; confirm from the
@@ -155,8 +156,10 @@ What a user can do now:
   [our API](docs/categorizer-api.md)). Review shows where each came from; "Suggest categories",
   "Also categorize N similar", "Remember as a rule…" and Select mode speed it up. Acceptance
   per categorizer shows on the Rules page.
-- **Select mode** (review and account ledgers): a sticky bar (Categorize as…, Confirm, Done);
-  tap anywhere on a card or row to select. Ledgers also have "Suggest categories".
+- **Select mode** (review, account ledgers and Transactions): a sticky bar with **Actions ▾**
+  (Confirm, Categorize as…, Suggest categories: rules, history and the book's AI), Select all
+  and Done; tap anywhere on a card or row to select. Review and ledgers also have "Suggest
+  categories" for everything unconfirmed.
 - **Investments (M5):** starred brokerages and holdings show **value, unrealized gain** and how
   fresh their prices are; account pages list **holdings** (lots, Update price) and **Trade**
   (buy, sell with a lot preview and short/long-term gains, dividends); houses and cars are
@@ -196,10 +199,10 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 183 tests, including the table lint
-    - auth: 20; app: 186; ai: 7; db: 10; csv-import: 22
+    - ledger: 185 tests, including the table lint
+    - auth: 20; app: 188; ai: 7; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 90 API tests and 94 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 90 API tests and 96 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
@@ -238,10 +241,10 @@ How it's put together:
   transfer two banks date apart can't satisfy both sides by date.
 - **Loans and withheld taxes:** how to record them is in [docs/loans-and-taxes.md](docs/loans-and-taxes.md).
 - **The first browser tests of a cold e2e stack** can time out waiting for review to load (seen
-  once, 2026-10-17: three of accounts.spec, passing on a rerun). Also seen twice (2026-10-17,
-  2026-10-21), passing on a rerun: m1.spec's "a file in another layout" (no import results within
-  5 seconds of "Save and import"). It passed 15 of 15 alone and 276 of 276 in three whole-suite
-  runs, so it's load or a cold stack: worth a look if it shows up in CI. m3.spec's time zone raced
+  once, 2026-10-17: three of accounts.spec, passing on a rerun). m1.spec's "a file in another
+  layout" failed now and then (no import results) until 2026-10-23: a file chosen before the
+  account's CSV layouts had loaded was profiled as if it had none. Import now offers the file
+  picker only once they have. m3.spec's time zone raced
   the PWA giving a new book the browser's zone in the background; the test now waits for it.
 
 - **Fetching prices needs the network** (beanprice's sources: Yahoo and friends, which change
@@ -261,6 +264,12 @@ How it's put together:
 - **The dev stack needs `SIMPLEFIN_ENCRYPTION_KEY` and `AI_ENCRYPTION_KEY`** (app and ai won't
   start without them): they're in the repo root's `.env` (gitignored), which Compose reads. Keep
   them: stored SimpleFIN connections and AI keys can't be opened without them.
+- **A form waits for the data its pickers need** (Import's file picker for the account's CSV
+  layouts, the transaction editor for the chart): offered too early, a file is profiled as if the
+  account had none, and a typed account name finds nothing, so Enter offers to create it. Both
+  were the e2e suite's occasional failures under load.
+- **`pnpm e2e` keeps the browser failures' traces and page snapshots** in `tests/ui/test-results`
+  (`pnpm exec playwright show-trace <trace.zip>` there).
 - **Colors are variables** (`--accent`, `--accent-soft`, `--on-accent`, `--paper`, `--card`,
   `--ink`, `--muted`, `--line`, `--good`, `--bad` in `styles.css`, light and dark): use them, not
   hex values, and put text on the accent in `--on-accent` (it's dark on the dark mode's cyan).

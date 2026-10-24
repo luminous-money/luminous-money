@@ -152,6 +152,31 @@ export class FakeLedger implements LedgerPort {
     return [account];
   }
 
+  /** The transactions posting to `account` or under it. */
+  private touching(account: string) {
+    const under = (name: string) => name === account || name.startsWith(`${account}:`);
+    return this.transactions.filter((t) => t.postings.some((p) => under(p.account)));
+  }
+
+  async purgePreview(_book: string, account: string) {
+    const doomed = this.touching(account);
+    return {
+      accounts: this.accountList
+        .filter((a) => a.name === account || a.name.startsWith(`${account}:`))
+        .map((a) => a.name),
+      transactions: doomed.length,
+      affected: [],
+    };
+  }
+
+  async purgeAccount(book: string, account: string) {
+    const { accounts } = await this.purgePreview(book, account);
+    const doomed = new Set(this.touching(account).map((t) => t.id));
+    this.transactions = this.transactions.filter((t) => !doomed.has(t.id));
+    this.accountList = this.accountList.filter((a) => !accounts.includes(a.name));
+    return { accounts, transactions: [...doomed] };
+  }
+
   prices: PriceIn[] = [];
   async addPrice(_book: string, price: PriceIn) {
     this.prices.push(price);

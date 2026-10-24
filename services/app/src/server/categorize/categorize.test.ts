@@ -476,6 +476,36 @@ describe("unconfirmed transactions", () => {
     expect(proposed.postings[1]).toMatchObject({ account: "Expenses:Food:Coffee", flag: "!" });
   });
 
+  it("Suggest categories for a selection asks about it alone, opening what a proposal needs", async () => {
+    const picked = unconfirmed("CORNER CAFE");
+    const other = unconfirmed("CORNER CAFE");
+    const asked: string[][] = [];
+    const ai: Categorizer = {
+      name: "ai",
+      async categorize(r) {
+        asked.push(r.transactions.map((t) => t.id));
+        return {
+          proposals: r.transactions.map((t) => ({
+            id: t.id,
+            splits: [{ index: 1, account: "Expenses:Food:Cafes" }],
+            opens: ["Expenses:Food:Cafes"],
+            confidence: 0.8,
+            reason: "a cafe",
+          })),
+        };
+      },
+    };
+
+    expect(
+      await suggestUnconfirmed({ db, ledger, book, categorizers: [ai], ids: [picked.id] })
+    ).toBe(1);
+
+    expect(asked).toEqual([[picked.id]]);
+    expect(ledger.created).toContain("Expenses:Food:Cafes");
+    expect(picked.postings[1]).toMatchObject({ account: "Expenses:Food:Cafes", flag: "!" });
+    expect(other.postings[1]!.account).toBe("Expenses:Uncategorized");
+  });
+
   it("a rule re-applies to what it covers that hasn't been touched, and counts", async () => {
     const open = unconfirmed("TEA HOUSE");
     const id = db.addRule("b", {

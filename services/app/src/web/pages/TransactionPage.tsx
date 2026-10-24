@@ -44,6 +44,9 @@ function currencyOf(t: Transaction): string {
 
 export function TransactionPage({ book, id }: { book: string; id: string }) {
   const loaded = useTransaction(book, id);
+  // The editor's account pickers need the chart: before it's there, a name typed would find
+  // nothing, and Enter would offer to create it.
+  const accounts = useAccounts(book);
   const back = useBack(`/books/${book}/review`);
 
   return (
@@ -54,9 +57,11 @@ export function TransactionPage({ book, id }: { book: string; id: string }) {
         </Link>
         <h1>Transaction</h1>
       </header>
-      {loaded.isPending && <p className="muted">Loading…</p>}
+      {(loaded.isPending || accounts.isPending) && <p className="muted">Loading…</p>}
       {loaded.error && <p className="card error">{explain(loaded.error)}</p>}
-      {loaded.data && <Editor book={book} transaction={loaded.data} back={back} />}
+      {loaded.data && !accounts.isPending && (
+        <Editor book={book} transaction={loaded.data} back={back} />
+      )}
     </main>
   );
 }
@@ -65,6 +70,7 @@ export function TransactionPage({ book, id }: { book: string; id: string }) {
  * and today's date. It's saved confirmed, since it's written by hand. */
 export function NewTransactionPage({ book }: { book: string }) {
   const account = useParam("account") ?? "";
+  const accounts = useAccounts(book); // the pickers need the chart (see TransactionPage)
   const back = useBack(`/books/${book}/review`);
   const draft: Transaction = {
     id: "",
@@ -89,7 +95,11 @@ export function NewTransactionPage({ book }: { book: string }) {
         </Link>
         <h1>New transaction</h1>
       </header>
-      <Editor book={book} transaction={draft} back={back} isNew />
+      {accounts.isPending ? (
+        <p className="muted">Loading…</p>
+      ) : (
+        <Editor book={book} transaction={draft} back={back} isNew />
+      )}
     </main>
   );
 }

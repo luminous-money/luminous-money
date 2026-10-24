@@ -1,5 +1,5 @@
 /** M4: categorization in review. */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { setUpUser } from "./support.js";
 
@@ -29,6 +29,12 @@ async function withUnconfirmed(page: Page, unconfirmed: string[]) {
   for (const narration of unconfirmed) await add(narration, "!", "Expenses:Uncategorized");
   await page.goto(`/ui/books/${book.id}/review`);
   return { book };
+}
+
+/** Select mode's bulk actions: open the menu, choose one. */
+async function act(bar: Locator, name: string) {
+  await bar.getByRole("button", { name: "Actions ▾" }).click();
+  await bar.getByRole("menuitem", { name }).click();
 }
 
 test("Suggest categories fills in a category and says where it came from", async ({ page }) => {
@@ -89,11 +95,11 @@ test("Select mode categorizes and confirms several at once", async ({ page }) =>
   await boxes.nth(1).check();
   const bar = page.getByRole("toolbar", { name: "Selected" });
   await expect(bar).toContainText("2 selected");
-  await bar.getByRole("button", { name: /^Categorize as:/ }).click();
+  await act(bar, "Categorize as…");
   await page.getByRole("combobox", { name: "Categorize as" }).fill("tea");
   await page.keyboard.press("Enter");
   await expect(page.getByRole("article").filter({ hasText: "Food:Tea" })).toHaveCount(2);
-  await bar.getByRole("button", { name: "Confirm 2" }).click();
+  await act(bar, "Confirm 2");
 
   await expect(page.getByRole("article")).toHaveCount(1);
 });
@@ -136,13 +142,39 @@ test("an account's ledger suggests categories, and categorizes and confirms in b
   await list.getByRole("checkbox", { name: /TEA TWO/ }).click();
   const bar = page.getByRole("toolbar", { name: "Selected" });
   await expect(bar).toContainText("2 selected");
-  await expect(bar.getByRole("button", { name: "Confirm 2" })).toBeDisabled(); // uncategorized
-  await bar.getByRole("button", { name: /^Categorize as:/ }).click();
+  await bar.getByRole("button", { name: "Actions ▾" }).click();
+  await expect(bar.getByRole("menuitem", { name: /^Confirm 2/ })).toBeDisabled(); // uncategorized
+  await bar.getByRole("button", { name: "Actions ▾" }).click(); // closed again
+  await act(bar, "Categorize as…");
   await page.getByRole("combobox", { name: "Categorize as" }).fill("tea");
   await page.keyboard.press("Enter");
   await expect(list.getByRole("checkbox", { name: /TEA ONE/ })).toContainText("Food:Tea");
-  await bar.getByRole("button", { name: "Confirm 2" }).click();
+  await act(bar, "Confirm 2");
 
   await expect(list.getByRole("checkbox", { name: /TEA ONE/ })).not.toContainText("unconfirmed");
   await expect(list.getByRole("checkbox", { name: /TEA TWO/ })).not.toContainText("unconfirmed");
+});
+
+test("Transactions' Select mode suggests categories for what's chosen, the book's AI included", async ({
+  page,
+}) => {
+  const { book } = await withUnconfirmed(page, ["KIOSK ONE", "KIOSK TWO"]);
+  // The book's AI: the fake provider, which places a split in the chart's first category.
+  await page.goto(`/ui/books/${book.id}/ai`);
+  const use = page.getByLabel("Use AI in this book");
+  await use.click();
+  await expect(use).toBeChecked();
+  await page.getByRole("combobox", { name: "Provider" }).selectOption("fake");
+  await expect(page.getByText(/Ready: the camera/)).toBeVisible();
+
+  await page.goto(`/ui/books/${book.id}/transactions`);
+  await page.getByRole("button", { name: "Select" }).click();
+  await page.getByRole("checkbox", { name: /KIOSK ONE/ }).click();
+  await page.getByRole("checkbox", { name: /KIOSK TWO/ }).click();
+  const bar = page.getByRole("toolbar", { name: "Selected" });
+  await act(bar, "Suggest categories");
+
+  await expect(bar).toContainText("Suggested categories for 2 of 2, the book's AI included.");
+  await expect(page.getByRole("checkbox", { name: /KIOSK ONE/ })).toContainText("Coffee");
+  await expect(page.getByRole("checkbox", { name: /KIOSK TWO/ })).toContainText("Coffee");
 });

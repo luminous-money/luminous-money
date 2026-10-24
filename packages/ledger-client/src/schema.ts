@@ -254,6 +254,32 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/accounts/{account}/purge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Purge Preview
+     * @description What deleting the account with its transactions would do: what goes, and every other
+     *     account those transactions touch.
+     */
+    get: operations["purge_preview_api_ledger_v1_books__book_id__accounts__account__purge_get"];
+    put?: never;
+    /**
+     * Purge
+     * @description Delete the account and its subtree with every transaction that posts to them (from
+     *     every account they touch). Returns what was deleted.
+     */
+    post: operations["purge_api_ledger_v1_books__book_id__accounts__account__purge_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliation": {
     parameters: {
       query?: never;
@@ -1995,6 +2021,65 @@ export interface components {
       /** Message */
       message: string;
     };
+    /**
+     * PurgeAffected
+     * @description Another account a purge changes: its splits in the transactions that go.
+     */
+    PurgeAffected: {
+      /** Account */
+      account: string;
+      /**
+       * Change
+       * @description What its balance changes by when they go.
+       */
+      change: components["schemas"]["Amount"][];
+      /**
+       * Reconciled
+       * @description How many of its splits among them are reconciled.
+       */
+      reconciled: number;
+      /** Transactions */
+      transactions: number;
+    };
+    /** PurgeIn */
+    PurgeIn: {
+      /**
+       * Updated At
+       * @description The account's version, as read.
+       */
+      updated_at?: string | null;
+    };
+    /**
+     * PurgePreview
+     * @description What deleting an account with its transactions does, before it's done.
+     */
+    PurgePreview: {
+      /**
+       * Accounts
+       * @description The accounts deleted: it and its subtree.
+       */
+      accounts: string[];
+      /**
+       * Affected
+       * @description The other accounts those transactions touch.
+       */
+      affected: components["schemas"]["PurgeAffected"][];
+      /**
+       * Transactions
+       * @description How many transactions go with them.
+       */
+      transactions: number;
+    };
+    /** Purged */
+    Purged: {
+      /** Accounts */
+      accounts: string[];
+      /**
+       * Transactions
+       * @description The IDs of the transactions deleted.
+       */
+      transactions: string[];
+    };
     /** QueryResult */
     QueryResult: {
       /** Columns */
@@ -3188,6 +3273,79 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
+    };
+  };
+  purge_preview_api_ledger_v1_books__book_id__accounts__account__purge_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PurgePreview"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  purge_api_ledger_v1_books__book_id__accounts__account__purge_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PurgeIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Purged"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

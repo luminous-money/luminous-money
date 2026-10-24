@@ -38,6 +38,7 @@ import {
 } from "./schedules.js";
 import type { Categorizer } from "./categorize/types.js";
 import { ruleProblem } from "./categorize/rules.js";
+import { aiCategorizer } from "./categorize/ai.js";
 import { applyRule, coveredBy, settle, suggestUnconfirmed } from "./categorize/service.js";
 import type { CategoryRuleIn, CategoryRulePatch } from "../shared/rules.js";
 import { LedgerError, type Book, type DivideIn, type LedgerPort, type Member } from "./ledger.js";
@@ -573,19 +574,36 @@ export function createApi({
   });
 
   /** "Suggest categories" for unconfirmed transactions not yet categorized (`?account=`: only
-   * those from that account and its subaccounts). */
+   * those from that account and its subaccounts). A selection's (`{transactions: [ids]}`, Select
+   * mode's bulk action) is asked of the book's AI too, when it's set up: `ai` says whether it
+   * was. */
   api.post("/books/:book/suggest", async (c) => {
     const { book } = c.req.param();
-    const info = await bookOf(c.get("user"), book);
+    const user = c.get("user");
+    const ledger = ledgerFor(user);
+    const info = await ledger.book(book);
     if (!info) return c.json({ detail: "not found" }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as { transactions?: unknown };
+    const ids = Array.isArray(body.transactions)
+      ? body.transactions.filter((t): t is string => typeof t === "string")
+      : undefined;
+    const ai = ids && aiFor?.(user);
+    const settings = ai ? await ai.settings(book) : null;
+    const withAi = !!(ai && settings?.ready);
     const suggested = await suggestUnconfirmed({
       db,
-      ledger: ledgerFor(c.get("user")),
-      book: info,
-      categorizers,
+      ledger,
+      book: { id: info.id, name: info.name },
+      categorizers: withAi
+        ? [
+            ...categorizers,
+            aiCategorizer(ai!, book, info.currency ?? "USD", !!settings!.create_accounts),
+          ]
+        : categorizers,
       account: c.req.query("account") || undefined,
+      ...(ids ? { ids } : {}),
     });
-    return c.json({ suggested });
+    return c.json({ suggested, ai: withAi });
   });
 
   /** The categorizers, in chain order, with how often their proposals were accepted. */
@@ -717,6 +735,23 @@ export function createApi({
       );
       db.mergeAccounts(book, deleted, substitute ?? null);
       return c.json(deleted);
+    })
+  );
+
+  /** Deleting an account with its transactions: first what it would do (what goes, and every
+   * other account those transactions touch), then doing it, and forgetting what `app` kept
+   * about them. */
+  api.get("/books/:book/accounts/:account/purge", (c) =>
+    accountChange(c, async (ledger, book, account) =>
+      c.json(await ledger.purgePreview(book, account))
+    )
+  );
+  api.post("/books/:book/accounts/:account/purge", (c) =>
+    accountChange(c, async (ledger, book, account) => {
+      const body = (await c.req.json().catch(() => ({}))) as { updated_at?: string };
+      const purged = await ledger.purgeAccount(book, account, body.updated_at);
+      db.purgeAccounts(book, purged.accounts, purged.transactions);
+      return c.json(purged);
     })
   );
 

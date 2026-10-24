@@ -575,6 +575,23 @@ class Store:
         )
         return [_row(r) for r in rows]
 
+    def postings_touching(self, book_id: str, account: str) -> list[sqlite3.Row]:
+        """Every posting of the live transactions that post to `account` or under it: each one's
+        transaction (`id`), account, amount (NULL where only booking could say), currency and
+        reconciliation mark."""
+        return self._conn.execute(
+            """
+            SELECT p.directive_id AS id, p.account, p.amount, p.amount_currency, p.reconciled
+            FROM posting p JOIN directive d ON d.id = p.directive_id
+            WHERE d.book_id = ? AND d.deleted = 0 AND d.kind = 'transaction' AND p.directive_id IN (
+                SELECT q.directive_id FROM posting q JOIN directive e ON e.id = q.directive_id
+                WHERE e.book_id = ? AND e.deleted = 0
+                  AND (q.account = ? OR substr(q.account, 1, length(?) + 1) = ? || ':'))
+            ORDER BY d.date, d.ordinal, p.idx
+            """,
+            (book_id, book_id, account, account, account),
+        ).fetchall()
+
     def last_posting(self, book_id: str, account: str) -> str | None:
         """The date of the latest live transaction posting to `account` or under it."""
         row = self._conn.execute(

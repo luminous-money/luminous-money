@@ -21,6 +21,8 @@ type Props = {
   label: string;
   disabled?: boolean;
   create?: AccountCreation;
+  /** Start open, searching (a picker that appears because someone asked for it). */
+  initiallyOpen?: boolean;
 };
 
 const CREATE = Symbol("create");
@@ -40,8 +42,9 @@ export function AccountPicker({
   label,
   disabled,
   create,
+  initiallyOpen = false,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [creating, setCreating] = useState(false);

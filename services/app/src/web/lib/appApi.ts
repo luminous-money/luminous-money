@@ -9,7 +9,7 @@ import {
 } from "../../shared/schedule.js";
 import type { CategoryRule, CategoryRuleIn, CategoryRulePatch } from "../../shared/rules.js";
 import type { ProposalSummary } from "../../shared/imports.js";
-import type { Book } from "@luminous-money/ledger-client";
+import type { Book, components } from "@luminous-money/ledger-client";
 
 import type {
   BankConnection,
@@ -243,7 +243,15 @@ export const accountChanges = {
         { method: "DELETE" }
       )
     ),
+  /** What deleting it with its transactions would do: what goes, and what else changes. */
+  purgePreview: async (book: string, account: string): Promise<PurgePreview> =>
+    json(await apiFetch(`${accountPath(book, account)}/purge`)),
+  /** Delete it (and its subtree) with every transaction that posts to it. */
+  purge: async (book: string, account: string, updatedAt?: string): Promise<unknown> =>
+    json(await apiFetch(`${accountPath(book, account)}/purge`, post({ updated_at: updatedAt }))),
 };
+
+export type PurgePreview = components["schemas"]["PurgePreview"];
 
 /** Receipts (M16): the file and the hints, read by the ai service if the book has it, staged
  * unconfirmed with the receipt attached. */
@@ -581,12 +589,18 @@ export const appApi = {
     await apiFetch(`${base(book)}/proposals/${transaction}/settle`, { method: "POST" });
   },
 
-  /** Suggest categories for unconfirmed transactions (from `account`, if given). */
-  suggest: async (book: string, account?: string): Promise<{ suggested: number }> =>
+  /** Suggest categories for unconfirmed transactions (from `account`, if given; only
+   * `transactions`, if given: a selection, which the book's AI is asked about too, if it's set
+   * up: `ai` says whether it was). */
+  suggest: async (
+    book: string,
+    account?: string,
+    transactions?: string[]
+  ): Promise<{ suggested: number; ai?: boolean }> =>
     json(
       await apiFetch(
         `${base(book)}/suggest${account ? `?account=${encodeURIComponent(account)}` : ""}`,
-        { method: "POST" }
+        transactions ? post({ transactions }) : { method: "POST" }
       )
     ),
 

@@ -54,6 +54,9 @@ export function Import({ book }: { book: string }) {
   const chosen = account || starred[0]?.name || others[0]?.name || "";
   const profiles = useProfiles(book, chosen || undefined);
   const saved = profiles.data?.length ?? 0;
+  // A file is taken only once it's known where it goes and in which layouts: before then, one
+  // chosen too early would be profiled as if the account had none.
+  const ready = !!all.data && !stars.isPending && !!chosen && !profiles.isPending;
   const save = useSaveProfile(book);
   const run = useImport(book);
   const [stage, setStage] = useState<Stage>({ kind: "choose" });
@@ -188,27 +191,31 @@ export function Import({ book }: { book: string }) {
                   : `This account has ${saved} known CSV layouts: files in any of them import straight away.`}
             </p>
           )}
-          <label
-            className={`dropzone${dragging ? " dragging" : ""}`}
-            onDragOver={(e) => (e.preventDefault(), setDragging(true))}
-            onDragLeave={() => setDragging(false)}
-            onDrop={onDrop}
-          >
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              aria-label="CSV file"
-              disabled={!chosen || run.isPending}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (file) void start(file);
-              }}
-            />
-            <span>
-              {run.isPending ? "Importing…" : "Drop a CSV file here, or tap to choose one"}
-            </span>
-          </label>
+          {ready ? (
+            <label
+              className={`dropzone${dragging ? " dragging" : ""}`}
+              onDragOver={(e) => (e.preventDefault(), setDragging(true))}
+              onDragLeave={() => setDragging(false)}
+              onDrop={onDrop}
+            >
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                aria-label="CSV file"
+                disabled={run.isPending}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void start(file);
+                }}
+              />
+              <span>
+                {run.isPending ? "Importing…" : "Drop a CSV file here, or tap to choose one"}
+              </span>
+            </label>
+          ) : (
+            (!all.data || open.length > 0) && <p className="muted">Loading…</p>
+          )}
           {error && <p className="error">{error}</p>}
           {all.data && open.length === 0 && (
             <p className="muted">

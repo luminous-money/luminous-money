@@ -1319,6 +1319,16 @@ button.plain {
   white-space: nowrap;
 }
 
+/* The bar's second row: an action's account picker (Categorize as…). */
+.select-bar-row + .select-bar-row {
+  margin-top: 0.5rem;
+}
+
+.bulk-actions .menu-panel {
+  left: 0;
+  right: auto;
+}
+
 /* A card or row being selected: tapping anywhere toggles it. */
 .item.selecting {
   position: relative;
@@ -2661,4 +2671,24 @@ details.divide summary {
   grid-template-columns: 4rem auto 1fr;
   align-items: center;
   gap: 0.6rem;
+}
+
+/* Deleting an account with its transactions: what goes, in red, before anything does. */
+.danger-notice {
+  border: 1px solid var(--bad);
+  border-radius: 0.7rem;
+  padding: 0.75rem 0.9rem;
+  background: color-mix(in srgb, var(--bad) 10%, var(--card));
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.danger-notice strong:first-child {
+  color: var(--bad);
+}
+
+.danger-notice ul {
+  margin: 0;
+  padding-left: 1.2rem;
 }

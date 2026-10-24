@@ -171,3 +171,32 @@ def test_what_has_no_price_is_named_beside_the_one_figure(book):
     )
     assets = by_name(book)["Assets"]
     assert assets.value.number == "1045.50" and assets.unpriced == ["VACHR"]
+
+
+def test_purging_an_account_says_what_goes_then_deletes_it_with_its_transactions(book):
+    preview = chart.purge_preview(book, BOOK, "Expenses:Food")
+
+    # Groceries and Coffee go with Food, and their two transactions from checking.
+    assert preview.accounts == ["Expenses:Food", "Expenses:Food:Coffee", "Expenses:Food:Groceries"]
+    assert preview.transactions == 2
+    assert [(a.account, a.transactions, a.change, a.reconciled) for a in preview.affected] == [
+        ("Assets:Bank:Checking", 2, [models.Amount(number="54.50", currency="USD")], 0)
+    ]
+
+    purged = chart.purge(book, BOOK, "Expenses:Food")
+
+    assert purged.accounts == preview.accounts and len(purged.transactions) == 2
+    names = by_name(book)
+    assert "Expenses:Food:Coffee" not in names and "Expenses:Food" not in names
+    assert names["Assets:Bank:Checking"].total[0].number == "800.00"  # 1000 - 200: lunch money back
+    export = book.export(BOOK)
+    for gone in ('"Groceries"', '"Coffee"', "balance Expenses:Food:Coffee", 'custom "budget" Expenses:Food'):
+        assert gone not in export
+    assert book.problems(BOOK) == []
+
+
+def test_purging_keeps_the_protections_deleting_has(book):
+    with pytest.raises(chart.AccountRefused, match="system"):
+        chart.purge(book, BOOK, "Equity:Opening-Balances")
+    with pytest.raises(chart.AccountRefused, match="brokerage"):
+        chart.purge_preview(book, BOOK, "Assets:Broker:Cash")

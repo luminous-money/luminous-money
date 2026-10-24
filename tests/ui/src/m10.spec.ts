@@ -72,6 +72,32 @@ test("an account is renamed, then merged into another, from its editor", async (
   await expect(section(page, "Expenses")).toBeHidden();
 });
 
+test("an account is deleted with its transactions, once told what else changes", async ({
+  page,
+}) => {
+  const { book } = await chart(page); // three groceries of $1.00 from checking
+  await page.goto(
+    `/ui/books/${book.id}/accounts/${encodeURIComponent("Expenses:Food:Groceries")}/edit`
+  );
+
+  await page.getByText("Delete or merge").click();
+  const form = page.getByRole("form", { name: "Delete or merge" });
+  await form.getByRole("radio", { name: "Delete them too" }).click();
+  const notice = form.getByRole("alert", { name: "What goes" });
+  await expect(notice).toContainText("This deletes 3 transactions for good");
+  await expect(notice).toContainText("PNC Checking: +$3.00 (3 transactions)");
+  await form
+    .getByRole("textbox", { name: "Name of the account to delete" })
+    .fill("Expenses:Food:Groceries");
+  await form.getByRole("button", { name: "Delete it and its transactions" }).click();
+
+  await expect(page).toHaveURL(/\/accounts$/);
+  // Checking is back where it opened: the groceries are gone from it too.
+  await expect(section(page, "Assets")).toContainText("$1,000.00");
+  await page.getByRole("searchbox", { name: "Find an account" }).fill("Groceries");
+  await expect(section(page, "Expenses")).toBeHidden();
+});
+
 test("system accounts can't be renamed", async ({ page }) => {
   const { book } = await chart(page);
   await page.goto(

@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
 import { SelectBar } from "../components/SelectBar.js";
+import { useBulkActions } from "../lib/bulk.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
 import { BaseChoice } from "../components/BaseChoice.js";
@@ -58,7 +59,6 @@ export function Review({ book }: { book: string }) {
   const suggest = useSuggest(book);
   const bulk = useBulkEdit(book);
   const selection = useSelection();
-  const [note, setNote] = useState<string | null>(null);
   const [skipped, setSkipped] = useState(() => readSkipped(book));
   useEffect(() => writeSkipped(book, skipped), [book, skipped]);
 
@@ -76,31 +76,21 @@ export function Review({ book }: { book: string }) {
   ];
   const queued = items.map((i) => i.transaction);
   const chosen = ordered.filter((i) => selection.has(i.transaction.id));
-  const categorizeChosen = (account: string) => {
-    const simpleOnes = chosen.map((i) => i.transaction).filter((t) => simple(t));
-    const skipped = chosen.length - simpleOnes.length;
-    setNote(skipped ? `Skipped ${skipped} with more than two splits.` : null);
-    bulk.mutate(
-      {
-        transactions: simpleOnes,
-        change: (t) => ({ postings: withCounterpart(t, account).postings }),
-      },
-      { onError: (e) => setNote(explain(e)) }
-    );
-  };
-  const confirmChosen = async () => {
-    setNote(null);
-    try {
-      await bulk.mutateAsync({
-        transactions: chosen.map((i) => i.transaction).filter((t) => t.flag === "!"),
-        change: () => ({ flag: "*" }),
-      });
+  const bulkActions = useBulkActions({
+    book,
+    chosen: chosen.map((i) => i.transaction),
+    accounts: accounts.data ? postable(accounts.data, today()) : [],
+    create,
+    categorize: (t, account) =>
+      simple(t) ? { postings: withCounterpart(t, account).postings } : null,
+    confirmBlocked:
+      chosen.some((i) => i.transaction.postings.some((p) => unresolved(p.account))) &&
+      "choose their accounts first",
+    afterConfirm: async () => {
       for (const m of chosen.flatMap((i) => i.matches)) await appApi.confirmMatch(book, m);
-      selection.clear();
-    } catch (e) {
-      setNote(explain(e));
-    }
-  };
+    },
+    onConfirmed: selection.clear,
+  });
 
   return (
     <main>
@@ -137,15 +127,9 @@ export function Review({ book }: { book: string }) {
           count={chosen.length}
           shown={ordered.length}
           onSelectAll={() => selection.selectAll(ordered.map((i) => i.transaction.id))}
-          accounts={accounts.data ? postable(accounts.data, today()) : []}
-          create={create}
-          onCategorize={categorizeChosen}
-          onConfirm={() => void confirmChosen()}
-          canConfirm={
-            !chosen.some((i) => i.transaction.postings.some((p) => unresolved(p.account)))
-          }
-          busy={bulk.isPending}
-          note={note}
+          actions={bulkActions.actions}
+          busy={bulkActions.busy}
+          note={bulkActions.note}
           onDone={selection.stop}
         />
       )}

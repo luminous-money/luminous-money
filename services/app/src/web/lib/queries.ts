@@ -1217,3 +1217,16 @@ export const useRemoveAccount = (book: string, account: string) =>
   useChartChange(book, (substitute: string | undefined) =>
     accountChanges.remove(book, account, substitute)
   );
+
+/** What deleting an account with its transactions would do (asked only when it's chosen). */
+export const usePurgePreview = (book: string, account: string, enabled: boolean) =>
+  useQuery({
+    queryKey: [...keys.book(book), "purge", account],
+    queryFn: () => accountChanges.purgePreview(book, account),
+    enabled,
+  });
+
+export const usePurgeAccount = (book: string, account: string) =>
+  useChartChange(book, (updatedAt: string | undefined) =>
+    accountChanges.purge(book, account, updatedAt)
+  );

@@ -313,6 +313,21 @@ def create_app(ledger: Ledger) -> FastAPI:
         there are any). Merging is this. Returns the accounts deleted."""
         return chart.delete(ledger, book_id, account, substitute=substitute, expected=updated_at)
 
+    @api.get("/books/{book_id}/accounts/{account}/purge")
+    def purge_preview(book_id: MemberBook, account: str) -> models.PurgePreview:
+        """What deleting the account with its transactions would do: what goes, and every other
+        account those transactions touch."""
+        return chart.purge_preview(ledger, book_id, account)
+
+    @api.post(
+        "/books/{book_id}/accounts/{account}/purge",
+        responses={409: {"description": "Stale version"}, 422: {"description": "Not allowed"}},
+    )
+    def purge(book_id: MemberBook, account: str, body: models.PurgeIn) -> models.Purged:
+        """Delete the account and its subtree with every transaction that posts to them (from
+        every account they touch). Returns what was deleted."""
+        return chart.purge(ledger, book_id, account, expected=body.updated_at)
+
     @api.get("/books/{book_id}/accounts/{account}/holdings")
     def holdings(book_id: MemberBook, account: str, on: datetime.date | None = None) -> models.Holdings:
         """What an account and everything under it holds: units, prices, value, cost basis, gains

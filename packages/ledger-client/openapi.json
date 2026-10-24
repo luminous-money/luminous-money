@@ -2688,6 +2688,117 @@
         "title": "Problem",
         "type": "object"
       },
+      "PurgeAffected": {
+        "description": "Another account a purge changes: its splits in the transactions that go.",
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "change": {
+            "description": "What its balance changes by when they go.",
+            "items": {
+              "$ref": "#/components/schemas/Amount"
+            },
+            "title": "Change",
+            "type": "array"
+          },
+          "reconciled": {
+            "description": "How many of its splits among them are reconciled.",
+            "title": "Reconciled",
+            "type": "integer"
+          },
+          "transactions": {
+            "title": "Transactions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "account",
+          "transactions",
+          "change",
+          "reconciled"
+        ],
+        "title": "PurgeAffected",
+        "type": "object"
+      },
+      "PurgeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The account's version, as read.",
+            "title": "Updated At"
+          }
+        },
+        "title": "PurgeIn",
+        "type": "object"
+      },
+      "PurgePreview": {
+        "description": "What deleting an account with its transactions does, before it's done.",
+        "properties": {
+          "accounts": {
+            "description": "The accounts deleted: it and its subtree.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Accounts",
+            "type": "array"
+          },
+          "affected": {
+            "description": "The other accounts those transactions touch.",
+            "items": {
+              "$ref": "#/components/schemas/PurgeAffected"
+            },
+            "title": "Affected",
+            "type": "array"
+          },
+          "transactions": {
+            "description": "How many transactions go with them.",
+            "title": "Transactions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accounts",
+          "transactions",
+          "affected"
+        ],
+        "title": "PurgePreview",
+        "type": "object"
+      },
+      "Purged": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Accounts",
+            "type": "array"
+          },
+          "transactions": {
+            "description": "The IDs of the transactions deleted.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Transactions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "accounts",
+          "transactions"
+        ],
+        "title": "Purged",
+        "type": "object"
+      },
       "QueryResult": {
         "properties": {
           "columns": {
@@ -4988,6 +5099,108 @@
           }
         },
         "summary": "Account Ledger"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/{account}/purge": {
+      "get": {
+        "description": "What deleting the account with its transactions would do: what goes, and every other\naccount those transactions touch.",
+        "operationId": "purge_preview_api_ledger_v1_books__book_id__accounts__account__purge_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgePreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Purge Preview"
+      },
+      "post": {
+        "description": "Delete the account and its subtree with every transaction that posts to them (from\nevery account they touch). Returns what was deleted.",
+        "operationId": "purge_api_ledger_v1_books__book_id__accounts__account__purge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "title": "Account",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurgeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Purged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Purge"
       }
     },
     "/api/ledger/v1/books/{book_id}/accounts/{account}/reconciliation": {

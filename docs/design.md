@@ -579,6 +579,14 @@ How auth works (M8; the shape is M1's):
   account's balance changes, and drops the accounts' opens, closes, balances, pads, notes and
   documents. Merging is the same operation. The substitute can be any type, with a warning when
   it differs. For a node, the other way is to delete what's under it one by one.
+- **Or it goes with its transactions** (`purge`, 2026-10-23): every transaction posting to it or
+  under it is deleted whole, from every account it touches, in one write. That changes other
+  accounts, so the editor first shows, in red, what goes and each other account that changes (by
+  how much, and how many of its reconciled splits go, so its statements stop holding), and then
+  asks for the name as any deletion does. `app` forgets what it kept about them: by account
+  (stars, links, profiles, import history, rules, schedules) and by transaction (proposals, and
+  other accounts' import rows, so re-importing a file brings those back instead of calling them
+  duplicates).
 - **Archiving is Beancount's `close`,** on a date no earlier than the last transaction, with an
   optional closing transfer of what's left. An archived account leaves pickers, home and imports,
   and its bank feed stops. Unarchiving removes the close.
@@ -1086,7 +1094,13 @@ Resolution only proposes. Everything lands in the review queue (new transactions
 as proposed), with the match or proposal shown and confirmable with one tap, except what a
 user's rule confirms automatically. Review also has "Suggest categories" (the chain over unconfirmed
 uncategorized transactions), "Also categorize N similar" (same payee key, same account), "Remember
-as a rule", and Select mode for categorizing or confirming many at once.
+as a rule", and Select mode for doing many at once.
+
+**Select mode's bulk actions are one menu** (Actions ▾, `lib/bulk.ts`), the same in review, an
+account's ledger and Transactions: Confirm, Categorize as… (an account picker in the bar), and
+Suggest categories, which for a selection asks the book's AI too, when it's set up (M19's
+categorizer, already there for receipts). Each says why it can't run when it can't; a new bulk
+action is one more entry.
 
 #### Context
 

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 import { JournalList } from "../components/JournalList.js";
@@ -7,13 +6,24 @@ import { JumpToDate, MoreBelow, NewerRow, usePaging } from "../components/Paged.
 import { SelectBar } from "../components/SelectBar.js";
 import { bookHome } from "../lib/books.js";
 import { withBack } from "../lib/navigation.js";
-import { explain, useBulkEdit, useCanWrite, useJournal } from "../lib/queries.js";
+import { useBulkActions } from "../lib/bulk.js";
+import { postable } from "../lib/accounts.js";
+import { today } from "../lib/format.js";
+import {
+  explain,
+  useAccountCreation,
+  useAccounts,
+  useCanWrite,
+  useJournal,
+} from "../lib/queries.js";
+import { simple, unresolved, withCounterpart } from "../lib/split.js";
 import { useSelection } from "../lib/selection.js";
 
 /**
  * Every account's transactions together, newest first, paged as an account's ledger is: 200 at
  * a time as you scroll, or from a date back (`?date=`) with Load more above; filtered by
- * reconciliation (`?reconciled=`). Select mode confirms several at once.
+ * reconciliation (`?reconciled=`). Select mode's actions confirm, categorize or suggest
+ * categories for several at once.
  */
 export function Transactions({ book }: { book: string }) {
   const [, navigate] = useLocation();
@@ -22,17 +32,22 @@ export function Transactions({ book }: { book: string }) {
   const pages = useJournal(book, date, reconciled);
   const canWrite = useCanWrite(book);
   const selection = useSelection();
-  const bulk = useBulkEdit(book);
-  const [note, setNote] = useState<string | null>(null);
+  const accounts = useAccounts(book);
+  const create = useAccountCreation(book);
   const { rows, list, end, loadNewer } = usePaging(pages);
   const chosen = rows.filter((r) => selection.has(r.id));
-  const confirmChosen = () => {
-    setNote(null);
-    bulk.mutate(
-      { transactions: chosen.filter((r) => r.flag === "!"), change: () => ({ flag: "*" }) },
-      { onSuccess: selection.clear, onError: (e) => setNote(explain(e)) }
-    );
-  };
+  const bulkActions = useBulkActions({
+    book,
+    chosen,
+    accounts: accounts.data ? postable(accounts.data, today()) : [],
+    create,
+    categorize: (t, account) =>
+      simple(t) ? { postings: withCounterpart(t, account).postings } : null,
+    confirmBlocked:
+      chosen.some((r) => r.postings.some((p) => unresolved(p.account))) &&
+      "choose their accounts first",
+    onConfirmed: selection.clear,
+  });
   return (
     <main>
       <header className="page-head">
@@ -54,12 +69,9 @@ export function Transactions({ book }: { book: string }) {
           count={chosen.length}
           shown={rows.length}
           onSelectAll={() => selection.selectAll(rows.map((r) => r.id))}
-          onConfirm={confirmChosen}
-          canConfirm={
-            !chosen.some((r) => r.postings.some((p) => p.account.endsWith(":Uncategorized")))
-          }
-          busy={bulk.isPending}
-          note={note}
+          actions={bulkActions.actions}
+          busy={bulkActions.busy}
+          note={bulkActions.note}
           onDone={selection.stop}
         />
       ) : (

@@ -9,6 +9,7 @@ import { partOf } from "../../shared/divided.js";
 import { displayName, shown, toSegment, TYPE_LABELS } from "../lib/accounts.js";
 import { formatMoney, isDecimal } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
+import type { PurgePreview } from "../lib/appApi.js";
 import type { TreeAccount } from "../lib/ledger.js";
 import {
   explain,
@@ -16,6 +17,8 @@ import {
   useAccountTree,
   useArchiveAccount,
   useBudgetStatus,
+  usePurgeAccount,
+  usePurgePreview,
   useRemoveAccount,
   useRenameAccount,
   useSetAccount,
@@ -648,20 +651,29 @@ function Remove({
 }) {
   const [, navigate] = useLocation();
   const remove = useRemoveAccount(book, account.name);
+  const purge = usePurgeAccount(book, account.name);
   const create = useAccountCreation(book);
   const [substitute, setSubstitute] = useState("");
+  // With transactions: move them to another account, or delete them too.
+  const [mode, setMode] = useState<"move" | "purge">("move");
   const [typed, setTyped] = useState("");
   const target = accounts.find((a) => a.name === substitute);
   const otherType = target && target.type !== account.type;
   const needsSubstitute = account.splits > 0;
-  const ready = (!needsSubstitute || !!substitute) && typed === account.name;
+  const purging = needsSubstitute && mode === "purge";
+  const preview = usePurgePreview(book, account.name, purging);
+  // Moving needs somewhere to move to; deleting them too, the notice of what goes, read first.
+  const chosen = !needsSubstitute || (purging ? !!preview.data : !!substitute);
+  const ready = typed === account.name && chosen;
+  const error = purging ? purge.error : remove.error;
+  const busy = remove.isPending || purge.isPending;
   return (
     <details>
       <summary>
         <span>Delete or merge</span>
         <span className="small muted">
           {needsSubstitute
-            ? `Its ${account.splits} split${account.splits === 1 ? "" : "s"} move elsewhere`
+            ? `Its ${account.splits} split${account.splits === 1 ? "" : "s"} move elsewhere, or go too`
             : "It has no transactions"}
         </span>
       </summary>
@@ -670,28 +682,57 @@ function Remove({
         aria-label="Delete or merge"
         onSubmit={async (e) => {
           e.preventDefault();
-          await remove
-            .mutateAsync(substitute || undefined)
+          const done = purging
+            ? purge.mutateAsync(account.updated_at ?? undefined)
+            : remove.mutateAsync(substitute || undefined);
+          await done
             .then(() =>
               navigate(
-                substitute
+                substitute && !purging
                   ? `/books/${book}/accounts/${encodeURIComponent(substitute)}`
                   : `/books/${book}/accounts`
               )
             )
-            .catch(() => undefined); // shown from remove.error
+            .catch(() => undefined); // shown from the mutation's error
         }}
       >
-        {needsSubstitute ? (
+        {needsSubstitute && (
+          <fieldset className="check-row">
+            <legend>Its transactions</legend>
+            <div className="segmented" role="radiogroup" aria-label="Its transactions">
+              {(
+                [
+                  ["move", "Move them to another account"],
+                  ["purge", "Delete them too"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === value}
+                  className={mode === value ? "on" : ""}
+                  onClick={() => setMode(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        )}
+        {!needsSubstitute ? (
+          <p className="small">It has no transactions, so it simply goes.</p>
+        ) : purging ? (
+          <PurgeNotice account={account} accounts={accounts} preview={preview.data} />
+        ) : (
           <p className="small">
             {account.kind === "node"
               ? `Deleting ${displayName(account)} deletes every account under it, and moves all ${account.splits} of their splits into one account. Or cancel, and delete the accounts under it one by one.`
               : `Its ${account.splits} split${account.splits === 1 ? "" : "s"} move to another account, so every other account's balance stays the same. That's also how to merge it into another account.`}
           </p>
-        ) : (
-          <p className="small">It has no transactions, so it simply goes.</p>
         )}
-        {needsSubstitute && (
+        {preview.error && purging && <p className="error">{explain(preview.error)}</p>}
+        {needsSubstitute && !purging && (
           <div className="picker-field">
             <span className="small muted">Move its splits to</span>
             <AccountPicker
@@ -703,7 +744,7 @@ function Remove({
             />
           </div>
         )}
-        {otherType && (
+        {otherType && !purging && (
           <p className="small warning">
             {substitute} is {TYPE_NAMES[target.type ?? ""] ?? "a different kind of"} account, and{" "}
             {account.name} is {TYPE_NAMES[account.type ?? ""] ?? "another kind"}: what these amounts
@@ -719,13 +760,76 @@ function Remove({
             autoComplete="off"
           />
         </label>
-        {remove.error && <p className="error">{explain(remove.error)}</p>}
+        {error && <p className="error">{explain(error)}</p>}
         <div className="actions">
-          <button type="submit" className="danger" disabled={!ready || remove.isPending}>
-            {substitute ? `Merge into ${displayName({ name: substitute })}` : "Delete"}
+          <button type="submit" className="danger" disabled={!ready || busy}>
+            {purging
+              ? "Delete it and its transactions"
+              : substitute
+                ? `Merge into ${displayName({ name: substitute })}`
+                : "Delete"}
           </button>
         </div>
       </form>
     </details>
+  );
+}
+
+/** Deleting an account with its transactions, said plainly first: they go from every account
+ * they touch, and these are the accounts whose balances change (and whose reconciled
+ * statements stop holding). */
+function PurgeNotice({
+  account,
+  accounts,
+  preview,
+}: {
+  account: TreeAccount;
+  accounts: TreeAccount[];
+  preview: PurgePreview | undefined;
+}) {
+  if (!preview) return <p className="small muted">Working out what goes with it…</p>;
+  const name = (n: string) => displayName(accounts.find((a) => a.name === n) ?? { name: n });
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const under = preview.accounts.filter((n) => n !== account.name);
+  return (
+    <div className="danger-notice" role="alert" aria-label="What goes">
+      <p>
+        <strong>
+          This deletes {plural(preview.transactions, "transaction")} for good, from every account
+          they touch.
+        </strong>{" "}
+        {under.length > 0 &&
+          `${under.map(name).join(", ")}, under it, go${under.length === 1 ? "es" : ""} too. `}
+        It can't be undone, except from a backup.
+      </p>
+      {preview.affected.length ? (
+        <>
+          <p>These accounts change:</p>
+          <ul>
+            {preview.affected.map((a) => {
+              const type = accounts.find((x) => x.name === a.account)?.type;
+              return (
+                <li key={a.account}>
+                  <strong>{name(a.account)}</strong>:{" "}
+                  {a.change.length
+                    ? a.change
+                        .map((c) => {
+                          const n = shown(c.number, type);
+                          return `${n.startsWith("-") ? "" : "+"}${formatMoney(n, c.currency)}`;
+                        })
+                        .join(", ")
+                    : "no change in balance"}{" "}
+                  ({plural(a.transactions, "transaction")})
+                  {a.reconciled > 0 &&
+                    `; ${plural(a.reconciled, "reconciled split")}, so its statements stop holding`}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : (
+        <p>No other account changes.</p>
+      )}
+    </div>
   );
 }

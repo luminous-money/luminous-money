@@ -13,8 +13,17 @@ compose="docker compose -p luminous-money-e2e -f compose.yaml -f compose.e2e.yam
 $compose up -d --wait traefik auth ledger app ai mailpit simplefin-fake || exit 1
 $compose run --rm e2e
 api=$?
-$compose run --rm ui
+# The browser suite keeps its container until its failures' traces and page snapshots are copied
+# out (tests/ui/test-results), so a failure can be looked at instead of guessed at.
+docker rm -f luminous-money-e2e-ui >/dev/null 2>&1
+$compose run --name luminous-money-e2e-ui ui
 ui=$?
+if [ $ui -ne 0 ]; then
+  rm -rf tests/ui/test-results
+  docker cp luminous-money-e2e-ui:/repo/tests/ui/test-results tests/ui/test-results >/dev/null 2>&1 &&
+    echo "The browser failures' traces and snapshots: tests/ui/test-results"
+fi
+docker rm luminous-money-e2e-ui >/dev/null 2>&1
 $compose down --volumes --remove-orphans >/dev/null 2>&1
 ./scripts/cli-test.sh >/tmp/luminous-money-cli-test.log 2>&1
 cli=$?

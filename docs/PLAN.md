@@ -261,7 +261,11 @@ Smaller improvements to pick up between milestones or at the end.
 - [ ] **Import file format management:** see, edit, rename and delete an account's saved CSV
       formats directly, rather than only replacing or adding to them when a file doesn't match.
 - [ ] **Review shows the book's ID at the top,** where its name belongs.
-- [ ] **Select all, and "select uncategorized",** in select mode.
+- [ ] **Select all, and "select uncategorized",** in select mode. (Select all is built.)
+- [x] **Bulk actions** (2026-10-23): one Actions menu in Select mode everywhere (Confirm,
+      Categorize as…, Suggest categories with the book's AI).
+- [x] **Delete an account with its transactions** (2026-10-23), after a red notice of every
+      other account that changes.
 - [x] **Review newest first** (2026-10-17), the latest entered of a day first too.
 - [x] **Pair transfers in review** (2026-10-17): money out of one account and the same into
       another within 7 days, both imported, become one transfer, with "Reject" to restore the

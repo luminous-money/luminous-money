@@ -1118,6 +1118,73 @@ export class AppDb {
     });
   }
 
+  /**
+   * Forget accounts deleted with their transactions (`purge`): what's about them goes (stars,
+   * bank links and attempts, reconciliations in progress, CSV profiles, import batches and their
+   * rows, rules that match or land in them, schedules that post to them), and so does what's
+   * about the transactions that went with them, in any account: open proposals, and import rows
+   * (so re-importing a file can bring those transactions back rather than call them duplicates).
+   * One transaction.
+   */
+  purgeAccounts(book: string, accounts: string[], transactions: string[]): void {
+    const gone = new Set(accounts);
+    const went = new Set(transactions);
+    const posts = (template: string) =>
+      ((JSON.parse(template) as { postings?: { account?: string }[] }).postings ?? []).some(
+        (p) => !!p.account && gone.has(p.account)
+      );
+    transaction(this.db, () => {
+      this.followAccounts(
+        book,
+        (name) => name,
+        (name) => gone.has(name)
+      );
+      const each = <T>(sql: string, ...args: unknown[]) =>
+        this.db.prepare(sql).all(...(args as never[])) as T[];
+      for (const name of gone) {
+        this.db
+          .prepare("DELETE FROM csv_profile WHERE book_id = ? AND account = ?")
+          .run(book, name);
+        for (const { id } of each<{ id: string }>(
+          "SELECT id FROM import_batch WHERE book_id = ? AND account = ?",
+          book,
+          name
+        )) {
+          this.db.prepare("DELETE FROM import_row WHERE batch_id = ?").run(id);
+          this.db.prepare("DELETE FROM import_batch WHERE id = ?").run(id);
+        }
+      }
+      for (const r of each<{
+        id: string;
+        account: string;
+        part: string | null;
+        conditions: string;
+      }>("SELECT id, account, part, conditions FROM category_rule WHERE book_id = ?", book)) {
+        const on = (JSON.parse(r.conditions) as { account?: string | null }).account;
+        if (gone.has(r.account) || (r.part && gone.has(r.part)) || (on && gone.has(on)))
+          this.db.prepare("DELETE FROM category_rule WHERE id = ?").run(r.id);
+      }
+      for (const s of each<{ id: string; template: string }>(
+        "SELECT id, template FROM schedule WHERE book_id = ?",
+        book
+      ))
+        if (posts(s.template)) {
+          this.db.prepare("DELETE FROM schedule_occurrence WHERE schedule_id = ?").run(s.id);
+          this.db.prepare("DELETE FROM schedule WHERE id = ?").run(s.id);
+        }
+      for (const id of went) {
+        this.db
+          .prepare("DELETE FROM proposal WHERE book_id = ? AND transaction_id = ?")
+          .run(book, id);
+        this.db
+          .prepare(
+            "DELETE FROM import_row WHERE transaction_id = ? AND batch_id IN (SELECT id FROM import_batch WHERE book_id = ?)"
+          )
+          .run(id, book);
+      }
+    });
+  }
+
   private followAccounts(
     book: string,
     to: (name: string) => string,

@@ -227,6 +227,66 @@ def delete(
     return subtree
 
 
+def purge_preview(ledger: Ledger, book_id: str, name: str) -> models.PurgePreview:
+    """What `purge` would do: the accounts it deletes, how many transactions go with them, and
+    every other account those transactions touch (what its balance changes by, and how many of
+    its splits among them are reconciled, whose statements stop holding)."""
+    _account(ledger, book_id, name)
+    subtree = _check_changeable(ledger, book_id, name, "deleted")
+    rows = ledger.store.postings_touching(book_id, name)
+    affected: dict[str, dict] = {}
+    for r in rows:
+        if _under(r["account"], name):
+            continue
+        a = affected.setdefault(r["account"], {"ids": set(), "change": defaultdict(Decimal), "reconciled": 0})
+        a["ids"].add(r["id"])
+        if r["amount"] is not None:
+            a["change"][r["amount_currency"]] -= Decimal(r["amount"])
+        if r["reconciled"]:
+            a["reconciled"] += 1
+    return models.PurgePreview(
+        accounts=subtree,
+        transactions=len({r["id"] for r in rows}),
+        affected=[
+            models.PurgeAffected(
+                account=account,
+                transactions=len(a["ids"]),
+                change=[
+                    models.Amount(number=engine.decimal_text(n), currency=c)
+                    for c, n in sorted(a["change"].items())
+                    if n
+                ],
+                reconciled=a["reconciled"],
+            )
+            for account, a in sorted(affected.items())
+        ],
+    )
+
+
+def purge(ledger: Ledger, book_id: str, name: str, *, expected: str | None = None) -> models.Purged:
+    """Delete an account and its subtree with every transaction that posts to them: those
+    transactions go whole (from every account they touch), with the accounts' own directives
+    (opens, closes, balances, pads, notes, documents, budgets, statements). One write."""
+    _account(ledger, book_id, name)
+    subtree = _check_changeable(ledger, book_id, name, "deleted")
+    with ledger.store.transaction():
+        _versioned(ledger, book_id, name, expected)
+        doomed = {r["id"] for r in ledger.store.postings_touching(book_id, name)}
+        dropped = sorted(doomed)
+        rewritten = []
+        for row in ledger.store.mentioning(book_id, name):
+            if row.id in doomed:
+                continue
+            directive = engine.with_accounts(row.text, row.id, lambda a: a, drop=lambda a: _under(a, name))
+            if directive is None:
+                dropped.append(row.id)
+            elif directive.text != row.text:
+                rewritten.append(directive)
+        ledger._write(book_id, rewritten)
+        ledger.store.delete(book_id, dropped)
+    return models.Purged(accounts=subtree, transactions=sorted(doomed))
+
+
 def archive(
     ledger: Ledger,
     book_id: str,

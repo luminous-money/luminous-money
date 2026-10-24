@@ -16,6 +16,7 @@ import { ReconcileStatus } from "../components/ReconcileStatus.js";
 import { partOf, reconciledItself } from "../../shared/divided.js";
 import { MoveMoney, PartsCard, partsOf } from "../components/Parts.js";
 import { SelectBar } from "../components/SelectBar.js";
+import { useBulkActions } from "../lib/bulk.js";
 import { postable } from "../lib/accounts.js";
 import { today } from "../lib/format.js";
 import { useSelection } from "../lib/selection.js";
@@ -26,7 +27,6 @@ import {
   useAccountLedger,
   useAccounts,
   useAccountTree,
-  useBulkEdit,
   useSuggest,
   useScheduled,
   useSetStar,
@@ -86,11 +86,9 @@ export function AccountLedger({ book, account }: { book: string; account: string
   const setStar = useSetStar(book);
   const scheduled = useScheduled(book);
   const suggest = useSuggest(book, account);
-  const bulk = useBulkEdit(book);
   const accounts = useAccounts(book);
   const create = useAccountCreation(book);
   const selection = useSelection();
-  const [note, setNote] = useState<string | null>(null);
   const upcoming = useUpcoming(book);
   const canWrite = useCanWrite(book);
   const budget = useBudgetStatus(book).data?.lines.find((l) => l.account === account);
@@ -107,28 +105,20 @@ export function AccountLedger({ book, account }: { book: string; account: string
 
   const open = (id: string) => navigate(withBack(`/books/${book}/transactions/${id}`, here));
   const chosen = rows.filter((r) => selection.has(r.id));
-  const categorizeChosen = (category: string) => {
-    const simpleOnes = chosen.filter((r) => r.splits === 2);
-    const skipped = chosen.length - simpleOnes.length;
-    setNote(skipped ? `Skipped ${skipped} with more than two splits.` : null);
-    bulk.mutate(
-      {
-        transactions: simpleOnes,
-        change: (t) => {
-          const moved = withOtherSide(t, account, category);
-          return moved && { postings: moved.postings };
-        },
-      },
-      { onError: (e) => setNote(explain(e)) }
-    );
-  };
-  const confirmChosen = () => {
-    setNote(null);
-    bulk.mutate(
-      { transactions: chosen.filter((r) => r.flag === "!"), change: () => ({ flag: "*" }) },
-      { onSuccess: selection.clear, onError: (e) => setNote(explain(e)) }
-    );
-  };
+  const bulkActions = useBulkActions({
+    book,
+    chosen,
+    accounts: accounts.data ? postable(accounts.data, today()) : [],
+    create,
+    categorize: (t, category) => {
+      const moved = withOtherSide(t, account, category);
+      return moved && { postings: moved.postings };
+    },
+    confirmBlocked:
+      (unresolved(account) || chosen.some((r) => !!r.counterpart && unresolved(r.counterpart))) &&
+      "choose their accounts first",
+    onConfirmed: selection.clear,
+  });
 
   return (
     <main>
@@ -252,16 +242,9 @@ export function AccountLedger({ book, account }: { book: string; account: string
           count={chosen.length}
           shown={rows.length}
           onSelectAll={() => selection.selectAll(rows.map((r) => r.id))}
-          accounts={accounts.data ? postable(accounts.data, today()) : []}
-          create={create}
-          onCategorize={categorizeChosen}
-          onConfirm={confirmChosen}
-          canConfirm={
-            !unresolved(account) &&
-            !chosen.some((r) => !!r.counterpart && unresolved(r.counterpart))
-          }
-          busy={bulk.isPending}
-          note={note}
+          actions={bulkActions.actions}
+          busy={bulkActions.busy}
+          note={bulkActions.note}
           onDone={selection.stop}
         />
       ) : canWrite ? (

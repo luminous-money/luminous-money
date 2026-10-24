@@ -106,14 +106,18 @@ async function apply(
 }
 
 /** "Suggest categories": run the chain over the unconfirmed transactions open to categorizing
- * (those from `account` or its subaccounts, if given). Returns how many got a proposal. */
+ * (those from `account` or its subaccounts, if given; only `ids`, if given: a selection). The
+ * accounts a proposal would open (the AI's, with the book's account creation on) are opened
+ * first. Returns how many got a proposal. */
 export async function suggestUnconfirmed(
-  services: Services & { categorizers: Categorizer[]; account?: string }
+  services: Services & { categorizers: Categorizer[]; account?: string; ids?: string[] }
 ): Promise<number> {
-  const { db, ledger, book, categorizers, account } = services;
+  const { db, ledger, book, categorizers, account, ids } = services;
   const unconfirmed = await ledger.unconfirmed(book.id);
   const inScope = (name: string) => !account || name === account || name.startsWith(`${account}:`);
+  const chosen = ids && new Set(ids);
   const open = unconfirmed.flatMap((t) => {
+    if (chosen && !chosen.has(t.id)) return [];
     const incoming = openToCategorizing(t);
     return incoming && inScope(incoming.account) ? [{ t, incoming }] : [];
   });
@@ -124,10 +128,19 @@ export async function suggestUnconfirmed(
     open.map((o) => o.incoming)
   );
   const decisions = await categorize(categorizers, request);
+  const known = new Set(request.context.accounts.map((a) => a.name));
   const uses = new Map<string, number>();
   let n = 0;
   for (const { t, incoming } of open) {
     const decision = decisions.get(t.id) ?? {};
+    const opens = [decision.category, ...(decision.splits?.values() ?? [])].flatMap(
+      (c) => c?.opens ?? []
+    );
+    for (const name of opens)
+      if (!known.has(name)) {
+        await ledger.createAccount(book.id, name);
+        known.add(name);
+      }
     if (await apply(services, t, incoming, decision, request.request_id)) n++;
     const rule = decision.category?.rule_id;
     if (rule) uses.set(rule, (uses.get(rule) ?? 0) + 1);

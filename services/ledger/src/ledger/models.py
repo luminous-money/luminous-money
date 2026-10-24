@@ -376,6 +376,32 @@ class AccountPatch(Strict):
     )
 
 
+class PurgeAffected(Api):
+    """Another account a purge changes: its splits in the transactions that go."""
+
+    account: str
+    transactions: int
+    change: list[Amount] = Field(description="What its balance changes by when they go.")
+    reconciled: int = Field(description="How many of its splits among them are reconciled.")
+
+
+class PurgePreview(Api):
+    """What deleting an account with its transactions does, before it's done."""
+
+    accounts: list[str] = Field(description="The accounts deleted: it and its subtree.")
+    transactions: int = Field(description="How many transactions go with them.")
+    affected: list[PurgeAffected] = Field(description="The other accounts those transactions touch.")
+
+
+class PurgeIn(Strict):
+    updated_at: str | None = Field(None, description="The account's version, as read.")
+
+
+class Purged(Api):
+    accounts: list[str]
+    transactions: list[str] = Field(description="The IDs of the transactions deleted.")
+
+
 class OpeningHolding(Strict):
     """A holding to open an account with."""
 

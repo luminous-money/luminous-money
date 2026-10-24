@@ -25,6 +25,8 @@ export type LedgerPage = components["schemas"]["LedgerPage"];
 export type TransactionEdit = components["schemas"]["TransactionEdit"];
 export type PriceIn = components["schemas"]["PriceIn"];
 export type TreeAccount = components["schemas"]["TreeAccount"];
+export type PurgePreview = components["schemas"]["PurgePreview"];
+export type Purged = components["schemas"]["Purged"];
 export type BudgetStatus = components["schemas"]["BudgetStatus"];
 export type Member = components["schemas"]["Member"];
 export type Role = NonNullable<Book["role"]>;
@@ -76,6 +78,10 @@ export interface LedgerPort {
     substitute?: string,
     updated_at?: string
   ): Promise<string[]>;
+  /** What deleting an account with its transactions would do (what goes, what else changes). */
+  purgePreview(book: string, account: string): Promise<PurgePreview>;
+  /** Delete an account and its subtree with every transaction that posts to them. */
+  purgeAccount(book: string, account: string, updated_at?: string): Promise<Purged>;
   /** An account's (or a brokerage's) holdings: units, cost basis, value per commodity. */
   holdings(book: string, account: string): Promise<Holdings>;
   /** Record a price (one per commodity and date: the same date replaces it). */
@@ -229,6 +235,19 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
       unwrap(
         client.DELETE("/api/ledger/v1/books/{book_id}/accounts/{account}", {
           params: { path: { book_id: book, account }, query: { substitute, updated_at } },
+        })
+      ),
+    purgePreview: (book, account) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/purge", {
+          params: { path: { book_id: book, account } },
+        })
+      ),
+    purgeAccount: (book, account, updated_at) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/accounts/{account}/purge", {
+          params: { path: { book_id: book, account } },
+          body: { updated_at: updated_at ?? null },
         })
       ),
     holdings: (book, account) =>

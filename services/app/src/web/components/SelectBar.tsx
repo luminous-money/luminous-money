@@ -1,19 +1,33 @@
+import { useState } from "react";
+
+import { usePopover } from "../lib/popover.js";
 import { AccountPicker, type AccountCreation } from "./AccountPicker.js";
+
+/** Something Select mode can do to what's selected. Disabled, it says why. */
+export type BulkAction = {
+  label: string;
+  /** Why it can't be done now, if it can't. */
+  disabled?: string | false;
+} & (
+  | { run: () => void; pick?: undefined }
+  /** One that needs an account first ("Categorize as…"): the bar shows a picker. */
+  | {
+      pick: { accounts: string[]; create?: AccountCreation; prefer?: string[] };
+      run: (account: string) => void;
+    }
+);
 
 /**
  * Select mode's bar, sticky across the top of review and ledgers: how many are selected,
- * "Select all" (what's shown: a filtered list's rows, loaded so far), "Categorize as…" (where
- * that means something), "Confirm", and "Done".
+ * "Select all" (what's shown: a filtered list's rows, loaded so far), the **Actions** menu (what
+ * the page can do in bulk: confirm, categorize, suggest categories…), and "Done". An action
+ * that needs an account opens a picker in the bar.
  */
 export function SelectBar({
   count,
   shown,
   onSelectAll,
-  accounts,
-  create,
-  onCategorize,
-  onConfirm,
-  canConfirm,
+  actions,
   busy,
   note,
   onDone,
@@ -23,18 +37,14 @@ export function SelectBar({
   shown: number;
   /** Select everything shown. */
   onSelectAll: () => void;
-  /** Accounts to categorize as. */
-  accounts?: string[];
-  create?: AccountCreation;
-  onCategorize?: (account: string) => void;
-  onConfirm: () => void;
-  /** Whether the selection can be confirmed (none uncategorized, say). */
-  canConfirm: boolean;
+  actions: BulkAction[];
   busy: boolean;
-  /** A line under the bar: what the last action skipped, or an error. */
+  /** A line under the bar: what the last action did or skipped, or an error. */
   note?: string | null;
   onDone: () => void;
 }) {
+  const menu = usePopover();
+  const [picking, setPicking] = useState<BulkAction | null>(null);
   return (
     <div className="select-bar" role="toolbar" aria-label="Selected">
       <div className="select-bar-row">
@@ -42,27 +52,62 @@ export function SelectBar({
         <button type="button" disabled={!shown || count === shown} onClick={onSelectAll}>
           Select all
         </button>
-        {onCategorize && accounts && (
-          <AccountPicker
-            label="Categorize as"
-            accounts={accounts}
-            value=""
-            create={create}
-            onChange={onCategorize}
-          />
-        )}
-        <button
-          type="button"
-          className="primary"
-          disabled={!count || busy || !canConfirm}
-          onClick={onConfirm}
-        >
-          Confirm {count || ""}
-        </button>
+        <div className="menu bulk-actions" ref={menu.ref}>
+          <button
+            type="button"
+            className="primary"
+            aria-expanded={menu.open}
+            disabled={!count || busy}
+            onClick={() => menu.setOpen((o) => !o)}
+          >
+            Actions ▾
+          </button>
+          {menu.open && (
+            <div className="menu-panel" role="menu" aria-label="Actions">
+              {actions.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  role="menuitem"
+                  className="menu-item"
+                  disabled={!!action.disabled}
+                  title={action.disabled || undefined}
+                  onClick={() => {
+                    menu.setOpen(false);
+                    if (action.pick) setPicking(action);
+                    else action.run();
+                  }}
+                >
+                  {action.label}
+                  {action.disabled && <span className="small muted"> ({action.disabled})</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button type="button" onClick={onDone}>
           Done
         </button>
       </div>
+      {picking?.pick && (
+        <div className="select-bar-row">
+          <AccountPicker
+            label={picking.label.replace(/…$/, "")}
+            accounts={picking.pick.accounts}
+            prefer={picking.pick.prefer}
+            value=""
+            create={picking.pick.create}
+            initiallyOpen
+            onChange={(account) => {
+              setPicking(null);
+              picking.run(account);
+            }}
+          />
+          <button type="button" className="plain" onClick={() => setPicking(null)}>
+            Cancel
+          </button>
+        </div>
+      )}
       {note && (
         <p className="small muted" aria-live="polite">
           {note}
