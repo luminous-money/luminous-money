@@ -1,7 +1,7 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-23._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-24._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
@@ -283,7 +283,8 @@ How it's put together:
   (`engine.confirmed`), and `FakeLedger` does the same, so tests see what production does.
   Don't confirm by editing text if the flags matter: text keeps what it says.
 - **The AI never breaks a flow; it says why it didn't help.** A failed call (no credit, a bad
-  key, an unknown model) becomes the reason in a receipt's note or Suggest categories' note, and
+  key, an unknown model) becomes the reason in a receipt's note (shown on its review card and its transaction page,
+  `ReceiptNote`) or Suggest categories' note, and
   a line in `docker compose logs ai`. Real Claude calls haven't been exercised in tests (no key
   in the repo): the first real ones are Kael's.
 - **Claude's models are set per operation:** `AI_CLAUDE_EXTRACT_MODEL` (default

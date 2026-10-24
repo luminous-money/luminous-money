@@ -68,6 +68,9 @@ test("a receipt that isn't read waits in review for the account it was paid from
   await page.getByRole("button", { name: "Create transaction" }).click();
 
   const item = page.getByRole("article").filter({ hasText: "Cafe" });
+  await expect(item.getByLabel("About the receipt")).toHaveText(
+    "Receipt: The book's AI isn't set up, so it wasn't read."
+  );
   const confirm = item.getByRole("button", { name: "Confirm" });
   await expect(confirm).toBeDisabled();
   await item.getByRole("button", { name: /^Paid from/ }).click();

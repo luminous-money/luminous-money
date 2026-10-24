@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 import { Attachments, type Pending } from "../components/Attachments.js";
+import { ReceiptNote } from "../components/ReceiptNote.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
 import { PartChoice } from "../components/PartChoice.js";
@@ -211,6 +212,8 @@ function Editor({
       <PartChoice book={book} postings={splits.rows} onChange={(rows) => splits.setRows(rows)} />
       <SplitsFieldset splits={splits} accounts={names} create={create} />
       <ExcludeFromBudget meta={meta} onChange={setMeta} />
+
+      <ReceiptNote meta={t.meta} />
 
       <Attachments
         book={book}

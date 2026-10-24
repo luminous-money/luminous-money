@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
 import { SelectBar } from "../components/SelectBar.js";
+import { ReceiptNote } from "../components/ReceiptNote.js";
 import { SuggestNote } from "../components/SuggestNote.js";
 import { useBulkActions } from "../lib/bulk.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
@@ -310,6 +311,8 @@ function QueueItem({
             onBlur={saveNarration}
             onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
           />
+
+          <ReceiptNote meta={t.meta} />
 
           <BaseChoice
             book={book}
