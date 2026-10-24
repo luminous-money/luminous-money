@@ -200,7 +200,7 @@ How it's put together:
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 185 tests, including the table lint
-    - auth: 20; app: 188; ai: 7; db: 10; csv-import: 22
+    - auth: 20; app: 189; ai: 8; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
   - `pnpm e2e`: 90 API tests and 96 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
@@ -282,6 +282,10 @@ How it's put together:
 - **A confirmed transaction has no split flags:** the ledger drops them on any `*` write
   (`engine.confirmed`), and `FakeLedger` does the same, so tests see what production does.
   Don't confirm by editing text if the flags matter: text keeps what it says.
+- **The AI never breaks a flow; it says why it didn't help.** A failed call (no credit, a bad
+  key, an unknown model) becomes the reason in a receipt's note or Suggest categories' note, and
+  a line in `docker compose logs ai`. Real Claude calls haven't been exercised in tests (no key
+  in the repo): the first real ones are Kael's.
 - **Claude's models are set per operation:** `AI_CLAUDE_EXTRACT_MODEL` (default
   `claude-sonnet-5`) and `AI_CLAUDE_CATEGORIZE_MODEL` (default `claude-opus-5`); the old
   `AI_CLAUDE_MODEL` is gone. The server-side refusal fallback is only sent for Opus 5 and Fable
