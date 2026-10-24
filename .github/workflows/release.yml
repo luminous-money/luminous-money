@@ -14,7 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # The docker driver, as on a workstation: what's built is loaded, for the e2e stack to run
       - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
       - run: docker buildx bake test
       - run: ./scripts/e2e.sh
 
