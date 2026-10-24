@@ -16,7 +16,6 @@ import { ReconcileStatus } from "../components/ReconcileStatus.js";
 import { partOf, reconciledItself } from "../../shared/divided.js";
 import { MoveMoney, PartsCard, partsOf } from "../components/Parts.js";
 import { SelectBar } from "../components/SelectBar.js";
-import { SuggestNote } from "../components/SuggestNote.js";
 import { useBulkActions } from "../lib/bulk.js";
 import { postable } from "../lib/accounts.js";
 import { today } from "../lib/format.js";
@@ -28,7 +27,6 @@ import {
   useAccountLedger,
   useAccounts,
   useAccountTree,
-  useSuggest,
   useScheduled,
   useSetStar,
   useStars,
@@ -86,7 +84,6 @@ export function AccountLedger({ book, account }: { book: string; account: string
   const linked = bank.data?.[account] ?? bank.data?.[account.replace(/:Cash$/, "")];
   const setStar = useSetStar(book);
   const scheduled = useScheduled(book);
-  const suggest = useSuggest(book, account);
   const accounts = useAccounts(book);
   const create = useAccountCreation(book);
   const selection = useSelection();
@@ -173,9 +170,6 @@ export function AccountLedger({ book, account }: { book: string; account: string
         )}
         {canWrite && !selection.selecting && (
           <div className="actions">
-            <button type="button" disabled={suggest.isPending} onClick={() => suggest.mutate()}>
-              {suggest.isPending ? "Suggesting…" : "Suggest categories"}
-            </button>
             <button type="button" onClick={selection.start}>
               Select
             </button>
@@ -206,7 +200,6 @@ export function AccountLedger({ book, account }: { book: string; account: string
             )}
           </div>
         )}
-        {suggest.data && <SuggestNote book={book} suggested={suggest.data.suggested} />}
       </header>
 
       {info?.divided && wholeInfo && tree.data && !selection.selecting && (

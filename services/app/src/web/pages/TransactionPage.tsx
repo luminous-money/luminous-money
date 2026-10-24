@@ -20,7 +20,7 @@ import {
   useEditTransaction,
   useTransaction,
 } from "../lib/queries.js";
-import { api } from "../lib/ledger.js";
+import { attachments } from "../lib/appApi.js";
 import { simple } from "../lib/split.js";
 
 /** Its postings' reconciliations (M14): which account's statement, of which day. */
@@ -149,7 +149,7 @@ function Editor({
       const changes = { date, flag, payee: payee.trim() || null, narration, postings, meta };
       if (isNew) {
         const created = await add.mutateAsync({ ...changes, tags: [], links: [] });
-        for (const file of pending) await api.attach(book, created.id, file.blob, file.name);
+        for (const file of pending) await attachments.add(book, created.id, file.blob, file.name);
         return navigate(back);
       }
       await edit.mutateAsync(changes);

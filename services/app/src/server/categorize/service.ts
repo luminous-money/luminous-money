@@ -13,6 +13,7 @@ import type { Transaction } from "@luminous-money/ledger-client";
 import type { FeedbackRequest } from "../../shared/categorizer-api.js";
 import { isUncategorized } from "../../shared/accounts.js";
 import { negate } from "../../shared/decimal.js";
+import { hasReceipt } from "../../shared/receipts.js";
 import type { CategoryRule } from "../../shared/rules.js";
 import type { AppDb, StoredProposal } from "../db.js";
 import type { LedgerPort } from "../ledger.js";
@@ -71,7 +72,7 @@ export function proposalRecord(
 }
 
 /** Receipts never confirm automatically, whatever a rule says: you land on them in review. */
-const mayAutoConfirm = (t: Pick<Transaction, "meta">) => t.meta?.["source"] !== "receipt";
+const mayAutoConfirm = (t: Pick<Transaction, "meta">) => !hasReceipt(t.meta);
 
 /** Write a decision to an unconfirmed transaction, and record the proposal. */
 async function apply(

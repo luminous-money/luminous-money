@@ -40,9 +40,15 @@ async function act(bar: Locator, name: string) {
 test("Suggest categories fills in a category and says where it came from", async ({ page }) => {
   await withUnconfirmed(page, ["CORNER CAFE #57"]);
 
-  await page.getByRole("button", { name: "Suggest categories" }).click();
+  await page.getByRole("button", { name: "Select" }).click();
+  const bar = page.getByRole("toolbar", { name: "Selected" });
+  await bar.getByRole("button", { name: "Select all" }).click();
+  await act(bar, "Suggest categories");
 
-  await expect(page.getByText("Suggested categories for 1.")).toBeVisible();
+  await expect(bar).toContainText(
+    "Suggested categories for 1 of 1: from rules and history (the book's AI isn't set up)."
+  );
+  await bar.getByRole("button", { name: "Done" }).click();
   const card = page.getByRole("article");
   await expect(card).toContainText("Suggested by history (50%)");
   await expect(card.getByRole("button", { name: /^Category:/ })).toContainText("Food:Coffee");
@@ -129,18 +135,20 @@ test("an account's ledger suggests categories, and categorizes and confirms in b
     `/ui/books/${book.id}/accounts/${encodeURIComponent("Assets:Bank:PNC-Checking")}`
   );
 
-  await page.getByRole("button", { name: "Suggest categories" }).click();
-  await expect(page.getByText("Suggested categories for 1.")).toBeVisible();
+  await page.getByRole("button", { name: "Select" }).click();
   const list = page.getByRole("list", { name: "Transactions" });
+  const bar = page.getByRole("toolbar", { name: "Selected" });
+  await list.getByRole("checkbox", { name: /CORNER CAFE #9/ }).click();
+  await act(bar, "Suggest categories");
+  await expect(bar).toContainText("Suggested categories for 1 of 1");
   // Now with history's clean payee, and its category.
-  await expect(list.getByRole("button", { name: /Corner Cafe.*unconfirmed/ })).toContainText(
+  await expect(list.getByRole("checkbox", { name: /Corner Cafe.*unconfirmed/ })).toContainText(
     "Food:Coffee"
   );
+  await list.getByRole("checkbox", { name: /Corner Cafe.*unconfirmed/ }).click(); // chosen no more
 
-  await page.getByRole("button", { name: "Select" }).click();
   await list.getByRole("checkbox", { name: /TEA ONE/ }).click();
   await list.getByRole("checkbox", { name: /TEA TWO/ }).click();
-  const bar = page.getByRole("toolbar", { name: "Selected" });
   await expect(bar).toContainText("2 selected");
   await bar.getByRole("button", { name: "Actions ▾" }).click();
   await expect(bar.getByRole("menuitem", { name: /^Confirm 2/ })).toBeDisabled(); // uncategorized

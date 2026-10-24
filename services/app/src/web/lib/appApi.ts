@@ -19,7 +19,7 @@ import type {
   LinkRequest,
 } from "../../shared/bank-feeds.js";
 
-import { ApiError } from "./ledger.js";
+import { ApiError, type Attachment } from "./ledger.js";
 import type { PairedTransfer } from "../../shared/transfers.js";
 import type { SystemInfo } from "../../shared/system.js";
 import type { ReconcileDraft, ReconcileView, Reconciled } from "../../shared/reconcile.js";
@@ -253,20 +253,63 @@ export const accountChanges = {
 
 export type PurgePreview = components["schemas"]["PurgePreview"];
 
+/** What reading a receipt made: the transaction (new, or the one it was read into). */
+export type Captured = {
+  transaction_id: string;
+  read: boolean;
+  matched: boolean;
+  note: string | null;
+};
+
+const transactionPath = (book: string, transaction: string) =>
+  `${base(book)}/transactions/${encodeURIComponent(transaction)}`;
+
 /** Receipts (M16): the file and the hints, read by the ai service if the book has it, staged
- * unconfirmed with the receipt attached. */
+ * unconfirmed with the receipt attached (or read into the bank's copy, if that's here). */
 export const receipts = {
   capture: async (
     book: string,
     file: Blob,
     filename: string,
     hints: Record<string, string | null | undefined>
-  ): Promise<{ transaction_id: string; read: boolean; note: string | null }> => {
+  ): Promise<Captured> => {
     const form = new FormData();
     form.set("file", file, filename);
     for (const [key, value] of Object.entries(hints)) if (value) form.set(key, value);
     return json(await apiFetch(`${base(book)}/receipts`, { method: "POST", body: form }));
   },
+  /** Read a receipt the transaction holds into it, sending it back to review. */
+  readInto: async (book: string, transaction: string, attachment: string): Promise<Captured> => {
+    const form = new FormData();
+    form.set("attachment", attachment);
+    return json(
+      await apiFetch(`${transactionPath(book, transaction)}/receipt`, {
+        method: "POST",
+        body: form,
+      })
+    );
+  },
+};
+
+/** Attachments (M16) go through the app, which keeps images as any browser shows them (an
+ * iPhone's HEIC becomes a JPEG). The body is the file itself. */
+export const attachments = {
+  add: async (
+    book: string,
+    transaction: string,
+    file: Blob,
+    filename: string
+  ): Promise<Attachment> =>
+    json(
+      await apiFetch(
+        `${transactionPath(book, transaction)}/attachments?filename=${encodeURIComponent(filename)}`,
+        {
+          method: "POST",
+          headers: { "content-type": file.type || "application/octet-stream" },
+          body: file,
+        }
+      )
+    ),
 };
 
 /** Reconciling an account (M14): the screen's view, saving for later, finishing. */

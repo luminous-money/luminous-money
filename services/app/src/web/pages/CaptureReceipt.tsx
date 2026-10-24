@@ -130,7 +130,7 @@ export function CaptureReceipt({ book }: { book: string }) {
                 ref={input}
                 type="file"
                 hidden
-                accept="image/*,application/pdf"
+                accept="image/*,.heic,.heif,application/pdf"
                 aria-label="Upload a receipt"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
@@ -216,7 +216,9 @@ export function CaptureReceipt({ book }: { book: string }) {
               <button
                 type="submit"
                 className="primary"
-                disabled={!photo || !totalOk || capture.isPending}
+                // The chart first: the account it was paid from is chosen from it (the page's
+                // own, `preset`, once it's there).
+                disabled={!photo || !totalOk || !accounts.data || capture.isPending}
               >
                 {capture.isPending ? "Reading it…" : "Create transaction"}
               </button>

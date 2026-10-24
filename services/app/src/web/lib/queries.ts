@@ -33,6 +33,7 @@ import { aiApi, type AiSettingsPatch } from "./ai.js";
 import {
   accountChanges,
   appApi,
+  attachments as appAttachments,
   bankFeeds,
   receipts,
   reconciling,
@@ -636,15 +637,6 @@ export function useBulkEdit(book: string) {
   });
 }
 
-/** "Suggest categories" for unconfirmed transactions not yet categorized. */
-export function useSuggest(book: string, account?: string) {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: () => appApi.suggest(book, account),
-    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
-  });
-}
-
 export function useRules(book: string) {
   return useQuery({ queryKey: keys.rules(book), queryFn: () => appApi.rules(book) });
 }
@@ -1123,8 +1115,18 @@ export function useAttach(book: string, transaction: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ file, filename }: { file: Blob; filename: string }) =>
-      api.attach(book, transaction, file, filename),
+      appAttachments.add(book, transaction, file, filename),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.transaction(book, transaction) }),
+  });
+}
+
+/** Read a receipt the transaction holds into it (M16): it's back in review, its splits the
+ * receipt's. */
+export function useReadReceipt(book: string, transaction: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (attachment: string) => receipts.readInto(book, transaction, attachment),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
   });
 }
 

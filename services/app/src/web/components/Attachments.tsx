@@ -1,12 +1,23 @@
 /**
  * A transaction's attachments (M16): each one (an image as a thumbnail, anything else by name)
  * to open or remove, and the camera button to add one: Open camera (grayed out without one) or
- * Upload. A transaction not saved yet holds what's added (`pending`) until it is.
+ * Upload. A transaction not saved yet holds what's added (`pending`) until it is. With the
+ * book's AI set up, a photo or PDF it holds can be read into it as its receipt (Read receipt):
+ * its splits become the receipt's, and it's back in review, where this goes.
  */
 import { useRef, useState } from "react";
+import { useLocation } from "wouter";
 
 import { api, type Attachment } from "../lib/ledger.js";
-import { explain, useAttach, useAttachments, useDetach } from "../lib/queries.js";
+import { withBack } from "../lib/navigation.js";
+import {
+  explain,
+  useAttach,
+  useAttachments,
+  useDetach,
+  useReadReceipt,
+  useReceiptsReady,
+} from "../lib/queries.js";
 import { CameraView, prepared, useHasCamera } from "./Camera.js";
 
 export type Pending = { blob: Blob; name: string };
@@ -29,7 +40,19 @@ export function Attachments({
   const saved = useAttachments(book, transaction);
   const attach = useAttach(book, transaction);
   const detach = useDetach(book, transaction);
+  const readReceipt = useReadReceipt(book, transaction);
+  const readable = useReceiptsReady(book) && canWrite && !!transaction;
+  const [location, navigate] = useLocation();
   const [error, setError] = useState<string | null>(null);
+  const read = async (attachment: string) => {
+    setError(null);
+    try {
+      const made = await readReceipt.mutateAsync(attachment);
+      navigate(withBack(`/books/${book}/review?only=${made.transaction_id}`, location));
+    } catch (e) {
+      setError(explain(e));
+    }
+  };
   const add = async (file: Pending) => {
     setError(null);
     if (!transaction) return onPending?.([...(pending ?? []), file]);
@@ -47,6 +70,10 @@ export function Attachments({
         image: a.content_type.startsWith("image/"),
         href: api.attachmentUrl(book, a.id),
         remove: () => detach.mutate(a.id),
+        read:
+          readable && (a.content_type.startsWith("image/") || a.content_type === "application/pdf")
+            ? () => void read(a.id)
+            : undefined,
       }))
     : (pending ?? []).map((p, i) => ({
         key: String(i),
@@ -54,6 +81,7 @@ export function Attachments({
         image: p.blob.type.startsWith("image/"),
         href: URL.createObjectURL(p.blob),
         remove: () => onPending?.((pending ?? []).filter((_, j) => j !== i)),
+        read: undefined as (() => void) | undefined,
       }));
   return (
     <section className="attachments" aria-label="Attachments">
@@ -72,6 +100,19 @@ export function Attachments({
                 <span className="file-name">{a.name}</span>
               )}
             </a>
+            {a.read && (
+              <button
+                type="button"
+                className="plain small"
+                aria-label={`Read ${a.name} as its receipt`}
+                disabled={readReceipt.isPending}
+                onClick={a.read}
+              >
+                {readReceipt.isPending && readReceipt.variables === a.key
+                  ? "Reading…"
+                  : "Read receipt"}
+              </button>
+            )}
             {canWrite && (
               <button
                 type="button"
@@ -119,7 +160,7 @@ export function AddAttachment({
         ref={input}
         type="file"
         hidden
-        accept="image/*,application/pdf"
+        accept="image/*,.heic,.heif,application/pdf"
         aria-label="Upload a file"
         onChange={async (e) => {
           const file = e.target.files?.[0];

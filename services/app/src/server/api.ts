@@ -22,7 +22,8 @@ import {
 } from "./reports.js";
 import { finish, ReconcileProblem, reconcileView, saveDraft } from "./reconcile.js";
 import type { AiPort } from "./ai.js";
-import { captureReceipt, ReceiptProblem } from "./receipts.js";
+import { normalized, UPLOAD_LIMIT } from "./images.js";
+import { captureReceipt, readReceipt, ReceiptProblem } from "./receipts.js";
 import type { System } from "./system.js";
 import { pairAfterImport, pairedTransfers, rejectTransfer, TransferProblem } from "./transfers.js";
 import { UPCOMING_DAYS, type ScheduleIn, type SchedulePatch } from "../shared/schedule.js";
@@ -249,6 +250,66 @@ export function createApi({
         );
       }
       throw error;
+    }
+  });
+
+  /** Attach a file to a transaction (M16), the body the file itself (as the ledger takes it),
+   * kept as images are kept: an iPhone's HEIC becomes a JPEG, one too big is made smaller. */
+  api.post("/books/:book/transactions/:id/attachments", async (c) => {
+    const { book, id } = c.req.param();
+    const tooBig = () => c.json({ detail: "an attachment is at most 25 MB" }, 413);
+    if (Number(c.req.header("content-length") ?? 0) > UPLOAD_LIMIT) return tooBig();
+    const bytes = new Uint8Array(await c.req.arrayBuffer());
+    if (bytes.length > UPLOAD_LIMIT) return tooBig();
+    const kept = await normalized({
+      name: c.req.query("filename") || "attachment",
+      type:
+        (c.req.header("content-type") ?? "").split(";")[0]!.trim() || "application/octet-stream",
+      bytes,
+    });
+    try {
+      return c.json(await ledgerFor(c.get("user")).attach(book, id, kept), 201);
+    } catch (error) {
+      return c.json(...ledgerStatus(error));
+    }
+  });
+
+  /** Read a receipt into a transaction (M16, its page's Read receipt): multipart, with `file` (a
+   * new one, attached too) or `attachment` (the ID of one it holds), and `itemize` (yes/no; the
+   * book's setting without). It's back in review after. */
+  api.post("/books/:book/transactions/:id/receipt", async (c) => {
+    const { book, id } = c.req.param();
+    const form = await c.req.parseBody();
+    const file = form["file"];
+    const attachment = typeof form["attachment"] === "string" ? form["attachment"] : null;
+    if (!(file instanceof File) && !attachment)
+      return c.json({ detail: "send the receipt as `file`, or name an `attachment`" }, 422);
+    const ledger = ledgerFor(c.get("user"));
+    try {
+      return c.json(
+        await readReceipt({
+          ledger,
+          ai: aiFor?.(c.get("user")),
+          db,
+          categorizers,
+          book,
+          transaction: id,
+          itemize: typeof form["itemize"] === "string" ? form["itemize"] === "yes" : null,
+          ...(file instanceof File
+            ? {
+                file: {
+                  name: file.name,
+                  type: file.type,
+                  bytes: new Uint8Array(await file.arrayBuffer()),
+                },
+              }
+            : { file: await ledger.attachmentFile(book, attachment!), attached: true }),
+          today: bookToday(db, book),
+        })
+      );
+    } catch (error) {
+      if (error instanceof ReceiptProblem) return c.json({ detail: error.message }, error.status);
+      return c.json(...ledgerStatus(error));
     }
   });
 

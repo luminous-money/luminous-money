@@ -14,6 +14,7 @@ import type {
 import { add, isZero, negate } from "../shared/decimal.js";
 import {
   LedgerError,
+  type Attachment,
   type Book,
   type BudgetStatus,
   type DayBalances,
@@ -312,7 +313,7 @@ export class FakeLedger implements LedgerPort {
   async patch(
     book: string,
     id: string,
-    changes: Partial<Pick<TransactionIn, "postings" | "payee" | "flag">>,
+    changes: Partial<Pick<TransactionIn, "postings" | "payee" | "narration" | "flag" | "meta">>,
     _updated_at: string
   ) {
     const found = await this.transaction(book, id);
@@ -394,6 +395,8 @@ export class FakeLedger implements LedgerPort {
   }
 
   attachments: { transaction: string; name: string; type: string; size: number }[] = [];
+  /** The attached files, by attachment ID. */
+  files = new Map<string, { name: string; type: string; bytes: Uint8Array }>();
   async attach(
     _book: string,
     transaction: string,
@@ -405,7 +408,23 @@ export class FakeLedger implements LedgerPort {
       type: file.type,
       size: file.bytes.length,
     });
-    return { id: `a${this.attachments.length}` };
+    const id = `a${this.attachments.length}`;
+    this.files.set(id, file);
+    return {
+      id,
+      transaction_id: transaction,
+      filename: file.name,
+      content_type: file.type,
+      size: file.bytes.length,
+      sha256: "",
+      created_at: "2026-01-01T00:00:00Z",
+    } satisfies Attachment;
+  }
+
+  async attachmentFile(_book: string, attachment: string) {
+    const found = this.files.get(attachment);
+    if (!found) throw new LedgerError(404, "no such attachment");
+    return found;
   }
 
   /** Divide a leaf (M15), as the ledger does: its postings to the main part, the parts given

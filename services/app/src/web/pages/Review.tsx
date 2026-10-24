@@ -5,7 +5,6 @@ import { Link, useLocation } from "wouter";
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { ReceiptNote } from "../components/ReceiptNote.js";
-import { SuggestNote } from "../components/SuggestNote.js";
 import { useBulkActions } from "../lib/bulk.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
@@ -34,7 +33,6 @@ import {
   useScheduled,
   useBankStatus,
   useReviewQueue,
-  useSuggest,
   writeSkipped,
 } from "../lib/queries.js";
 import { chosen, simple, UNCATEGORIZED, unresolved, withCounterpart } from "../lib/split.js";
@@ -42,9 +40,9 @@ import { chosen, simple, UNCATEGORIZED, unresolved, withCounterpart } from "../l
 /**
  * The review queue: unconfirmed transactions to categorize and confirm, and imported rows matched
  * to transactions already in the account, whose matches are confirmed here too (or moved,
- * swapped, or undone). Categories proposed on import say where they came from. "Suggest
- * categories" proposes for anything still uncategorized; Select mode categorizes or confirms
- * many at once.
+ * swapped, or undone). Categories proposed on import say where they came from. Select mode
+ * acts on many at once: confirms them, categorizes them, or suggests their categories (rules,
+ * history and the book's AI).
  */
 export function Review({ book }: { book: string }) {
   const [, navigate] = useLocation();
@@ -58,7 +56,6 @@ export function Review({ book }: { book: string }) {
   const bank = useBankStatus(book);
   const notAtBank = new Set(Object.values(bank.data ?? {}).flatMap((s) => s.not_at_bank));
   const proposals = useProposals(book);
-  const suggest = useSuggest(book);
   const bulk = useBulkEdit(book);
   const selection = useSelection();
   const [skipped, setSkipped] = useState(() => readSkipped(book));
@@ -106,16 +103,12 @@ export function Review({ book }: { book: string }) {
           {queue.items && ` · ${ordered.length} left`}
         </p>
         <div className="actions">
-          <button type="button" disabled={suggest.isPending} onClick={() => suggest.mutate()}>
-            {suggest.isPending ? "Suggesting…" : "Suggest categories"}
-          </button>
           {!selection.selecting && (
             <button type="button" onClick={selection.start}>
               Select
             </button>
           )}
         </div>
-        {suggest.data && <SuggestNote book={book} suggested={suggest.data.suggested} />}
       </header>
 
       {selection.selecting && (

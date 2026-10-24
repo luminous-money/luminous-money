@@ -1,6 +1,9 @@
 /** M16: setting a book's AI up, capturing a receipt from a file, and reviewing it (its splits
- * too); an account's payment cards. */
-import { expect, test } from "@playwright/test";
+ * too); a receipt read into the bank's copy, or into a transaction from its page; an iPhone's
+ * photo kept as a JPEG; an account's payment cards. */
+import { readFileSync } from "node:fs";
+
+import { expect, test, type Page } from "@playwright/test";
 
 import { accounts, setUpUser, stored } from "./support.js";
 
@@ -10,6 +13,48 @@ const JPEG = Buffer.from(
   "base64"
 );
 
+// A synthetic HEIC (as an iPhone's photos are), the app's own test fixture.
+const HEIC = readFileSync(
+  new URL("../../../services/app/src/server/fixtures/receipt.heic", import.meta.url)
+);
+
+/** Turn the book's AI on with the fake provider: it reads every receipt as Fake Store's, 12.34
+ * today, in two lines. */
+async function fakeAi(page: Page, book: string) {
+  await page.goto(`/ui/books/${book}/ai`);
+  // Saved as it's ticked: checked once the service has it.
+  const use = page.getByLabel("Use AI in this book");
+  await use.click();
+  await expect(use).toBeChecked();
+  await page.getByRole("combobox", { name: "Provider" }).selectOption("fake");
+  await expect(page.getByText(/Ready: the camera/)).toBeVisible();
+}
+
+/** A confirmed purchase already in the account, as if imported and categorized. */
+async function bankCopy(
+  session: Awaited<ReturnType<typeof setUpUser>>["session"],
+  book: string,
+  account: string,
+  { date, amount }: { date: string; amount: string }
+) {
+  const { data } = await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+    params: { path: { book_id: book } },
+    body: {
+      date,
+      flag: "*",
+      payee: "FAKE STORE 0042",
+      narration: "",
+      postings: [
+        { account, units: { number: amount, currency: "USD" } },
+        { account: "Expenses:Food:Groceries" },
+      ],
+    },
+  });
+  return data!;
+}
+
+const yesterday = () => new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+
 test("a receipt is captured from a file, read, and reviewed, coming back where it started", async ({
   page,
 }) => {
@@ -18,13 +63,7 @@ test("a receipt is captured from a file, read, and reviewed, coming back where i
     params: { path: { book_id: book.id } },
     body: { name: "Expenses:Food:Groceries", kind: "leaf" },
   });
-  await page.goto(`/ui/books/${book.id}/ai`);
-  // Saved as it's ticked: checked once the service has it.
-  const use = page.getByLabel("Use AI in this book");
-  await use.click();
-  await expect(use).toBeChecked();
-  await page.getByRole("combobox", { name: "Provider" }).selectOption("fake");
-  await expect(page.getByText(/Ready: the camera/)).toBeVisible();
+  await fakeAi(page, book.id);
 
   // From the account's page, the masthead's camera takes the account as the hint.
   await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
@@ -108,12 +147,7 @@ test("an itemized receipt's splits are each placed in review", async ({ page }) 
       params: { path: { book_id: book.id } },
       body: { name, kind: "leaf" },
     });
-  await page.goto(`/ui/books/${book.id}/ai`);
-  const use = page.getByLabel("Use AI in this book");
-  await use.click();
-  await expect(use).toBeChecked();
-  await page.getByRole("combobox", { name: "Provider" }).selectOption("fake");
-  await expect(page.getByText(/Ready: the camera/)).toBeVisible();
+  await fakeAi(page, book.id);
 
   await page.goto(`/ui/books/${book.id}/receipt?account=${encodeURIComponent(account)}`);
   await page.getByLabel("Upload a receipt").setInputFiles({
@@ -143,4 +177,70 @@ test("an itemized receipt's splits are each placed in review", async ({ page }) 
   await item.getByRole("button", { name: "Confirm" }).click();
   // Opened without a way back, it goes home.
   await expect(page).toHaveURL((url) => url.pathname.endsWith(`/books/${book.id}`));
+});
+
+test("a receipt for a purchase already here is read into it, which is back in review", async ({
+  page,
+}) => {
+  const { session, book, account } = await setUpUser(page);
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+    params: { path: { book_id: book.id } },
+    body: { name: "Expenses:Food:Groceries", kind: "leaf" },
+  });
+  const date = yesterday();
+  const bank = await bankCopy(session, book.id, account, { date, amount: "-12.34" });
+  await fakeAi(page, book.id);
+
+  await page.goto(`/ui/books/${book.id}/receipt?account=${encodeURIComponent(account)}`);
+  await page.getByLabel("Upload a receipt").setInputFiles({
+    name: "fake.jpg",
+    mimeType: "image/jpeg",
+    buffer: JPEG,
+  });
+  await page.getByRole("radio", { name: "Yes" }).click();
+  await page.getByRole("button", { name: "Create transaction" }).click();
+
+  await expect(page).toHaveURL((url) => url.searchParams.get("only") === bank.id);
+  const item = page.getByRole("article").filter({ hasText: "FAKE STORE 0042" });
+  await expect(item.getByLabel("About the receipt")).toHaveText(
+    `Receipt: It was read into the transaction already here from ${date}, which is back in review. Read by the fake provider.`
+  );
+  await expect(item.getByRole("button", { name: /^FIRST ITEM/ })).toBeVisible();
+  const t = await stored(book.id, bank.id);
+  expect([t.flag, t.postings.length, t.date]).toEqual(["!", 3, date]);
+});
+
+test("an iPhone's photo is kept as a JPEG, and read into its transaction as the receipt", async ({
+  page,
+}) => {
+  const { session, book, account } = await setUpUser(page);
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+    params: { path: { book_id: book.id } },
+    body: { name: "Expenses:Food:Groceries", kind: "leaf" },
+  });
+  // Paid with a tip the receipt doesn't show.
+  const t0 = await bankCopy(session, book.id, account, { date: yesterday(), amount: "-15.00" });
+  await fakeAi(page, book.id);
+
+  await page.goto(`/ui/books/${book.id}/transactions/${t0.id}`);
+  await page.getByLabel("Upload a file").setInputFiles({
+    name: "IMG_0001.HEIC",
+    mimeType: "image/heic",
+    buffer: HEIC,
+  });
+  const photo = page.getByRole("img", { name: "IMG_0001.jpg" });
+  await expect(photo).toBeVisible();
+  await expect
+    .poll(() => photo.evaluate((img) => (img as unknown as { naturalWidth: number }).naturalWidth))
+    .toBe(600);
+
+  await page.getByRole("button", { name: "Read IMG_0001.jpg as its receipt" }).click();
+  await expect(page).toHaveURL((url) => url.searchParams.get("only") === t0.id);
+  const item = page.getByRole("article").filter({ hasText: "FAKE STORE 0042" });
+  await expect(item.getByLabel("About the receipt")).toContainText(
+    "The receipt says 12.34; the transaction's amount was kept."
+  );
+  const t = await stored(book.id, t0.id);
+  expect(t.flag).toBe("!");
+  expect(t.postings[0]!.units?.number).toBe("-15.00");
 });

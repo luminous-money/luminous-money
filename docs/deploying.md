@@ -93,7 +93,7 @@ address in `LUMINOUS_MONEY_TRUSTED_PROXIES`.
 
 - **Caddy:** `books.example.com { reverse_proxy 127.0.0.1:8080 }`
 - **nginx:** `proxy_pass http://127.0.0.1:8080;` with `proxy_set_header Host $host;` and
-  `proxy_set_header X-Forwarded-Proto $scheme;`, and `client_max_body_size 10m;` (receipts and
+  `proxy_set_header X-Forwarded-Proto $scheme;`, and `client_max_body_size 25m;` (receipts and
   imports are uploads).
 - **Tailscale Serve** (HTTPS on your tailnet, nothing public): `tailscale serve --bg 8080`; set
   `LUMINOUS_MONEY_PUBLIC_URL` to the `https://<machine>.<tailnet>.ts.net` address it prints.

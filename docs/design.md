@@ -799,8 +799,15 @@ same money in through another's, a day or so later. Both would sit in review, un
   its book deletes them. A transaction says how many it has (`attachments`).
 - **The body is the file** (`POST …/transactions/{t}/attachments?filename=`, its
   `Content-Type` the type), not multipart: one file per request, and the ledger stays free of
-  form parsing. 5 MB each (413 above); the PWA shrinks photos (JPEG, at most 2,000 px a side)
-  before sending them.
+  form parsing. 5 MB each (413 above).
+- **The server keeps images as every browser shows them, so no client has to:** the PWA
+  attaches through `app` (`POST /api/app/v1/books/{b}/transactions/{t}/attachments`, the same
+  shape), which, like a receipt, goes through `normalized` (`server/images.ts`) first. An
+  iPhone's HEIC (known by its bytes: browsers often give it no type) or any image that isn't
+  JPEG, PNG, WebP or GIF becomes a JPEG at most 2,000 px a side, and so does one over 5 MB;
+  anything else is kept as it is. HEIC is decoded by libheif in WASM (`heic-decode`), since
+  sharp's own build has no HEVC; sharp does the rest. Uploads may be 25 MB before that. The PWA
+  still shrinks a big JPEG, PNG or WebP before sending it, only to send less.
 - **Exports and backups don't carry them yet:** they're Beancount text. Noted for later.
 
 ### Receipts and AI (M16)
@@ -841,8 +848,25 @@ same money in through another's, a day or so later. Both would sit in review, un
   which the bank's copy could never match). A divided account takes it in its main part.
 - **A capture always makes something:** if AI is off, down, or can't read it, the transaction
   is made from what was typed (a zero total if nothing), with the receipt attached and
-  `receipt-note:` saying why. Staged unconfirmed with `source: "receipt"`, it never confirms
-  itself, and the matcher finds it when the bank's copy arrives.
+  `receipt-note:` saying why (shown on its review card and its page). Staged unconfirmed with
+  `source: "receipt"`, it never confirms itself, and the matcher finds it when the bank's copy
+  arrives.
+- **A receipt for a purchase already here is read into it, not made again** (Kael,
+  2026-10-24). The matcher looks at the paying account's transactions within its window (5
+  days either side of the receipt's date). The match must be clear: exactly the receipt's
+  amount, a purchase or refund (no other asset or liability in it, nothing at a cost or price),
+  no receipt read into it yet (`receipt-read:`, or made from one), and the one candidate or the
+  closest in date. Otherwise it's a new transaction, as before. The bank's copy keeps its date,
+  its payee (unless one was typed) and its paying posting, with that posting's part and
+  reconciliation mark. Its other side becomes the receipt's splits when it's itemized or still
+  uncategorized; a categorized one keeps its category. Either way it goes back to review (`!`):
+  a confirmed transaction is unconfirmed, and its note says so.
+- **Reading a receipt into a transaction** is the same with the transaction given (its page:
+  **Read receipt** on a photo or PDF it holds, with the book's AI set up; or `POST
+  …/transactions/{t}/receipt` with a new `file`). Its amount is the total ("the transaction's
+  amount was kept"), so what the lines don't cover (a tip written on the slip) is a split of
+  its own. Its paying posting is the one on the receipt's card's account, else its first asset
+  or liability; a transaction with none can't take a receipt.
 - **Providers are a small interface** (`extract`, `categorize`, or `ReadFailed`): `claude` (the
   official SDK, structured output against JSON Schemas checked again with zod;
   `AI_CLAUDE_EXTRACT_MODEL` and `AI_CLAUDE_CATEGORIZE_MODEL` override the models; the server-side
@@ -1092,15 +1116,17 @@ The default chain:
 
 Resolution only proposes. Everything lands in the review queue (new transactions as `!`, matches
 as proposed), with the match or proposal shown and confirmable with one tap, except what a
-user's rule confirms automatically. Review also has "Suggest categories" (the chain over unconfirmed
-uncategorized transactions), "Also categorize N similar" (same payee key, same account), "Remember
-as a rule", and Select mode for doing many at once.
+user's rule confirms automatically. Review also has "Also categorize N similar" (same payee key,
+same account), "Remember as a rule", and Select mode for doing many at once.
 
 **Select mode's bulk actions are one menu** (Actions ▾, `lib/bulk.ts`), the same in review, an
 account's ledger and Transactions: Confirm, Categorize as… (an account picker in the bar), and
-Suggest categories, which for a selection asks the book's AI too, when it's set up (M19's
-categorizer, already there for receipts). Each says why it can't run when it can't; a new bulk
-action is one more entry.
+Suggest categories, which asks the book's AI too, when it's set up (M19's categorizer, already
+there for receipts). Each says why it can't run when it can't; a new bulk action is one more
+entry. **Suggest categories is only a bulk action** (Kael, 2026-10-24): a button over every
+unconfirmed transaction ran rules and history alone, which had already run on import, so it
+rarely found anything and seemed to do nothing. Select all, then Suggest categories, does that
+and asks the AI.
 
 #### Context
 

@@ -203,26 +203,6 @@ export const api = {
       })
     ),
 
-  /** Attach a file: the body is the file itself (at most 5 MB). */
-  async attach(
-    book_id: string,
-    transaction: string,
-    file: Blob,
-    filename: string
-  ): Promise<Attachment> {
-    const response = await apiFetch(
-      `/api/ledger/v1/books/${encodeURIComponent(book_id)}/transactions/${encodeURIComponent(transaction)}/attachments?filename=${encodeURIComponent(filename)}`,
-      {
-        method: "POST",
-        headers: { "content-type": file.type || "application/octet-stream" },
-        body: file,
-      }
-    );
-    const body = (await response.json().catch(() => ({}))) as Attachment & { detail?: unknown };
-    if (!response.ok) throw new ApiError(response.status, describe(body) ?? "couldn't attach it");
-    return body;
-  },
-
   async detach(book_id: string, attachment: string) {
     const { response, error } = await ledger.DELETE(
       "/api/ledger/v1/books/{book_id}/attachments/{attachment_id}",

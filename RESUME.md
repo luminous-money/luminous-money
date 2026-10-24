@@ -43,9 +43,14 @@ What a user can do now:
   to where you were. The account that paid is the one holding the receipt's **card** (an asset
   or liability's editor lists its **Payment cards**: brand and last four), else the page you
   came from, else `Assets:Unknown`, which review asks to replace ("Paid from"). If it can't be
-  read (AI off, down, or it failed), the transaction is made from what you typed, saying why.
-  **Attachments:** any transaction's page has them (Open camera, or Upload; 5 MB each), new
-  transactions too.
+  read (AI off, down, or it failed), the transaction is made from what you typed, saying why
+  (the review card and the transaction's page show its **Receipt:** note). **A receipt for a
+  purchase already here** (the bank's copy: the paying account, exactly its amount, within 5
+  days) is read into that instead of making a second, which goes back to review even if it was
+  confirmed. **Read receipt** on a transaction's page reads a photo or PDF it holds into it
+  (its amount kept as the total). **Attachments:** any transaction's page has them (Open
+  camera, or Upload), new transactions too. The server keeps every image as browsers show it:
+  an iPhone's HEIC becomes a JPEG (at most 2,000 px a side), as does any image over 5 MB.
 - **Split flags (M16):** what's proposed and not yet confirmed is marked on the split (`!` on
   the posting): imports stage their categorized side that way, choosing an account yourself or
   confirming clears it, and Suggest categories and rules act on what's still flagged.
@@ -153,13 +158,13 @@ What a user can do now:
 - **Categorization (M4):** imported rows are staged with a proposed category and clean payee:
   from the user's **rules** (Rules page; can confirm automatically), from **history** (what the
   same payee was confirmed as), or from **external providers** (`CATEGORIZERS`, speaking
-  [our API](docs/categorizer-api.md)). Review shows where each came from; "Suggest categories",
-  "Also categorize N similar", "Remember as a rule…" and Select mode speed it up. Acceptance
+  [our API](docs/categorizer-api.md)). Review shows where each came from; "Also categorize N
+  similar", "Remember as a rule…" and Select mode (Suggest categories) speed it up. Acceptance
   per categorizer shows on the Rules page.
 - **Select mode** (review, account ledgers and Transactions): a sticky bar with **Actions ▾**
   (Confirm, Categorize as…, Suggest categories: rules, history and the book's AI), Select all
-  and Done; tap anywhere on a card or row to select. Review and ledgers also have "Suggest
-  categories" for everything unconfirmed.
+  and Done; tap anywhere on a card or row to select. Suggest categories is only a bulk action
+  now (the old button, rules and history alone, seemed to do nothing).
 - **Investments (M5):** starred brokerages and holdings show **value, unrealized gain** and how
   fresh their prices are; account pages list **holdings** (lots, Update price) and **Trade**
   (buy, sell with a lot preview and short/long-term gains, dividends); houses and cars are

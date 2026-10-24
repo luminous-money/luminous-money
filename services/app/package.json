@@ -18,17 +18,19 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.3",
     "@luminous-money/ai-api": "workspace:*",
     "@luminous-money/csv-import": "workspace:*",
     "@luminous-money/db": "workspace:*",
     "@luminous-money/ledger-client": "workspace:*",
-    "@hono/node-server": "^2.1.3",
     "@luminous-money/ledger-graphs-api": "^0.1.1",
     "@luminous-money/ledger-graphs-ui": "^0.1.1",
     "@wymp/config-simple": "^1.1.0",
     "dotenv": "^18.0.8",
     "echarts": "^6.1.0",
-    "hono": "^4.13.13"
+    "heic-decode": "^2.1.0",
+    "hono": "^4.13.13",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@luminous-money/simplefin-fake": "workspace:*",

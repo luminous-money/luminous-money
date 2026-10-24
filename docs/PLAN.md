@@ -266,6 +266,12 @@ Smaller improvements to pick up between milestones or at the end.
       Categorize as…, Suggest categories with the book's AI).
 - [x] **Delete an account with its transactions** (2026-10-23), after a red notice of every
       other account that changes.
+- [x] **Receipts meet the bank's copy** (2026-10-24): a capture reads itself into a clear
+      match already in the paying account (5 days either side), and **Read receipt** on a
+      transaction's page reads one it holds into it; either goes back to review.
+- [x] **HEIC on the server** (2026-10-24): every image is kept as browsers show it (an
+      iPhone's HEIC becomes a JPEG), for receipts and attachments alike.
+- [x] **Suggest categories only in Select mode** (2026-10-24), where it asks the book's AI.
 - [x] **Review newest first** (2026-10-17), the latest entered of a day first too.
 - [x] **Pair transfers in review** (2026-10-17): money out of one account and the same into
       another within 7 days, both imported, become one transfer, with "Reject" to restore the

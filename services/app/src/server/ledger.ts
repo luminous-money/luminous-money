@@ -20,7 +20,10 @@ import {
   type TransactionIn,
 } from "@luminous-money/ledger-client";
 
+import type { FileIn } from "./images.js";
+
 export type Book = components["schemas"]["Book"];
+export type Attachment = components["schemas"]["Attachment"];
 export type LedgerPage = components["schemas"]["LedgerPage"];
 export type TransactionEdit = components["schemas"]["TransactionEdit"];
 export type PriceIn = components["schemas"]["PriceIn"];
@@ -98,7 +101,7 @@ export interface LedgerPort {
   patch(
     book: string,
     id: string,
-    changes: Partial<Pick<TransactionIn, "postings" | "payee" | "flag">>,
+    changes: Partial<Pick<TransactionIn, "postings" | "payee" | "narration" | "flag" | "meta">>,
     updated_at: string
   ): Promise<Transaction>;
   /** The book's unconfirmed (`!`) transactions. */
@@ -126,7 +129,9 @@ export interface LedgerPort {
     book: string,
     transaction: string,
     file: { name: string; type: string; bytes: Uint8Array }
-  ): Promise<{ id: string }>;
+  ): Promise<Attachment>;
+  /** An attachment's file, as it was attached. */
+  attachmentFile(book: string, attachment: string): Promise<FileIn>;
   /** Divide an account (M15): a divided account of the same name, its history in its main part. */
   divide(book: string, account: string, d: DivideIn): Promise<Account>;
   /** Change an account's settings (only those given), against its version. */
@@ -369,13 +374,28 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
           body: file.bytes,
         }
       );
-      const body = (await response.json().catch(() => ({}))) as { id?: string; detail?: unknown };
+      const body = (await response.json().catch(() => ({}))) as Partial<Attachment> & {
+        detail?: unknown;
+      };
       if (!response.ok || !body.id)
         throw new LedgerError(
           response.status,
           typeof body.detail === "string" ? body.detail : "couldn't attach the file"
         );
-      return { id: body.id };
+      return body as Attachment;
+    },
+    async attachmentFile(book, attachment) {
+      const response = await fetch(
+        `${baseUrl}/api/ledger/v1/books/${encodeURIComponent(book)}/attachments/${encodeURIComponent(attachment)}`,
+        { headers: { "X-User-Id": userId } }
+      );
+      if (!response.ok) throw new LedgerError(response.status, "couldn't read the attachment");
+      const disposition = response.headers.get("content-disposition") ?? "";
+      return {
+        name: /filename="([^"]*)"/.exec(disposition)?.[1] || "attachment",
+        type: (response.headers.get("content-type") ?? "").split(";")[0]!.trim(),
+        bytes: new Uint8Array(await response.arrayBuffer()),
+      };
     },
     divide: (book, account, d) =>
       unwrap(

@@ -4,7 +4,13 @@ import type { AiSettings, CategorizeIn, CategorizeOut, ReceiptFacts } from "@lum
 
 import type { AiPort, Answer } from "./ai.js";
 import type { Categorizer } from "./categorize/types.js";
-import { captureReceipt, paidWith, ReceiptProblem, receiptTransaction } from "./receipts.js";
+import {
+  captureReceipt,
+  paidWith,
+  readReceipt,
+  ReceiptProblem,
+  receiptTransaction,
+} from "./receipts.js";
 import { FakeLedger } from "./testing.js";
 
 const CARD = "Liabilities:Fidelity-Visa";
@@ -242,6 +248,195 @@ describe("capturing a receipt", () => {
         hints: {},
         today: "2026-10-18",
       })
+    ).rejects.toThrow(ReceiptProblem);
+  });
+});
+
+/** A card purchase already here, as an import stages it (or as it was confirmed). */
+function bankCopy(
+  ledger: FakeLedger,
+  { date = "2026-01-22", amount = "-23.50", flag = "!", other = "Expenses:Uncategorized" } = {}
+) {
+  return ledger.addTransaction({
+    date,
+    flag,
+    payee: "JEWEL OSCO 3456",
+    narration: "",
+    meta: { source: "csv" },
+    postings: [
+      { account: CARD, units: { number: amount, currency: "USD" }, meta: { reconciled: "s1" } },
+      { account: other, flag: flag === "!" ? "!" : null },
+    ],
+  } as never);
+}
+
+const groceries = (input: CategorizeIn): CategorizeOut => ({
+  proposals: [
+    {
+      id: input.transactions[0]!.id,
+      splits: [],
+      fallback: "Expenses:Groceries",
+      confidence: 0.8,
+      reason: "a grocery store",
+    },
+  ],
+  new_accounts: [],
+});
+
+describe("a receipt for a transaction already here", () => {
+  it("is read into the bank's copy, within five days, keeping its paying side", async () => {
+    const ledger = setUp();
+    const bank = bankCopy(ledger);
+    bankCopy(ledger, { date: "2026-01-12" }); // too long before
+    const { port } = ai(() => ({ ok: facts() }), groceries);
+
+    const captured = await captureReceipt({
+      ledger,
+      ai: port,
+      book: "b",
+      file: PHOTO,
+      hints: { itemize: true },
+      today: "2026-10-18",
+    });
+
+    expect(captured).toMatchObject({ transaction_id: bank.id, matched: true, read: true });
+    expect(ledger.transactions).toHaveLength(2); // nothing new
+    const t = await ledger.transaction("b", bank.id);
+    expect([t.flag, t.date, t.payee, t.meta?.["receipt-read"]]).toEqual([
+      "!",
+      "2026-01-22", // the bank's date
+      "JEWEL OSCO 3456", // and its payee
+      "2026-10-18",
+    ]);
+    expect(t.postings[0]!.meta).toEqual({ reconciled: "s1" });
+    expect(accountsOf(t.postings)).toEqual([
+      [CARD, "-23.50"],
+      ["Expenses:Groceries", "9.99"],
+      ["Expenses:Groceries", "9.99"],
+      ["Expenses:Groceries", "3.52"],
+    ]);
+    expect(t.meta?.["receipt-note"]).toBe(
+      "It was read into the transaction already here from 2026-01-22."
+    );
+    expect(ledger.attachments.map((a) => a.transaction)).toEqual([bank.id]);
+  });
+
+  it("sends a confirmed one back to review, keeping its category if it isn't itemized", async () => {
+    const ledger = setUp();
+    const bank = bankCopy(ledger, { flag: "*", other: "Expenses:Household" });
+    const { port, asked } = ai(() => ({ ok: facts() }), groceries);
+
+    await captureReceipt({
+      ledger,
+      ai: port,
+      book: "b",
+      file: PHOTO,
+      hints: { itemize: false },
+      today: "2026-10-18",
+    });
+
+    const t = await ledger.transaction("b", bank.id);
+    expect(t.flag).toBe("!");
+    expect(accountsOf(t.postings)).toEqual([
+      [CARD, "-23.50"],
+      ["Expenses:Household", undefined],
+    ]);
+    expect(asked).toEqual([]); // nothing to categorize
+    expect(t.meta?.["receipt-note"]).toContain("which is back in review");
+  });
+
+  it("makes a new one when it isn't clear which is the bank's copy", async () => {
+    const cases: ((ledger: FakeLedger) => void)[] = [
+      // Two as close.
+      (l) => (bankCopy(l, { date: "2026-01-23" }), bankCopy(l, { date: "2026-01-25" })),
+      // Another amount.
+      (l) => void bankCopy(l, { amount: "-23.51" }),
+      // A transfer, not a purchase.
+      (l) => void bankCopy(l, { other: "Assets:Bank:Checking" }),
+      // One a receipt was read into already.
+      (l) => void (bankCopy(l).meta!["receipt-read"] = "2026-10-01"),
+    ];
+    for (const arrange of cases) {
+      const ledger = setUp();
+      arrange(ledger);
+      const before = ledger.transactions.length;
+      const captured = await captureReceipt({
+        ledger,
+        ai: ai(() => ({ ok: facts() })).port,
+        book: "b",
+        file: PHOTO,
+        hints: {},
+        today: "2026-10-18",
+      });
+      expect(captured.matched).toBe(false);
+      expect(ledger.transactions).toHaveLength(before + 1);
+    }
+  });
+});
+
+describe("reading a receipt into a transaction", () => {
+  it("keeps its amount as the total, its splits the lines and what they don't cover", async () => {
+    const ledger = setUp();
+    // Paid with a tip the receipt doesn't show, and confirmed.
+    const t0 = bankCopy(ledger, { amount: "-27.00", flag: "*", other: "Expenses:Groceries" });
+    const { port } = ai(() => ({ ok: facts() }), groceries, { itemize: true });
+
+    const captured = await readReceipt({
+      ledger,
+      ai: port,
+      book: "b",
+      transaction: t0.id,
+      file: PHOTO,
+      today: "2026-10-18",
+    });
+
+    expect(captured).toMatchObject({ transaction_id: t0.id, matched: true });
+    const t = await ledger.transaction("b", t0.id);
+    expect(t.flag).toBe("!");
+    expect(accountsOf(t.postings)).toEqual([
+      [CARD, "-27.00"],
+      ["Expenses:Groceries", "9.99"],
+      ["Expenses:Groceries", "9.99"],
+      ["Expenses:Groceries", "3.52"],
+      ["Expenses:Groceries", "3.50"],
+    ]);
+    expect(t.meta?.["receipt-note"]).toBe(
+      "The receipt says 23.50; the transaction's amount was kept. The lines don't add up to the total: 3.50 is left over."
+    );
+    expect(ledger.attachments.map((a) => a.transaction)).toEqual([t0.id]);
+  });
+
+  it("reads one it holds already without attaching it again", async () => {
+    const ledger = setUp();
+    const t0 = bankCopy(ledger);
+    const held = await ledger.attach("b", t0.id, PHOTO);
+    await readReceipt({
+      ledger,
+      ai: ai(() => ({ ok: facts() }), groceries).port,
+      book: "b",
+      transaction: t0.id,
+      itemize: true,
+      file: await ledger.attachmentFile("b", held.id),
+      attached: true,
+      today: "2026-10-18",
+    });
+    expect(ledger.attachments).toHaveLength(1);
+    expect((await ledger.transaction("b", t0.id)).postings).toHaveLength(4);
+  });
+
+  it("refuses a transaction no account paid", async () => {
+    const ledger = setUp();
+    const t0 = ledger.addTransaction({
+      date: "2026-01-22",
+      flag: "*",
+      narration: "Moved",
+      postings: [
+        { account: "Expenses:Groceries", units: { number: "5", currency: "USD" } },
+        { account: "Expenses:Household" },
+      ],
+    } as never);
+    await expect(
+      readReceipt({ ledger, book: "b", transaction: t0.id, file: PHOTO, today: "2026-10-18" })
     ).rejects.toThrow(ReceiptProblem);
   });
 });
