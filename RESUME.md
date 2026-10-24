@@ -29,8 +29,12 @@ attachments and the keys, online), `logs`, `report` (for bug reports, secrets hi
 `config`, and `auto-upgrade on|off` (a crontab line). Every service has `/health` and an image
 healthcheck; `/api/health` is public for uptime monitors (with a domain, the certificate too).
 Admins (`LUMINOUS_MONEY_ADMINS`, once their email is confirmed) see **System** in the menu:
-versions, health, data, the last backup, and whether a newer release is out. Nothing is
-published yet: there's no GitHub repository or release.
+versions, health, data, the last backup, and whether a newer release is out. **Published**
+(2026-10-24) at [luminous-money/luminous-money](https://github.com/luminous-money/luminous-money):
+a `v*.*.*` tag runs the Release workflow (the tests, then both architectures' images on
+ghcr.io/luminous-money/luminous-money/<service>, then the release with its bundle). The first is
+`v0.1.0`. Its history was rewritten once before it was pushed (an email taken out of RESUME),
+so commit IDs from before then are gone.
 
 What a user can do now:
 - **Receipts (M16):** Menu → AI turns a book's AI on (Claude, with an API key kept encrypted;
@@ -215,10 +219,11 @@ How it's put together:
 
 ## Next steps
 
-1. **The first live deployment** (Kael, after a last local pass over linking, matching,
-   receipts and reconciling): publish first (create `luminous-money/luminous-money` on GitHub,
-   push, tag `v0.1.0`, make the ghcr.io images public), then `luminous-money install` where it'll
-   run (docs/deploying.md).
+1. **The first live deployment, on Emmer** at `https://luminous.kaelshipman.me` (later
+   `luminous.money`): Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
+   `LM_SOURCE=release`: the installer on 127.0.0.1:8080 behind Emmer's nginx, which has the
+   certificate; then `70_dns.sh` and `80_web.sh`). The release's five images must be public on
+   ghcr.io (a package's settings, once each) for an install to pull them.
 2. **M17 (transaction tagging):** see [its plan](docs/milestones/m17-transaction-tagging/PLAN.md).
 3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).

@@ -6,9 +6,9 @@ A self-hostable, database-driven, double-entry accounting system. It uses
 format, and has a mobile-first app built for fast review and categorization. One server hosts many
 books, each independent: switching books is like switching profiles.
 
-> **Status: early build, not released yet.** Milestones M1 to M16 are built (books, imports, bank
-> feeds, budgets, reports, sharing, reconciliation, receipts): see [RESUME.md](RESUME.md). The
-> first release (`v0.1.0`) comes with [production readiness](docs/milestones/production-readiness/PLAN.md).
+> **Status: early.** `v0.1.0` is the first release. Milestones M1 to M16 are built (books,
+> imports, bank feeds, budgets, reports, sharing, reconciliation, receipts): see
+> [RESUME.md](RESUME.md). Expect it to change quickly.
 
 ## Run it
 
