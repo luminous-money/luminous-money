@@ -212,6 +212,27 @@ describe("capturing a receipt", () => {
     }
   });
 
+  it("says so when the AI read it but couldn't categorize it", async () => {
+    const ledger = setUp();
+    const { port } = ai(() => ({ ok: facts() }));
+    port.categorize = async () => ({ failed: "the Anthropic account has no credit left" });
+
+    const captured = await captureReceipt({
+      ledger,
+      ai: port,
+      book: "b",
+      file: PHOTO,
+      hints: { itemize: false },
+      today: "2026-10-18",
+    });
+
+    expect(captured.note).toContain(
+      "The AI couldn't categorize it: the Anthropic account has no credit left."
+    );
+    const t = await ledger.transaction("b", captured.transaction_id);
+    expect(t.postings[1]!.account).toBe("Expenses:Uncategorized"); // still made, for review
+  });
+
   it("refuses what isn't a receipt", async () => {
     await expect(
       captureReceipt({

@@ -37,9 +37,12 @@ async function shrunk(source: CanvasImageSource, width: number, height: number):
   );
 }
 
-/** An image file shrunk the same way (a PDF, or anything else, as it is). */
+/** An image file shrunk the same way, or a JPEG of one the reader can't take (an iPhone's
+ * HEIC, where the browser can decode it); a PDF, or anything else, as it is. */
 export async function prepared(file: File): Promise<{ blob: Blob; name: string }> {
-  if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 1_500_000)
+  const readable = /^image\/(jpeg|png|webp|gif)$/.test(file.type);
+  const image = file.type.startsWith("image/") || /\.(heic|heif)$/i.test(file.name);
+  if (!image || (readable && (file.size < 1_500_000 || file.type === "image/gif")))
     return { blob: file, name: file.name };
   try {
     const bitmap = await createImageBitmap(file);

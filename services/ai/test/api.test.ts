@@ -2,6 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import Anthropic from "@anthropic-ai/sdk";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Sealer } from "@luminous-money/db";
@@ -156,8 +157,9 @@ describe("the two operations", () => {
   });
 });
 
-/** A stand-in for the SDK's client: answers in turn, and remembers what it was asked. */
-function scripted(...answers: (object | "refusal")[]) {
+/** A stand-in for the SDK's client: answers in turn (an Error is thrown, as the SDK throws),
+ * and remembers what it was asked. */
+function scripted(...answers: (object | "refusal" | Error)[]) {
   const asked: Record<string, unknown>[] = [];
   const client = {
     beta: {
@@ -166,8 +168,9 @@ function scripted(...answers: (object | "refusal")[]) {
           asked.push(structuredClone(params));
           const answer = answers.shift()!;
           return {
-            finalMessage: async () =>
-              answer === "refusal"
+            finalMessage: async () => {
+              if (answer instanceof Error) throw answer;
+              return answer === "refusal"
                 ? { stop_reason: "refusal", content: [] }
                 : {
                     stop_reason: "end_turn",
@@ -175,7 +178,8 @@ function scripted(...answers: (object | "refusal")[]) {
                       { type: "thinking", thinking: "", signature: "sig" },
                       { type: "text", text: JSON.stringify(answer) },
                     ],
-                  },
+                  };
+            },
           };
         },
       },
@@ -239,5 +243,43 @@ describe("Claude", () => {
       }).categorize({ ...CATEGORIZE, guidance: null, creation: null }, "sk-key")
     ).rejects.toBeInstanceOf(ReadFailed);
     expect(sonnet.asked[0]).not.toHaveProperty("fallbacks");
+  });
+
+  it("says what went wrong in Claude's own words: no credit, no model, unreachable", async () => {
+    const said = (status: number, type: string, message: string) =>
+      Anthropic.APIError.generate(
+        status,
+        { type: "error", error: { type, message } },
+        message,
+        new Headers()
+      );
+    const read = async (error: Error) => {
+      const { client } = scripted(error);
+      return claude({ ...models, client: () => client })
+        .extract(EXTRACT, "sk-key")
+        .then(
+          () => "read",
+          (e: Error) => e.message
+        );
+    };
+
+    expect(
+      await read(
+        said(
+          400,
+          "invalid_request_error",
+          "Your credit balance is too low to access the Anthropic API."
+        )
+      )
+    ).toBe("the Anthropic account has no credit left: add some in the Claude Console (Billing)");
+    expect(await read(said(404, "not_found_error", "model: claude-sonnet-5"))).toBe(
+      "Claude has no model called claude-sonnet-5"
+    );
+    expect(await read(said(400, "invalid_request_error", "messages: something odd"))).toBe(
+      "Claude couldn't answer (400: messages: something odd)"
+    );
+    expect(await read(new Anthropic.APIConnectionError({ message: "fetch failed" }))).toBe(
+      "Claude couldn't be reached (is this server online?)"
+    );
   });
 });

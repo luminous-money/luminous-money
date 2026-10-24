@@ -16,6 +16,7 @@ import { ReconcileStatus } from "../components/ReconcileStatus.js";
 import { partOf, reconciledItself } from "../../shared/divided.js";
 import { MoveMoney, PartsCard, partsOf } from "../components/Parts.js";
 import { SelectBar } from "../components/SelectBar.js";
+import { SuggestNote } from "../components/SuggestNote.js";
 import { useBulkActions } from "../lib/bulk.js";
 import { postable } from "../lib/accounts.js";
 import { today } from "../lib/format.js";
@@ -205,13 +206,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
             )}
           </div>
         )}
-        {suggest.data && (
-          <p className="muted small" aria-live="polite">
-            {suggest.data.suggested
-              ? `Suggested categories for ${suggest.data.suggested}.`
-              : "Nothing new to suggest."}
-          </p>
-        )}
+        {suggest.data && <SuggestNote book={book} suggested={suggest.data.suggested} />}
       </header>
 
       {info?.divided && wholeInfo && tree.data && !selection.selecting && (

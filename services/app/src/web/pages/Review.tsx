@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
 import { SelectBar } from "../components/SelectBar.js";
+import { SuggestNote } from "../components/SuggestNote.js";
 import { useBulkActions } from "../lib/bulk.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
@@ -113,13 +114,7 @@ export function Review({ book }: { book: string }) {
             </button>
           )}
         </div>
-        {suggest.data && (
-          <p className="muted small" aria-live="polite">
-            {suggest.data.suggested
-              ? `Suggested categories for ${suggest.data.suggested}.`
-              : "Nothing new to suggest."}
-          </p>
-        )}
+        {suggest.data && <SuggestNote book={book} suggested={suggest.data.suggested} />}
       </header>
 
       {selection.selecting && (

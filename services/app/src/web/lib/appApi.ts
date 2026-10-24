@@ -596,7 +596,7 @@ export const appApi = {
     book: string,
     account?: string,
     transactions?: string[]
-  ): Promise<{ suggested: number; ai?: boolean }> =>
+  ): Promise<{ suggested: number; ai?: boolean; ai_error?: string | null }> =>
     json(
       await apiFetch(
         `${base(book)}/suggest${account ? `?account=${encodeURIComponent(account)}` : ""}`,

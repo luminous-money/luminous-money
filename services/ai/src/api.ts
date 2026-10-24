@@ -146,12 +146,16 @@ export function createApi({
     };
   };
 
-  /** Run a provider's operation; 422 when it couldn't answer (`app` carries on without it). */
-  const answer = async <T>(c: Context<Env>, run: () => Promise<T>) => {
+  /** Run a provider's operation; 422 when it couldn't answer (`app` carries on without it),
+   * which the log says too: `luminous-money logs ai`. */
+  const answer = async <T>(c: Context<Env>, what: string, run: () => Promise<T>) => {
     try {
       return c.json(await run());
     } catch (error) {
-      if (error instanceof ReadFailed) return c.json({ detail: error.message }, 422);
+      if (error instanceof ReadFailed) {
+        console.warn(`book ${c.req.param("book")}: ${what} failed: ${error.message}`);
+        return c.json({ detail: error.message }, 422);
+      }
       throw error;
     }
   };
@@ -165,7 +169,7 @@ export function createApi({
       return c.json({ detail: "send the receipt, today and the currency" }, 422);
     if (input.file.data.length > MAX_BASE64)
       return c.json({ detail: "a receipt is at most 5 MB" }, 413);
-    return answer(c, () => use.provider.extract(input, use.credential));
+    return answer(c, "extract", () => use.provider.extract(input, use.credential));
   });
 
   /** Where transactions' unconfirmed splits belong, with the book's guidance (and its
@@ -177,7 +181,7 @@ export function createApi({
     if (!Array.isArray(input?.transactions) || !Array.isArray(input.accounts) || !input.currency)
       return c.json({ detail: "send the transactions, the accounts and the currency" }, 422);
     const { settings } = use;
-    return answer(c, () =>
+    return answer(c, "categorize", () =>
       use.provider.categorize(
         {
           ...input,

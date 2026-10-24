@@ -130,6 +130,34 @@ function receiptBlock({ data, media_type }: ReceiptFile): Anthropic.Beta.BetaCon
   throw new ReadFailed(`a receipt is an image or a PDF, not ${media_type}`);
 }
 
+/** What went wrong calling Claude, for the person who'll read it in review or on the AI page:
+ * the API's own words where they help. */
+export function failure(error: unknown, model: string): ReadFailed {
+  if (error instanceof Anthropic.APIConnectionError)
+    return new ReadFailed("Claude couldn't be reached (is this server online?)");
+  if (error instanceof Anthropic.AuthenticationError)
+    return new ReadFailed("Claude didn't accept the book's API key");
+  if (error instanceof Anthropic.APIError) {
+    const said = (error.error as { error?: { message?: string } } | undefined)?.error?.message;
+    if (said && /credit balance/i.test(said))
+      return new ReadFailed(
+        "the Anthropic account has no credit left: add some in the Claude Console (Billing)"
+      );
+    if (error instanceof Anthropic.RateLimitError)
+      return new ReadFailed("Claude is busy (rate limited): try again shortly");
+    if (error instanceof Anthropic.PermissionDeniedError)
+      return new ReadFailed(`the book's API key can't use ${model}${said ? `: ${said}` : ""}`);
+    if (error instanceof Anthropic.NotFoundError)
+      return new ReadFailed(`Claude has no model called ${model}`);
+    if (error.status === 529 || error.type === "overloaded_error")
+      return new ReadFailed("Claude is overloaded: try again shortly");
+    return new ReadFailed(
+      `Claude couldn't answer (${error.status ?? "no status"}${said ? `: ${said}` : ""})`
+    );
+  }
+  return new ReadFailed("Claude couldn't be reached");
+}
+
 /** One request, its answer parsed (not yet checked); every way it can fail is ReadFailed. */
 async function ask(
   client: Client,
@@ -139,13 +167,7 @@ async function ask(
   try {
     message = await client.beta.messages.stream(params).finalMessage();
   } catch (error) {
-    if (error instanceof Anthropic.AuthenticationError)
-      throw new ReadFailed("Claude didn't accept the book's API key");
-    if (error instanceof Anthropic.RateLimitError)
-      throw new ReadFailed("Claude is busy (rate limited): try again shortly");
-    if (error instanceof Anthropic.APIError)
-      throw new ReadFailed(`Claude couldn't answer (${error.status ?? "no status"})`);
-    throw new ReadFailed("Claude couldn't be reached");
+    throw failure(error, params.model);
   }
   if (message.stop_reason === "refusal") throw new ReadFailed("Claude declined");
   if (message.stop_reason === "max_tokens") throw new ReadFailed("the answer ran too long");

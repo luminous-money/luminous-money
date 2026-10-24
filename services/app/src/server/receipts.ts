@@ -185,7 +185,10 @@ export async function captureReceipt({
 }): Promise<Captured> {
   if (file.bytes.length > RECEIPT_LIMIT) throw new ReceiptProblem(413, "a receipt is at most 5 MB");
   if (!ACCEPTED.test(file.type))
-    throw new ReceiptProblem(415, "a receipt is a photo (JPEG, PNG, WebP, GIF) or a PDF");
+    throw new ReceiptProblem(
+      415,
+      "a receipt is a photo (JPEG, PNG, WebP, GIF) or a PDF: an iPhone's HEIC photo needs saving as JPEG first"
+    );
   const [info, accounts] = await Promise.all([ledger.book(book), ledger.accounts(book)]);
   if (!info) throw new ReceiptProblem(422, "there's no such book");
   const currency = info.currency ?? "USD";
@@ -221,7 +224,13 @@ export async function captureReceipt({
   // Categorize its splits: the chain, then the book's AI.
   const chain = [
     ...categorizers,
-    ...(ready ? [aiCategorizer(ai!, book, currency, !!settings!.create_accounts)] : []),
+    ...(ready
+      ? [
+          aiCategorizer(ai!, book, currency, !!settings!.create_accounts, (reason) =>
+            notes.push(`The AI couldn't categorize it: ${reason}.`)
+          ),
+        ]
+      : []),
   ];
   const request = await buildRequest(ledger, { id: book, name: info.name }, [incoming]);
   const decision = chain.length ? ((await categorize(chain, request)).get(incoming.id) ?? {}) : {};

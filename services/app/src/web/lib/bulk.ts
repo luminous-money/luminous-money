@@ -53,12 +53,14 @@ export function useBulkActions({
         undefined,
         unconfirmed.map((t) => t.id)
       ),
-    onSuccess: ({ suggested, ai }) => {
+    onSuccess: ({ suggested, ai, ai_error }) => {
+      const of = `${suggested} of ${unconfirmed.length}`;
       setNote(
-        `Suggested categories for ${suggested} of ${unconfirmed.length}` +
-          (ai
-            ? ", the book's AI included."
-            : ": from rules and history (the book's AI isn't set up).")
+        ai_error
+          ? `The book's AI couldn't answer: ${ai_error}. From rules and history: suggested categories for ${of}.`
+          : ai
+            ? `Suggested categories for ${of}, the book's AI included.`
+            : `Suggested categories for ${of}: from rules and history (the book's AI isn't set up).`
       );
       return client.invalidateQueries({ queryKey: ["book", book] });
     },

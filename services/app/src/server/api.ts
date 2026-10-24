@@ -576,7 +576,7 @@ export function createApi({
   /** "Suggest categories" for unconfirmed transactions not yet categorized (`?account=`: only
    * those from that account and its subaccounts). A selection's (`{transactions: [ids]}`, Select
    * mode's bulk action) is asked of the book's AI too, when it's set up: `ai` says whether it
-   * was. */
+   * was, and `ai_error` why it couldn't answer, if it couldn't. */
   api.post("/books/:book/suggest", async (c) => {
     const { book } = c.req.param();
     const user = c.get("user");
@@ -590,6 +590,7 @@ export function createApi({
     const ai = ids && aiFor?.(user);
     const settings = ai ? await ai.settings(book) : null;
     const withAi = !!(ai && settings?.ready);
+    let aiError: string | null = null;
     const suggested = await suggestUnconfirmed({
       db,
       ledger,
@@ -597,13 +598,19 @@ export function createApi({
       categorizers: withAi
         ? [
             ...categorizers,
-            aiCategorizer(ai!, book, info.currency ?? "USD", !!settings!.create_accounts),
+            aiCategorizer(
+              ai!,
+              book,
+              info.currency ?? "USD",
+              !!settings!.create_accounts,
+              (reason) => (aiError = reason)
+            ),
           ]
         : categorizers,
       account: c.req.query("account") || undefined,
       ...(ids ? { ids } : {}),
     });
-    return c.json({ suggested, ai: withAi });
+    return c.json({ suggested, ai: withAi, ai_error: aiError });
   });
 
   /** The categorizers, in chain order, with how often their proposals were accepted. */
