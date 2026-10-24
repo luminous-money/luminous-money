@@ -10,6 +10,8 @@
  *                                account; reads its password from standard input
  *   rotate-keys                  start signing with a new key (the old one keeps verifying
  *                                tokens it signed until they expire)
+ *   confirm-email <email>        mark an account's email confirmed, for a server without email
+ *                                (an admin, in LUMINOUS_MONEY_ADMINS, counts once it is)
  */
 import { text } from "node:stream/consumers";
 
@@ -54,11 +56,19 @@ switch (command) {
     console.log(`${user.email} now owns the stub's books`);
     break;
   }
+  case "confirm-email": {
+    const user = userFor(args[0]);
+    users.verify(user.id, user.email);
+    console.log(`${user.email} is confirmed`);
+    break;
+  }
   case "rotate-keys":
     await keys.ensure();
     console.log(`signing with ${await keys.rotate()}`);
     break;
   default:
-    console.error("commands: reset-link, disable, enable, claim-stub, rotate-keys (see cli.ts)");
+    console.error(
+      "commands: reset-link, disable, enable, claim-stub, rotate-keys, confirm-email (see cli.ts)"
+    );
     process.exitCode = 2;
 }

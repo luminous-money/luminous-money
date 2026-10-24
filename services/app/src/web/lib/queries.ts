@@ -36,6 +36,7 @@ import {
   bankFeeds,
   receipts,
   reconciling,
+  systemApi,
   type LinkRequest,
   type BookInfo,
   type BookInvite,
@@ -105,6 +106,30 @@ export const keys = {
   schedule: (book: string, id: string) => ["book", book, "schedules", id] as const,
   transaction: (book: string, id: string) => ["book", book, "transaction", id] as const,
 };
+
+// The system page (admins only)
+
+/** Whether the caller is an admin: the menu offers System if so. */
+export function useSystemAccess(enabled = true) {
+  return useQuery({
+    queryKey: ["system", "access"],
+    queryFn: systemApi.access,
+    staleTime: 5 * 60_000,
+    enabled,
+  });
+}
+
+export function useSystemInfo() {
+  return useQuery({ queryKey: ["system", "info"], queryFn: systemApi.info, staleTime: 30_000 });
+}
+
+export function useCheckUpdates() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: systemApi.check,
+    onSuccess: (info) => client.setQueryData(["system", "info"], info),
+  });
+}
 
 // Session
 

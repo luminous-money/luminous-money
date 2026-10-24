@@ -10,16 +10,11 @@
  * missing one means browsers can't reach the site (`down`). A certificate is public anyway, so
  * saying when it expires gives nothing away.
  */
+import type { CertificateHealth } from "../shared/system.js";
 
 export type Up = "up" | "down";
 
-export type CertificateHealth = {
-  domain: string;
-  status: "ok" | "expiring" | "expired" | "missing" | "unknown";
-  /** When it expires (ISO), if there is one. */
-  expires: string | null;
-  days_left: number | null;
-};
+export type { CertificateHealth } from "../shared/system.js";
 
 export type StackHealth = {
   status: "ok" | "degraded" | "down";
@@ -76,35 +71,51 @@ export function certificateOf(
   };
 }
 
+/** A service's own health: up or down, and when it answers, its version and schema. */
+export type Probed = { status: Up; version: string | null; schema: number | null };
+
+const get = (fetchImpl: typeof fetch, base: string, path: string) =>
+  fetchImpl(`${base.replace(/\/$/, "")}${path}`, { signal: AbortSignal.timeout(3000) });
+
+/** Ask a service's `/health`. */
+export async function probe(url: string, fetchImpl: typeof fetch = fetch): Promise<Probed> {
+  try {
+    const response = await get(fetchImpl, url, "/health");
+    if (!response.ok) return { status: "down", version: null, schema: null };
+    const body = (await response.json().catch(() => ({}))) as { version?: string; schema?: number };
+    return { status: "up", version: body.version ?? null, schema: body.schema ?? null };
+  } catch {
+    return { status: "down", version: null, schema: null };
+  }
+}
+
+/** The gateway's certificate for the domain, when it serves HTTPS for one. */
+export async function certificateHealth(
+  peers: Peers,
+  fetchImpl: typeof fetch = fetch,
+  now = new Date()
+): Promise<CertificateHealth | undefined> {
+  if (!peers.domain || !peers.gateway) return undefined;
+  try {
+    const response = await get(fetchImpl, peers.gateway, "/metrics");
+    if (!response.ok) throw new Error(`metrics answered ${response.status}`);
+    return certificateOf(await response.text(), peers.domain, now);
+  } catch {
+    return { domain: peers.domain, status: "unknown", expires: null, days_left: null };
+  }
+}
+
 export async function stackHealth(
   peers: Peers,
   fetchImpl: typeof fetch = fetch,
   now = new Date()
 ): Promise<StackHealth> {
-  const get = (base: string, path: string) =>
-    fetchImpl(`${base.replace(/\/$/, "")}${path}`, { signal: AbortSignal.timeout(3000) });
-  const ask = async (url: string): Promise<Up> => {
-    try {
-      return (await get(url, "/health")).ok ? "up" : "down";
-    } catch {
-      return "down";
-    }
-  };
-  const certificate = async (): Promise<CertificateHealth | undefined> => {
-    if (!peers.domain || !peers.gateway) return undefined;
-    try {
-      const response = await get(peers.gateway, "/metrics");
-      if (!response.ok) throw new Error(`metrics answered ${response.status}`);
-      return certificateOf(await response.text(), peers.domain, now);
-    } catch {
-      return { domain: peers.domain, status: "unknown", expires: null, days_left: null };
-    }
-  };
+  const ask = async (url: string): Promise<Up> => (await probe(url, fetchImpl)).status;
   const [auth, ledger, ai, cert] = await Promise.all([
     ask(peers.auth),
     ask(peers.ledger),
     ask(peers.ai),
-    certificate(),
+    certificateHealth(peers, fetchImpl, now),
   ]);
   const services = { auth, ledger, app: "up" as const, ai };
   const broken =

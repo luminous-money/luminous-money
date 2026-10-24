@@ -23,6 +23,7 @@ import {
 import { finish, ReconcileProblem, reconcileView, saveDraft } from "./reconcile.js";
 import type { AiPort } from "./ai.js";
 import { captureReceipt, ReceiptProblem } from "./receipts.js";
+import type { System } from "./system.js";
 import { pairAfterImport, pairedTransfers, rejectTransfer, TransferProblem } from "./transfers.js";
 import { UPCOMING_DAYS, type ScheduleIn, type SchedulePatch } from "../shared/schedule.js";
 import { StaleVersion } from "./db.js";
@@ -67,6 +68,7 @@ export function createApi({
   categorizers = [],
   simplefin,
   aiFor,
+  system,
 }: {
   db: AppDb;
   ledgerFor: (userId: string) => LedgerPort;
@@ -75,6 +77,8 @@ export function createApi({
   /** The categorization chain, in order (see categorize/chain.ts). */
   categorizers?: Categorizer[];
   simplefin?: SimplefinServices;
+  /** The system page's facts, and who may see them: admins' emails (lowercase). */
+  system?: { facts: System; admins: Set<string> };
 }) {
   const api = new Hono<Env>().basePath("/api/app/v1");
 
@@ -105,6 +109,29 @@ export function createApi({
   api.use("/simplefin/*", caller);
   api.use("/invites/*", caller);
   api.use("/me", caller);
+  api.use("/system", caller);
+  api.use("/system/*", caller);
+
+  // The system page (production readiness): admins only, named by email in the config and
+  // confirmed. Anyone else is told there's nothing here.
+  const isAdmin = (c: Context<Env>) => {
+    if (!system || c.req.header("x-user-email-verified") !== "true") return false;
+    try {
+      const email = decodeURIComponent(c.req.header("x-user-email") ?? "").toLowerCase();
+      return !!email && system.admins.has(email);
+    } catch {
+      return false;
+    }
+  };
+  api.get("/system/access", (c) => c.json({ admin: isAdmin(c) }));
+  api.get("/system", async (c) =>
+    isAdmin(c) ? c.json(await system!.facts.info()) : c.json({ detail: "not found" }, 404)
+  );
+  api.post("/system/check", async (c) => {
+    if (!isAdmin(c)) return c.json({ detail: "not found" }, 404);
+    await system!.facts.check();
+    return c.json(await system!.facts.info());
+  });
 
   /** The caller's role in the book (owner, manage, write, read), or undefined if none. */
   const roleIn = async (user: string, book: string) =>

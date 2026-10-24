@@ -33,6 +33,7 @@ luminous-money: install and run a Luminous Money server.
       --bind ADDRESS             listen only on ADDRESS (127.0.0.1: this machine only)
       --version VERSION          a release (default: the latest)
       --name NAME                the Compose project (default: the directory's name)
+      --admin EMAIL              the server's admin: they see the system page (once confirmed)
       --from DIR                 take compose.yaml from DIR (a clone or a bundle), not a release
       --registry REGISTRY        where the images are (default the release's; `luminous-money`
                                    for images built here with `pnpm build`)
@@ -42,6 +43,9 @@ luminous-money: install and run a Luminous Money server.
   luminous-money up | down           start (and wait until healthy) | stop (the data stays)
   luminous-money upgrade [VERSION]   back up, then move to VERSION (default: the latest release)
       --from DIR                 take compose.yaml from DIR instead of the release
+  luminous-money auto-upgrade on [--at HH:MM] | off | status
+                                 upgrade to each new release by itself, daily at HH:MM (default
+                                   03:30, the server's time), backing up first (cron)
   luminous-money backup [--keep N]   a whole-system backup into backups/ (keeping the newest N)
   luminous-money restore FILE        stop, replace everything with FILE's, start
       --version VERSION          and run VERSION (the one the backup was made with, say)
@@ -146,7 +150,7 @@ stamp() { date -u +%Y%m%dT%H%M%SZ; }
 
 cmd_install() {
   local dir="$HOME/luminous-money" domain="" email="" port="" bind="" version="" name="" from=""
-  local registry=""
+  local registry="" admin=""
   YES=""
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -159,6 +163,7 @@ cmd_install() {
       --name) name="$2"; shift 2 ;;
       --from) from="$(cd "$2" && pwd)"; shift 2 ;;
       --registry) registry="$2"; shift 2 ;;
+      --admin) admin="$2"; shift 2 ;;
       --yes) YES=1; shift ;;
       *) die "install: unknown option $1" ;;
     esac
@@ -199,6 +204,10 @@ cmd_install() {
     [ -n "$email" ] || die "HTTPS needs an email for Let's Encrypt: --email"
   fi
 
+  if [ -z "$admin" ]; then
+    admin="$(ask "Your email, as the server's admin (the system page; blank for none)" "$email")"
+  fi
+
   say "Installing Luminous Money $version in $HOME_DIR (project $name)…"
   fetch compose.yaml "$version" "$from" "$HOME_DIR/compose.yaml"
   umask 077
@@ -217,6 +226,9 @@ cmd_install() {
       echo "LUMINOUS_MONEY_PORT=${port:-8080}"
     fi
     if [ -n "$bind" ]; then echo "LUMINOUS_MONEY_BIND=$bind"; fi
+    echo "# The system page's admins, by email (once confirmed); updates: notify, off or auto."
+    echo "LUMINOUS_MONEY_ADMINS=$admin"
+    echo "LUMINOUS_MONEY_UPDATES=notify"
     echo "# Encryption keys for stored bank-feed and AI credentials: back them up."
     echo "SIMPLEFIN_ENCRYPTION_KEY=$(key)"
     echo "AI_ENCRYPTION_KEY=$(key)"
@@ -240,6 +252,10 @@ cmd_install() {
     say "Luminous Money is running: http://localhost:${port:-8080}/ (and this machine's address, on your network)."
   fi
   say "Create your account there: the first one is no different from the rest."
+  if [ -n "$admin" ]; then
+    say "Sign up as $admin to see the system page, once your email is confirmed (from the link"
+    say "mailed to you, or without email: docker compose exec auth node dist/cli.js confirm-email $admin)."
+  fi
   say "From now on: $HOME_DIR/luminous-money status | backup | upgrade | logs (see docs/deploying.md)."
 }
 
@@ -276,6 +292,13 @@ cmd_status() {
   if [ -n "$newest" ]; then
     if [ "$newest" = "$pinned" ]; then say "Latest:     $newest (up to date)"; else say "Latest:     $newest (\`luminous-money upgrade\` to move to it)"; fi
   fi
+  local policy
+  policy="$(setting LUMINOUS_MONEY_UPDATES)"
+  case "${policy:-notify}" in
+    auto) say "Updates:    upgrades itself daily at $(setting LUMINOUS_MONEY_UPGRADE_AT) (auto-upgrade)" ;;
+    off) say "Updates:    not checked (LUMINOUS_MONEY_UPDATES=off)" ;;
+    *) say "Updates:    checked daily; the system page says when one is out" ;;
+  esac
   marker="$(compose exec -T ledger cat /data/last-backup.json 2>/dev/null || true)"
   say "Backup:     ${marker:-none made with \`luminous-money backup\` yet}"
   say ""
@@ -384,13 +407,15 @@ cmd_restore() {
 # --- upgrades -------------------------------------------------------------------------------
 
 cmd_upgrade() {
-  local target="" from="" current
+  local target="" from="" current auto=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --from) from="$(cd "$2" && pwd)"; shift 2 ;;
+      --auto) auto=1; shift ;; # from the timer (auto-upgrade): the log says when
       *) target="$1"; shift ;;
     esac
   done
+  if [ -n "$auto" ]; then say "--- $(date -u '+%Y-%m-%d %H:%M:%S UTC'): looking for a new release"; fi
   current="$(setting LUMINOUS_MONEY_VERSION)"
   if [ -z "$target" ]; then
     [ -z "$from" ] || die "upgrade --from needs the version to run"
@@ -422,6 +447,57 @@ cmd_upgrade() {
     warn "  $HOME_DIR/luminous-money restore $(ls -1 "$HOME_DIR"/backups/luminous-money-*.tar.gz | sort | tail -1) --version ${current:-dev}"
     exit 1
   fi
+}
+
+# The crontab, or a file standing in for it (LUMINOUS_MONEY_CRONTAB: tests).
+crontab_read() {
+  if [ -n "${LUMINOUS_MONEY_CRONTAB:-}" ]; then
+    cat "$LUMINOUS_MONEY_CRONTAB" 2>/dev/null || true
+  else
+    crontab -l 2>/dev/null || true
+  fi
+}
+crontab_write() {
+  if [ -n "${LUMINOUS_MONEY_CRONTAB:-}" ]; then cat >"$LUMINOUS_MONEY_CRONTAB"; else crontab -; fi
+}
+
+cmd_auto_upgrade() {
+  local action="${1:-status}" at="03:30" tag="# luminous-money auto-upgrade: $HOME_DIR" line
+  if [ $# -gt 0 ]; then shift; fi
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --at) at="$2"; shift 2 ;;
+      *) die "auto-upgrade: unknown option $1" ;;
+    esac
+  done
+  case "$action" in
+    on)
+      echo "$at" | grep -Eq '^([01][0-9]|2[0-3]):[0-5][0-9]$' || die "--at is a 24-hour time, like 03:30"
+      if [ -z "${LUMINOUS_MONEY_CRONTAB:-}" ] && ! command -v crontab >/dev/null; then
+        die "it needs cron (crontab); or run \`$HOME_DIR/luminous-money upgrade --auto\` from a systemd timer (docs/deploying.md)"
+      fi
+      # Cron's PATH is bare: give it this one, so it finds docker.
+      line="$((10#${at##*:})) $((10#${at%%:*})) * * * PATH='$PATH' '$HOME_DIR/luminous-money' upgrade --auto >>'$HOME_DIR/backups/upgrade.log' 2>&1 $tag"
+      { crontab_read | grep -vF "$tag" || true; echo "$line"; } | crontab_write
+      set_setting LUMINOUS_MONEY_UPDATES auto
+      set_setting LUMINOUS_MONEY_UPGRADE_AT "$at"
+      compose up -d --wait app >/dev/null 2>&1 || true # so the system page says so
+      say "It upgrades itself to each new release daily at $at (this machine's time), backing up first."
+      say "What it did: $HOME_DIR/backups/upgrade.log. Stop it: luminous-money auto-upgrade off."
+      ;;
+    off)
+      { crontab_read | grep -vF "$tag" || true; } | crontab_write
+      set_setting LUMINOUS_MONEY_UPDATES notify
+      set_setting LUMINOUS_MONEY_UPGRADE_AT ""
+      compose up -d --wait app >/dev/null 2>&1 || true
+      say "No more upgrades by itself: \`luminous-money upgrade\` when you're ready."
+      ;;
+    status)
+      line="$(crontab_read | grep -F "$tag" || true)"
+      if [ -n "$line" ]; then say "on: daily at $(setting LUMINOUS_MONEY_UPGRADE_AT)"; else say "off"; fi
+      ;;
+    *) die "auto-upgrade: on, off or status" ;;
+  esac
 }
 
 # --- diagnostics ----------------------------------------------------------------------------
@@ -500,10 +576,10 @@ main() {
   case "$command" in
     install) cmd_install "$@" ;;
     help | -h | --help) usage ;;
-    status | up | down | upgrade | backup | restore | logs | report | config)
+    status | up | down | upgrade | backup | restore | logs | report | config | auto-upgrade)
       need
       HOME_DIR="$(deployment)"
-      "cmd_$command" "$@"
+      "cmd_${command//-/_}" "$@"
       ;;
     *)
       usage >&2

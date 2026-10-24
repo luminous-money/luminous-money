@@ -1,6 +1,8 @@
+import { join } from "node:path";
+
 import { serve } from "@hono/node-server";
 
-import { join } from "node:path";
+import { health } from "@luminous-money/db";
 
 import { createApp } from "./app.js";
 import { config } from "./config.js";
@@ -12,6 +14,7 @@ import { history } from "./categorize/history.js";
 import { items } from "./categorize/items.js";
 import { rules } from "./categorize/rules.js";
 import { startDaily } from "./daily.js";
+import { createSystem } from "./system.js";
 import { pricesJob } from "./prices.js";
 import { schedulesJob } from "./schedules.js";
 import { Sealer } from "./simplefin/crypto.js";
@@ -41,6 +44,31 @@ if (simplefin.policy.allowInsecure)
     "SIMPLEFIN_ALLOW_INSECURE is on: plain-HTTP SimpleFIN servers allowed. Test stacks only."
   );
 
+const peers = {
+  auth: config.authUrl,
+  ledger: config.ledgerUrl,
+  ai: config.aiUrl,
+  gateway: config.gatewayUrl,
+  domain: config.domain ?? null,
+};
+// The system page's facts, for the admins named in the config (and confirmed).
+const system = createSystem({
+  version: process.env["LUMINOUS_MONEY_VERSION"] ?? "dev",
+  dataDir: config.dataDir,
+  peers,
+  policy: config.system.updates,
+  upgradeAt: config.system.upgradeAt ?? null,
+  repo: config.system.repo,
+  schema: () => health("app", db.db).schema,
+});
+const admins = new Set(
+  config.system.admins
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean)
+);
+if (!admins.size) console.warn("LUMINOUS_MONEY_ADMINS isn't set: no one sees the system page.");
+
 serve(
   {
     fetch: createApp(webRoot, {
@@ -49,13 +77,8 @@ serve(
       categorizers,
       simplefin,
       aiFor: (user) => httpAi(config.aiUrl, user),
-      peers: {
-        auth: config.authUrl,
-        ledger: config.ledgerUrl,
-        ai: config.aiUrl,
-        gateway: config.gatewayUrl,
-        domain: config.domain ?? null,
-      },
+      peers,
+      system: { facts: system, admins },
     }).fetch,
     port,
   },
@@ -65,6 +88,7 @@ serve(
       schedulesJob(db, ledgerFor),
       pricesJob(db, ledgerFor),
       simplefinJob({ ...simplefin, db, ledgerFor, categorizers }),
+      system.job,
     ]);
   }
 );

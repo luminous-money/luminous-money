@@ -2,7 +2,8 @@
 # The `luminous-money` command, end to end, against images built here (`pnpm build`): install a
 # deployment from this checkout into a scratch directory, under its own project and port, then
 # its health, a sign-up, a backup, a restore (what came after the backup is gone), an upgrade,
-# the report (its secrets hidden), and the settings check. Cleans up after itself. Run by
+# upgrading by itself (against a stand-in crontab), the report (its secrets hidden), and the
+# settings check. Cleans up after itself. Run by
 # `pnpm e2e`; on its own, `pnpm test:cli`.
 set -eu
 cd "$(dirname "$0")/.."
@@ -66,6 +67,18 @@ if books | grep -q '"After"'; then fail "restoring kept what came after the back
 step "upgrade"
 "$cli" upgrade dev --from . | grep -q "Now on dev" || fail "upgrade didn't finish"
 [ "$(ls -1 "$home"/backups/luminous-money-*.tar.gz | wc -l | tr -d ' ')" = 2 ] || fail "upgrade didn't back up first"
+
+step "auto-upgrade"
+LUMINOUS_MONEY_CRONTAB="$work/crontab" # a stand-in: never this machine's crontab
+export LUMINOUS_MONEY_CRONTAB
+"$cli" auto-upgrade on --at 04:15 >/dev/null
+grep -F "# luminous-money auto-upgrade: $home" "$work/crontab" | grep -q '^15 4 \* \* \* .* upgrade --auto ' ||
+  fail "auto-upgrade didn't add its daily line"
+grep -q '^LUMINOUS_MONEY_UPDATES=auto$' "$home/.env" || fail "auto-upgrade didn't set the policy"
+[ "$("$cli" auto-upgrade status)" = "on: daily at 04:15" ] || fail "auto-upgrade status is wrong"
+"$cli" auto-upgrade off >/dev/null
+if grep -q 'auto-upgrade' "$work/crontab"; then fail "auto-upgrade off left its line"; fi
+unset LUMINOUS_MONEY_CRONTAB
 
 step "report and config"
 (cd "$home" && ./luminous-money report --since 1h >/dev/null)

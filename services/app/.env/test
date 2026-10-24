@@ -3,3 +3,7 @@
 SIMPLEFIN_ENCRYPTION_KEY=njq+/gPlbFRkrci0WD3h9Va4gUZ4pjZz32YduU/AjDI=
 SIMPLEFIN_HOSTS=simplefin-fake
 SIMPLEFIN_ALLOW_INSECURE=true
+# The system page's admins in the end-to-end tests (one per suite, once confirmed), and no calls to
+# GitHub for releases.
+LUMINOUS_MONEY_ADMINS=system-admin@test.local,ui-admin@test.local
+LUMINOUS_MONEY_UPDATES=off

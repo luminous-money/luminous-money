@@ -79,6 +79,11 @@ services:
       - SIMPLEFIN_ENCRYPTION_KEY
       # With a domain, app watches the gateway's certificate for /api/health.
       - LUMINOUS_MONEY_DOMAIN
+      # The system page: the admins (emails; once confirmed), whether to look for new releases
+      # (off, notify, auto), and with auto, when the host's timer upgrades.
+      - LUMINOUS_MONEY_ADMINS
+      - LUMINOUS_MONEY_UPDATES
+      - LUMINOUS_MONEY_UPGRADE_AT
       # The SimpleFIN servers setup tokens may point to (default: the SimpleFIN Bridge's).
       - SIMPLEFIN_HOSTS
       # External categorization providers (docs/categorizer-api.md).

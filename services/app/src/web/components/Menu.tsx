@@ -2,17 +2,18 @@ import { Link } from "wouter";
 
 import { bookHome, useSelectedBook } from "../lib/books.js";
 import { usePopover } from "../lib/popover.js";
-import { useBooks, useLogOut, useMe } from "../lib/queries.js";
+import { useBooks, useLogOut, useMe, useSystemAccess } from "../lib/queries.js";
 
 /** The hamburger menu: the selected book's Home, Review, Transactions, Accounts, Budgets, Reports, Schedules, Rules,
  * Commodities, Bank connections and AI;
- * Manage books; your account; and logging out. */
+ * Manage books; your account; for admins, System; and logging out. */
 export function Menu() {
   const { open, setOpen, ref } = usePopover();
   const me = useMe();
   const books = useBooks();
   const book = useSelectedBook(me.data?.id ?? "", books.data ?? []);
   const logOut = useLogOut();
+  const system = useSystemAccess(!!me.data);
 
   const item = (href: string, label: string) => (
     <Link href={href} className="menu-item" onClick={() => setOpen(false)}>
@@ -47,6 +48,7 @@ export function Menu() {
           {home && item(`${home}/ai`, "AI")}
           {item("/books", "Manage books")}
           {item("/account", "Your account")}
+          {system.data?.admin && item("/system", "System")}
           <button type="button" className="menu-item" onClick={() => logOut.mutate()}>
             Log out
           </button>

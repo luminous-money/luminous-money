@@ -1,8 +1,9 @@
 Production readiness: plan
 ==================================================================================================
 
-> **Status: planned (2026-10-19); phase 1 built (2026-10-21); the questions answered
-> (2026-10-23), the certificate watched; phase 2 next.** The brief, from Kael: confirm we're ready
+> **Status: built.** Planned 2026-10-19; phase 1 built 2026-10-21; the questions answered and
+> the certificate watched 2026-10-23; phase 2 (admins, the system page, update checks,
+> `auto-upgrade`) built 2026-10-23. The brief, from Kael: confirm we're ready
 > for production, and document deploying it, with setup scripts, so going from finding it on
 > GitHub to running it, on a laptop or on a public server, is as simple as it can be. Answer:
 > how one upgrades (and migrates), backs up, reads and exports logs, and knows it's healthy.
@@ -154,7 +155,8 @@ copies it into the deployment's directory.
 8. **Tests:** the health routes; a snapshot that restores; the script's commands against a
    throwaway project (`install` from a local bundle, `backup`, `restore`, `status`, `report`).
 
-**Phase 2 (next):** admins and the system page, update checks, `auto-upgrade`.
+**Phase 2 (built 2026-10-23):** admins and the system page, update checks, `auto-upgrade`
+(a crontab line; `install` asks for the first admin).
 
 **What phase 1 changed from this plan:** without a domain, the HTTPS port is published on any
 free port, not 8443, so two stacks on one machine (development and a live one) don't collide over

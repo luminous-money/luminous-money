@@ -13,6 +13,8 @@ import { fileURLToPath } from "node:url";
 import { configValue, REQUIRED, validate, Validators, type ConfigError } from "@wymp/config-simple";
 import * as dotenv from "dotenv";
 
+import { UPDATE_POLICIES, type UpdatePolicy } from "./system.js";
+
 export const ENVS = ["production", "development", "test"] as const;
 export type Env = (typeof ENVS)[number];
 
@@ -42,6 +44,20 @@ const configDef = {
   aiUrl: configValue("AI_URL", "str", "http://ai:3000"),
   /** External categorization providers, a JSON list (docs/categorizer-api.md). */
   categorizers: configValue("CATEGORIZERS", "str"),
+  system: {
+    /** Admins: emails, comma-separated; those confirmed see the system page. */
+    admins: configValue("LUMINOUS_MONEY_ADMINS", "str", ""),
+    /** Whether to look for new releases (`notify`, `auto`) or not (`off`). */
+    updates: configValue(
+      "LUMINOUS_MONEY_UPDATES",
+      "notify",
+      Validators.oneOf([...UPDATE_POLICIES])
+    ) as UpdatePolicy | ConfigError,
+    /** With `auto`, when the host's timer upgrades (HH:MM): shown on the system page. */
+    upgradeAt: configValue("LUMINOUS_MONEY_UPGRADE_AT", "str"),
+    /** Where releases come from on GitHub. */
+    repo: configValue("LUMINOUS_MONEY_REPO", "str", "luminous-money/luminous-money"),
+  },
   simplefin: {
     /** Encrypts stored SimpleFIN access URLs. No default: `app` won't start without it. */
     encryptionKey: configValue("SIMPLEFIN_ENCRYPTION_KEY", "str", REQUIRED, key256),

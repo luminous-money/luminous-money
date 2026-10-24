@@ -7,6 +7,7 @@ import type { BookInfo } from "./lib/appApi.js";
 import { bookHome, rememberBook, startingBook, useBookInPath } from "./lib/books.js";
 import { useBooks, useMe, useSessionLifecycle, useTimeZoneBackfill } from "./lib/queries.js";
 import { Account } from "./pages/Account.js";
+import { System } from "./pages/System.js";
 import { AccountEditor } from "./pages/AccountEditor.js";
 import { ChartOfAccounts } from "./pages/ChartOfAccounts.js";
 import { BankConnections } from "./pages/BankConnections.js";
@@ -124,6 +125,9 @@ function Gate() {
           </Route>
           <Route path="/account">
             <Account />
+          </Route>
+          <Route path="/system">
+            <System />
           </Route>
           <Route path="/verify/:token">{({ token }) => <VerifyEmail token={token} />}</Route>
           <Route path="/invite/:token">

@@ -21,6 +21,7 @@ import type {
 
 import { ApiError } from "./ledger.js";
 import type { PairedTransfer } from "../../shared/transfers.js";
+import type { SystemInfo } from "../../shared/system.js";
 import type { ReconcileDraft, ReconcileView, Reconciled } from "../../shared/reconcile.js";
 import type {
   Breakdown,
@@ -610,4 +611,15 @@ export const appApi = {
         `${base(book)}/imports${account ? `?account=${encodeURIComponent(account)}` : ""}`
       )
     ),
+};
+
+/** The system page (production readiness): whether the caller is an admin, and for admins,
+ * what's running and whether a newer release is out. Anyone else gets 404 for the facts. */
+export const systemApi = {
+  access: async (): Promise<{ admin: boolean }> =>
+    json(await apiFetch("/api/app/v1/system/access")),
+  info: async (): Promise<SystemInfo> => json(await apiFetch("/api/app/v1/system")),
+  /** Ask GitHub for the latest release now. */
+  check: async (): Promise<SystemInfo> =>
+    json(await apiFetch("/api/app/v1/system/check", { method: "POST" })),
 };

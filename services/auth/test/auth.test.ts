@@ -217,6 +217,8 @@ describe("tokens", () => {
     const ok = await call("/verify", { headers: bearer(tokens.access_token) });
     expect(ok.status).toBe(200);
     expect(ok.headers.get("x-user-id")).toBe(tokens.user.id);
+    // Not confirmed yet: an admin named by this email wouldn't count.
+    expect(ok.headers.get("x-user-email-verified")).toBe("false");
 
     await call("/token/revoke", { method: "POST", json: { refresh_token: tokens.refresh_token } });
     expect((await call("/verify", { headers: bearer(tokens.access_token) })).status).toBe(401);

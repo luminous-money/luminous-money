@@ -26,8 +26,11 @@ What an operator can do now (production readiness, phase 1; [docs/deploying.md](
 `luminous-money install` sets a deployment up (a laptop, or a public server with built-in HTTPS),
 then `status`, `upgrade` (backing up first), `backup` / `restore` (every database, the
 attachments and the keys, online), `logs`, `report` (for bug reports, secrets hidden) and
-`config`. Every service has `/health` and an image healthcheck; `/api/health` is public for
-uptime monitors. Nothing is published yet: there's no GitHub repository or release.
+`config`, and `auto-upgrade on|off` (a crontab line). Every service has `/health` and an image
+healthcheck; `/api/health` is public for uptime monitors (with a domain, the certificate too).
+Admins (`LUMINOUS_MONEY_ADMINS`, once their email is confirmed) see **System** in the menu:
+versions, health, data, the last backup, and whether a newer release is out. Nothing is
+published yet: there's no GitHub repository or release.
 
 What a user can do now:
 - **Receipts (M16):** Menu → AI turns a book's AI on (Claude, with an API key kept encrypted;
@@ -194,9 +197,9 @@ How it's put together:
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 183 tests, including the table lint
-    - auth: 20; app: 181; ai: 7; db: 10; csv-import: 22
+    - auth: 20; app: 186; ai: 7; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 88 API tests and 92 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 90 API tests and 94 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Kael's account claimed the old stub user, so it owns the "Demo"
@@ -204,10 +207,10 @@ How it's put together:
 
 ## Next steps
 
-1. **Production readiness, phase 2** ([its plan](docs/milestones/production-readiness/PLAN.md);
-   its questions are answered): admins by email and the system page, update checks,
-   `auto-upgrade`. Publishing needs Kael: create `luminous-money/luminous-money` on GitHub, push,
-   tag `v0.1.0`, then make the images on ghcr.io public.
+1. **The first live deployment** (Kael, after a last local pass over linking, matching,
+   receipts and reconciling): publish first (create `luminous-money/luminous-money` on GitHub,
+   push, tag `v0.1.0`, make the ghcr.io images public), then `luminous-money install` where it'll
+   run (docs/deploying.md).
 2. **M17 (transaction tagging):** see [its plan](docs/milestones/m17-transaction-tagging/PLAN.md).
 3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).

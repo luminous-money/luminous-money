@@ -13,6 +13,7 @@ import type { Categorizer } from "./categorize/types.js";
 import type { LedgerPort } from "./ledger.js";
 import type { AiPort } from "./ai.js";
 import { stackHealth, type Peers } from "./health.js";
+import type { System } from "./system.js";
 
 export function createApp(
   webRoot: string,
@@ -24,6 +25,8 @@ export function createApp(
     aiFor?: (userId: string) => AiPort;
     /** The other services, for the stack's public health (`/api/health`). */
     peers?: Peers;
+    /** The system page's facts and its admins. */
+    system?: { facts: System; admins: Set<string> };
   }
 ) {
   const app = new Hono();

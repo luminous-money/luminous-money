@@ -3,33 +3,13 @@ import { randomBytes } from "node:crypto";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { linkMailedTo } from "./support.js";
+
 const PASSWORD = "correct horse battery staple";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const newEmail = () => `m8-${randomBytes(4).toString("hex")}@test.local`;
-
-/** Mailpit, the e2e stack's mail server: the link in the newest email to `to`. */
-async function linkMailedTo(to: string, kind: "reset" | "verify"): Promise<string> {
-  const mailpit = process.env.MAILPIT_URL ?? "http://mailpit:8025";
-  for (let i = 0; i < 40; i++) {
-    const search = await fetch(
-      `${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`
-    );
-    const { messages } = (await search.json()) as { messages: { ID: string }[] };
-    if (messages.length) {
-      const { Text } = (await (
-        await fetch(`${mailpit}/api/v1/message/${messages[0]!.ID}`)
-      ).json()) as {
-        Text: string;
-      };
-      const link = new RegExp(`/ui/${kind}/[\\w-]+`).exec(Text)?.[0];
-      if (link) return link;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error(`no ${kind} email to ${to}`);
-}
 
 async function signUp(page: Page, email = newEmail()) {
   await page.goto("/ui/");

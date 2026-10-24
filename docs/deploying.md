@@ -8,14 +8,16 @@ command, and `backups/`. Docker does the rest.
 
 There are no admin accounts: everyone, including you, signs up in the app like anyone else. What
 only the server's operator can do happens on the server, through the `luminous-money` command and
-`auth`'s command line.
+`auth`'s command line. The people you name as [admins](#admins-and-the-system-page) also get a
+System page in the app, and no one else sees anything about the server.
 
 - [What you need](#what-you-need)
 - [Installing](#installing): [on a laptop or home server](#on-a-laptop-or-a-home-server),
   [on a public server](#on-a-public-server), [behind a proxy you have](#behind-a-proxy-you-have),
   [by hand](#by-hand), [from a clone](#from-a-clone)
 - [The `luminous-money` command](#the-luminous-money-command)
-- [Upgrading](#upgrading) · [Backups](#backups) · [Logs](#logs) · [Health](#health-and-monitoring)
+- [Upgrading](#upgrading) · [Backups](#backups) · [Logs](#logs) · [Health](#health-and-monitoring) ·
+  [Admins and the system page](#admins-and-the-system-page)
 - [Settings](#settings) · [The operator's commands](#the-operators-commands) ·
   [Several stacks on one machine](#several-stacks-on-one-machine) ·
   [Troubleshooting](#troubleshooting)
@@ -136,6 +138,7 @@ on the deployment it lives in.
 | `logs [SERVICE…] [--since 2h] [--follow]` | The logs, timestamped. See [Logs](#logs). |
 | `report [--since 24h]` | A bundle for a bug report: logs, status, versions, and the settings with every secret hidden. |
 | `config` | Check `.env`, and show it with its secrets hidden. |
+| `auto-upgrade on [--at HH:MM]` / `off` / `status` | Upgrade to each new release by itself, daily at a time (default 03:30), backing up first. See [Upgrading](#upgrading). |
 | `help` | All of this. |
 
 ## Upgrading
@@ -159,6 +162,23 @@ command), pins the version, pulls the images, restarts, and waits until everythi
   upgrade doesn't come up healthy, it prints exactly that.
 - **By hand:** set `LUMINOUS_MONEY_VERSION`, replace `compose.yaml` with that release's, then
   `docker compose pull && docker compose up -d --wait`. Back up first.
+
+### Knowing there's a new release, and upgrading by itself
+
+`LUMINOUS_MONEY_UPDATES` decides (the app asks GitHub for the latest release once a day, sending
+nothing but the version it runs):
+
+- **`notify`** (the default): the [system page](#admins-and-the-system-page) and `status` say when
+  one is out. Nobody else sees a thing: end users are never told about upgrades.
+- **`off`:** never asks.
+- **`auto`:** it upgrades itself. `./luminous-money auto-upgrade on --at 03:30` sets this up: a
+  line in your crontab runs `luminous-money upgrade --auto` every day at that time (the server's
+  clock), which backs up and upgrades only when there's a newer release, logging to
+  `backups/upgrade.log`. `auto-upgrade off` stops it; `auto-upgrade status` says which. Without
+  cron, run `luminous-money upgrade --auto` from a systemd timer like the backup's.
+
+Upgrades always happen on the server, never from the app: replacing the containers takes control
+of Docker, which the app shouldn't have.
 
 ## Backups
 
@@ -286,6 +306,24 @@ accounts (never amounts, passwords or keys): look it over before sharing it.
   `expired`, or `missing` (none issued), is `down`. With a proxy of your own in front, its
   certificate is the proxy's to watch.
 
+## Admins and the system page
+
+Name the server's admins by email in `.env`:
+
+```sh
+LUMINOUS_MONEY_ADMINS=you@example.com,colleague@example.com
+```
+
+then `./luminous-money up`. An admin is anyone signed in with one of those emails, **once it's
+confirmed** (so nobody can sign up with an admin's address before they do): with email set up,
+from the link they're sent; without it, `docker compose exec auth node dist/cli.js confirm-email
+you@example.com`. Admins are ordinary accounts otherwise.
+
+Admins find **System** in the menu: each service's state, version and database schema, the
+certificate, how much data there is, the last backup, and whether a newer release is out (with
+**Check now**). It changes nothing: it says what to run on the server. Anyone else gets "not
+found".
+
 ## Settings
 
 All in `.env` (`env.example` in the release lists them). After changing any, `./luminous-money up`.
@@ -309,6 +347,9 @@ All in `.env` (`env.example` in the release lists them). After changing any, `./
 | `SIMPLEFIN_HOSTS` | The SimpleFIN servers setup tokens may point to, comma-separated. Default: the SimpleFIN Bridge's. |
 | `CATEGORIZERS` | External categorization providers ([categorizer-api.md](categorizer-api.md)). |
 | `AI_CLAUDE_EXTRACT_MODEL`, `AI_CLAUDE_CATEGORIZE_MODEL` | Claude's models for reading receipts and categorizing (defaults `claude-sonnet-5`, `claude-opus-5`). |
+| `LUMINOUS_MONEY_ADMINS` | The [admins](#admins-and-the-system-page), by email, comma-separated: they see the system page once their email is confirmed. |
+| `LUMINOUS_MONEY_UPDATES` | `notify` (default), `off` or `auto`: whether to look for new releases, and whether the server upgrades itself ([Upgrading](#knowing-theres-a-new-release-and-upgrading-by-itself)). `auto-upgrade` sets it. |
+| `LUMINOUS_MONEY_UPGRADE_AT` | With `auto`, when it upgrades (`HH:MM`): `auto-upgrade on --at` sets it, for the system page to show. |
 | `APP_ENV` | Which settings file each service starts from. Leave it `production`. |
 | `AUTH_TEST_USERS` | Test stacks only. **Never** on a real server: it lets anyone log in as any email. |
 
@@ -326,6 +367,7 @@ docker compose exec auth node dist/cli.js <command>
 | `reset-link <email>` | Prints a password-reset link (works once, for a day). For servers without email, or when it doesn't arrive. |
 | `disable <email>` / `enable <email>` | Stops an account logging in and ends its sessions, or lets it back in. |
 | `rotate-keys` | Starts signing with a new key; tokens signed with the old one keep working until they expire (10 minutes). |
+| `confirm-email <email>` | Marks an account's email confirmed, for a server without email: an [admin](#admins-and-the-system-page) counts once theirs is. |
 | `claim-stub <email> <name>` | For a stack from before accounts existed: gives the old stub user's books to a new account, whose password is read from standard input. |
 
 ## Several stacks on one machine

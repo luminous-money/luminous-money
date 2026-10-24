@@ -2640,3 +2640,25 @@ details.divide summary {
 .camera-dialog > button {
   margin: 0.75rem;
 }
+
+/* The system page (admins only): its cards' lines apart, and a service per row, its state and
+   version. */
+.system-card {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.system-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.system-list li {
+  display: grid;
+  grid-template-columns: 4rem auto 1fr;
+  align-items: center;
+  gap: 0.6rem;
+}

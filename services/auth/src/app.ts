@@ -478,6 +478,8 @@ export function createApp(services: Services) {
     // Who they are, for others sharing a book with them (M13); URI-encoded, as headers are ASCII.
     c.header("X-User-Name", encodeURIComponent(found.user.name));
     c.header("X-User-Email", encodeURIComponent(found.user.email));
+    // Whether that email is confirmed: an admin is named by email, so only a confirmed one counts.
+    c.header("X-User-Email-Verified", found.user.email_verified_at ? "true" : "false");
     return c.body(null, 200);
   });
 

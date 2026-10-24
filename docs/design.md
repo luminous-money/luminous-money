@@ -240,6 +240,16 @@ finding it on GitHub to running it, on a laptop or a public server, in one comma
   left, so under 14 is a renewal that's been failing for two weeks (`degraded`, time to fix it);
   expired or missing is `down`. `status` adds the last day's Let's Encrypt errors from the log.
 - **Every service knows its version** (a build argument baked in), for `/health` and support.
+- **Admins are named, not made:** `LUMINOUS_MONEY_ADMINS` lists emails, and an admin is a
+  signed-in user with one of them **confirmed** (auth forwards `X-User-Email-Verified` with the
+  rest), so no one can claim an admin's address by signing up first; without email, `auth`'s
+  `confirm-email` confirms it. There are still no special accounts: an admin is an ordinary user
+  with one more page.
+- **The system page tells, it doesn't do:** versions, health, schema, the certificate, data
+  sizes, the last backup (a marker `backup` leaves on the volume), and the latest release (asked of
+  GitHub once a day unless `LUMINOUS_MONEY_UPDATES=off`). Upgrading needs control of Docker, so
+  it stays on the host (`upgrade`, or `auto-upgrade`'s cron line, with `auto`); the app never
+  holds the socket. Nothing about the system reaches anyone else: its API answers 404.
 
 ### TypeScript where we write code, existing tools where they already exist
 

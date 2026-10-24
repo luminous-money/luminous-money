@@ -137,7 +137,7 @@ milestone starts.
       categorize with Opus 5), payment cards on accounts naming the paying account, and
       categorizing by **split**: posting flags mark what's unconfirmed, fallbacks and item
       history in the chain, and review's split pickers.
-- [ ] **Production readiness** (before M17; Kael, 2026-10-19): ready for production, and simple
+- [x] **Production readiness** (before M17; Kael, 2026-10-19): ready for production, and simple
       to deploy from GitHub to a laptop or a public server: upgrades and migrations, whole-system
       backups, logs, health; releases on GitHub; admins (by email, in config) with a system page,
       and upgrades on the admin's terms. [Its plan](milestones/production-readiness/PLAN.md).
@@ -145,8 +145,8 @@ milestone starts.
       HTTPS), whole-system backups, the `luminous-money` command, the release workflow,
       [docs/deploying.md](deploying.md). Questions answered 2026-10-23 (host-only upgrades,
       GitHub as luminous-money/luminous-money, GPL-2.0-or-later, HTTPS kept with its certificate
-      watched, open sign-ups). Phase 2 next: admins, the system page, update checks,
-      auto-upgrade.
+      watched, open sign-ups). Phase 2 built 2026-10-23: admins by email (once confirmed),
+      the system page, update checks, `auto-upgrade`.
 - [ ] **M17: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
       tag.
 - [ ] **M18: Suggested recurring transactions.** Nightly, analyze each account's last 14 months
