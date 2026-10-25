@@ -39,6 +39,19 @@ jobs:
           registry="ghcr.io/${GITHUB_REPOSITORY,,}"
           REGISTRY="$registry" VERSION="$version" SOURCE="https://github.com/$GITHUB_REPOSITORY" \
             docker buildx bake release
+      # Each architecture's app loads its native modules (sharp), before anything points at
+      # this release: 0.1.7's arm64 image had only x64's and crash-looped on a Pi.
+      - name: Check both architectures
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/app:${GITHUB_REF_NAME#v}"
+          for arch in amd64 arm64; do
+            docker run --rm --platform "linux/$arch" --entrypoint node "$image" \
+              -e "require('sharp'); console.log('linux/$arch: sharp loads')"
+          done
+      - name: Latest
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          registry="ghcr.io/${GITHUB_REPOSITORY,,}"
           for image in gateway auth ledger app ai; do
             docker buildx imagetools create -t "$registry/$image:latest" "$registry/$image:$version"
           done

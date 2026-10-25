@@ -250,6 +250,12 @@ How it's put together:
 
 ## Gotchas
 
+- **Release images get one `node_modules`, installed on the amd64 runner,** for both
+  architectures (the shared `workspace` stage isn't built per platform). So native packages
+  need every platform's binaries: `supportedArchitectures` in pnpm-workspace.yaml (linux x64 and
+  arm64, glibc). Without it, 0.1.7's arm64 `app` had only x64's sharp and crash-looped on a Pi.
+  The release checks `require('sharp')` on both before it tags `latest`.
+
 - **Reconciliation's marks belong to reconciling:** the ledger keeps a posting's `reconciled:`
   through JSON edits and strips it from new transactions (`service._marked`). Write marks only
   through `reconcile.py`.

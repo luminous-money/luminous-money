@@ -6,3 +6,9 @@ packages:
 # new releases.
 minimumReleaseAgeExclude:
   - '@luminous-money/*'
+# Native packages' binaries (sharp's) for every platform the images run on, whichever machine
+# installs them: a release installs node_modules once, on its amd64 runner, for both images.
+supportedArchitectures:
+  os: [current, linux]
+  cpu: [current, x64, arm64]
+  libc: [current, glibc]
