@@ -41,6 +41,22 @@ describe("M8: auth", () => {
     assert.equal(((await me.json()) as { email_verified: boolean }).email_verified, true);
   });
 
+  it("behind an HTTPS proxy, the browser's session cookies reach every API", async () => {
+    // As nginx (or Caddy, …) passes a browser's requests on: Secure, prefixed cookies.
+    const https = { "x-forwarded-proto": "https" };
+    const email = `m8-${randomBytes(4).toString("hex")}@test.local`;
+    const signup = await post("/signup", { name: "Kael", email, password: PASSWORD }, https);
+    assert.equal(signup.status, 201);
+    const [access, refresh] = signup.headers.getSetCookie().map((c) => c.split(";")[0]!);
+    assert.match(access!, /^__Host-lm_access=/);
+
+    const api = await fetch(`${BASE_URL}/api/ledger/v1/books`, {
+      headers: { ...https, cookie: access! },
+    });
+    assert.equal(api.status, 200);
+    assert.equal((await post("/token", {}, { ...https, cookie: refresh! })).status, 200);
+  });
+
   it("logs in with a password, refreshes, and logging out stops the access token at once", async () => {
     const user = await signUp();
     const login = await post("/login", { email: user.email, password: PASSWORD, delivery: "body" });

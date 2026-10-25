@@ -38,6 +38,9 @@ http:
     session:
       forwardAuth:
         address: http://auth:3000/api/auth/v1/verify
+        # Pass on the request's X-Forwarded-* (Proto: https behind a TLS proxy), which the
+        # entrypoints' forwardedHeaders.trustedIPs already strip from anyone untrusted.
+        trustForwardHeader: true
         authResponseHeaders: [X-User-Id, X-User-Name, X-User-Email, X-User-Email-Verified]
     to-ui:
       redirectRegex:

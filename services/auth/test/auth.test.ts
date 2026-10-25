@@ -142,6 +142,12 @@ describe("signing up and logging in", () => {
     const cookies = response.headers.getSetCookie();
     expect(cookies[0]).toMatch(/^__Host-lm_access=.*; Secure/);
     expect(cookies[1]).toMatch(/^__Secure-lm_refresh=.*; Secure/);
+
+    // Traefik's forwardAuth asks /verify over the stack's plain HTTP: the cookies still count.
+    const [access, refresh] = cookies.map((c) => c.split(";")[0]!);
+    expect((await call("/verify", { headers: { cookie: access! } })).status).toBe(200);
+    const renewed = await call("/token", { method: "POST", headers: { cookie: refresh! } });
+    expect(renewed.status).toBe(200);
   });
 
   it("refuses a taken email (any case), a weak or breached password, and a bad email", async () => {

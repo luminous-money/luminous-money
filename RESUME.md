@@ -250,6 +250,13 @@ How it's put together:
 
 ## Gotchas
 
+- **Behind a TLS proxy, session cookies are `__Host-lm_access` / `__Secure-lm_refresh`;** on
+  plain HTTP, `lm_access` / `lm_refresh`. auth reads either (prefixed first), because a request
+  may not say it came over HTTPS: until 0.1.9, Traefik's forwardAuth asked `/verify` with
+  `X-Forwarded-Proto: http`, so every session-checked call was 401 behind nginx (log in, then
+  the login form again). forwardAuth now has `trustForwardHeader` too, and the API suite logs
+  in behind a stand-in proxy (`X-Forwarded-Proto: https`) with cookies.
+
 - **Release images get one `node_modules`, installed on the amd64 runner,** for both
   architectures (the shared `workspace` stage isn't built per platform). So native packages
   need every platform's binaries: `supportedArchitectures` in pnpm-workspace.yaml (linux x64 and

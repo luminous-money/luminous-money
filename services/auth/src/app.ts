@@ -95,8 +95,16 @@ export function createApp(services: Services) {
   // Behind a TLS-terminating proxy, cookies are Secure (and the access cookie gets the __Host-
   // prefix); on plain HTTP (a local network) they can't be, or the browser would drop them.
   const secure = (c: Context) => c.req.header("x-forwarded-proto") === "https";
-  const accessCookie = (c: Context) => (secure(c) ? "__Host-lm_access" : "lm_access");
-  const refreshCookie = (c: Context) => (secure(c) ? "__Secure-lm_refresh" : "lm_refresh");
+  const ACCESS = { secure: "__Host-lm_access", plain: "lm_access" };
+  const REFRESH = { secure: "__Secure-lm_refresh", plain: "lm_refresh" };
+  const named = (c: Context, cookie: typeof ACCESS) => (secure(c) ? cookie.secure : cookie.plain);
+  const accessCookie = (c: Context) => named(c, ACCESS);
+  const refreshCookie = (c: Context) => named(c, REFRESH);
+  // Read by either name: a request may not say it came over HTTPS though its cookie was set over
+  // it (Traefik's forwardAuth asks /verify over the stack's plain HTTP). A prefixed cookie can
+  // only have been set over HTTPS, so it comes first.
+  const cookie = (c: Context, cookie: typeof ACCESS) =>
+    getCookie(c, cookie.secure) ?? getCookie(c, cookie.plain);
   const clientIp = (c: Context) =>
     c.req.header("x-forwarded-for")?.split(",").at(-1)?.trim() || "local";
   const bearer = (c: Context) => c.req.header("authorization")?.match(/^Bearer (.+)$/i)?.[1];
@@ -166,7 +174,7 @@ export function createApp(services: Services) {
   /** Who's calling: from an access token (Bearer or cookie) whose session is live, or an API
    * token. Disabled users are nobody. */
   const caller = async (c: Context): Promise<{ user: User; session?: Session } | undefined> => {
-    const token = bearer(c) ?? getCookie(c, accessCookie(c));
+    const token = bearer(c) ?? cookie(c, ACCESS);
     if (!token) return undefined;
     if (token.startsWith(API_TOKEN_PREFIX)) {
       const id = apiTokens.check(token);
@@ -297,7 +305,7 @@ export function createApp(services: Services) {
   /** Trade a refresh token (the cookie, or `refresh_token` in the body) for new tokens. */
   app.post("/token", async (c) => {
     const fromBody = (await body(c)).refresh_token;
-    const token = typeof fromBody === "string" ? fromBody : getCookie(c, refreshCookie(c));
+    const token = typeof fromBody === "string" ? fromBody : cookie(c, REFRESH);
     const next = token ? sessions.refresh(token) : undefined;
     const user = next && users.get(next.session.user_id);
     if (!next || !user || user.disabled_at) {
@@ -310,10 +318,10 @@ export function createApp(services: Services) {
   /** Log out: end the session the refresh token (or access token) belongs to. */
   app.post("/token/revoke", async (c) => {
     const fromBody = (await body(c)).refresh_token;
-    const refresh = typeof fromBody === "string" ? fromBody : getCookie(c, refreshCookie(c));
+    const refresh = typeof fromBody === "string" ? fromBody : cookie(c, REFRESH);
     const sessionId =
       (refresh && sessions.ofRefreshToken(refresh)) ??
-      (await keys.verify(bearer(c) ?? getCookie(c, accessCookie(c)), { ignoreExpiry: true }))?.sid;
+      (await keys.verify(bearer(c) ?? cookie(c, ACCESS), { ignoreExpiry: true }))?.sid;
     const session = sessionId ? sessions.get(sessionId) : undefined;
     if (session) sessions.end(session.user_id, session.id);
     clearCookies(c);
