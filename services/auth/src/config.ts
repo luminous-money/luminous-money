@@ -37,8 +37,11 @@ const configDef = {
   breachedPasswords: configValue("AUTH_BREACHED_PASSWORDS", "bool", true),
   signupsPerHour: configValue("AUTH_SIGNUPS_PER_HOUR", "num", 20),
   /** Who may sign up (access.ts): `public`, anyone; `private`, only `allowedEmails`. */
-  serviceMode: configValue("LUMINOUS_MONEY_SERVICE_MODE", "public", Validators.oneOf([...SERVICE_MODES])) as
-    ServiceMode | ConfigError,
+  serviceMode: configValue(
+    "LUMINOUS_MONEY_SERVICE_MODE",
+    "public",
+    Validators.oneOf([...SERVICE_MODES])
+  ) as ServiceMode | ConfigError,
   /** Comma-separated. */
   allowedEmails: configValue("LUMINOUS_MONEY_ALLOWED_EMAILS", "str", ""),
   /** Test stacks only: log in by email alone. */

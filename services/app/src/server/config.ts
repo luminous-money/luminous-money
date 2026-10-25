@@ -74,8 +74,11 @@ const configDef = {
     /** `daily`: every linked connection syncs once a day by itself. `on-demand`: only when
      * someone taps Sync now (a development stack, say, that mustn't spend a real connection's
      * requests). */
-    mode: configValue("LUMINOUS_MONEY_SIMPLEFIN_MODE", "daily", Validators.oneOf([...SIMPLEFIN_MODES])) as
-      SimplefinMode | ConfigError,
+    mode: configValue(
+      "LUMINOUS_MONEY_SIMPLEFIN_MODE",
+      "daily",
+      Validators.oneOf([...SIMPLEFIN_MODES])
+    ) as SimplefinMode | ConfigError,
   },
 };
 
