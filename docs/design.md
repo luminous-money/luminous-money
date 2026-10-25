@@ -962,6 +962,9 @@ and `holdings`, and errors either as coded `errlist` or as the older plain `erro
   - Attempts survive restarts.
 - **Syncing:** once each morning, at a random minute between 06:00 and 08:00 in the first linked
   book's time zone (the Bridge asks apps to spread out), plus "Sync now".
+  `LM_SIMPLEFIN_MODE=on-demand` (Kael, 2026-10-24; default `daily`) leaves out the morning
+  sync, and with it the morning's resuming of link attempts, so only Sync now spends a
+  connection's requests: for a development stack holding the same connection as a live one.
 - **Brokerages** (seen with Fidelity, 2026-10-16):
   - **Holdings come only with transactions,** not with balances-only requests.
   - **Each sync's holdings are a snapshot.** It records that day's price per symbol. Where the

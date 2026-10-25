@@ -366,6 +366,7 @@ All in `.env` (`env.example` in the release lists them). After changing any, `./
 | `LM_SERVICE_MODE` | `public` (default): anyone can create an account. `private`: only the emails in `LM_ALLOWED_EMAILS` ([a private instance](#a-private-instance)). |
 | `LM_ALLOWED_EMAILS` | With `private`, who may create an account, by email, comma-separated. |
 | `SIMPLEFIN_HOSTS` | The SimpleFIN servers setup tokens may point to, comma-separated. Default: the SimpleFIN Bridge's. |
+| `LM_SIMPLEFIN_MODE` | `daily` (default): bank feeds sync once each morning by themselves. `on-demand`: only when someone taps Sync now (for a test or development server sharing a live one's SimpleFIN connection, whose requests are limited). |
 | `CATEGORIZERS` | External categorization providers ([categorizer-api.md](categorizer-api.md)). |
 | `AI_CLAUDE_EXTRACT_MODEL`, `AI_CLAUDE_CATEGORIZE_MODEL` | Claude's models for reading receipts and categorizing (defaults `claude-sonnet-5`, `claude-opus-5`). |
 | `LUMINOUS_MONEY_ADMINS` | The [admins](#admins-and-the-system-page), by email, comma-separated: they see the system page once their email is confirmed. |

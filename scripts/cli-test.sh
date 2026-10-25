@@ -3,7 +3,7 @@
 # deployment from this checkout into a scratch directory, under its own project and port, then
 # its health, a sign-up, a backup, a restore (what came after the backup is gone), an upgrade,
 # upgrading by itself (against a stand-in crontab), the report (its secrets hidden), the
-# settings check, and a private instance. Cleans up after itself. Run by
+# settings check, a private instance, and bank feeds on demand. Cleans up after itself. Run by
 # `pnpm e2e`; on its own, `pnpm test:cli`.
 set -eu
 cd "$(dirname "$0")/.."
@@ -107,5 +107,13 @@ join() {
 [ "$(join stranger@test.local)" = 403 ] || fail "a private instance let a stranger sign up"
 [ "$(join friend@test.local)" = 201 ] || fail "a private instance didn't let an allowed email sign up"
 [ "$(signups)" = false ] || fail "sign-ups stayed open once every allowed email had an account"
+
+step "bank feeds on demand"
+echo "LM_SIMPLEFIN_MODE=weekly" >>"$home/.env"
+if "$cli" config >/dev/null 2>&1; then fail "config took a SimpleFIN mode that isn't one"; fi
+sed -i.bak 's/^LM_SIMPLEFIN_MODE=weekly$/LM_SIMPLEFIN_MODE=on-demand/' "$home/.env"
+"$cli" up >/dev/null
+"$cli" logs app --since 2m | grep -q "LM_SIMPLEFIN_MODE is on-demand" ||
+  fail "app didn't get LM_SIMPLEFIN_MODE from .env"
 
 echo "cli-test: passed"

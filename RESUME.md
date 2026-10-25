@@ -218,7 +218,9 @@ How it's put together:
   - `pnpm e2e`: 90 API tests and 96 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
-  mail. Kael's account claimed the old stub user, so it owns the "Demo"
+  mail. Its `.env` (not committed: its keys) sets `LM_SIMPLEFIN_MODE=on-demand`, so it never
+  syncs bank feeds by itself: Kael's live server holds the same SimpleFIN connection, and its
+  requests are limited. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).
 
 ## Next steps

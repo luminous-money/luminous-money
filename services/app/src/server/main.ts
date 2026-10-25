@@ -39,6 +39,8 @@ const simplefin = {
   sealer: new Sealer(config.simplefin.encryptionKey, "SIMPLEFIN_ENCRYPTION_KEY"),
   policy: { hosts: config.simplefin.hosts, allowInsecure: config.simplefin.allowInsecure },
 };
+if (config.simplefin.mode === "on-demand")
+  console.log("LM_SIMPLEFIN_MODE is on-demand: bank feeds sync only when someone taps Sync now.");
 if (simplefin.policy.allowInsecure)
   console.warn(
     "SIMPLEFIN_ALLOW_INSECURE is on: plain-HTTP SimpleFIN servers allowed. Test stacks only."
@@ -87,7 +89,9 @@ serve(
     startDaily([
       schedulesJob(db, ledgerFor),
       pricesJob(db, ledgerFor),
-      simplefinJob({ ...simplefin, db, ledgerFor, categorizers }),
+      ...(config.simplefin.mode === "daily"
+        ? [simplefinJob({ ...simplefin, db, ledgerFor, categorizers })]
+        : []),
       system.job,
     ]);
   }

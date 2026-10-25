@@ -275,6 +275,8 @@ Smaller improvements to pick up between milestones or at the end.
 - [x] **A private instance** (2026-10-24): `LM_SERVICE_MODE=private` lets only
       `LM_ALLOWED_EMAILS` sign up, and the login page says it's private once they all
       have accounts.
+- [x] **Bank feeds on demand** (2026-10-24): `LM_SIMPLEFIN_MODE=on-demand` stops the morning
+      sync (only Sync now), for the dev stack.
 - [x] **Review newest first** (2026-10-17), the latest entered of a day first too.
 - [x] **Pair transfers in review** (2026-10-17): money out of one account and the same into
       another within 7 days, both imported, become one transfer, with "Reject" to restore the

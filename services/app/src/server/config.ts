@@ -15,6 +15,9 @@ import * as dotenv from "dotenv";
 
 import { UPDATE_POLICIES, type UpdatePolicy } from "./system.js";
 
+export const SIMPLEFIN_MODES = ["daily", "on-demand"] as const;
+export type SimplefinMode = (typeof SIMPLEFIN_MODES)[number];
+
 export const ENVS = ["production", "development", "test"] as const;
 export type Env = (typeof ENVS)[number];
 
@@ -68,6 +71,11 @@ const configDef = {
       .filter(Boolean),
     /** Test stacks only: allow plain HTTP and private addresses (the fake SimpleFIN server). */
     allowInsecure: configValue("SIMPLEFIN_ALLOW_INSECURE", "bool", false),
+    /** `daily`: every linked connection syncs once a day by itself. `on-demand`: only when
+     * someone taps Sync now (a development stack, say, that mustn't spend a real connection's
+     * requests). */
+    mode: configValue("LM_SIMPLEFIN_MODE", "daily", Validators.oneOf([...SIMPLEFIN_MODES])) as
+      SimplefinMode | ConfigError,
   },
 };
 

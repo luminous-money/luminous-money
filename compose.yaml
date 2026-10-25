@@ -90,6 +90,9 @@ services:
       - LUMINOUS_MONEY_UPGRADE_AT
       # The SimpleFIN servers setup tokens may point to (default: the SimpleFIN Bridge's).
       - SIMPLEFIN_HOSTS
+      # daily (the default): bank feeds sync once a day by themselves. on-demand: only when
+      # someone taps Sync now.
+      - LM_SIMPLEFIN_MODE
       # External categorization providers (docs/categorizer-api.md).
       - CATEGORIZERS
     volumes:
