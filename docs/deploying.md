@@ -85,8 +85,8 @@ For a household's server (or anyone's who isn't offering accounts to the world),
 create one in `.env`, then `./luminous-money up`:
 
 ```sh
-LM_SERVICE_MODE=private
-LM_ALLOWED_EMAILS=you@example.com,partner@example.com
+LUMINOUS_MONEY_SERVICE_MODE=private
+LUMINOUS_MONEY_ALLOWED_EMAILS=you@example.com,partner@example.com
 ```
 
 Only those emails can sign up (in any case); anyone else is told it's a private instance. Once
@@ -363,10 +363,10 @@ All in `.env` (`env.example` in the release lists them). After changing any, `./
 | `SMTP_URL`, `MAIL_FROM` | Email, for password resets and confirming addresses, e.g. `smtps://user:pass@smtp.example.com` and `Luminous Money <books@example.com>`. Optional. |
 | `AUTH_BREACHED_PASSWORDS` | `true` (default) checks new passwords against Have I Been Pwned. Only the first five characters of the password's SHA-1 leave the server. |
 | `AUTH_SIGNUPS_PER_HOUR` | Sign-ups allowed per client address per hour (default 20). |
-| `LM_SERVICE_MODE` | `public` (default): anyone can create an account. `private`: only the emails in `LM_ALLOWED_EMAILS` ([a private instance](#a-private-instance)). |
-| `LM_ALLOWED_EMAILS` | With `private`, who may create an account, by email, comma-separated. |
+| `LUMINOUS_MONEY_SERVICE_MODE` | `public` (default): anyone can create an account. `private`: only the emails in `LUMINOUS_MONEY_ALLOWED_EMAILS` ([a private instance](#a-private-instance)). |
+| `LUMINOUS_MONEY_ALLOWED_EMAILS` | With `private`, who may create an account, by email, comma-separated. |
 | `SIMPLEFIN_HOSTS` | The SimpleFIN servers setup tokens may point to, comma-separated. Default: the SimpleFIN Bridge's. |
-| `LM_SIMPLEFIN_MODE` | `daily` (default): bank feeds sync once each morning by themselves. `on-demand`: only when someone taps Sync now (for a test or development server sharing a live one's SimpleFIN connection, whose requests are limited). |
+| `LUMINOUS_MONEY_SIMPLEFIN_MODE` | `daily` (default): bank feeds sync once each morning by themselves. `on-demand`: only when someone taps Sync now (for a test or development server sharing a live one's SimpleFIN connection, whose requests are limited). |
 | `CATEGORIZERS` | External categorization providers ([categorizer-api.md](categorizer-api.md)). |
 | `AI_CLAUDE_EXTRACT_MODEL`, `AI_CLAUDE_CATEGORIZE_MODEL` | Claude's models for reading receipts and categorizing (defaults `claude-sonnet-5`, `claude-opus-5`). |
 | `LUMINOUS_MONEY_ADMINS` | The [admins](#admins-and-the-system-page), by email, comma-separated: they see the system page once their email is confirmed. |

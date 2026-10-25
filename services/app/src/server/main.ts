@@ -40,7 +40,7 @@ const simplefin = {
   policy: { hosts: config.simplefin.hosts, allowInsecure: config.simplefin.allowInsecure },
 };
 if (config.simplefin.mode === "on-demand")
-  console.log("LM_SIMPLEFIN_MODE is on-demand: bank feeds sync only when someone taps Sync now.");
+  console.log("LUMINOUS_MONEY_SIMPLEFIN_MODE is on-demand: bank feeds sync only when someone taps Sync now.");
 if (simplefin.policy.allowInsecure)
   console.warn(
     "SIMPLEFIN_ALLOW_INSECURE is on: plain-HTTP SimpleFIN servers allowed. Test stacks only."

@@ -33,8 +33,8 @@ const access = { mode: config.serviceMode, allowed: allowList(config.allowedEmai
 if (access.mode === "private")
   console.log(
     access.allowed.length
-      ? `A private instance: ${access.allowed.length} email(s) in LM_ALLOWED_EMAILS may create accounts.`
-      : "A private instance with no LM_ALLOWED_EMAILS: no one can create an account."
+      ? `A private instance: ${access.allowed.length} email(s) in LUMINOUS_MONEY_ALLOWED_EMAILS may create accounts.`
+      : "A private instance with no LUMINOUS_MONEY_ALLOWED_EMAILS: no one can create an account."
   );
 if (!services.breached)
   console.warn("AUTH_BREACHED_PASSWORDS is off: breached passwords are allowed.");

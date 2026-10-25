@@ -28,8 +28,8 @@ then `status`, `upgrade` (backing up first), `backup` / `restore` (every databas
 attachments and the keys, online), `logs`, `report` (for bug reports, secrets hidden) and
 `config`, and `auto-upgrade on|off` (a crontab line). Every service has `/health` and an image
 healthcheck; `/api/health` is public for uptime monitors (with a domain, the certificate too).
-A **private instance** (`LM_SERVICE_MODE=private`) lets only the emails in
-`LM_ALLOWED_EMAILS` sign up; once they all have accounts, the login page says it's a
+A **private instance** (`LUMINOUS_MONEY_SERVICE_MODE=private`) lets only the emails in
+`LUMINOUS_MONEY_ALLOWED_EMAILS` sign up; once they all have accounts, the login page says it's a
 private instance instead of offering sign-up. Admins (`LUMINOUS_MONEY_ADMINS`, once their email is confirmed) see **System** in the menu:
 versions, health, data, the last backup, and whether a newer release is out. **Published**
 (2026-10-24) at [luminous-money/luminous-money](https://github.com/luminous-money/luminous-money):
@@ -38,9 +38,8 @@ ghcr.io/luminous-money/luminous-money/<service>, then the release with its bundl
 release is **`v0.1.1`** (the `v0.1.0` tag was pushed before CI could build on GitHub: its runner's
 builder didn't load images for e2e, and it has no release); **`v0.1.2`** finds the latest release
 from github.com's redirect, not the API, whose 60-an-hour limit for an address had run out;
-**`v0.1.3`** adds private instances (`LM_SERVICE_MODE`, `LM_ALLOWED_EMAILS`), and **`v0.1.4`**
-`LM_SIMPLEFIN_MODE`. The newer settings are `LM_*`, as Kael named them; the older ones keep
-`LUMINOUS_MONEY_*`. The history was rewritten once before
+**`v0.1.3`** adds private instances (`LUMINOUS_MONEY_SERVICE_MODE`, `LUMINOUS_MONEY_ALLOWED_EMAILS`), and **`v0.1.4`**
+`LUMINOUS_MONEY_SIMPLEFIN_MODE`; **`v0.1.5`** names them all `LUMINOUS_MONEY_*` (they were `LM_*`). The history was rewritten once before
 the first push (an email taken out of RESUME), so commit IDs from before then are gone.
 
 What a user can do now:
@@ -221,7 +220,7 @@ How it's put together:
   - `pnpm e2e`: 90 API tests and 96 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
-  mail. Its `.env` (not committed: its keys) sets `LM_SIMPLEFIN_MODE=on-demand`, so it never
+  mail. Its `.env` (not committed: its keys) sets `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand`, so it never
   syncs bank feeds by itself: Kael's live server holds the same SimpleFIN connection, and its
   requests are limited. Kael's account claimed the old stub user, so it owns the "Demo"
   book (checking, card and ETrade brokerage starred) and "Demo Household" (joint checking).

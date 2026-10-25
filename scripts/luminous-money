@@ -549,11 +549,11 @@ cmd_config() {
     warn "LUMINOUS_MONEY_DOMAIN needs LUMINOUS_MONEY_ACME_EMAIL"
     problems=1
   fi
-  choice LM_SERVICE_MODE public private || problems=1
-  choice LM_SIMPLEFIN_MODE daily on-demand || problems=1
+  choice LUMINOUS_MONEY_SERVICE_MODE public private || problems=1
+  choice LUMINOUS_MONEY_SIMPLEFIN_MODE daily on-demand || problems=1
   choice LUMINOUS_MONEY_UPDATES off notify auto || problems=1
-  if [ "$(setting LM_SERVICE_MODE)" = private ] && [ -z "$(setting LM_ALLOWED_EMAILS | tr -d ' ,')" ]; then
-    warn "LM_SERVICE_MODE is private with no LM_ALLOWED_EMAILS: no one can create an account"
+  if [ "$(setting LUMINOUS_MONEY_SERVICE_MODE)" = private ] && [ -z "$(setting LUMINOUS_MONEY_ALLOWED_EMAILS | tr -d ' ,')" ]; then
+    warn "LUMINOUS_MONEY_SERVICE_MODE is private with no LUMINOUS_MONEY_ALLOWED_EMAILS: no one can create an account"
   fi
   compose config --quiet || problems=1
   redacted

@@ -272,10 +272,10 @@ Smaller improvements to pick up between milestones or at the end.
 - [x] **HEIC on the server** (2026-10-24): every image is kept as browsers show it (an
       iPhone's HEIC becomes a JPEG), for receipts and attachments alike.
 - [x] **Suggest categories only in Select mode** (2026-10-24), where it asks the book's AI.
-- [x] **A private instance** (2026-10-24): `LM_SERVICE_MODE=private` lets only
-      `LM_ALLOWED_EMAILS` sign up, and the login page says it's private once they all
+- [x] **A private instance** (2026-10-24): `LUMINOUS_MONEY_SERVICE_MODE=private` lets only
+      `LUMINOUS_MONEY_ALLOWED_EMAILS` sign up, and the login page says it's private once they all
       have accounts.
-- [x] **Bank feeds on demand** (2026-10-24): `LM_SIMPLEFIN_MODE=on-demand` stops the morning
+- [x] **Bank feeds on demand** (2026-10-24): `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand` stops the morning
       sync (only Sync now), for the dev stack.
 - [x] **Review newest first** (2026-10-17), the latest entered of a day first too.
 - [x] **Pair transfers in review** (2026-10-17): money out of one account and the same into

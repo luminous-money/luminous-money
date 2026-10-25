@@ -59,9 +59,9 @@ services:
       - AUTH_BREACHED_PASSWORDS
       - AUTH_SIGNUPS_PER_HOUR
       # Who may create an account: public (anyone; the default), or private (only the emails in
-      # LM_ALLOWED_EMAILS, comma-separated).
-      - LM_SERVICE_MODE
-      - LM_ALLOWED_EMAILS
+      # LUMINOUS_MONEY_ALLOWED_EMAILS, comma-separated).
+      - LUMINOUS_MONEY_SERVICE_MODE
+      - LUMINOUS_MONEY_ALLOWED_EMAILS
     volumes:
       - data:/data
     logging: *logging
@@ -92,7 +92,7 @@ services:
       - SIMPLEFIN_HOSTS
       # daily (the default): bank feeds sync once a day by themselves. on-demand: only when
       # someone taps Sync now.
-      - LM_SIMPLEFIN_MODE
+      - LUMINOUS_MONEY_SIMPLEFIN_MODE
       # External categorization providers (docs/categorizer-api.md).
       - CATEGORIZERS
     volumes:

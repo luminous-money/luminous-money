@@ -89,16 +89,16 @@ gzip -dc "$report" | tar -xOf - ./settings.txt | grep -q 'SIMPLEFIN_ENCRYPTION_K
 if gzip -dc "$report" | grep -aqF "$key"; then fail "the report has a secret in it"; fi
 "$cli" config >/dev/null || fail "config found a problem with a fresh install"
 cp "$home/.env" "$work/env"
-echo "LM_SERVICE_MODE=secret" >>"$home/.env"
+echo "LUMINOUS_MONEY_SERVICE_MODE=secret" >>"$home/.env"
 if "$cli" config >/dev/null 2>&1; then fail "config took a service mode that isn't one"; fi
 cp "$work/env" "$home/.env"
 
 step "a private instance"
-printf 'LM_SERVICE_MODE=private\nLM_ALLOWED_EMAILS=Friend@Test.local\n' >>"$home/.env"
+printf 'LUMINOUS_MONEY_SERVICE_MODE=private\nLM_ALLOWED_EMAILS=Friend@Test.local\n' >>"$home/.env"
 "$cli" up >/dev/null
 signups() { curl -fsS "$base/api/auth/v1/config" | sed -n 's/.*"signups_open":\([a-z]*\).*/\1/p'; }
 curl -fsS "$base/api/auth/v1/config" | grep -q '"service_mode":"private"' ||
-  fail "auth didn't get LM_SERVICE_MODE from .env"
+  fail "auth didn't get LUMINOUS_MONEY_SERVICE_MODE from .env"
 [ "$(signups)" = true ] || fail "a private instance with an allowed email to come isn't open"
 join() {
   curl -s -o /dev/null -w '%{http_code}' -H 'content-type: application/json' "$base/api/auth/v1/signup" \
@@ -109,11 +109,11 @@ join() {
 [ "$(signups)" = false ] || fail "sign-ups stayed open once every allowed email had an account"
 
 step "bank feeds on demand"
-echo "LM_SIMPLEFIN_MODE=weekly" >>"$home/.env"
+echo "LUMINOUS_MONEY_SIMPLEFIN_MODE=weekly" >>"$home/.env"
 if "$cli" config >/dev/null 2>&1; then fail "config took a SimpleFIN mode that isn't one"; fi
-sed -i.bak 's/^LM_SIMPLEFIN_MODE=weekly$/LM_SIMPLEFIN_MODE=on-demand/' "$home/.env"
+sed -i.bak 's/^LUMINOUS_MONEY_SIMPLEFIN_MODE=weekly$/LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand/' "$home/.env"
 "$cli" up >/dev/null
-"$cli" logs app --since 2m | grep -q "LM_SIMPLEFIN_MODE is on-demand" ||
-  fail "app didn't get LM_SIMPLEFIN_MODE from .env"
+"$cli" logs app --since 2m | grep -q "LUMINOUS_MONEY_SIMPLEFIN_MODE is on-demand" ||
+  fail "app didn't get LUMINOUS_MONEY_SIMPLEFIN_MODE from .env"
 
 echo "cli-test: passed"

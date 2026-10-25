@@ -1,6 +1,6 @@
 /**
- * Who may create an account (`LM_SERVICE_MODE`): on a `public` server, anyone; on a
- * `private` one, only the emails in `LM_ALLOWED_EMAILS` (comma-separated, in any
+ * Who may create an account (`LUMINOUS_MONEY_SERVICE_MODE`): on a `public` server, anyone; on a
+ * `private` one, only the emails in `LUMINOUS_MONEY_ALLOWED_EMAILS` (comma-separated, in any
  * case). Once every allowed email has an account, sign-ups are closed, and the PWA says it's a
  * private instance instead of offering one. Accounts already made stay, whatever the list says.
  */
