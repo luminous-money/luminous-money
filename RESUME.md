@@ -37,7 +37,10 @@ a `v*.*.*` tag runs the Release workflow (the tests, then both architectures' im
 ghcr.io/luminous-money/luminous-money/<service>, then the release with its bundle). The first
 release is **`v0.1.1`** (the `v0.1.0` tag was pushed before CI could build on GitHub: its runner's
 builder didn't load images for e2e, and it has no release); **`v0.1.2`** finds the latest release
-from github.com's redirect, not the API, whose 60-an-hour limit for an address had run out. The history was rewritten once before
+from github.com's redirect, not the API, whose 60-an-hour limit for an address had run out;
+**`v0.1.3`** adds private instances (`LM_SERVICE_MODE`, `LM_ALLOWED_EMAILS`), and **`v0.1.4`**
+`LM_SIMPLEFIN_MODE`. The newer settings are `LM_*`, as Kael named them; the older ones keep
+`LUMINOUS_MONEY_*`. The history was rewritten once before
 the first push (an email taken out of RESUME), so commit IDs from before then are gone.
 
 What a user can do now:
