@@ -94,7 +94,7 @@ if "$cli" config >/dev/null 2>&1; then fail "config took a service mode that isn
 cp "$work/env" "$home/.env"
 
 step "a private instance"
-printf 'LUMINOUS_MONEY_SERVICE_MODE=private\nLM_ALLOWED_EMAILS=Friend@Test.local\n' >>"$home/.env"
+printf 'LUMINOUS_MONEY_SERVICE_MODE=private\nLUMINOUS_MONEY_ALLOWED_EMAILS=Friend@Test.local\n' >>"$home/.env"
 "$cli" up >/dev/null
 signups() { curl -fsS "$base/api/auth/v1/config" | sed -n 's/.*"signups_open":\([a-z]*\).*/\1/p'; }
 curl -fsS "$base/api/auth/v1/config" | grep -q '"service_mode":"private"' ||
