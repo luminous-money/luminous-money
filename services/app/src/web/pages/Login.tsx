@@ -6,8 +6,9 @@ import { explain, useAuthConfig, useLogIn, useSignUp } from "../lib/queries.js";
 
 type Mode = "log-in" | "sign-up" | "forgot";
 
-/** The first thing a logged-out visitor sees: log in, create an account (anyone can), or ask
- * for a password-reset email. After logging in you're wherever you were headed. */
+/** The first thing a logged-out visitor sees: log in, create an account (anyone can on a public
+ * server; on a private one, the emails it allows, until they all have one), or ask for a
+ * password-reset email. After logging in you're wherever you were headed. */
 export function Login() {
   const [mode, setMode] = useState<Mode>("log-in");
   const [email, setEmail] = useState("");
@@ -46,6 +47,7 @@ function EmailField({ email, setEmail }: Pick<FormProps, "email" | "setEmail">) 
 
 function LogIn({ email, setEmail, setMode }: FormProps) {
   const logIn = useLogIn();
+  const config = useAuthConfig();
   const [password, setPassword] = useState("");
   return (
     <form
@@ -73,12 +75,19 @@ function LogIn({ email, setEmail, setMode }: FormProps) {
           Log in
         </button>
       </div>
-      <p className="center small">
-        New here?{" "}
-        <button type="button" className="link-button" onClick={() => setMode("sign-up")}>
-          Create an account
-        </button>
-      </p>
+      {config.data?.signups_open && (
+        <p className="center small">
+          New here?{" "}
+          <button type="button" className="link-button" onClick={() => setMode("sign-up")}>
+            Create an account
+          </button>
+        </p>
+      )}
+      {config.data?.signups_open === false && (
+        <p className="center small muted">
+          This is a private instance: request access from the server administrator.
+        </p>
+      )}
     </form>
   );
 }
@@ -99,6 +108,12 @@ function SignUp({ email, setEmail, setMode }: FormProps) {
       }}
     >
       <h2 className="section-title">Create an account</h2>
+      {config.data?.service_mode === "private" && (
+        <p className="small muted">
+          This is a private instance: only the emails its administrator allows can create an
+          account.
+        </p>
+      )}
       <label>
         Your name
         <input

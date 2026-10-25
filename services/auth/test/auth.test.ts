@@ -15,6 +15,7 @@ import {
   verifyPassword,
 } from "../src/passwords.js";
 import { ApiTokens, GRACE_MS, Sessions } from "../src/sessions.js";
+import { allowList } from "../src/access.js";
 import { STUB_USER_ID, Users } from "../src/users.js";
 
 const PASSWORD = "correct horse battery staple";
@@ -180,6 +181,51 @@ describe("signing up and logging in", () => {
 
     expect((await login(plain.call)).status).toBe(401);
     expect((await login(test.call)).status).toBe(200);
+  });
+});
+
+describe("a private instance", () => {
+  it("reads its allowlist from the setting: trimmed, any case, once each", () => {
+    expect(allowList(" Kael@Example.com, jess@example.com,,kael@example.com ")).toEqual([
+      "kael@example.com",
+      "jess@example.com",
+    ]);
+    expect(allowList(undefined)).toEqual([]);
+  });
+
+  const privately = (allowed: string[]) => setup({ access: { mode: "private", allowed } });
+  const signups = async (call: Awaited<ReturnType<typeof setup>>["call"]) =>
+    (await (await call("/config")).json()) as { service_mode: string; signups_open: boolean };
+
+  it("lets only the allowed emails sign up (in any case), and says so to anyone else", async () => {
+    const { call } = await privately(["kael@example.com", "jess@example.com"]);
+
+    const stranger = await call("/signup", {
+      method: "POST",
+      json: { name: "X", email: "someone@example.com", password: PASSWORD },
+    });
+    expect(stranger.status).toBe(403);
+    expect(await stranger.json()).toEqual({
+      detail: "This is a private instance: request access from the server administrator.",
+    });
+    await signUp(call, "Kael@Example.com");
+  });
+
+  it("closes sign-ups once every allowed email has an account", async () => {
+    const { call } = await privately(["kael@example.com", "jess@example.com"]);
+    expect(await signups(call)).toMatchObject({ service_mode: "private", signups_open: true });
+
+    await signUp(call, "kael@example.com");
+    expect((await signups(call)).signups_open).toBe(true);
+    await signUp(call, "JESS@example.com");
+    expect((await signups(call)).signups_open).toBe(false);
+  });
+
+  it("is closed with no one allowed; a public server is always open", async () => {
+    expect((await signups((await privately([])).call)).signups_open).toBe(false);
+    const { call } = await setup();
+    await signUp(call);
+    expect(await signups(call)).toMatchObject({ service_mode: "public", signups_open: true });
   });
 });
 

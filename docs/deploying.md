@@ -13,8 +13,9 @@ System page in the app, and no one else sees anything about the server.
 
 - [What you need](#what-you-need)
 - [Installing](#installing): [on a laptop or home server](#on-a-laptop-or-a-home-server),
-  [on a public server](#on-a-public-server), [behind a proxy you have](#behind-a-proxy-you-have),
-  [by hand](#by-hand), [from a clone](#from-a-clone)
+  [on a public server](#on-a-public-server), [a private instance](#a-private-instance),
+  [behind a proxy you have](#behind-a-proxy-you-have), [by hand](#by-hand),
+  [from a clone](#from-a-clone)
 - [The `luminous-money` command](#the-luminous-money-command)
 - [Upgrading](#upgrading) · [Backups](#backups) · [Logs](#logs) · [Health](#health-and-monitoring) ·
   [Admins and the system page](#admins-and-the-system-page)
@@ -75,7 +76,25 @@ to be reachable from it.
 5. **Backups:** [schedule them](#scheduling) and copy them somewhere else.
 
 Anyone who can reach the server can create an account (a few per hour per address:
-`AUTH_SIGNUPS_PER_HOUR`). Each account sees only its own books and those shared with it.
+`AUTH_SIGNUPS_PER_HOUR`), unless it's [private](#a-private-instance). Each account sees only its
+own books and those shared with it.
+
+### A private instance
+
+For a household's server (or anyone's who isn't offering accounts to the world), say who may
+create one in `.env`, then `./luminous-money up`:
+
+```sh
+LM_SERVICE_MODE=private
+LM_ALLOWED_EMAILS=you@example.com,partner@example.com
+```
+
+Only those emails can sign up (in any case); anyone else is told it's a private instance. Once
+every one of them has an account, the app stops offering sign-up and says instead: "This is a
+private instance: request access from the server administrator." To let someone in, add their
+email and `up` again. The list only governs creating accounts: taking an email out of it
+doesn't touch an account already made (`disable` in [the operator's commands](#the-operators-commands)
+does). [Admins](#admins-and-the-system-page) need to be on the list too, to sign up.
 
 ### Behind a proxy you have
 
@@ -344,6 +363,8 @@ All in `.env` (`env.example` in the release lists them). After changing any, `./
 | `SMTP_URL`, `MAIL_FROM` | Email, for password resets and confirming addresses, e.g. `smtps://user:pass@smtp.example.com` and `Luminous Money <books@example.com>`. Optional. |
 | `AUTH_BREACHED_PASSWORDS` | `true` (default) checks new passwords against Have I Been Pwned. Only the first five characters of the password's SHA-1 leave the server. |
 | `AUTH_SIGNUPS_PER_HOUR` | Sign-ups allowed per client address per hour (default 20). |
+| `LM_SERVICE_MODE` | `public` (default): anyone can create an account. `private`: only the emails in `LM_ALLOWED_EMAILS` ([a private instance](#a-private-instance)). |
+| `LM_ALLOWED_EMAILS` | With `private`, who may create an account, by email, comma-separated. |
 | `SIMPLEFIN_HOSTS` | The SimpleFIN servers setup tokens may point to, comma-separated. Default: the SimpleFIN Bridge's. |
 | `CATEGORIZERS` | External categorization providers ([categorizer-api.md](categorizer-api.md)). |
 | `AI_CLAUDE_EXTRACT_MODEL`, `AI_CLAUDE_CATEGORIZE_MODEL` | Claude's models for reading receipts and categorizing (defaults `claude-sonnet-5`, `claude-opus-5`). |

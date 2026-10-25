@@ -3,6 +3,7 @@ import { Hono } from "hono";
 
 import { health } from "@luminous-money/db";
 
+import { allowList } from "./access.js";
 import { createApp } from "./app.js";
 import { booksOverHttp } from "./books.js";
 import { config } from "./config.js";
@@ -28,6 +29,13 @@ if (config.mail.smtpUrl) {
 
 if (config.testUsers)
   console.warn("AUTH_TEST_USERS is on: anyone can log in as any email. Test stacks only.");
+const access = { mode: config.serviceMode, allowed: allowList(config.allowedEmails) };
+if (access.mode === "private")
+  console.log(
+    access.allowed.length
+      ? `A private instance: ${access.allowed.length} email(s) in LM_ALLOWED_EMAILS may create accounts.`
+      : "A private instance with no LM_ALLOWED_EMAILS: no one can create an account."
+  );
 if (!services.breached)
   console.warn("AUTH_BREACHED_PASSWORDS is off: breached passwords are allowed.");
 
@@ -35,6 +43,7 @@ const app = createApp({
   ...services,
   mail,
   testUsers: config.testUsers,
+  access,
   deleteBooks: booksOverHttp(config.ledgerUrl, config.appUrl),
   limits: { account: 5, ip: 20, signups: config.signupsPerHour, resets: 5 },
 });

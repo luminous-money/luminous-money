@@ -58,6 +58,10 @@ services:
       # New passwords are checked against Have I Been Pwned (by hash prefix only); default true.
       - AUTH_BREACHED_PASSWORDS
       - AUTH_SIGNUPS_PER_HOUR
+      # Who may create an account: public (anyone; the default), or private (only the emails in
+      # LM_ALLOWED_EMAILS, comma-separated).
+      - LM_SERVICE_MODE
+      - LM_ALLOWED_EMAILS
     volumes:
       - data:/data
     logging: *logging

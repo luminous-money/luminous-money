@@ -416,6 +416,14 @@ How auth works (M8; the shape is M1's):
   there's nothing global to administer: everyone is an ordinary user, including whoever runs the
   server. Operator tasks (reset links, disabling an account, key rotation) go through `auth`'s
   command line (`node dist/cli.js`), not an admin role.
+- **A private instance lets in only the emails its operator lists** (Kael, 2026-10-24):
+  `LM_SERVICE_MODE=private` with `LM_ALLOWED_EMAILS` (comma-separated,
+  any case; `access.ts`). Anyone else's sign-up is refused (403, "This is a private instance:
+  request access from the server administrator"), and once every allowed email has an account,
+  `/config` says sign-ups are closed and the login page shows that sentence instead of "Create
+  an account". It governs creating accounts only: those already made stay. Admins aren't
+  allowed implicitly (`app` names them, `auth` lets people in): one list, said once. The two
+  are named as Kael named them (`LM_*`), shorter than the older settings' `LUMINOUS_MONEY_*`.
 - **Who you are is apart from how you prove it.** A user is a name and an email (unique,
   case-insensitive). An `identity` is a way to log in: a password now, and OIDC providers later
   as another kind, with nothing else moving. Sessions record which one started them.

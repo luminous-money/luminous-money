@@ -12,6 +12,8 @@ import { existsSync } from "node:fs";
 import { configValue, validate, Validators, type ConfigError } from "@wymp/config-simple";
 import * as dotenv from "dotenv";
 
+import { SERVICE_MODES, type ServiceMode } from "./access.js";
+
 export const ENVS = ["production", "development", "test"] as const;
 export type Env = (typeof ENVS)[number];
 
@@ -34,6 +36,11 @@ const configDef = {
   publicUrl: configValue("LUMINOUS_MONEY_PUBLIC_URL", "str"),
   breachedPasswords: configValue("AUTH_BREACHED_PASSWORDS", "bool", true),
   signupsPerHour: configValue("AUTH_SIGNUPS_PER_HOUR", "num", 20),
+  /** Who may sign up (access.ts): `public`, anyone; `private`, only `allowedEmails`. */
+  serviceMode: configValue("LM_SERVICE_MODE", "public", Validators.oneOf([...SERVICE_MODES])) as
+    ServiceMode | ConfigError,
+  /** Comma-separated. */
+  allowedEmails: configValue("LM_ALLOWED_EMAILS", "str", ""),
   /** Test stacks only: log in by email alone. */
   testUsers: configValue("AUTH_TEST_USERS", "bool", false),
 };

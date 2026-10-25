@@ -28,7 +28,9 @@ then `status`, `upgrade` (backing up first), `backup` / `restore` (every databas
 attachments and the keys, online), `logs`, `report` (for bug reports, secrets hidden) and
 `config`, and `auto-upgrade on|off` (a crontab line). Every service has `/health` and an image
 healthcheck; `/api/health` is public for uptime monitors (with a domain, the certificate too).
-Admins (`LUMINOUS_MONEY_ADMINS`, once their email is confirmed) see **System** in the menu:
+A **private instance** (`LM_SERVICE_MODE=private`) lets only the emails in
+`LM_ALLOWED_EMAILS` sign up; once they all have accounts, the login page says it's a
+private instance instead of offering sign-up. Admins (`LUMINOUS_MONEY_ADMINS`, once their email is confirmed) see **System** in the menu:
 versions, health, data, the last backup, and whether a newer release is out. **Published**
 (2026-10-24) at [luminous-money/luminous-money](https://github.com/luminous-money/luminous-money):
 a `v*.*.*` tag runs the Release workflow (the tests, then both architectures' images on

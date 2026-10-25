@@ -538,6 +538,17 @@ cmd_config() {
     warn "LUMINOUS_MONEY_DOMAIN needs LUMINOUS_MONEY_ACME_EMAIL"
     problems=1
   fi
+  case "$(setting LM_SERVICE_MODE)" in
+    "" | public) ;;
+    private)
+      [ -n "$(setting LM_ALLOWED_EMAILS | tr -d ' ,')" ] ||
+        warn "LM_SERVICE_MODE is private with no LM_ALLOWED_EMAILS: no one can create an account"
+      ;;
+    *)
+      warn "LM_SERVICE_MODE is public or private"
+      problems=1
+      ;;
+  esac
   compose config --quiet || problems=1
   redacted
   if [ "$problems" != 0 ]; then exit 1; fi

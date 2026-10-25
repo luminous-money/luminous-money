@@ -23,6 +23,11 @@ export type User = {
 export type AuthConfig = {
   mail: boolean;
   test_users: boolean;
+  /** Who may sign up: anyone (public), or only the emails the server allows (private). */
+  service_mode: "public" | "private";
+  /** Whether anyone may still sign up: false once a private server's allowed emails all have
+   * accounts. */
+  signups_open: boolean;
   password: { min_length: number; max_length: number };
 };
 

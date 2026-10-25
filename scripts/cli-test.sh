@@ -2,8 +2,8 @@
 # The `luminous-money` command, end to end, against images built here (`pnpm build`): install a
 # deployment from this checkout into a scratch directory, under its own project and port, then
 # its health, a sign-up, a backup, a restore (what came after the backup is gone), an upgrade,
-# upgrading by itself (against a stand-in crontab), the report (its secrets hidden), and the
-# settings check. Cleans up after itself. Run by
+# upgrading by itself (against a stand-in crontab), the report (its secrets hidden), the
+# settings check, and a private instance. Cleans up after itself. Run by
 # `pnpm e2e`; on its own, `pnpm test:cli`.
 set -eu
 cd "$(dirname "$0")/.."
@@ -88,5 +88,24 @@ gzip -dc "$report" | tar -xOf - ./settings.txt | grep -q 'SIMPLEFIN_ENCRYPTION_K
   fail "the report's settings don't hide the key"
 if gzip -dc "$report" | grep -aqF "$key"; then fail "the report has a secret in it"; fi
 "$cli" config >/dev/null || fail "config found a problem with a fresh install"
+cp "$home/.env" "$work/env"
+echo "LM_SERVICE_MODE=secret" >>"$home/.env"
+if "$cli" config >/dev/null 2>&1; then fail "config took a service mode that isn't one"; fi
+cp "$work/env" "$home/.env"
+
+step "a private instance"
+printf 'LM_SERVICE_MODE=private\nLM_ALLOWED_EMAILS=Friend@Test.local\n' >>"$home/.env"
+"$cli" up >/dev/null
+signups() { curl -fsS "$base/api/auth/v1/config" | sed -n 's/.*"signups_open":\([a-z]*\).*/\1/p'; }
+curl -fsS "$base/api/auth/v1/config" | grep -q '"service_mode":"private"' ||
+  fail "auth didn't get LM_SERVICE_MODE from .env"
+[ "$(signups)" = true ] || fail "a private instance with an allowed email to come isn't open"
+join() {
+  curl -s -o /dev/null -w '%{http_code}' -H 'content-type: application/json' "$base/api/auth/v1/signup" \
+    -d "{\"name\":\"Someone\",\"email\":\"$1\",\"password\":\"a long enough test passphrase\"}"
+}
+[ "$(join stranger@test.local)" = 403 ] || fail "a private instance let a stranger sign up"
+[ "$(join friend@test.local)" = 201 ] || fail "a private instance didn't let an allowed email sign up"
+[ "$(signups)" = false ] || fail "sign-ups stayed open once every allowed email had an account"
 
 echo "cli-test: passed"

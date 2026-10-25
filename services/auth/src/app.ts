@@ -2,7 +2,9 @@
  * The auth service's HTTP surface, at /api/auth/v1: the only API without Traefik's session check,
  * so every route here checks for itself.
  *
- * - **Accounts:** anyone can sign up (`/signup`) with an email and a password. Nobody is special.
+ * - **Accounts:** anyone can sign up (`/signup`) with an email and a password, on a public server;
+ *   on a private one, only the allowed emails (`access`, access.ts). `/config` says whether
+ *   sign-ups are open. Nobody is special.
  * - **Sessions:** logging in (`/login`) starts one, with a 10-minute access token (an Ed25519
  *   JWT) and a refresh token that rotates on every use (`/token`). `/token/revoke` logs out.
  * - **In the browser** both are HttpOnly cookies (the refresh token's scoped to `/token`), so the
@@ -18,6 +20,7 @@
 import { Hono, type Context, type Next } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 
+import { mayJoin, PRIVATE_INSTANCE, PUBLIC, signupsOpen, type Access } from "./access.js";
 import { ACCESS_TTL_SECONDS, type SigningKeys } from "./keys.js";
 import { Failures, Rate } from "./limits.js";
 import type { EmailLinks } from "./links.js";
@@ -68,6 +71,8 @@ export type Services = {
   /** Sends email, with links to `publicUrl`; without it, nothing is sent. */
   mail?: { mailer: Mailer; publicUrl: string };
   testUsers?: boolean;
+  /** Who may sign up (access.ts); public without it. */
+  access?: Access;
   /** How many wrong passwords before waiting, per account and per client IP; sign-ups and
    * reset emails allowed per IP per hour. */
   limits?: { account: number; ip: number; signups: number; resets: number };
@@ -80,6 +85,7 @@ const DEFAULT_LIMITS = { account: 5, ip: 20, signups: 20, resets: 5 };
 export function createApp(services: Services) {
   const { users, sessions, apiTokens, keys, links, mail, breached } = services;
   const limits = { ...DEFAULT_LIMITS, ...services.limits };
+  const access = services.access ?? PUBLIC;
   const accountFailures = new Failures(limits.account);
   const ipFailures = new Failures(limits.ip);
   const signups = new Rate(limits.signups);
@@ -241,6 +247,8 @@ export function createApp(services: Services) {
     c.json({
       mail: !!mail,
       test_users: !!services.testUsers,
+      service_mode: access.mode,
+      signups_open: signupsOpen(access, users),
       password: { min_length: MIN_LENGTH, max_length: MAX_LENGTH },
     })
   );
@@ -254,6 +262,7 @@ export function createApp(services: Services) {
     if (typeof name !== "string" || !name.trim() || name.trim().length > 100)
       return problem(c, "enter your name", 422);
     if (!isEmail(email)) return problem(c, "enter your email address", 422);
+    if (!mayJoin(access, email)) return problem(c, PRIVATE_INSTANCE, 403);
     if (users.byEmail(email)) return problem(c, new EmailTaken().message, 422);
     const weak = await passwordProblem(password, email, breached);
     if (weak) return problem(c, weak, 422);

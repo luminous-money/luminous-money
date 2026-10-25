@@ -1,4 +1,5 @@
-/** M8: accounts anyone can create, sessions that stay fresh, and your account page. */
+/** M8: accounts anyone can create (or, on a private server, the emails it allows), sessions that
+ * stay fresh, and your account page. */
 import { randomBytes } from "node:crypto";
 
 import { expect, test, type Page } from "@playwright/test";
@@ -129,4 +130,33 @@ test("your account: confirm the email, see devices, make an API token, delete it
   await page.getByLabel("Your password, to confirm", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Delete everything" }).click();
   await expect(page.getByRole("form", { name: "Log in" })).toBeVisible();
+});
+
+test("a private instance offers sign-up only while an allowed email has no account", async ({
+  page,
+}) => {
+  // As the auth service of a private server says it, still open, then once everyone allowed
+  // has an account (the stack itself is public; the rule is auth's, tested there).
+  let open = true;
+  await page.route("**/api/auth/v1/config", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: { ...(await response.json()), service_mode: "private", signups_open: open },
+    });
+  });
+
+  await page.goto("/ui/");
+  await page.getByRole("button", { name: "Create an account" }).click();
+  await expect(page.getByRole("form", { name: "Create an account" })).toContainText(
+    "This is a private instance: only the emails its administrator allows can create an account."
+  );
+
+  open = false;
+  await page.reload();
+  const login = page.getByRole("form", { name: "Log in" });
+  await expect(login).toContainText(
+    "This is a private instance: request access from the server administrator."
+  );
+  await expect(page.getByRole("button", { name: "Create an account" })).toHaveCount(0);
 });

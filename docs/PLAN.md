@@ -272,6 +272,9 @@ Smaller improvements to pick up between milestones or at the end.
 - [x] **HEIC on the server** (2026-10-24): every image is kept as browsers show it (an
       iPhone's HEIC becomes a JPEG), for receipts and attachments alike.
 - [x] **Suggest categories only in Select mode** (2026-10-24), where it asks the book's AI.
+- [x] **A private instance** (2026-10-24): `LM_SERVICE_MODE=private` lets only
+      `LM_ALLOWED_EMAILS` sign up, and the login page says it's private once they all
+      have accounts.
 - [x] **Review newest first** (2026-10-17), the latest entered of a day first too.
 - [x] **Pair transfers in review** (2026-10-17): money out of one account and the same into
       another within 7 days, both imported, become one transfer, with "Reject" to restore the
