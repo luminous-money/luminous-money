@@ -73,20 +73,25 @@ export function NewTransactionPage({ book }: { book: string }) {
   const account = useParam("account") ?? "";
   const accounts = useAccounts(book); // the pickers need the chart (see TransactionPage)
   const back = useBack(`/books/${book}/review`);
-  const draft: Transaction = {
-    id: "",
-    created_at: "",
-    updated_at: "",
-    attachments: 0,
-    date: today(),
-    flag: "*",
-    payee: null,
-    narration: "",
-    tags: [],
-    links: [],
-    meta: {},
-    postings: [{ account }, { account: "" }],
-  };
+  // Made once: the editor's splits start over whenever their postings change, so a new draft
+  // on every render (a refetch's, say) would wipe what's been typed.
+  const draft = useMemo<Transaction>(
+    () => ({
+      id: "",
+      created_at: "",
+      updated_at: "",
+      attachments: 0,
+      date: today(),
+      flag: "*",
+      payee: null,
+      narration: "",
+      tags: [],
+      links: [],
+      meta: {},
+      postings: [{ account }, { account: "" }],
+    }),
+    [account]
+  );
 
   return (
     <main>

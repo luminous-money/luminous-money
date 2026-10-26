@@ -26,6 +26,7 @@ import { Sharing } from "./pages/Sharing.js";
 import { Transactions } from "./pages/Transactions.js";
 import { Home } from "./pages/Home.js";
 import { Import } from "./pages/Import.js";
+import { ImportChart } from "./pages/ImportChart.js";
 import { Login } from "./pages/Login.js";
 import { Commodities } from "./pages/Commodities.js";
 import { Review } from "./pages/Review.js";
@@ -156,6 +157,9 @@ function Gate() {
           </Route>
           <Route path="/books/:book/accounts/new">
             {() => <AddAccount key={book!.id} book={book!} />}
+          </Route>
+          <Route path="/books/:book/accounts/import">
+            {() => <ImportChart key={book!.id} book={book!} />}
           </Route>
           <Route path="/books/:book/accounts/:account/trade">
             {({ book: id, account }) => (

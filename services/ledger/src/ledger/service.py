@@ -382,7 +382,7 @@ class Ledger:
 
     def set_account(self, book_id: str, name: str, patch: models.AccountPatch) -> models.Account:
         """Change an account's settings (only those given), against its version: how its sales
-        pick lots, whether it's a revalued asset (and how often), its display name, and whether
+        pick lots, whether it's a revalued asset (and how often), its display name and description, and whether
         it's a divided account (an implicit node is opened for that) and its main part, and its
         payment cards."""
         changes = patch.model_dump(exclude_unset=True, exclude={"updated_at"})
@@ -419,6 +419,7 @@ class Ledger:
             booking=changes.get("booking", account.booking),
             revalue_every=changes.get("revalue_every", account.revalue_every),
             **({"display_name": changes["display_name"]} if "display_name" in changes else {}),
+            **({"description": changes["description"]} if "description" in changes else {}),
             **(
                 {"divided": changes["divided"]}
                 if "divided" in changes
@@ -491,13 +492,37 @@ class Ledger:
         moved like any transaction), and the account opens then and holds that currency. All of
         it is one write.
         """
+        directives = self._opened(book_id, a)
+        with self.store.transaction():
+            self.store.put(book_id, directives)
+        return self._account(book_id, a.name)
+
+    def create_accounts(self, book_id: str, batch: list[models.AccountIn]) -> list[models.Account]:
+        """Open many accounts in one atomic write, in order, each as `create_account` would given
+        those before it (so a node comes before what's under it): all of them, or none. A refusal
+        names the account it's about."""
+        with self.store.transaction():
+            for a in batch:
+                try:
+                    self.store.put(book_id, self._opened(book_id, a))
+                except engine.ParseFailure as e:
+                    raise engine.ParseFailure([f"{a.name}: {error}" for error in e.errors]) from e
+        accounts = {x.name: x for x in self.accounts(book_id)}
+        return [accounts[a.name] for a in batch]
+
+    def _opened(self, book_id: str, a: models.AccountIn) -> list[engine.Directive]:
+        """What opening an account writes (`create_account`), checked against the book as it is."""
         opening = a.opening_balance
         if (opening or a.opening_holdings) and a.kind != "leaf":
             raise engine.ParseFailure(["only a leaf account can have an opening balance or holdings"])
         if a.opening_holdings and not opening:
             raise engine.ParseFailure(["opening holdings need an opening balance's date (its amount can be 0)"])
         opened = a.open or (opening.date if opening else None)
-        meta = {engine.REVALUE_EVERY_KEY: Decimal(a.revalue_every)} if a.revalue_every else None
+        meta: dict[str, object] = {
+            **({engine.REVALUE_EVERY_KEY: Decimal(a.revalue_every)} if a.revalue_every else {}),
+            **({engine.DISPLAY_NAME_KEY: a.display_name.strip()} if a.display_name and a.display_name.strip() else {}),
+            **({engine.DESCRIPTION_KEY: engine.one_line(a.description)} if a.description and a.description.strip() else {}),
+        }
         directives = self._account_directives(
             book_id,
             a.name,
@@ -522,9 +547,7 @@ class Ledger:
                 ],
             )
             directives.append(engine.transaction_directive(transaction))
-        with self.store.transaction():
-            self.store.put(book_id, directives)
-        return self._account(book_id, a.name)
+        return directives
 
     def _account(self, book_id: str, name: str) -> models.Account:
         return next(x for x in self.accounts(book_id) if x.name == name)

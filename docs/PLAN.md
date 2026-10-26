@@ -147,6 +147,11 @@ milestone starts.
       GitHub as luminous-money/luminous-money, GPL-2.0-or-later, HTTPS kept with its certificate
       watched, open sign-ups). Phase 2 built 2026-10-23: admins by email (once confirmed),
       the system page, update checks, `auto-upgrade`.
+- [x] **Chart of accounts import** (before M17; Kael, 2026-10-26): Accounts → Import, a CSV of
+      full names and the fields an account can start with, every name title-cased by the one
+      normalizer. [Built](milestones/chart-of-accounts-import/PLAN.md) 2026-10-26: a preview of
+      what's added, already here or refused (and why), then one atomic write
+      (`POST /accounts/batch`); descriptions on accounts; typing and suggestions title-case too.
 - [ ] **M17: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
       tag.
 - [ ] **M18: Suggested recurring transactions.** Nightly, analyze each account's last 14 months

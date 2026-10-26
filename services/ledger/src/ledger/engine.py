@@ -38,6 +38,8 @@ KIND_KEY = "kind"
 # An account's human name, since account names can't have spaces. Optional: the app falls back
 # to the name's last segment.
 DISPLAY_NAME_KEY = "display-name"
+# What an account is for, in words: one line, from a chart of accounts or the editor.
+DESCRIPTION_KEY = "description"
 # A revalued asset (a house, a car): how many days its value stays current (M5).
 REVALUE_EVERY_KEY = "revalue-every"
 BUDGET_KEY = "budget"  # on a transaction: FALSE keeps it out of budgets (M11)
@@ -388,6 +390,7 @@ def accounts(header: list[str], texts: list[str], versions: dict[str, str] | Non
                 open=entry.date,
                 currencies=list(entry.currencies or []),
                 display_name=entry.meta.get(DISPLAY_NAME_KEY),
+                description=entry.meta[DESCRIPTION_KEY] if isinstance(entry.meta.get(DESCRIPTION_KEY), str) else None,
                 booking=entry.booking.name if entry.booking else None,
                 updated_at=(versions or {}).get(str(entry.meta.get(ID_KEY))),
                 revalue_every=int(entry.meta[REVALUE_EVERY_KEY]) if REVALUE_EVERY_KEY in entry.meta else None,
@@ -414,6 +417,11 @@ def segment(text: str) -> str:
     if not part:
         raise ParseFailure([f"can't make an account name from {text!r}"])
     return part[0].upper() + part[1:]
+
+
+def one_line(text: str) -> str:
+    """Text as one line: runs of whitespace (line breaks too) become one space."""
+    return " ".join(text.split())
 
 
 def decimal_text(number: Decimal) -> str:
@@ -460,12 +468,13 @@ def reopened(
     booking: str | None,
     revalue_every: int | None,
     display_name: object = _KEEP,
+    description: object = _KEEP,
     divided: object = _KEEP,
     main_part: object = _KEEP,
     cards: object = _KEEP,
 ) -> Directive:
     """An `open` directive with its booking method and `revalue-every` set (None: removed), and
-    its `display-name` (None or "": removed), `divided` (False: removed), main part and cards
+    its `display-name` and `description` (None or "": removed), `divided` (False: removed), main part and cards
     (none: removed) set if given, kept if not."""
     entries, errors, _ = parser.parse_string(text)
     if errors or len(entries) != 1 or not isinstance(entries[0], data.Open):
@@ -478,6 +487,10 @@ def reopened(
         meta.pop(DISPLAY_NAME_KEY, None)
         if display_name:
             meta[DISPLAY_NAME_KEY] = str(display_name)
+    if description is not _KEEP:
+        meta.pop(DESCRIPTION_KEY, None)
+        if description:
+            meta[DESCRIPTION_KEY] = one_line(str(description))
     if divided is not _KEEP:
         meta.pop(DIVIDED_KEY, None)
         if divided:
@@ -537,20 +550,21 @@ def with_accounts(
 def divided_opens(text: str, main: str) -> tuple[Directive, Directive]:
     """Dividing an account (M15): its `open` becomes a divided node's (the same directive: kind
     node, divided, `main` its main part, its display name kept), and `main` opens as it was (the
-    same date, currencies and booking), to take everything that was the account's. Its cards stay
-    with the whole: they're the real account's."""
+    same date, currencies and booking), to take everything that was the account's. Its cards and
+    description stay with the whole: they're the real account's."""
     entries, errors, _ = parser.parse_string(text)
     if errors or len(entries) != 1 or not isinstance(entries[0], data.Open):
         raise ParseFailure(["not an open directive"])
     entry = entries[0]
-    kept = {k: v for k, v in entry.meta.items() if k in (ID_KEY, DISPLAY_NAME_KEY, CARDS_KEY)}
+    whole = (ID_KEY, DISPLAY_NAME_KEY, DESCRIPTION_KEY, CARDS_KEY)
+    kept = {k: v for k, v in entry.meta.items() if k in whole}
     node = entry._replace(
         meta={**kept, KIND_KEY: NODE, DIVIDED_KEY: True, MAIN_PART_KEY: main}, currencies=None, booking=None
     )
     rest = {
         k: v
         for k, v in entry.meta.items()
-        if k not in ("filename", "lineno", ID_KEY, DISPLAY_NAME_KEY, KIND_KEY, CARDS_KEY)
+        if k not in ("filename", "lineno", KIND_KEY, *whole)
     }
     part = entry._replace(account=main, meta=rest)
     return to_directive(node), parse_one(to_directive(part, new_id()).text)

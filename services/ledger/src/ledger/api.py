@@ -228,6 +228,13 @@ def create_app(ledger: Ledger) -> FastAPI:
     def create_account(book_id: MemberBook, account: models.AccountIn) -> models.Account:
         return ledger.create_account(book_id, account)
 
+    @api.post("/books/{book_id}/accounts/batch", status_code=201)
+    def create_accounts(book_id: MemberBook, batch: list[models.AccountIn]) -> list[models.Account]:
+        """Open many accounts in one atomic write, in order (a chart of accounts): all of them, or
+        none. Each is checked against the book and those before it, as one `POST /accounts` would
+        be; a refusal names its account."""
+        return ledger.create_accounts(book_id, batch)
+
     # Account summaries and ledgers
 
     @api.get("/books/{book_id}/accounts/summary")

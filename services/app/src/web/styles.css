@@ -237,6 +237,10 @@ button.danger {
   margin: 0;
 }
 
+.page-head .account-description {
+  margin-top: 0.35rem;
+}
+
 .back {
   color: var(--accent);
   text-decoration: none;
@@ -1566,8 +1570,40 @@ code.secret {
   gap: 1rem;
 }
 
+.chart-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .chart-search {
   margin-bottom: 0.75rem;
+}
+
+/* Importing a chart of accounts: the example, then what the file adds. */
+
+.chart-example {
+  margin: 0;
+  padding: 0.75rem;
+  overflow-x: auto;
+  border-radius: 0.6rem;
+  background: var(--paper);
+  font-size: 0.8rem;
+}
+
+.chart-plan {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.chart-plan-name {
+  overflow-wrap: anywhere;
+}
+
+.chart-plan-details {
+  display: block;
 }
 
 .chart {

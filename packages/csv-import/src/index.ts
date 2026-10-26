@@ -81,14 +81,16 @@ export type Row = {
   error: string | null;
 };
 
-/** Split a file into rows of cells. The delimiter is detected unless given. */
+/** Split a file into rows of cells. The delimiter is detected unless given. Blank lines are
+ * left out, unless `keepBlank` (so each row's index is its line, a quoted line break aside). */
 export function parseCsv(
   text: string,
-  delimiter?: string
+  delimiter?: string,
+  { keepBlank = false }: { keepBlank?: boolean } = {}
 ): { rows: string[][]; delimiter: string } {
   const result = Papa.parse<string[]>(text.replace(/^﻿/, ""), {
     delimiter: delimiter ?? "",
-    skipEmptyLines: "greedy",
+    skipEmptyLines: keepBlank ? false : "greedy",
   });
   return {
     rows: result.data.map((row) => row.map((cell) => cell.trim())),

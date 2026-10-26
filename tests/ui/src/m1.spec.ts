@@ -229,6 +229,30 @@ test.describe("an account's ledger", () => {
     await expect(page.getByRole("button", { name: /Corner Cafe/ })).toContainText("$995.50");
   });
 
+  test("a new transaction keeps what's typed when the chart reloads (an account made on the way)", async ({
+    page,
+  }) => {
+    const { book, account } = await setUpUser(page);
+    await page.goto(`/ui/books/${book.id}/transactions/new?account=${encodeURIComponent(account)}`);
+    const amounts = page.getByRole("textbox", { name: "Amount" });
+    await amounts.nth(0).fill("-4.50");
+
+    await page
+      .getByRole("button", { name: /^Account:/ })
+      .nth(1)
+      .click();
+    await page.getByRole("combobox", { name: "Account" }).fill("snacks");
+    await page.getByRole("option", { name: /Create account/ }).click();
+    const dialog = page.getByRole("dialog", { name: "Create account" });
+    await dialog.getByRole("combobox", { name: "Account" }).fill("Expenses:Snacks");
+    await dialog.getByRole("button", { name: "Create" }).click();
+    await expect(dialog).toBeHidden();
+
+    await expect(page.getByRole("button", { name: "Account: Expenses:Snacks" })).toBeVisible();
+    await expect(amounts.nth(0)).toHaveValue("-4.50");
+    await expect(page.getByText("Balanced. The blank amount will be $4.50.")).toBeVisible();
+  });
+
   test("imports into the account it's showing, and comes back", async ({ page }) => {
     const { book } = await setUpUser(page);
     const savings = { name: await addAccount(book.id, "Assets:Bank:PNC-Savings", "0") };

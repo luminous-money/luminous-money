@@ -174,9 +174,14 @@ export function ChartOfAccounts({ book }: { book: string }) {
       <header className="page-head chart-head">
         <h1>Accounts</h1>
         {canWrite && (
-          <Link href={`/books/${book}/accounts/new`} className="button primary-link">
-            + Add
-          </Link>
+          <div className="chart-actions">
+            <Link href={`/books/${book}/accounts/import`} className="button">
+              Import
+            </Link>
+            <Link href={`/books/${book}/accounts/new`} className="button primary-link">
+              + Add
+            </Link>
+          </div>
         )}
       </header>
       <input

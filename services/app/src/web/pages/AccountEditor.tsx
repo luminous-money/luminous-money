@@ -74,6 +74,7 @@ export function AccountEditor({ book, account }: { book: string; account: string
           {found.type && ` · ${TYPE_LABELS[found.type]} account`}
           {found.close && " · archived"}
         </p>
+        {found.description && <p className="account-description">{found.description}</p>}
       </header>
       {found.kind === "node" && !found.close && (
         <Link
@@ -128,8 +129,12 @@ function Names({
   const rename = useRenameAccount(book, account.name);
   const set = useSetAccount(book, account.name);
   const [display, setDisplay] = useState(account.display_name ?? "");
+  const [description, setDescription] = useState(account.description ?? "");
   const [name, setName] = useState(account.name);
-  const relabeled = !account.implicit && (account.display_name ?? "") !== display.trim();
+  const relabeled =
+    !account.implicit &&
+    ((account.display_name ?? "") !== display.trim() ||
+      (account.description ?? "") !== description.trim());
   const renamed = name !== account.name;
   const exists = renamed && accounts.some((a) => a.name === name);
   const pending = rename.isPending || set.isPending;
@@ -149,6 +154,7 @@ function Names({
               await set.mutateAsync({
                 updated_at: account.updated_at!,
                 display_name: display.trim() || null,
+                description: description.trim() || null,
               } as never)
             ).updated_at!;
           if (renamed) {
@@ -173,6 +179,18 @@ function Names({
           <span className="small muted">
             On cards and in lists. Empty: the last part of its name.
           </span>
+        </label>
+      )}
+      {!account.implicit && (
+        <label>
+          Description <span className="muted">(optional)</span>
+          <input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            aria-label="Description"
+            maxLength={500}
+            placeholder="What it's for"
+          />
         </label>
       )}
       {account.protected ? (

@@ -811,6 +811,15 @@ export function useCreateAccount(book: string) {
   });
 }
 
+/** Open a chart of accounts' accounts, in one write. */
+export function useCreateAccounts(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (accounts: AccountIn[]) => api.createAccounts(book, accounts),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
 /** "Create account" for a book's pickers, once its accounts have loaded. */
 export function useAccountCreation(book: string): AccountCreation | undefined {
   const accounts = useAccounts(book);

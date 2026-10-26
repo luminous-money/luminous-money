@@ -43,6 +43,18 @@
             "title": "Currencies",
             "type": "array"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the account is for, in words: `description` metadata.",
+            "title": "Description"
+          },
           "display_name": {
             "anyOf": [
               {
@@ -221,6 +233,32 @@
             ],
             "title": "Booking"
           },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the account is for, one line.",
+            "title": "Description"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A human name; None or \"\": the name's last part.",
+            "title": "Display Name"
+          },
           "kind": {
             "default": "leaf",
             "enum": [
@@ -325,6 +363,19 @@
             ],
             "description": "An asset or liability account's payment cards (a divided account's on the whole); each card is one account's.",
             "title": "Cards"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the account is for, one line; None or \"\": none.",
+            "title": "Description"
           },
           "display_name": {
             "anyOf": [
@@ -478,6 +529,18 @@
             },
             "title": "Currencies",
             "type": "array"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the account is for, in words: `description` metadata.",
+            "title": "Description"
           },
           "display_name": {
             "anyOf": [
@@ -3926,6 +3989,18 @@
             "title": "Currencies",
             "type": "array"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the account is for, in words: `description` metadata.",
+            "title": "Description"
+          },
           "display_name": {
             "anyOf": [
               {
@@ -4477,6 +4552,64 @@
           }
         },
         "summary": "Create Account"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/accounts/batch": {
+      "post": {
+        "description": "Open many accounts in one atomic write, in order (a chart of accounts): all of them, or\nnone. Each is checked against the book and those before it, as one `POST /accounts` would\nbe; a refusal names its account.",
+        "operationId": "create_accounts_api_ledger_v1_books__book_id__accounts_batch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/AccountIn"
+                },
+                "title": "Batch",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Account"
+                  },
+                  "title": "Response Create Accounts Api Ledger V1 Books  Book Id  Accounts Batch Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Accounts"
       }
     },
     "/api/ledger/v1/books/{book_id}/accounts/summary": {

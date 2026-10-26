@@ -43,7 +43,7 @@ test("the search becomes a full account name under the preferred root", async ({
 
 test("editing the full name and creating a leaf selects it for the card", async ({ page }) => {
   await startCreating(page, coffee(page), "coffee shops");
-  await expect(nameField(page)).toHaveValue("Expenses:Coffee-shops");
+  await expect(nameField(page)).toHaveValue("Expenses:Coffee-Shops");
 
   await nameField(page).fill("Expenses:Food:Coffee-Shops");
   await dialog(page).getByRole("button", { name: "Create" }).click();
@@ -92,13 +92,13 @@ test("names the ledger would refuse are explained and can't be created", async (
   }
 });
 
-test("typing turns spaces into dashes and capitalizes each part", async ({ page }) => {
+test("typing turns spaces into dashes and title-cases each part", async ({ page }) => {
   await startCreating(page, coffee(page), "x");
 
   await nameField(page).fill("");
   await nameField(page).pressSequentially("expenses:late night snacks");
 
-  await expect(nameField(page)).toHaveValue("Expenses:Late-night-snacks");
+  await expect(nameField(page)).toHaveValue("Expenses:Late-Night-Snacks");
   await expect(dialog(page).getByRole("button", { name: "Create" })).toBeEnabled();
 });
 

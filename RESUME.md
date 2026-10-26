@@ -1,7 +1,7 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-24._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-26._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
 ## State
@@ -19,7 +19,8 @@ GPL-2.0-or-later (Beancount is GPL-2.0-only). It wears the original app's look: 
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
 accounts), M11 (budgets), M12 (reports), M13 (sharing books), M14 (reconciliation), M15 (divided
-accounts) and M16 (receipt capture) are described in their plans. The milestones ahead
+accounts) and M16 (receipt capture) are described in their plans, and so is the **chart of
+accounts import** slipped in before M17 (2026-10-26). The milestones ahead
 (M17–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What an operator can do now (production readiness, phase 1; [docs/deploying.md](docs/deploying.md)):
@@ -106,6 +107,14 @@ What a user can do now:
 - **Transfers in review:** money out of one account and the same into another within 7 days,
   both imported, are paired into one transfer (after every import or sync), shown with what it
   was made of; "Reject" brings the two back and they're not paired again.
+- **Importing a chart of accounts** (2026-10-26): Accounts → **Import**: a CSV with an Account
+  column (full names) and any of Display name, Description, Opening balance with As of, Currency,
+  Opened, Booking and Revalue every. The preview shows each name as it will be (title-cased,
+  spaces as dashes: `expenses:dining out` is `Expenses:Dining-Out`), which rows hold others
+  (nodes), what's already here (left alone) and which rows can't be added and why; **Add N
+  accounts** opens them in one write. Accounts have a **Description** now (the editor's Name
+  card, shown under the name). Every name the app makes from words is title-cased the same way,
+  typing in the name field included (`Coffee-Shops`, `Gifts-and-Giving`).
 - **Accounts (M10):** Menu → Accounts: one card, the tree by type, tap a node to open or close
   it, balances rolled up (one figure each), Find, "Show archived". A node's › opens its editor
   (with "Add an account under it"); a leaf opens its ledger, whose Edit opens the same editor:
@@ -214,10 +223,10 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 185 tests, including the table lint
-    - auth: 20; app: 189; ai: 9; db: 10; csv-import: 22
+    - ledger: 191 tests, including the table lint
+    - auth: 24; app: 206; ai: 9; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 90 API tests and 96 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 91 API tests and 102 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Its `.env` (not committed: its keys) sets `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand`, so it never
@@ -227,13 +236,18 @@ How it's put together:
 
 ## Next steps
 
-1. **The first live deployment, on Emmer** at `https://luminous.kaelshipman.me` (later
-   `luminous.money`): Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
+1. **The first live deployment, on Emmer,** is up at `https://luminous.kaelshipman.me` (later
+   `luminous.money`), on 0.1.9 (2026-10-25), with Kael's real bank feed. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
    `LM_SOURCE=release`: the installer on 127.0.0.1:8080 behind Emmer's nginx, which has the
    certificate; then `70_dns.sh` and `80_web.sh`). The release's five images must be public on
    ghcr.io (a package's settings, once each) for an install to pull them.
-2. **M17 (transaction tagging):** see [its plan](docs/milestones/m17-transaction-tagging/PLAN.md).
-3. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
+2. **Bootstrapping from the old books** (Kael's question, 2026-10-26: hundreds of
+   uncategorized transactions since July): proposed, awaiting a decision. The idea: an old
+   ledger's year of entries as context only (never committed), mapped onto the new chart, for
+   the history and AI categorizers, plus rules proposed from its consistent payees and a
+   by-payee view in review.
+3. **M17 (transaction tagging):** see [its plan](docs/milestones/m17-transaction-tagging/PLAN.md).
+4. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
 
 ## The ledger-graphs libraries
@@ -298,7 +312,11 @@ How it's put together:
 - **A form waits for the data its pickers need** (Import's file picker for the account's CSV
   layouts, the transaction editor for the chart): offered too early, a file is profiled as if the
   account had none, and a typed account name finds nothing, so Enter offers to create it. Both
-  were the e2e suite's occasional failures under load.
+  were the e2e suite's occasional failures under load. So was a third (m1's "The blank amount
+  will be $4.50", until 2026-10-26): New transaction made its draft on every render, and the
+  splits editor starts over when its postings change, so any refetch (the chart's, after making
+  an account on the way, or on returning to the app) wiped what had been typed. Give an editor
+  a draft that's made once.
 - **`pnpm e2e` keeps the browser failures' traces and page snapshots** in `tests/ui/test-results`
   (`pnpm exec playwright show-trace <trace.zip>` there).
 - **Colors are variables** (`--accent`, `--accent-soft`, `--on-accent`, `--paper`, `--card`,

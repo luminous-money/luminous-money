@@ -144,6 +144,15 @@ Beancount:
   then letters, digits and dashes. That's Beancount's rule, not ours: account names are bare
   tokens in its file format, so a space would end one. The UI turns spaces into dashes as you
   type.
+- **Names the app makes from words are title-cased** (2026-10-26), by one normalizer,
+  `toSegment` (the PWA's `lib/accounts.ts`): words split at spaces, underscores and dashes,
+  joined by dashes, each starting with a capital (the rest kept, so `PNC` and `401k` survive),
+  short joining words inside a part lowercase (`Gifts-and-Giving`), anything Beancount doesn't
+  allow dropped. A picker's suggestion, a divided account's parts and an imported chart use it,
+  and typing (`typed`) does the same without changing the length, so the cursor stays put: a
+  joining word is lowercased only once another word follows it. One rule everywhere keeps a
+  book's names consistent, whoever (or whatever) made them; before, only a part's first letter
+  was capitalized, so typing gave `Coffee-shops` beside the seed's `Coffee-Shops`.
 - **Postings to node accounts are refused on write** (422). Imported data that does it is flagged
   as a validation problem. That check runs after Beancount's loader rather than through its
   `extra_validations` hook: Beancount 3.2 appends those to its global list of validations on
@@ -616,6 +625,26 @@ How auth works (M8; the shape is M1's):
     and attempts
   - **merged:** they move to the substitute; stars and links on the deleted account go
 
+
+### Importing a chart of accounts (2026-10-26)
+
+- **A CSV, read in the browser, written in one call.** The PWA reads the file (headers matched
+  loosely; a GnuCash account export's `full_name` and `description` are read), normalizes each
+  name, and plans every row against the book: added (a node if another row goes under it),
+  already here (left as it is: settings are the editor's), or refused with why. Nothing is
+  written until **Add**; then the ledger's `POST /accounts/batch` opens them in one atomic write,
+  each checked against the book and those before it, as one `POST /accounts` would be, and a
+  refusal names its account. Rows that can't be added don't stop the rest: the preview lists
+  them, and the file can be fixed and chosen again (what was added is then "already here").
+- **The order is the ledger's to keep simple:** the planner sends what has no balance first,
+  each by name, so a node precedes what's under it, and `Equity:Opening-Balances`, if the file
+  names it, exists before a balance needs it.
+- **Balances are as a statement shows them,** as in Add an account: a card's is what's owed,
+  stored negative. An opening balance needs its date; nothing guesses one.
+- **Imported accounts aren't starred:** a chart can hold hundreds, and home is for the few
+  watched ones.
+- **Accounts have a description** (`description` metadata on the `open`, one line), set there
+  or in the editor; a divided account keeps it on the whole, like its cards.
 
 ### Budgets (M11)
 

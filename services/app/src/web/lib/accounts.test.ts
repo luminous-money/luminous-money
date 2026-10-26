@@ -8,6 +8,7 @@ import {
   completions,
   typed,
   isSegment,
+  normalizeName,
   postable,
   preferredRoots,
   search,
@@ -70,12 +71,38 @@ describe("which accounts are offered", () => {
 });
 
 describe("naming a new account", () => {
-  it("makes a valid segment from what was typed", () => {
-    expect(toSegment("coffee shops")).toBe("Coffee-shops");
-    expect(toSegment("Gifts and Giving")).toBe("Gifts-and-Giving");
+  it("makes a valid, title-cased segment from what was typed", () => {
+    expect(toSegment("coffee shops")).toBe("Coffee-Shops");
+    expect(toSegment("gifts and giving")).toBe("Gifts-and-Giving");
+    expect(toSegment("Gifts And Giving")).toBe("Gifts-and-Giving");
+    expect(toSegment("the end of an era")).toBe("The-End-of-an-Era");
     expect(toSegment("  café  ")).toBe("Café");
-    expect(toSegment("Kids' toys!")).toBe("Kids-toys");
-    expect(toSegment("401k match")).toBe("401k-match");
+    expect(toSegment("Kids' toys!")).toBe("Kids-Toys");
+    expect(toSegment("401k match")).toBe("401k-Match");
+    expect(toSegment("PNC checking")).toBe("PNC-Checking");
+    expect(toSegment("late-night_snacks")).toBe("Late-Night-Snacks");
+  });
+
+  it("normalizes a full name written by hand", () => {
+    const roots = ["Assets", "Liabilities", "Equity", "Income", "Expenses"];
+    expect(normalizeName("expenses:dining out", roots)).toEqual({ name: "Expenses:Dining-Out" });
+    expect(normalizeName(" Assets : Bank : PNC checking ", roots)).toEqual({
+      name: "Assets:Bank:PNC-Checking",
+    });
+    expect(normalizeName("Expense:Food:", roots)).toEqual({ name: "Expenses:Food" });
+    expect(normalizeName("liability:cards:visa", roots)).toEqual({
+      name: "Liabilities:Cards:Visa",
+    });
+    expect(normalizeName("Stuff:Things", roots)).toEqual({
+      problem: "Start with one of Assets, Liabilities, Equity, Income, Expenses",
+    });
+    expect(normalizeName("Income", roots)).toEqual({ problem: "Name an account under Income" });
+    expect(normalizeName("Expenses:!!!:Food", roots)).toEqual({
+      problem: '"!!!" has no letters or digits to make a name from',
+    });
+    expect(normalizeName("Expenses::Food", roots)).toEqual({
+      problem: "A part of the name is empty",
+    });
   });
 
   it("knows a valid segment", () => {
@@ -101,7 +128,7 @@ describe("a new account's full name", () => {
 
   it("starts from the search, under the preferred root", () => {
     expect(suggestName("Groceries", accounts, "Expenses")).toBe("Expenses:Groceries");
-    expect(suggestName("coffee shops", accounts, "Expenses")).toBe("Expenses:Coffee-shops");
+    expect(suggestName("coffee shops", accounts, "Expenses")).toBe("Expenses:Coffee-Shops");
     expect(suggestName("salary", accounts, "Income")).toBe("Income:Salary");
     expect(suggestName("", accounts, "Expenses")).toBe("Expenses:");
   });
@@ -111,12 +138,12 @@ describe("a new account's full name", () => {
       "Expenses:Gifts-and-Giving:Friends"
     );
     expect(suggestName("home:garden tools", accounts, "Expenses")).toBe(
-      "Expenses:Home:Garden-tools"
+      "Expenses:Home:Garden-Tools"
     );
   });
 
   it("keeps a typed root, and goes under a typed node", () => {
-    expect(suggestName("assets:cash wallet", accounts, "Expenses")).toBe("Assets:Cash-wallet");
+    expect(suggestName("assets:cash wallet", accounts, "Expenses")).toBe("Assets:Cash-Wallet");
     expect(suggestName("utilities:power", accounts, "Expenses")).toBe("Expenses:Utilities:Power");
     expect(suggestName("Expenses:Utilities:", accounts, "Expenses")).toBe("Expenses:Utilities:");
   });
@@ -182,10 +209,20 @@ describe("typing a new account's name", () => {
     account("Expenses:Gone", { kind: "node", close: "2021-01-01" }),
   ];
 
-  it("turns spaces into dashes and capitalizes each part, keeping the length", () => {
-    expect(typed("expenses:coffee shops")).toBe("Expenses:Coffee-shops");
-    expect(typed("Expenses:Food:Late night")).toBe("Expenses:Food:Late-night");
+  it("turns spaces into dashes and title-cases each part, keeping the length", () => {
+    expect(typed("expenses:coffee shops")).toBe("Expenses:Coffee-Shops");
+    expect(typed("Expenses:Food:Late night")).toBe("Expenses:Food:Late-Night");
     expect(typed("expenses:food:x y").length).toBe("expenses:food:x y".length);
+    expect(typed("PNC checking")).toBe("PNC-Checking");
+  });
+
+  it("keeps a joining word lowercase once another word follows it", () => {
+    expect(typed("expenses:gifts and")).toBe("Expenses:Gifts-And");
+    expect(typed("expenses:gifts and ")).toBe("Expenses:Gifts-and-");
+    expect(typed("expenses:gifts and giving")).toBe("Expenses:Gifts-and-Giving");
+    expect(typed("expenses:the end")).toBe("Expenses:The-End");
+    expect(typed("expenses:-of course")).toBe("Expenses:-Of-Course");
+    expect(typed("expenses:ßa")).toBe("Expenses:ßa");
   });
 
   it("suggests open node accounts that continue what's typed, ignoring case", () => {

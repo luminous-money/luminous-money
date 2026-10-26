@@ -276,6 +276,15 @@ export const api = {
       })
     ),
 
+  /** Open many accounts in one write (an imported chart of accounts): all, or none. */
+  createAccounts: (book_id: string, body: AccountIn[]): Promise<Account[]> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/accounts/batch", {
+        params: { path: { book_id } },
+        body,
+      })
+    ),
+
   staged: (book_id: string): Promise<Transaction[]> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/transactions", {

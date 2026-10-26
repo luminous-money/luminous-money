@@ -75,3 +75,15 @@ def test_dividing_a_node_turns_on_its_first_part_as_main(ledger, book):
     pnc = next(a for a in ledger.accounts(book) if a.name == "Assets:PNC")
     ledger.set_account(book, "Assets:PNC", models.AccountPatch(updated_at=pnc.updated_at, divided=False))
     assert next(a for a in ledger.accounts(book) if a.name == "Assets:PNC").main_part is None
+
+
+def test_a_divided_account_keeps_its_description_on_the_whole(ledger, book):
+    checking = "Assets:Bank:Checking"
+    version = next(a for a in ledger.accounts(book) if a.name == checking).updated_at
+    version = ledger.set_account(book, checking, models.AccountPatch(updated_at=version, description="Joint, at the bank")).updated_at
+
+    chart.divide(ledger, book, checking, models.DivideIn(parts=[models.DividePart(name="Padding", amount="0")], date=D(2026, 2, 1), updated_at=version))
+
+    accounts = {a.name: a for a in ledger.accounts(book)}
+    assert accounts[checking].description == "Joint, at the bank"
+    assert accounts[f"{checking}:General"].description is None

@@ -87,6 +87,28 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/accounts/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Create Accounts
+     * @description Open many accounts in one atomic write, in order (a chart of accounts): all of them, or
+     *     none. Each is checked against the book and those before it, as one `POST /accounts` would
+     *     be; a refusal names its account.
+     */
+    post: operations["create_accounts_api_ledger_v1_books__book_id__accounts_batch_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/accounts/summary": {
     parameters: {
       query?: never;
@@ -941,6 +963,11 @@ export interface components {
        */
       currencies?: string[];
       /**
+       * Description
+       * @description What the account is for, in words: `description` metadata.
+       */
+      description?: string | null;
+      /**
        * Display Name
        * @description A human name, from `display-name` metadata if set.
        */
@@ -1008,6 +1035,16 @@ export interface components {
       /** Booking */
       booking?: ("FIFO" | "LIFO" | "HIFO" | "STRICT" | "NONE") | null;
       /**
+       * Description
+       * @description What the account is for, one line.
+       */
+      description?: string | null;
+      /**
+       * Display Name
+       * @description A human name; None or "": the name's last part.
+       */
+      display_name?: string | null;
+      /**
        * Kind
        * @default leaf
        * @enum {string}
@@ -1051,6 +1088,11 @@ export interface components {
        * @description An asset or liability account's payment cards (a divided account's on the whole); each card is one account's.
        */
       cards?: components["schemas"]["Card"][] | null;
+      /**
+       * Description
+       * @description What the account is for, one line; None or "": none.
+       */
+      description?: string | null;
       /**
        * Display Name
        * @description A human name; None or "": the name's last part.
@@ -1119,6 +1161,11 @@ export interface components {
        * @description Constraint from the open directive; empty means any.
        */
       currencies?: string[];
+      /**
+       * Description
+       * @description What the account is for, in words: `description` metadata.
+       */
+      description?: string | null;
       /**
        * Display Name
        * @description A human name, from `display-name` metadata if set.
@@ -2552,6 +2599,11 @@ export interface components {
        */
       currencies?: string[];
       /**
+       * Description
+       * @description What the account is for, in words: `description` metadata.
+       */
+      description?: string | null;
+      /**
        * Display Name
        * @description A human name, from `display-name` metadata if set.
        */
@@ -2929,6 +2981,41 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Account"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_accounts_api_ledger_v1_books__book_id__accounts_batch_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AccountIn"][];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Account"][];
         };
       };
       /** @description Validation Error */

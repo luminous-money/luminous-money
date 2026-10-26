@@ -169,6 +169,7 @@ class Account(Api):
     close: datetime.date | None = None
     currencies: list[str] = Field(default_factory=list, description="Constraint from the open directive; empty means any.")
     display_name: str | None = Field(None, description="A human name, from `display-name` metadata if set.")
+    description: str | None = Field(None, description="What the account is for, in words: `description` metadata.")
     booking: str | None = Field(
         None, description="How sales pick lots (FIFO, LIFO, HIFO, STRICT for specific lots, NONE for average cost); "
         "None: the book's default."
@@ -355,6 +356,9 @@ class AccountPatch(Strict):
 
     updated_at: str
     display_name: str | None = Field(None, max_length=100, description="A human name; None or \"\": the name's last part.")
+    description: str | None = Field(
+        None, max_length=500, description="What the account is for, one line; None or \"\": none."
+    )
     booking: Booking | None = Field(
         None, description="FIFO, LIFO, HIFO, STRICT (choose lots), NONE (average cost, booked by luminous-money); "
         "None: the book's default."
@@ -693,6 +697,8 @@ class AccountIn(Strict):
     )
     booking: Booking | None = None
     revalue_every: int | None = Field(None, ge=1, description="A revalued asset (a house, a car): days its value stays current.")
+    display_name: str | None = Field(None, max_length=100, description="A human name; None or \"\": the name's last part.")
+    description: str | None = Field(None, max_length=500, description="What the account is for, one line.")
 
 
 class Directive(Api):
