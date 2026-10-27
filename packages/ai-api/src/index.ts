@@ -183,4 +183,70 @@ export type CategorizeOut = {
   proposals: SplitProposal[];
   /** Accounts it would open (only when the book lets it), used in its proposals. */
   new_accounts: string[];
+  /** What answering cost (the ai service adds it). */
+  cost?: AiCost;
+};
+
+/** `POST /api/ai/v1/books/:book/receipts/extract`'s answer: the facts, and what reading them
+ * cost. */
+export type ExtractOut = ReceiptFacts & { cost?: AiCost };
+
+/** One call to a model, and what it cost, estimated from the usage it reported at the model's
+ * list prices (USD). `usd` is null for a model whose prices aren't known. */
+export type AiCall = {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation_input_tokens: number;
+  usd: number | null;
+};
+
+/** What an operation's calls cost, together: their tokens, and the estimate (USD, null if any
+ * model's prices aren't known). Every answer from the operations carries it as `cost`. */
+export type AiCost = Omit<AiCall, "model" | "usd"> & {
+  calls: number;
+  models: string[];
+  usd: number | null;
+};
+
+export const NO_COST: AiCost = {
+  calls: 0,
+  models: [],
+  input_tokens: 0,
+  output_tokens: 0,
+  cache_read_input_tokens: 0,
+  cache_creation_input_tokens: 0,
+  usd: 0,
+};
+
+/** Two costs as one (an operation's calls, or several operations'). */
+export function addCost(a: AiCost, b: AiCost | AiCall): AiCost {
+  const calls = "calls" in b ? b.calls : 1;
+  const models = "models" in b ? b.models : [b.model];
+  return {
+    calls: a.calls + calls,
+    models: [...new Set([...a.models, ...models])],
+    input_tokens: a.input_tokens + b.input_tokens,
+    output_tokens: a.output_tokens + b.output_tokens,
+    cache_read_input_tokens: a.cache_read_input_tokens + b.cache_read_input_tokens,
+    cache_creation_input_tokens: a.cache_creation_input_tokens + b.cache_creation_input_tokens,
+    usd: a.usd === null || b.usd === null ? null : a.usd + b.usd,
+  };
+}
+
+/** Dollars as people read a small cost: "$0.0042", "$0.03", "$12.40"; unknown when null. */
+export function formatUsd(usd: number | null): string {
+  if (usd === null) return "an unknown amount";
+  if (usd > 0 && usd < 0.01) return `$${usd.toFixed(4)}`;
+  return `$${usd.toFixed(2)}`;
+}
+
+/** `GET /api/ai/v1/books/:book/usage`: the book's AI spending in a month (UTC), by operation. */
+export type AiUsage = {
+  /** YYYY-MM. */
+  month: string;
+  usd: number | null;
+  calls: number;
+  operations: { operation: "extract" | "categorize"; count: number; usd: number | null }[];
 };

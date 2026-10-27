@@ -9,16 +9,32 @@
  *   that account as the fallback. A transaction whose payee or narration contains a reference
  *   entry's payee (ignoring case) goes to that entry's most usual account instead, with "From
  *   the reference" as its reason.
+ * - **Cost:** each operation is one made-up call, `FAKE_CALL` ($0.0042), so costs can be shown
+ *   and summed in tests.
  */
 import type { CategorizeOut, ExtractIn, ReceiptFacts } from "@luminous-money/ai-api";
 
-import type { CategorizeInput, Provider } from "./types.js";
+import type { CategorizeInput, Meter, Provider } from "./types.js";
 
 export const FAKE_CARD = { brand: "visa", last_four: "4242" } as const;
 
+export const FAKE_CALL = {
+  model: "fake",
+  input_tokens: 1000,
+  output_tokens: 200,
+  cache_read_input_tokens: 0,
+  cache_creation_input_tokens: 0,
+  usd: 0.0042,
+};
+
 export const fake: Provider = {
   name: "fake",
-  async extract(input: ExtractIn): Promise<ReceiptFacts> {
+  async extract(
+    input: ExtractIn,
+    _credential: string | null,
+    meter?: Meter
+  ): Promise<ReceiptFacts> {
+    meter?.(FAKE_CALL);
     return {
       payee: "Fake Store",
       date: input.today,
@@ -35,7 +51,12 @@ export const fake: Provider = {
       note: "Read by the fake provider",
     };
   },
-  async categorize(input: CategorizeInput): Promise<CategorizeOut> {
+  async categorize(
+    input: CategorizeInput,
+    _credential: string | null,
+    meter?: Meter
+  ): Promise<CategorizeOut> {
+    meter?.(FAKE_CALL);
     const category =
       input.accounts.find((a) => a.type === "expense" && !a.name.endsWith(":Uncategorized"))
         ?.name ?? null;

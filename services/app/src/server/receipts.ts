@@ -23,7 +23,13 @@
  * It always makes something: with no reading (AI off, down, or it couldn't), it's made from the
  * hints (a zero total if none), and says why.
  */
-import type { ReceiptFacts, ReceiptHints } from "@luminous-money/ai-api";
+import {
+  addCost,
+  NO_COST,
+  type AiCost,
+  type ReceiptFacts,
+  type ReceiptHints,
+} from "@luminous-money/ai-api";
 import type { Account, Transaction, TransactionIn } from "@luminous-money/ledger-client";
 
 import { isUncategorized, UNCATEGORIZED, UNKNOWN } from "../shared/accounts.js";
@@ -63,6 +69,9 @@ export type Captured = {
   matched: boolean;
   /** What to tell the person: why it wasn't read, or what the reading said. */
   note: string | null;
+  /** What the AI's part cost (reading, then categorizing): USD, estimated; null if it wasn't
+   * asked or a model's prices aren't known. */
+  ai_cost: number | null;
 };
 
 const ACCEPTED = /^(image\/(jpeg|png|gif|webp)|application\/pdf)$/;
@@ -313,6 +322,10 @@ async function read({
 
   const notes: string[] = [];
   let facts: ReceiptFacts | null = null;
+  let spent: AiCost | null = null;
+  const spend = (cost: AiCost | undefined) => {
+    if (cost) spent = addCost(spent ?? NO_COST, cost);
+  };
   if (!ai || !settings) notes.push("AI isn't available right now, so it wasn't read.");
   else if (!settings.ready) notes.push("The book's AI isn't set up, so it wasn't read.");
   else {
@@ -325,8 +338,11 @@ async function read({
       today,
       currency,
     });
-    if ("ok" in answer) facts = answer.ok;
-    else notes.push(`It couldn't be read: ${answer.failed}.`);
+    spend("ok" in answer ? answer.ok.cost : answer.cost);
+    if ("ok" in answer) {
+      const { cost: _c, ...read } = answer.ok;
+      facts = read;
+    } else notes.push(`It couldn't be read: ${answer.failed}.`);
   }
 
   // Read into a transaction given, its paying side the total; else built from the hints, and
@@ -369,14 +385,13 @@ async function read({
     ...categorizers,
     ...(ready
       ? [
-          aiCategorizer(
-            ai!,
-            book,
+          aiCategorizer(ai!, book, {
             currency,
-            !!settings!.create_accounts,
-            (reason) => notes.push(`The AI couldn't categorize it: ${reason}.`),
-            reference
-          ),
+            opens: !!settings!.create_accounts,
+            onFailure: (reason) => notes.push(`The AI couldn't categorize it: ${reason}.`),
+            onCost: spend,
+            imported: reference,
+          }),
         ]
       : []),
   ];
@@ -450,5 +465,11 @@ async function read({
         decision.payee
       ),
     ]);
-  return { transaction_id: id, read: !!facts, matched: !!target, note: sentences(notes) || null };
+  return {
+    transaction_id: id,
+    read: !!facts,
+    matched: !!target,
+    note: sentences(notes) || null,
+    ai_cost: (spent as AiCost | null)?.usd ?? null,
+  };
 }

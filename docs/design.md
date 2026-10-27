@@ -689,6 +689,25 @@ setup and Accounts until it's been done once.
   time), 40 at a time through Suggest categories' own path, progress in the migration's state; a
   restart marks a running one stopped, to run again.
 
+### What the AI costs (2026-10-26)
+
+Kael's concern: an AI that categorizes hundreds of transactions shouldn't spend money unseen.
+
+- **Every call is priced where it's made:** the `ai` service prices each answer's reported usage
+  (`services/ai/src/pricing.ts`: input, output, cache reads and writes, at each model's list
+  prices, and a fallback's attempts each at its own model's) and logs it, one line a call, then
+  one for the operation (`luminous-money logs ai`). It's an estimate (list prices, the global
+  endpoint); the Console's billing is the truth, and a model it has no prices for is "an
+  unknown amount" rather than a guess.
+- **Every operation's total is kept** (`ai_usage`, failed ones too: their calls still cost) and
+  returned with its answer as `cost`. `app` adds an operation's up (a receipt: reading, then
+  categorizing; Suggest categories: every batch) and says it after it runs: in Select mode's
+  note, in review after a receipt (`?ai_cost=`, not stored), and on the migration's suggestions.
+- **The AI page shows the month so far** (UTC), by operation. Per book, since each book has its
+  own key.
+- **The fake provider's calls are made up** ($0.0042 each), so tests can see costs shown and
+  added.
+
 ### Budgets (M11)
 
 A budget is how much an account may take in a period (a **limit**, for expenses) or should

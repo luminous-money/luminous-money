@@ -7,7 +7,7 @@
  * batch's, worked out from the imported history and the book's own (migrate/reference.ts).
  * Receipts and Suggest categories call it; imports and bank feeds don't (yet).
  */
-import type { CategorizeHistory } from "@luminous-money/ai-api";
+import type { AiCost, CategorizeHistory } from "@luminous-money/ai-api";
 
 import { buildReference, entriesFor, seenInBook, type Seen } from "../migrate/reference.js";
 
@@ -25,15 +25,24 @@ export const BATCH = 20;
 /**
  * `opens`: whether the book lets it open accounts (its answer's others are dropped if not).
  * `onFailure` hears why it couldn't answer (no credit, say), for the person to be told; what
- * earlier batches proposed still counts.
+ * earlier batches proposed still counts. `onCost` hears what each batch cost, answered or not.
  */
 export function aiCategorizer(
   ai: AiPort,
   book: string,
-  currency: string,
-  opens: boolean,
-  onFailure?: (reason: string) => void,
-  imported?: Seen[]
+  {
+    currency,
+    opens,
+    onFailure,
+    onCost,
+    imported,
+  }: {
+    currency: string;
+    opens: boolean;
+    onFailure?: (reason: string) => void;
+    onCost?: (cost: AiCost) => void;
+    imported?: Seen[];
+  }
 ): Categorizer {
   /** The reference, for a request: none without imported history. */
   const referenceOf = (request: Request) => {
@@ -113,6 +122,8 @@ export function aiCategorizer(
       const reference = referenceOf(request);
       for (let i = 0; i < request.transactions.length; i += BATCH) {
         const answer = await ask(request, request.transactions.slice(i, i + BATCH), reference);
+        const cost = "ok" in answer ? answer.ok.cost : answer.cost;
+        if (cost) onCost?.(cost);
         if ("failed" in answer) {
           console.warn(`categorizer ai: ${answer.failed}`);
           onFailure?.(answer.failed);

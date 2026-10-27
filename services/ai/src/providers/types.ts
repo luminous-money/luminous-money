@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import {
   CARD_BRANDS,
+  type AiCall,
   type CategorizeIn,
   type CategorizeOut,
   type Eagerness,
@@ -22,10 +23,17 @@ export type CategorizeInput = CategorizeIn & {
   creation: { eagerness: Eagerness } | null;
 };
 
+/** Told what each call to a model cost, as it's answered. */
+export type Meter = (call: AiCall) => void;
+
 export interface Provider {
   name: ProviderName;
-  extract(input: ExtractIn, credential: string | null): Promise<ReceiptFacts>;
-  categorize(input: CategorizeInput, credential: string | null): Promise<CategorizeOut>;
+  extract(input: ExtractIn, credential: string | null, meter?: Meter): Promise<ReceiptFacts>;
+  categorize(
+    input: CategorizeInput,
+    credential: string | null,
+    meter?: Meter
+  ): Promise<CategorizeOut>;
 }
 
 /** The provider couldn't answer (declined, failed, or answered nonsense): `app` carries on

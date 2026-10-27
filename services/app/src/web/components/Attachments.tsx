@@ -48,7 +48,12 @@ export function Attachments({
     setError(null);
     try {
       const made = await readReceipt.mutateAsync(attachment);
-      navigate(withBack(`/books/${book}/review?only=${made.transaction_id}`, location));
+      navigate(
+        withBack(
+          `/books/${book}/review?only=${made.transaction_id}${made.ai_cost !== null ? `&ai_cost=${made.ai_cost}` : ""}`,
+          location
+        )
+      );
     } catch (e) {
       setError(explain(e));
     }

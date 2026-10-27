@@ -6,7 +6,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Sealer } from "@luminous-money/db";
-import type { AiSettings, CategorizeIn, CategorizeOut, ReceiptFacts } from "@luminous-money/ai-api";
+import type {
+  AiSettings,
+  AiUsage,
+  CategorizeIn,
+  CategorizeOut,
+  ReceiptFacts,
+} from "@luminous-money/ai-api";
 
 import { createApi, type Role } from "../src/api.js";
 import { AiDb } from "../src/db.js";
@@ -157,6 +163,23 @@ describe("the two operations", () => {
       ],
       fallback: "Expenses:Groceries",
     });
+
+    // Each answer says what it cost, and the month adds them up (the fake's calls are made up).
+    expect(out.cost).toMatchObject({ calls: 1, models: ["fake"], usd: 0.0042 });
+    expect(facts).toMatchObject({ cost: { usd: 0.0042 } });
+    const usage = (await (await call("reader", "/books/b/usage")).json()) as AiUsage;
+    expect(usage).toMatchObject({
+      calls: 2,
+      operations: [
+        { operation: "categorize", count: 1 },
+        { operation: "extract", count: 1 },
+      ],
+    });
+    expect(usage.usd).toBeCloseTo(0.0084);
+    expect((await call("reader", "/books/b/usage?month=2020-01")).status).toBe(200);
+    expect(
+      ((await (await call("reader", "/books/b/usage?month=2020-01")).json()) as AiUsage).usd
+    ).toBe(0);
 
     // The fake follows the reference, through the API, as Claude is told to.
     const referenced = (await (

@@ -36,6 +36,7 @@ import {
   writeSkipped,
 } from "../lib/queries.js";
 import { chosen, simple, UNCATEGORIZED, unresolved, withCounterpart } from "../lib/split.js";
+import { aiCostSentence } from "../lib/ai.js";
 
 /**
  * The review queue: unconfirmed transactions to categorize and confirm, and imported rows matched
@@ -48,6 +49,8 @@ export function Review({ book }: { book: string }) {
   const [, navigate] = useLocation();
   // Just one transaction (a receipt just captured, M16): confirming or skipping it goes `back`.
   const only = useParam("only");
+  // What reading it cost the AI, if it was read (an estimate, from the ai service).
+  const aiCost = useParam("ai_cost");
   const back = useBack(`/books/${book}/review`);
   const queue = useReviewQueue(book);
   const accounts = useAccounts(book);
@@ -102,6 +105,11 @@ export function Review({ book }: { book: string }) {
           {book}
           {queue.items && ` · ${ordered.length} left`}
         </p>
+        {only && aiCost && Number.isFinite(Number(aiCost)) && (
+          <p className="small muted" role="status">
+            {aiCostSentence(Number(aiCost))}
+          </p>
+        )}
         <div className="actions">
           {!selection.selecting && (
             <button type="button" onClick={selection.start}>

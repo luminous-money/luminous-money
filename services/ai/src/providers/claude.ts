@@ -15,6 +15,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 
+import { callsOf, type Usage } from "../pricing.js";
 import type {
   CategorizeOut,
   ExtractIn,
@@ -32,6 +33,7 @@ import {
   sumOf,
   type CategorizeInput,
   type Provider,
+  type Meter,
 } from "./types.js";
 
 type Params = Anthropic.Beta.MessageCreateParamsNonStreaming;
@@ -184,10 +186,12 @@ export function failure(error: unknown, model: string): ReadFailed {
   return new ReadFailed("Claude couldn't be reached");
 }
 
-/** One request, its answer parsed (not yet checked); every way it can fail is ReadFailed. */
+/** One request, its answer parsed (not yet checked); every way it can fail is ReadFailed.
+ * What it cost goes to `meter` once it's answered, whatever the answer (a refusal costs too). */
 async function ask(
   client: Client,
-  params: Params
+  params: Params,
+  meter?: Meter
 ): Promise<{ message: Anthropic.Beta.BetaMessage; answer: unknown }> {
   let message: Anthropic.Beta.BetaMessage;
   try {
@@ -195,6 +199,9 @@ async function ask(
   } catch (error) {
     throw failure(error, params.model);
   }
+  if (message.usage)
+    for (const call of callsOf(message.model ?? params.model, message.usage as Usage))
+      meter?.(call);
   if (message.stop_reason === "refusal") throw new ReadFailed("Claude declined");
   if (message.stop_reason === "max_tokens") throw new ReadFailed("the answer ran too long");
   // The last text: a model that declined mid-answer leaves its partial text before the
@@ -216,7 +223,11 @@ export function claude({ extractModel, categorizeModel, client }: ClaudeOptions)
   return {
     name: "claude",
 
-    async extract(input: ExtractIn, credential: string | null): Promise<ReceiptFacts> {
+    async extract(
+      input: ExtractIn,
+      credential: string | null,
+      meter?: Meter
+    ): Promise<ReceiptFacts> {
       const api = connect(credential);
       const messages: Anthropic.Beta.BetaMessageParam[] = [
         {
@@ -238,7 +249,7 @@ export function claude({ extractModel, categorizeModel, client }: ClaudeOptions)
         output_config: { format: { type: "json_schema", schema: FACTS_JSON_SCHEMA } },
         messages,
       });
-      const first = await ask(api, request());
+      const first = await ask(api, request(), meter);
       const facts = checkedFacts(first.answer);
       if (facts.difference === null) return facts;
       // A second look, in the same conversation: its answer as it gave it (thinking and all),
@@ -254,41 +265,49 @@ export function claude({ extractModel, categorizeModel, client }: ClaudeOptions)
         }
       );
       try {
-        return checkedFacts((await ask(api, request())).answer);
+        return checkedFacts((await ask(api, request(), meter)).answer);
       } catch {
         return facts; // the first answer, saying how far off it is
       }
     },
 
-    async categorize(input: CategorizeInput, credential: string | null): Promise<CategorizeOut> {
+    async categorize(
+      input: CategorizeInput,
+      credential: string | null,
+      meter?: Meter
+    ): Promise<CategorizeOut> {
       const api = connect(credential);
       const fallbacks = FALLBACKS.test(categorizeModel)
         ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const }
         : {};
-      const { answer } = await ask(api, {
-        model: categorizeModel,
-        max_tokens: 32000,
-        thinking: { type: "adaptive" },
-        ...fallbacks,
-        system: [
-          { type: "text", text: categorizeSystem(input) },
-          { type: "text", text: chartText(input), cache_control: { type: "ephemeral" } },
-        ],
-        output_config: { format: { type: "json_schema", schema: PROPOSALS_JSON_SCHEMA } },
-        messages: [
-          {
-            role: "user",
-            content: [
-              `Amounts are in ${input.currency}.`,
-              `The transactions to categorize:\n${JSON.stringify(input.transactions)}`,
-              input.history.length
-                ? `The book's history that bears on them (confirmed: the person's own choices):\n${JSON.stringify(input.history)}`
-                : "The book has no history that bears on them.",
-              ...(input.reference?.length ? [referenceText(input.reference)] : []),
-            ].join("\n\n"),
-          },
-        ],
-      } as Params);
+      const { answer } = await ask(
+        api,
+        {
+          model: categorizeModel,
+          max_tokens: 32000,
+          thinking: { type: "adaptive" },
+          ...fallbacks,
+          system: [
+            { type: "text", text: categorizeSystem(input) },
+            { type: "text", text: chartText(input), cache_control: { type: "ephemeral" } },
+          ],
+          output_config: { format: { type: "json_schema", schema: PROPOSALS_JSON_SCHEMA } },
+          messages: [
+            {
+              role: "user",
+              content: [
+                `Amounts are in ${input.currency}.`,
+                `The transactions to categorize:\n${JSON.stringify(input.transactions)}`,
+                input.history.length
+                  ? `The book's history that bears on them (confirmed: the person's own choices):\n${JSON.stringify(input.history)}`
+                  : "The book has no history that bears on them.",
+                ...(input.reference?.length ? [referenceText(input.reference)] : []),
+              ].join("\n\n"),
+            },
+          ],
+        } as Params,
+        meter
+      );
       return checkedProposals(answer);
     },
   };

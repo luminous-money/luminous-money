@@ -4,21 +4,23 @@
  * when it's down (or not deployed), `settings` says null and receipts are made without it.
  */
 import type {
+  AiCost,
   AiSettings,
   CategorizeIn,
   CategorizeOut,
   ExtractIn,
-  ReceiptFacts,
+  ExtractOut,
 } from "@luminous-money/ai-api";
 
-/** An answer, or why there isn't one. */
-export type Answer<T> = { ok: T } | { failed: string };
+/** An answer (with what it cost, in it), or why there isn't one (and what trying cost, if the
+ * service said). */
+export type Answer<T> = { ok: T } | { failed: string; cost?: AiCost };
 
 export interface AiPort {
   /** The book's AI settings, or null if the service can't be reached. */
   settings(book: string): Promise<AiSettings | null>;
   /** What a receipt says. */
-  extract(book: string, input: ExtractIn): Promise<Answer<ReceiptFacts>>;
+  extract(book: string, input: ExtractIn): Promise<Answer<ExtractOut>>;
   /** Where transactions' unconfirmed splits belong. */
   categorize(book: string, input: CategorizeIn): Promise<Answer<CategorizeOut>>;
   /** Forget a deleted book. */
@@ -36,8 +38,14 @@ export function httpAi(baseUrl: string, userId: string): AiPort {
     try {
       const response = await call(path, { method: "POST", body: JSON.stringify(body) });
       if (response.ok) return { ok: (await response.json()) as T };
-      const answer = (await response.json().catch(() => ({}))) as { detail?: string };
-      return { failed: answer.detail ?? `the AI service said ${response.status}` };
+      const answer = (await response.json().catch(() => ({}))) as {
+        detail?: string;
+        cost?: AiCost;
+      };
+      return {
+        failed: answer.detail ?? `the AI service said ${response.status}`,
+        ...(answer.cost ? { cost: answer.cost } : {}),
+      };
     } catch {
       return { failed: "the AI service couldn't be reached" };
     }

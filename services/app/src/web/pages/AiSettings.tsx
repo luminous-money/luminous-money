@@ -7,12 +7,13 @@
 import { useState } from "react";
 import { Link } from "wouter";
 
-import type { AiSettings as Settings, Eagerness } from "../lib/ai.js";
+import { formatUsd, type AiSettings as Settings, type Eagerness } from "../lib/ai.js";
 import { bookHome } from "../lib/books.js";
 import {
   explain,
   useAiHealth,
   useAiSettings,
+  useAiUsage,
   useClearAiKey,
   usePatchAi,
   useRole,
@@ -63,7 +64,50 @@ export function AiSettingsPanel({ book }: { book: string }) {
           manage={manage}
         />
       )}
+      {health.data && <Spending book={book} />}
     </>
+  );
+}
+
+const OPERATIONS = {
+  extract: ["receipt read", "receipts read"],
+  categorize: ["categorizing request", "categorizing requests"],
+} as const;
+
+/** What the book's AI has cost this month (UTC), estimated from what each call reported. */
+function Spending({ book }: { book: string }) {
+  const usage = useAiUsage(book);
+  if (!usage.data) return null;
+  const { usd, calls, operations, month } = usage.data;
+  const name = new Date(`${month}-01T00:00:00Z`).toLocaleString(undefined, {
+    month: "long",
+    timeZone: "UTC",
+  });
+  return (
+    <section className="card" aria-label="This month">
+      <h2 className="section-title">This month</h2>
+      {calls === 0 ? (
+        <p className="muted">Nothing yet in {name}.</p>
+      ) : (
+        <>
+          <p>
+            About <strong>{formatUsd(usd)}</strong> so far in {name}
+            {operations.length > 0 &&
+              `: ${operations
+                .map((o) => {
+                  const [one, many] = OPERATIONS[o.operation];
+                  return `${o.count} ${o.count === 1 ? one : many} (${formatUsd(o.usd)})`;
+                })
+                .join(", ")}`}
+            .
+          </p>
+          <p className="small muted">
+            An estimate at Anthropic&apos;s list prices, from what each call reported; the Claude
+            Console&apos;s billing has the real figure.
+          </p>
+        </>
+      )}
+    </section>
   );
 }
 

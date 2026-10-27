@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { AiSettings, CategorizeIn } from "@luminous-money/ai-api";
+import { NO_COST, type AiSettings, type CategorizeIn } from "@luminous-money/ai-api";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { AiPort } from "../ai.js";
@@ -68,6 +68,7 @@ const ai: AiPort = {
           };
         }),
         new_accounts: [],
+        cost: { ...NO_COST, calls: 1, models: ["fake"], usd: 0.01 },
       },
     };
   },
@@ -230,7 +231,14 @@ describe("migrating from another system", () => {
       if (job !== "skipped" && job?.status !== "running") break;
       await new Promise((r) => setTimeout(r, 20));
     }
-    expect(job).toMatchObject({ status: "done", total: 2, done: 2, suggested: 2, ai: true });
+    expect(job).toMatchObject({
+      status: "done",
+      total: 2,
+      done: 2,
+      suggested: 2,
+      ai: true,
+      ai_cost: 0.01, // one batch asked of it: the grocer (the café's rule settled it)
+    });
     expect(cafe.postings[1]!.account).toBe("Expenses:Dining-Out");
     expect(grocer.postings[1]!.account).toBe("Expenses:Groceries");
     // The AI was asked with the reference for the grocer (the café's rule settled it first).

@@ -3,7 +3,13 @@
  * offering anything AI), each book's AI settings and credential. Receipts go through `app`
  * (appApi.ts), which stages what the service reads.
  */
-import type { AiHealth, AiSettings, AiSettingsPatch } from "@luminous-money/ai-api";
+import {
+  formatUsd,
+  type AiHealth,
+  type AiSettings,
+  type AiSettingsPatch,
+  type AiUsage,
+} from "@luminous-money/ai-api";
 
 import { ApiError } from "./ledger.js";
 import { apiFetch } from "./session.js";
@@ -24,7 +30,14 @@ const send = (method: string, body?: unknown): RequestInit => ({
   body: body === undefined ? undefined : JSON.stringify(body),
 });
 
+/** What an operation's AI calls cost, as a sentence: "The AI's part cost about $0.03." */
+export const aiCostSentence = (usd: number) => `The AI's part cost about ${formatUsd(usd)}.`;
+
+export { formatUsd };
+
 export const aiApi = {
+  /** What the book's AI has cost this month (UTC). */
+  usage: async (book: string): Promise<AiUsage> => json(await apiFetch(`${base(book)}/usage`)),
   /** Up, or not: null when the service can't be reached (it's optional). */
   health: async (): Promise<AiHealth | null> => {
     try {

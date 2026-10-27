@@ -26,9 +26,11 @@ export type SuggestJob = {
   total: number;
   done: number;
   suggested: number;
-  /** Whether the book's AI was asked, and why it couldn't answer if it couldn't. */
+  /** Whether the book's AI was asked, why it couldn't answer if it couldn't, and what it's
+   * cost so far (USD, estimated; null if a model's prices aren't known). */
   ai: boolean;
   ai_error: string | null;
+  ai_cost?: number | null;
   error: string | null;
   started_at: string;
   finished_at: string | null;

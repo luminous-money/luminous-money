@@ -244,3 +244,37 @@ test("an iPhone's photo is kept as a JPEG, and read into its transaction as the 
   expect(t.flag).toBe("!");
   expect(t.postings[0]!.units?.number).toBe("-15.00");
 });
+
+test("what the AI cost: after reading a receipt, and this month on the AI page", async ({
+  page,
+}) => {
+  const { session, book, account } = await setUpUser(page);
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+    params: { path: { book_id: book.id } },
+    body: { name: "Expenses:Food:Groceries", kind: "leaf" },
+  });
+  await fakeAi(page, book.id);
+  await expect(page.getByRole("region", { name: "This month" })).toContainText("Nothing yet");
+
+  await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
+  await page.getByRole("link", { name: "Capture a receipt" }).click();
+  await page.getByLabel("Upload a receipt").setInputFiles({
+    name: "jewel.jpg",
+    mimeType: "image/jpeg",
+    buffer: JPEG,
+  });
+  await page.getByRole("button", { name: "Create transaction" }).click();
+
+  // The fake provider's calls are made up, $0.0042 each: reading it, then categorizing it.
+  await expect(page.getByRole("status").filter({ hasText: "AI's part" })).toHaveText(
+    "The AI's part cost about $0.0084."
+  );
+
+  await page.goto(`/ui/books/${book.id}/ai`);
+  await expect(page.getByRole("region", { name: "This month" })).toContainText(
+    "About $0.0084 so far"
+  );
+  await expect(page.getByRole("region", { name: "This month" })).toContainText(
+    "1 categorizing request ($0.0042), 1 receipt read ($0.0042)"
+  );
+});

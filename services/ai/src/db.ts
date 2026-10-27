@@ -1,15 +1,26 @@
-/** The ai service's database: each book's AI settings, its provider's credential sealed. */
+/** The ai service's database: each book's AI settings, its provider's credential sealed, and
+ * what its operations cost. */
 import {
   after,
   createTable,
   migrate,
+  now,
   open,
   transaction,
   type DatabaseSync,
   type Migration,
 } from "@luminous-money/db";
 
-import type { AiSettings, AiSettingsPatch, Eagerness, ProviderName } from "@luminous-money/ai-api";
+import type {
+  AiCost,
+  AiSettings,
+  AiSettingsPatch,
+  AiUsage,
+  Eagerness,
+  ProviderName,
+} from "@luminous-money/ai-api";
+
+export type Operation = AiUsage["operations"][number]["operation"];
 
 export const MIGRATIONS: Migration[] = [
   // 1: a book's AI (M16): on or off, its provider and credential (sealed), and the AI's settings.
@@ -25,6 +36,23 @@ export const MIGRATIONS: Migration[] = [
       "eagerness TEXT NOT NULL DEFAULT 'average'",
       "guidance TEXT",
     ]),
+  ],
+  // 2: what each operation cost (estimated from the usage the model reported), for the AI
+  // page's month-to-date and the logs.
+  [
+    createTable("ai_usage", [
+      "book_id TEXT NOT NULL",
+      "operation TEXT NOT NULL", // extract, categorize
+      "ok INTEGER NOT NULL", // answered (else it failed, after calls that still cost)
+      "models TEXT NOT NULL", // JSON: the models that ran
+      "calls INTEGER NOT NULL",
+      "input_tokens INTEGER NOT NULL",
+      "output_tokens INTEGER NOT NULL",
+      "cache_read_input_tokens INTEGER NOT NULL",
+      "cache_creation_input_tokens INTEGER NOT NULL",
+      "usd REAL", // null: a model's prices aren't known
+    ]),
+    "CREATE INDEX ai_usage_book ON ai_usage (book_id, created_at)",
   ],
 ];
 
@@ -111,6 +139,62 @@ export class AiDb {
   /** Forget a book (once it's deleted). */
   forgetBook(book: string): void {
     this.db.prepare("DELETE FROM ai_setting WHERE book_id = ?").run(book);
+    this.db.prepare("DELETE FROM ai_usage WHERE book_id = ?").run(book);
+  }
+
+  /** Record what an operation cost. */
+  recordUsage(book: string, operation: Operation, ok: boolean, cost: AiCost): void {
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO ai_usage (book_id, operation, ok, models, calls, input_tokens, output_tokens,
+           cache_read_input_tokens, cache_creation_input_tokens, usd, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        book,
+        operation,
+        ok ? 1 : 0,
+        JSON.stringify(cost.models),
+        cost.calls,
+        cost.input_tokens,
+        cost.output_tokens,
+        cost.cache_read_input_tokens,
+        cost.cache_creation_input_tokens,
+        cost.usd,
+        stamp,
+        stamp
+      );
+  }
+
+  /** The book's spending in a month (YYYY-MM, UTC), by operation; failed ones count too. */
+  usage(book: string, month: string): AiUsage {
+    const rows = this.db
+      .prepare(
+        `SELECT operation, COUNT(*) AS count, SUM(calls) AS calls, SUM(usd) AS usd,
+           SUM(usd IS NULL AND calls > 0) AS unpriced
+         FROM ai_usage WHERE book_id = ? AND created_at LIKE ? GROUP BY operation ORDER BY operation`
+      )
+      .all(book, `${month}-%`) as {
+      operation: Operation;
+      count: number;
+      calls: number;
+      usd: number | null;
+      unpriced: number;
+    }[];
+    const operations = rows.map((r) => ({
+      operation: r.operation,
+      count: r.count,
+      usd: r.unpriced ? null : (r.usd ?? 0),
+    }));
+    return {
+      month,
+      calls: rows.reduce((n, r) => n + r.calls, 0),
+      usd: operations.some((o) => o.usd === null)
+        ? null
+        : operations.reduce((n, o) => n + (o.usd ?? 0), 0),
+      operations,
+    };
   }
 
   private upsert(book: string, current: Row | undefined, changes: Partial<Row>): void {

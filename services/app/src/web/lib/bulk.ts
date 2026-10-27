@@ -14,6 +14,7 @@ import type { BulkAction } from "../components/SelectBar.js";
 import { appApi } from "./appApi.js";
 import type { TransactionChanges } from "./ledger.js";
 import { explain, useBulkEdit } from "./queries.js";
+import { aiCostSentence } from "./ai.js";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -53,14 +54,16 @@ export function useBulkActions({
         undefined,
         unconfirmed.map((t) => t.id)
       ),
-    onSuccess: ({ suggested, ai, ai_error }) => {
+    onSuccess: ({ suggested, ai, ai_error, ai_cost }) => {
       const of = `${suggested} of ${unconfirmed.length}`;
+      const cost = typeof ai_cost === "number" ? ` ${aiCostSentence(ai_cost)}` : "";
       setNote(
-        ai_error
+        (ai_error
           ? `The book's AI couldn't answer: ${ai_error}. From rules and history: suggested categories for ${of}.`
           : ai
             ? `Suggested categories for ${of}, the book's AI included.`
-            : `Suggested categories for ${of}: from rules and history (the book's AI isn't set up).`
+            : `Suggested categories for ${of}: from rules and history (the book's AI isn't set up).`) +
+          cost
       );
       return client.invalidateQueries({ queryKey: ["book", book] });
     },

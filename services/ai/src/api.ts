@@ -9,7 +9,10 @@ import { Hono, type Context } from "hono";
 
 import type { Sealer } from "@luminous-money/db";
 import {
+  addCost,
   EAGERNESS,
+  formatUsd,
+  NO_COST,
   type AiHealth,
   type AiSettingsPatch,
   type CategorizeIn,
@@ -17,8 +20,8 @@ import {
   type ProviderName,
 } from "@luminous-money/ai-api";
 
-import { StaleVersion, type AiDb } from "./db.js";
-import { ReadFailed, type Provider } from "./providers/types.js";
+import { StaleVersion, type AiDb, type Operation } from "./db.js";
+import { ReadFailed, type Meter, type Provider } from "./providers/types.js";
 
 type Env = { Variables: { user: string } };
 export type Role = "owner" | "manage" | "write" | "read";
@@ -146,19 +149,56 @@ export function createApi({
     };
   };
 
-  /** Run a provider's operation; 422 when it couldn't answer (`app` carries on without it),
-   * which the log says too: `luminous-money logs ai`. */
-  const answer = async <T>(c: Context<Env>, what: string, run: () => Promise<T>) => {
+  /**
+   * Run a provider's operation, with what it cost as `cost`; 422 when it couldn't answer (`app`
+   * carries on without it), which the log says too: `luminous-money logs ai`. Every call to a
+   * model is logged with its tokens and estimated cost as it's answered, and the operation's
+   * total is recorded for the book (failed ones too: their calls still cost).
+   */
+  const answer = async <T extends object>(
+    c: Context<Env>,
+    what: Operation,
+    run: (meter: Meter) => Promise<T>
+  ) => {
+    const book = c.req.param("book")!;
+    let cost = NO_COST;
+    const meter: Meter = (call) => {
+      cost = addCost(cost, call);
+      console.log(
+        `book ${book}: ${what} call: ${call.model}, ${call.input_tokens} in, ${call.output_tokens} out, ` +
+          `${call.cache_read_input_tokens} cache read, ${call.cache_creation_input_tokens} cache written: ` +
+          `about ${formatUsd(call.usd)}`
+      );
+    };
+    const done = (ok: boolean) => {
+      if (!cost.calls) return;
+      db.recordUsage(book, what, ok, cost);
+      console.log(
+        `book ${book}: ${what} ${ok ? "answered" : "failed"}: about ${formatUsd(cost.usd)} in all`
+      );
+    };
     try {
-      return c.json(await run());
+      const result = await run(meter);
+      done(true);
+      return c.json({ ...result, cost });
     } catch (error) {
+      done(false);
       if (error instanceof ReadFailed) {
-        console.warn(`book ${c.req.param("book")}: ${what} failed: ${error.message}`);
-        return c.json({ detail: error.message }, 422);
+        console.warn(`book ${book}: ${what} failed: ${error.message}`);
+        return c.json({ detail: error.message, cost }, 422);
       }
       throw error;
     }
   };
+
+  /** What the book's AI cost in a month (`?month=YYYY-MM`, UTC; default this one): any member. */
+  api.get("/books/:book/usage", async (c) => {
+    const refused = await allowed(c, "read");
+    if (refused) return refused;
+    const month = c.req.query("month") ?? new Date().toISOString().slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(month)) return c.json({ detail: "the month is YYYY-MM" }, 422);
+    return c.json(db.usage(c.req.param("book"), month));
+  });
 
   /** What a receipt says: its facts, nothing about the book. */
   api.post("/books/:book/receipts/extract", async (c) => {
@@ -169,7 +209,7 @@ export function createApi({
       return c.json({ detail: "send the receipt, today and the currency" }, 422);
     if (input.file.data.length > MAX_BASE64)
       return c.json({ detail: "a receipt is at most 5 MB" }, 413);
-    return answer(c, "extract", () => use.provider.extract(input, use.credential));
+    return answer(c, "extract", (meter) => use.provider.extract(input, use.credential, meter));
   });
 
   /** Where transactions' unconfirmed splits belong, with the book's guidance (and its
@@ -181,7 +221,7 @@ export function createApi({
     if (!Array.isArray(input?.transactions) || !Array.isArray(input.accounts) || !input.currency)
       return c.json({ detail: "send the transactions, the accounts and the currency" }, 422);
     const { settings } = use;
-    return answer(c, "categorize", () =>
+    return answer(c, "categorize", (meter) =>
       use.provider.categorize(
         {
           ...input,
@@ -190,7 +230,8 @@ export function createApi({
           guidance: settings.guidance,
           creation: settings.create_accounts ? { eagerness: settings.eagerness } : null,
         },
-        use.credential
+        use.credential,
+        meter
       )
     );
   });

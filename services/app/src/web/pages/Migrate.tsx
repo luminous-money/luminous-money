@@ -15,6 +15,7 @@ import type { ChartChoice } from "../../shared/chart.js";
 import type { Migration, RuleSuggestion, Step } from "../../shared/migration.js";
 import { ChartPreview, plural } from "../components/ChartPreview.js";
 import { FileDrop } from "../components/FileDrop.js";
+import { aiCostSentence, formatUsd } from "../lib/ai.js";
 import { appApi } from "../lib/appApi.js";
 import { formatDay } from "../lib/format.js";
 import {
@@ -666,6 +667,13 @@ function SuggestStep({ book, migration, busy, act, go }: StepProps) {
             </p>
           )}
           {job.ai_error && <p className="small error">The AI couldn&apos;t help: {job.ai_error}</p>}
+          {typeof job.ai_cost === "number" && (
+            <p className="small muted">
+              {running
+                ? `So far, the AI's part has cost about ${formatUsd(job.ai_cost)}.`
+                : aiCostSentence(job.ai_cost)}
+            </p>
+          )}
         </div>
       )}
       <div className="actions">

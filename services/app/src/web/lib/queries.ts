@@ -1085,6 +1085,16 @@ export function useAiHealth() {
   return useQuery({ queryKey: ["ai", "health"], queryFn: aiApi.health, staleTime: 60_000 });
 }
 
+/** What the book's AI has cost this month. */
+export function useAiUsage(book: string, enabled = true) {
+  return useQuery({
+    queryKey: ["book", book, "ai", "usage"],
+    queryFn: () => aiApi.usage(book),
+    enabled,
+    retry: false,
+  });
+}
+
 export function useAiSettings(book: string, enabled = true) {
   return useQuery({
     queryKey: ["book", book, "ai"],

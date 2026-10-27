@@ -182,7 +182,10 @@ test("Transactions' Select mode suggests categories for what's chosen, the book'
   const bar = page.getByRole("toolbar", { name: "Selected" });
   await act(bar, "Suggest categories");
 
-  await expect(bar).toContainText("Suggested categories for 2 of 2, the book's AI included.");
+  // One batch asked of the AI: the fake's made-up $0.0042.
+  await expect(bar).toContainText(
+    "Suggested categories for 2 of 2, the book's AI included. The AI's part cost about $0.0042."
+  );
   await expect(page.getByRole("checkbox", { name: /KIOSK ONE/ })).toContainText("Coffee");
   await expect(page.getByRole("checkbox", { name: /KIOSK TWO/ })).toContainText("Coffee");
 });

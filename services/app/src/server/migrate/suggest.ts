@@ -7,6 +7,7 @@
  * running when the app stops is marked stopped at the next start (`MigrationStore.stopInterrupted`)
  * and can be run again.
  */
+import type { AiCost } from "@luminous-money/ai-api";
 import { now } from "@luminous-money/db";
 
 import { isUncategorized } from "../../shared/accounts.js";
@@ -26,7 +27,12 @@ export type SuggestDeps = {
     user: string,
     book: string,
     currency: string
-  ) => Promise<{ categorizers: Categorizer[]; ai: boolean; error: () => string | null }>;
+  ) => Promise<{
+    categorizers: Categorizer[];
+    ai: boolean;
+    error: () => string | null;
+    cost: () => AiCost | null;
+  }>;
 };
 
 const running = new Set<string>();
@@ -57,6 +63,7 @@ async function run(deps: SuggestDeps, user: string, book: string): Promise<void>
     suggested: 0,
     ai: false,
     ai_error: null,
+    ai_cost: null,
     error: null,
     started_at: now(),
     finished_at: null,
@@ -80,10 +87,12 @@ async function run(deps: SuggestDeps, user: string, book: string): Promise<void>
         categorizers: chain.categorizers,
         ids: ids.slice(i, i + CHUNK),
       });
+      const spent = chain.cost();
       save({
         done: Math.min(ids.length, i + CHUNK),
         suggested: job.suggested + suggested,
         ai_error: chain.error(),
+        ai_cost: !chain.ai ? null : spent ? spent.usd : 0,
       });
     }
     save({ status: "done", finished_at: now() });

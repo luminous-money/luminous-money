@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import type { AiSettings, CategorizeIn, CategorizeOut, ReceiptFacts } from "@luminous-money/ai-api";
+import {
+  NO_COST,
+  type AiSettings,
+  type CategorizeIn,
+  type CategorizeOut,
+  type ExtractOut,
+  type ReceiptFacts,
+} from "@luminous-money/ai-api";
 
 import type { AiPort, Answer } from "./ai.js";
 import type { Categorizer } from "./categorize/types.js";
@@ -54,7 +61,7 @@ const facts = (f: Partial<ReceiptFacts> = {}): ReceiptFacts => ({
 
 /** The ai service, answering as told, and remembering what it was asked to categorize. */
 function ai(
-  extract: () => Answer<ReceiptFacts>,
+  extract: () => Answer<ExtractOut>,
   categorize: (input: CategorizeIn) => CategorizeOut = () => ({ proposals: [], new_accounts: [] }),
   settings: Partial<AiSettings> = {}
 ) {
@@ -220,8 +227,12 @@ describe("capturing a receipt", () => {
 
   it("says so when the AI read it but couldn't categorize it", async () => {
     const ledger = setUp();
-    const { port } = ai(() => ({ ok: facts() }));
-    port.categorize = async () => ({ failed: "the Anthropic account has no credit left" });
+    const cost = (usd: number) => ({ ...NO_COST, calls: 1, models: ["claude-opus-5"], usd });
+    const { port } = ai(() => ({ ok: { ...facts(), cost: cost(0.02) } }));
+    port.categorize = async () => ({
+      failed: "the Anthropic account has no credit left",
+      cost: cost(0.005),
+    });
 
     const captured = await captureReceipt({
       ledger,
@@ -235,6 +246,8 @@ describe("capturing a receipt", () => {
     expect(captured.note).toContain(
       "The AI couldn't categorize it: the Anthropic account has no credit left."
     );
+    // Reading cost, and so did trying to categorize.
+    expect(captured.ai_cost).toBeCloseTo(0.025);
     const t = await ledger.transaction("b", captured.transaction_id);
     expect(t.postings[1]!.account).toBe("Expenses:Uncategorized"); // still made, for review
   });

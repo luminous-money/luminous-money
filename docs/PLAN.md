@@ -297,6 +297,9 @@ Smaller improvements to pick up between milestones or at the end.
 - [x] **A private instance** (2026-10-24): `LUMINOUS_MONEY_SERVICE_MODE=private` lets only
       `LUMINOUS_MONEY_ALLOWED_EMAILS` sign up, and the login page says it's private once they all
       have accounts.
+- [x] **What the AI costs** (2026-10-26): every call logged with its estimated cost, each
+      operation's shown after it runs (Suggest categories, a receipt, a migration's
+      suggestions), and the month so far on the AI page.
 - [x] **Bank feeds on demand** (2026-10-24): `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand` stops the morning
       sync (only Sync now), for the dev stack.
 - [x] **Review newest first** (2026-10-17), the latest entered of a day first too.

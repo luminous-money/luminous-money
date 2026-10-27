@@ -1,8 +1,89 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-26._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-27._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
+
+## Hand-off (2026-10-27): the run in progress
+
+**Read this first.** The last session ran out of budget partway through a change set.
+
+### Done and released
+
+- **`v0.1.10`** (pushed, tagged, Release workflow green, the latest release): the chart of accounts
+  import (Accounts → Import), title-casing names everywhere (`shared/names.ts`), account
+  descriptions, the ledger's `POST /accounts/batch`, and **Migrate from another system**
+  (docs/milestones/migrate-from-another-system/PLAN.md), plus two fixes: New transaction's draft
+  no longer resets on a refetch, and Create account in a picker no longer submits the
+  transaction around it. Kael was told to upgrade the live server (Emmer) to it and run the
+  migration there.
+- M19 was found built (within M16) and PLAN.md corrected.
+
+### What the AI costs: committed and tagged `v0.1.11` (2026-10-27)
+
+Kael asked: log every AI call with its cost; show each operation's cost in the UI after it runs;
+show month-to-date on the AI settings page; then **publish a new version (`v0.1.11`)**.
+
+Built:
+- `packages/ai-api`: `AiCall`, `AiCost`, `NO_COST`, `addCost`, `formatUsd`, `AiUsage`,
+  `ExtractOut`; `CategorizeOut.cost`.
+- `services/ai`: `src/pricing.ts` (list prices per model, `usage.iterations` for fallbacks),
+  a `meter` through `providers/claude.ts` and `providers/fake.ts` (made-up $0.0042 a call),
+  `api.ts` logging each call and each operation, recording it (`ai_usage`, migration 2 in
+  `db.ts`), returning `cost` (on 422s too), and `GET /books/:book/usage?month=`. Tests:
+  `test/pricing.test.ts`, and additions in `test/api.test.ts`.
+- `services/app`: `ai.ts` (a failed answer's `cost`), `categorize/ai.ts` (options object now,
+  with `onCost`), `api.ts` (`chainFor` gives `cost()`; `/suggest` returns `ai_cost`),
+  `receipts.ts` (`Captured.ai_cost`: reading plus categorizing), `migrate/suggest.ts`
+  (`SuggestJob.ai_cost`). PWA: Select mode's note (`lib/bulk.ts`), review after a receipt
+  (`?ai_cost=` from CaptureReceipt and Attachments), the migration's suggestions step, and the
+  AI page's **This month** card (`AiSettings.tsx`, `useAiUsage`).
+- Docs: design.md ("What the AI costs"), PLAN.md (Polish item), and this file's user-facing and
+  gotcha notes.
+- Browser tests added (not yet run): m16.spec ("what the AI cost…"), cost lines in m4.spec's AI
+  Select-mode test and migrate.spec.
+
+Verified locally: `pnpm test` passes (ai 14, app 218, auth 24, db 10, csv-import 22, ledger 191;
+drift, typechecks, Prettier). `pnpm e2e` wasn't run locally (Kael asked to publish to save
+budget): the Release workflow runs it before publishing, so if `v0.1.11` has no release, look at
+its run (`gh run list`, `gh run view --log-failed`).
+
+### Left to do, in order
+
+1. If `v0.1.11`'s Release run failed: fix what it caught, then tag `v0.1.12` (don't move
+   tags). The likeliest:
+   - **m16 spec:** the cost text ("$0.0084" assumes the fake was asked twice: extract, then
+     categorize).
+   - **AI page card:** the operations' order (alphabetical: categorize before extract).
+2. Update the test counts in this file (ai is now 14; the browser count from the next e2e run).
+   Commit with `git add -A -- . ':!docs/milestones/m16-receipt-capture/notes.md'` (never commit
+   that file), ending the message with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+3. Tell Kael which version is live.
+4. Answer Kael's open question (asked with this request, not yet answered): *"If we don't save the
+   history file and don't create a durable artifact, how does the AI categorizer keep using the
+   migration's data?"* The raw CSV isn't kept, but the history read from it is, durably:
+   - **What's stored:** every transaction, normalized and mapped, in `app.sqlite`'s
+     `reference_transaction` table. Whole-system backups carry it. It follows renames, merges and
+     divisions, and is replaced only by reading another file.
+   - **What isn't stored:** only the per-payee *summary* (the reference). It's recomputed from
+     those stored rows plus the book's own confirmed transactions each time it's used, so it
+     can't go stale.
+   - **Who uses it:** the history categorizer reads the table on every import, sync and suggest.
+     The AI gets the summary whenever the book's migration has `reference: true`.
+   - The wording "files aren't kept" in the migration's docs and UI caused the confusion; consider
+     saying "the history is kept; the files you upload aren't".
+5. Still open, not started: a by-payee grouping in review (from the bootstrapping proposal), and
+   whether imports and bank feeds should ask the AI by themselves (PLAN.md open questions).
+
+### Standing rules for this repo (from Kael)
+
+- Never commit `docs/milestones/m16-receipt-capture/notes.md`.
+- The repo is public: no real financial data, personal emails, names or card digits.
+- The dev stack holds Kael's real data: don't read it. Don't read `secrets.*.local.sh`. List the
+  root `.env`'s key names only, never its values.
+- Don't delete or move pushed tags.
+- Don't run anything against Emmer: Kael runs it.
+- Releases: a `v*.*.*` tag runs the Release workflow; the CLI's `upgrade` installs it.
 
 ## State
 
@@ -43,7 +124,9 @@ release is **`v0.1.1`** (the `v0.1.0` tag was pushed before CI could build on Gi
 builder didn't load images for e2e, and it has no release); **`v0.1.2`** finds the latest release
 from github.com's redirect, not the API, whose 60-an-hour limit for an address had run out;
 **`v0.1.3`** adds private instances (`LUMINOUS_MONEY_SERVICE_MODE`, `LUMINOUS_MONEY_ALLOWED_EMAILS`), and **`v0.1.4`**
-`LUMINOUS_MONEY_SIMPLEFIN_MODE`; **`v0.1.5`** names them all `LUMINOUS_MONEY_*` (they were `LM_*`). The history was rewritten once before
+`LUMINOUS_MONEY_SIMPLEFIN_MODE`; **`v0.1.5`** names them all `LUMINOUS_MONEY_*` (they were `LM_*`);
+**`v0.1.10`** (2026-10-27) brings the chart of accounts import and migrating from another
+system, and **`v0.1.11`** what the AI costs. The history was rewritten once before
 the first push (an email taken out of RESUME), so commit IDs from before then are gone.
 
 What a user can do now:
@@ -110,6 +193,11 @@ What a user can do now:
 - **Transfers in review:** money out of one account and the same into another within 7 days,
   both imported, are paired into one transfer (after every import or sync), shown with what it
   was made of; "Reject" brings the two back and they're not paired again.
+- **What the AI costs** (2026-10-26): each operation says what its AI calls cost after it
+  runs (Select mode's Suggest categories note, review after a receipt is read, a migration's
+  suggestions), the AI page shows **This month** (about $… so far, by operation), and the `ai`
+  service logs every call's tokens and estimated cost (`luminous-money logs ai`). Estimates at
+  list prices (`services/ai/src/pricing.ts`); the Claude Console has the bill.
 - **Migrating from another system** (2026-10-26): setup's second step and Accounts offer
   **Migrate** (to managers, until it's done once; existing books too). From GnuCash's two
   exports: the **accounts** (the import below, with an old bank or card account "Same as" one
@@ -298,6 +386,9 @@ How it's put together:
 - **A dialog is a portal, and React carries a portal's events up the React tree:** a form in one
   (Create account) submitted the form its picker sat in (a transaction's editor) as well, until
   2026-10-26. A form in a portal stops its submit's propagation.
+- **AI prices are a table** (`services/ai/src/pricing.ts`, from platform.claude.com's pricing
+  page, 2026-10-26): a new model, or a price change, needs a line there. Without one, its calls
+  show as "an unknown amount" (and the month's total too) rather than a wrong figure.
 - **The reference isn't stored:** `migrate/reference.ts` works it out from the imported history
   and the book's own each time (Suggest categories, receipts, the migration's pages). Don't add
   a table for it; it would go stale.

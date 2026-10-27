@@ -5,6 +5,7 @@
  */
 import { Hono, type Context, type Next } from "hono";
 
+import { addCost, NO_COST, type AiCost } from "@luminous-money/ai-api";
 import type { CsvProfile } from "@luminous-money/csv-import";
 
 import type { AppDb, Invite } from "./db.js";
@@ -526,21 +527,22 @@ export function createApi({
     const ai = aiFor?.(user);
     const settings = ai ? await ai.settings(book) : null;
     let error: string | null = null;
-    if (!ai || !settings?.ready) return { categorizers, ai: false, error: () => error };
+    let cost: AiCost | null = null;
+    const said = { error: () => error, cost: () => cost };
+    if (!ai || !settings?.ready) return { categorizers, ai: false, ...said };
     return {
       categorizers: [
         ...categorizers,
-        aiCategorizer(
-          ai,
-          book,
+        aiCategorizer(ai, book, {
           currency,
-          !!settings.create_accounts,
-          (reason) => (error = reason),
-          referenceFor(book)
-        ),
+          opens: !!settings.create_accounts,
+          onFailure: (reason) => (error = reason),
+          onCost: (spent) => (cost = addCost(cost ?? NO_COST, spent)),
+          imported: referenceFor(book),
+        }),
       ],
       ai: true,
-      error: () => error,
+      ...said,
     };
   };
 
@@ -683,7 +685,7 @@ export function createApi({
       : undefined;
     const chain = ids
       ? await chainFor(user, book, info.currency ?? "USD")
-      : { categorizers, ai: false, error: () => null };
+      : { categorizers, ai: false, error: () => null, cost: () => null };
     const suggested = await suggestUnconfirmed({
       db,
       ledger,
@@ -692,7 +694,14 @@ export function createApi({
       account: c.req.query("account") || undefined,
       ...(ids ? { ids } : {}),
     });
-    return c.json({ suggested, ai: chain.ai, ai_error: chain.error() });
+    return c.json({
+      suggested,
+      ai: chain.ai,
+      ai_error: chain.error(),
+      // What the AI's part cost (none asked of it: 0); null if it wasn't asked, or a model's
+      // prices aren't known.
+      ai_cost: !chain.ai ? null : (chain.cost() ?? { usd: 0 }).usd,
+    });
   });
 
   /** The categorizers, in chain order, with how often their proposals were accepted. */

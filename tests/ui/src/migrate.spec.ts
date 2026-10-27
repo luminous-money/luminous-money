@@ -124,6 +124,8 @@ test("a GnuCash book comes in: accounts, history, the AI, rules and suggestions"
   await expect(suggestions).toContainText("2 transactions of 2 got a suggestion.", {
     timeout: 20_000,
   });
+  // One batch asked of the (fake) AI: the grocer's. The café's rule settled it.
+  await expect(suggestions).toContainText("The AI's part cost about $0.0042.");
   await suggestions.getByRole("button", { name: "Continue" }).click();
   await step(page, "Finish").getByRole("button", { name: "Finish" }).click();
 

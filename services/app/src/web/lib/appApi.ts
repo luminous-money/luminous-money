@@ -275,6 +275,8 @@ export type Captured = {
   read: boolean;
   matched: boolean;
   note: string | null;
+  /** What the AI's part cost (USD, estimated); null if it wasn't asked, or isn't known. */
+  ai_cost: number | null;
 };
 
 const transactionPath = (book: string, transaction: string) =>
@@ -699,7 +701,12 @@ export const appApi = {
     book: string,
     account?: string,
     transactions?: string[]
-  ): Promise<{ suggested: number; ai?: boolean; ai_error?: string | null }> =>
+  ): Promise<{
+    suggested: number;
+    ai?: boolean;
+    ai_error?: string | null;
+    ai_cost?: number | null;
+  }> =>
     json(
       await apiFetch(
         `${base(book)}/suggest${account ? `?account=${encodeURIComponent(account)}` : ""}`,

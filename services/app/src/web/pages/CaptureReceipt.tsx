@@ -65,7 +65,12 @@ export function CaptureReceipt({ book }: { book: string }) {
           note: note.trim() || null,
         },
       });
-      navigate(withBack(`/books/${book}/review?only=${made.transaction_id}`, back));
+      navigate(
+        withBack(
+          `/books/${book}/review?only=${made.transaction_id}${made.ai_cost !== null ? `&ai_cost=${made.ai_cost}` : ""}`,
+          back
+        )
+      );
     } catch {
       // shown from the mutation's error
     }
