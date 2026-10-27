@@ -77,12 +77,10 @@ its run (`gh run list`, `gh run view --log-failed`).
 
 ### Standing rules for this repo (from Kael)
 
-- Never commit `docs/milestones/m16-receipt-capture/notes.md`.
 - The repo is public: no real financial data, personal emails, names or card digits.
 - The dev stack holds Kael's real data: don't read it. Don't read `secrets.*.local.sh`. List the
   root `.env`'s key names only, never its values.
 - Don't delete or move pushed tags.
-- Don't run anything against Emmer: Kael runs it.
 - Releases: a `v*.*.*` tag runs the Release workflow; the CLI's `upgrade` installs it.
 
 ## State
@@ -347,7 +345,9 @@ How it's put together:
    `luminous.money`), on 0.1.9 (2026-10-25), with Kael's real bank feed. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
    `LM_SOURCE=release`: the installer on 127.0.0.1:8080 behind Emmer's nginx, which has the
    certificate; then `70_dns.sh` and `80_web.sh`). The release's five images must be public on
-   ghcr.io (a package's settings, once each) for an install to pull them.
+   ghcr.io (a package's settings, once each) for an install to pull them. Now luminous.money is
+   free and we need to add it and the relevant subdomains to the dynamic DNS configuration on
+   Emmer and update the deployment URL.
 2. **Kael migrates the live book on Emmer** (once released): Accounts → Migrate, with GnuCash's
    two exports. Real Claude calls with a reference haven't been seen yet (no key in the repo);
    watch the first suggestions' quality and `docker compose logs ai`. Not built from the
