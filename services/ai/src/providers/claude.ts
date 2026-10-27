@@ -15,7 +15,13 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 
-import type { CategorizeOut, ExtractIn, ReceiptFacts, ReceiptFile } from "@luminous-money/ai-api";
+import type {
+  CategorizeOut,
+  ExtractIn,
+  PayeeReference,
+  ReceiptFacts,
+  ReceiptFile,
+} from "@luminous-money/ai-api";
 
 import {
   checkedFacts,
@@ -101,6 +107,7 @@ export function categorizeSystem(input: Pick<CategorizeInput, "creation" | "guid
     "- fallback is the account the transaction as a whole belongs to (a grocery store's receipt: groceries), for any split you left out; null if you can't tell.",
     "- Put tax, tips and fees with what they were for (a grocery receipt's tax with the groceries), unless the chart has accounts for them.",
     "- The history is the person's own confirmed choices: follow how the same payee, and the same items, were categorized before, unless a split is clearly something else.",
+    "- The reference, when there is one, sums up the person's past choices by payee (from the books they kept before and this one, recent ones weighing more): where each payee's transactions went, how often, and for how much. Use it like history: a bank's text for a payee often differs from what the old books called it (\"KROGER #123 CINCINNATI OH\" is \"Kroger\"), and a payee's amounts can tell its accounts apart.",
     "- confidence is 0 to 1: how likely the person is to accept your accounts unchanged.",
     '- reason is one short sentence the person sees ("Jewel-Osco is a grocery store; eggs and milk are groceries").',
   ];
@@ -117,7 +124,26 @@ function chartText(input: CategorizeInput): string {
   return [
     "The chart of accounts (leaves you may choose):",
     ...input.accounts.map(
-      (a) => `${a.name} (${a.type ?? "?"}${a.display_name ? `, "${a.display_name}"` : ""})`
+      (a) =>
+        `${a.name} (${a.type ?? "?"}${a.display_name ? `, "${a.display_name}"` : ""})${a.description ? `: ${a.description}` : ""}`
+    ),
+  ].join("\n");
+}
+
+/** The reference's entries, a line each: `Kroger (31 times, last 2026-06-14): Expenses:Groceries
+ * 94% (31, typically 85.20, 12.00 to 210.00); …`. */
+export function referenceText(reference: PayeeReference[]): string {
+  const range = (a: PayeeReference["accounts"][number]) =>
+    a.typical === null
+      ? ""
+      : `, typically ${a.typical}${a.low !== a.high ? `, ${a.low} to ${a.high}` : ""}`;
+  return [
+    "The reference for payees like these (where their transactions went before):",
+    ...reference.map(
+      (r) =>
+        `${r.payee} (${r.seen} times, last ${r.last}): ${r.accounts
+          .map((a) => `${a.account} ${Math.round(a.share * 100)}% (${a.seen}${range(a)})`)
+          .join("; ")}`
     ),
   ].join("\n");
 }
@@ -258,6 +284,7 @@ export function claude({ extractModel, categorizeModel, client }: ClaudeOptions)
               input.history.length
                 ? `The book's history that bears on them (confirmed: the person's own choices):\n${JSON.stringify(input.history)}`
                 : "The book has no history that bears on them.",
+              ...(input.reference?.length ? [referenceText(input.reference)] : []),
             ].join("\n\n"),
           },
         ],

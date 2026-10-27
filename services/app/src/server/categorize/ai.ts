@@ -2,10 +2,14 @@
  * The `ai` categorizer (M16): the book's AI, through the ai service, placing each split still to
  * place, with a fallback for the transaction, and (with the book's account creation on) the
  * accounts it would open. It sees the history that bears on the transactions asked about: the
- * confirmed ones from the same payees, the most recent first. For receipts, for now; whether
- * imports call it is M19's to decide.
+ * confirmed ones from the same payees, the most recent first; and, with `imported` (a book
+ * whose migration turned the reference on), the reference's entries for payees like the
+ * batch's, worked out from the imported history and the book's own (migrate/reference.ts).
+ * Receipts and Suggest categories call it; imports and bank feeds don't (yet).
  */
 import type { CategorizeHistory } from "@luminous-money/ai-api";
+
+import { buildReference, entriesFor, seenInBook, type Seen } from "../migrate/reference.js";
 
 import { UNKNOWN } from "../../shared/accounts.js";
 import { payeeKey } from "../../shared/payees.js";
@@ -28,10 +32,32 @@ export function aiCategorizer(
   book: string,
   currency: string,
   opens: boolean,
-  onFailure?: (reason: string) => void
+  onFailure?: (reason: string) => void,
+  imported?: Seen[]
 ): Categorizer {
+  /** The reference, for a request: none without imported history. */
+  const referenceOf = (request: Request) => {
+    if (!imported) return null;
+    const accounts = request.context.accounts;
+    const sides = new Set(
+      accounts.filter((a) => a.type === "asset" || a.type === "liability").map((a) => a.name)
+    );
+    const leaves = new Set(
+      accounts.filter((a) => a.kind === "leaf" && !a.close && a.name !== UNKNOWN).map((a) => a.name)
+    );
+    return buildReference([...imported, ...seenInBook(request.context.history)], {
+      today: new Date().toISOString().slice(0, 10),
+      balanceSheet: (a) => sides.has(a) || /^(Assets|Liabilities):/.test(a),
+      usable: (a) => leaves.has(a),
+    });
+  };
+
   /** One batch's request to the ai service. */
-  const ask = (request: Request, transactions: Request["transactions"]) => {
+  const ask = (
+    request: Request,
+    transactions: Request["transactions"],
+    reference: ReturnType<typeof referenceOf>
+  ) => {
     const payees = new Set(transactions.map((t) => payeeKey(t.payee || t.description)));
     const history: CategorizeHistory[] = request.context.history
       .filter((t) => t.flag === "*" && payees.has(payeeKey(t.payee || t.narration || "")))
@@ -61,8 +87,21 @@ export function aiCategorizer(
       })),
       accounts: request.context.accounts
         .filter((a) => a.kind === "leaf" && !a.close && a.name !== UNKNOWN)
-        .map((a) => ({ name: a.name, type: a.type, display_name: null })),
+        .map((a) => ({
+          name: a.name,
+          type: a.type,
+          display_name: a.display_name ?? null,
+          description: a.description ?? null,
+        })),
       history,
+      ...(reference
+        ? {
+            reference: entriesFor(
+              reference,
+              transactions.flatMap((t) => [t.description, t.payee ?? ""])
+            ).map(({ key: _k, weight: _w, ...entry }) => entry),
+          }
+        : {}),
       currency,
     });
   };
@@ -71,8 +110,9 @@ export function aiCategorizer(
     name: "ai",
     async categorize(request: Request) {
       const proposals: InternalProposal[] = [];
+      const reference = referenceOf(request);
       for (let i = 0; i < request.transactions.length; i += BATCH) {
-        const answer = await ask(request, request.transactions.slice(i, i + BATCH));
+        const answer = await ask(request, request.transactions.slice(i, i + BATCH), reference);
         if ("failed" in answer) {
           console.warn(`categorizer ai: ${answer.failed}`);
           onFailure?.(answer.failed);

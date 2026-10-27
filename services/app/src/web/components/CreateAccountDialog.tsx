@@ -60,6 +60,9 @@ export function CreateAccountDialog({ initialName, accounts, submit, onCreated, 
           className="editor"
           onSubmit={(e) => {
             e.preventDefault();
+            // React carries a portal's events up its own tree: without this, the form the
+            // picker is in (a transaction's editor) would be submitted too.
+            e.stopPropagation();
             void create();
           }}
         >

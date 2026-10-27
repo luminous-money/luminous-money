@@ -644,7 +644,50 @@ How auth works (M8; the shape is M1's):
 - **Imported accounts aren't starred:** a chart can hold hundreds, and home is for the few
   watched ones.
 - **Accounts have a description** (`description` metadata on the `open`, one line), set there
-  or in the editor; a divided account keeps it on the whole, like its cards.
+  or in the editor; a divided account keeps it on the whole, like its cards. The AI is told it
+  with the chart (2026-10-26), so a chart's own words help it choose.
+- **GnuCash's account tree export is read as it comes** (2026-10-26): `Full Account Name`,
+  `Description` (else `Notes`), `Placeholder` (a node), `Hidden` (left out unless asked), and
+  `Type` placing a name that doesn't start with a top-level account under its type's (`BANK`
+  under Assets). GnuCash's `Imbalance-*`, `Orphan-*` and trading accounts are left out.
+
+### Migrating from another system (2026-10-26)
+
+Bootstrapping a book is the hard part: its accounts, and the history that tells the categorizers
+where things go. The migration (`/books/:book/migrate`) is one workflow for both, offered from
+setup and Accounts until it's been done once.
+
+- **Steps, kept on the server** (`book_migration`: the step, and what each did), so it can be
+  left and picked up: SimpleFIN's daily requests may mean coming back tomorrow. Files aren't
+  kept; a step that needs one asks again. Only managers migrate (it sets up the AI and rules).
+- **The chart is the chart import's** (`shared/chart.ts`), planned and added by `app` as the
+  import page does, and it records a **mapping** from every old name to the book's. An old
+  asset or liability can be **Same as** one the book has (a live book's accounts linked to the
+  bank under other names), or left out, so nothing is duplicated.
+- **The history is kept, never committed** (`reference_transaction`): GnuCash's transactions
+  export read split by split (each line carries its transaction's ID), amounts by value in the
+  transaction's currency, voids left out, names through the mapping (else the same
+  normalization). It follows renames, merges and divisions like everything `app` keeps by name.
+- **The history categorizer learns from it after the book's own** (only when its own history
+  has nothing for the payee), at 0.8 of the confidence, toward open leaves only. That's always
+  on once there's imported history: it's the point of bringing it.
+- **The reference is derived, never stored:** per payee key, from the imported history and the
+  book's own confirmed transactions, weighted by recency (half-life 180 days): how often, when
+  last, and per account its share and amounts. Worked out each time it's used, it can't go
+  stale, and "regenerating it as history advances" is simply what happens. The AI categorizer
+  gets the entries closest to each batch's payees (key overlap, a key's words all in the
+  other's counting as close: the old books' "Corner Cafe" for the bank's "SQ *CORNER CAFE
+  CHICAGO"), at most 40, as compact lines in its prompt. It's turned on per book by the
+  migration's reference step; Suggest categories and receipts use it from then on.
+- **No AI builds the reference or the rules:** counting is free, instant, repeatable and easy
+  to check; the AI earns its cost by using them. So rules and suggestions are offered without
+  the AI too (only the reference step needs it).
+- **Rules come from consistency:** a payee seen 3 or more times, 90% to one account, that no rule
+  covers. Each matches by the payee's key, or by its description containing the key when that
+  catches more of what's waiting (hand-typed old names against the bank's text).
+- **Suggestions for everything uncategorized run in the background** (hundreds, the AI 20 at a
+  time), 40 at a time through Suggest categories' own path, progress in the migration's state; a
+  restart marks a running one stopped, to run again.
 
 ### Budgets (M11)
 
@@ -939,8 +982,9 @@ same money in through another's, a day or so later. Both would sit in review, un
     (with the book's account creation on).
   - **External categorizers keep API v1:** they get one-split transactions as before (no
     `splits`, no memos); with several splits their one-posting answer is the fallback.
-  - **The AI is in the chain for receipts only** (it reads the receipt anyway); whether imports
-    call it is M19's.
+  - **The AI is in the chain for receipts and Suggest categories** (a selection, or a
+    migration's last step), not imports or bank feeds: whether those should ask it by themselves
+    is an open question (PLAN.md).
 
 ### Bank feeds: SimpleFIN (M9)
 

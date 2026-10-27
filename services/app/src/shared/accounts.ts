@@ -2,6 +2,7 @@
  * Accounts the code relies on, and which accounts money comes from, for the server and the PWA
  * alike. The ledger protects the system accounts (its `chart.PROTECTED`).
  */
+import { negate } from "./decimal.js";
 import { partOf } from "./divided.js";
 
 /** Where money in or out goes until it's categorized. */
@@ -35,4 +36,18 @@ export function baseAccounts(accounts: Named[]): string[] {
         ((a.kind === "leaf" && !a.implicit && !partOf(accounts, a.name)) || a.divided)
     )
     .map((a) => a.name);
+}
+
+/**
+ * Whether an account's amounts are shown with their signs flipped: liabilities and income, so a
+ * card shows what's owed and income shows as positive. Only for reading (balances, ledgers,
+ * previews); editors show stored signs, since splits sum to zero.
+ */
+export function shownInverted(type: string | null | undefined): boolean {
+  return type === "liability" || type === "income";
+}
+
+/** A stored amount as it's shown for an account of `type`, and back (the same flip). */
+export function shown(number: string, type: string | null | undefined): string {
+  return shownInverted(type) ? negate(number) : number;
 }

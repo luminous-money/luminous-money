@@ -71,6 +71,13 @@ export function external(config: ProviderConfig, fetchImpl: typeof fetch = fetch
         transactions: request.transactions.map(({ splits: _s, ...t }) => t),
         context: {
           ...request.context,
+          accounts: request.context.accounts.map(({ name, type, kind, open, close }) => ({
+            name,
+            type,
+            kind,
+            open,
+            close,
+          })),
           history: request.context.history.map((t) => ({
             ...t,
             postings: t.postings.map(({ account, amount }) => ({ account, amount })),

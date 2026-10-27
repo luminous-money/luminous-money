@@ -186,6 +186,7 @@ export function createApi({
         {
           ...input,
           history: input.history ?? [],
+          reference: Array.isArray(input.reference) ? input.reference : [],
           guidance: settings.guidance,
           creation: settings.create_accounts ? { eagerness: settings.eagerness } : null,
         },

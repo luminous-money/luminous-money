@@ -1,7 +1,7 @@
 import type { Account } from "@luminous-money/ledger-client";
 import { describe, expect, it } from "vitest";
 
-import { batchOrder, planChart } from "./chartImport.js";
+import { batchOrder, planChart } from "./chart.js";
 
 const TYPES = {
   Assets: "asset",
@@ -37,14 +37,14 @@ describe("importing a chart of accounts", () => {
   it("reads the columns it knows, normalizing names, and says which it doesn't", () => {
     const result = plan(
       [
-        "Full Name,Display_Name,Description,Opening Balance,As of,Type",
-        'expenses:dining out,Eating out,"  Restaurants and\n takeout ",,,EXPENSE',
-        'liabilities:cards:chase visa,,,"$1,250.00",01/31/2026,LIABILITY',
+        "Full Name,Display_Name,Description,Opening Balance,As of,Color",
+        'expenses:dining out,Eating out,"  Restaurants and\n takeout ",,,red',
+        'liabilities:cards:chase visa,,,"$1,250.00",01/31/2026,blue',
       ].join("\n")
     );
 
     expect(result.error).toBeNull();
-    expect(result.ignored).toEqual(["Type"]);
+    expect(result.ignored).toEqual(["Color"]);
     expect(result.problems).toEqual([]);
     expect(result.add.map((p) => p.account)).toEqual([
       {
@@ -145,6 +145,74 @@ describe("importing a chart of accounts", () => {
   it("needs an Account column", () => {
     expect(plan("Name of thing,Amount\nGroceries,5").error).toMatch(/needs an Account column/);
     expect(plan("").error).toBe("The file is empty.");
+  });
+
+  it("reads GnuCash's account tree export as it comes", () => {
+    const tree = [
+      '"Type","Full Account Name","Account Name","Account Code","Description","Account Color","Notes","Symbol","Namespace","Hidden","Tax Info","Placeholder"',
+      '"ASSET","Assets","Assets","","","","","USD","CURRENCY","F","F","T"',
+      '"ASSET","Assets:Current Assets","Current Assets","","","","","USD","CURRENCY","F","F","T"',
+      '"BANK","Assets:Current Assets:Checking Account","Checking Account","","Everyday","","","USD","CURRENCY","F","F","F"',
+      '"BANK","Assets:Current Assets:Old Savings","Old Savings","","","","","USD","CURRENCY","T","F","F"',
+      '"CREDIT","Credit Cards:Visa","Visa","","","","The travel card","USD","CURRENCY","F","F","F"',
+      '"EXPENSE","Expenses:Auto","Auto","","","","","USD","CURRENCY","F","F","T"',
+      '"EXPENSE","Expenses:Dining","Dining","","","","","USD","CURRENCY","F","F","F"',
+      '"BANK","Imbalance-USD","Imbalance-USD","","","","","USD","CURRENCY","F","F","F"',
+      '"TRADING","Trading:CURRENCY:USD","USD","","","","","USD","CURRENCY","F","F","F"',
+    ].join("\n");
+
+    const result = plan(tree);
+
+    expect(result.problems).toEqual([]);
+    expect(result.add.map((p) => [p.account.name, p.account.kind, p.account.description])).toEqual([
+      ["Assets:Current-Assets", "node", null],
+      ["Assets:Current-Assets:Checking-Account", "leaf", "Everyday"],
+      ["Liabilities:Credit-Cards:Visa", "leaf", "The travel card"],
+      ["Expenses:Auto", "node", null],
+      ["Expenses:Dining", "leaf", null],
+    ]);
+    expect(result.existing.map((e) => e.name)).toEqual(["Assets"]);
+    expect(result.left.map((l) => [l.name, l.why])).toEqual([
+      ["Assets:Current-Assets:Old-Savings", "Hidden"],
+      [null, "GnuCash's own, for what it couldn't balance"],
+      [null, "A trading account: not used here"],
+    ]);
+    expect(result.mapping).toMatchObject({
+      "Assets:Current Assets:Checking Account": "Assets:Current-Assets:Checking-Account",
+      "Credit Cards:Visa": "Liabilities:Credit-Cards:Visa",
+      "Assets:Current Assets:Old Savings": "Assets:Current-Assets:Old-Savings",
+    });
+    expect(planChart(tree, BOOK, "USD", { includeHidden: true }).add).toHaveLength(6);
+  });
+
+  it("treats a row as an account the book has, or leaves it out, as chosen", () => {
+    const result = planChart(
+      "Account\nAssets:Old Bank:Checking\nAssets:Old Bank:Savings\nExpenses:Pets\n",
+      BOOK,
+      "USD",
+      {
+        choices: {
+          "Assets:Old-Bank:Checking": { same_as: "Assets:Bank:Checking" },
+          "Assets:Old-Bank:Savings": "leave",
+          "Expenses:Pets": { same_as: "Expenses:Old" },
+        },
+      }
+    );
+
+    expect(result.add).toEqual([]);
+    expect(result.existing).toEqual([
+      {
+        line: 2,
+        written: "Assets:Old Bank:Checking",
+        name: "Assets:Old-Bank:Checking",
+        as: "Assets:Bank:Checking",
+      },
+    ]);
+    expect(result.left.map((l) => [l.line, l.why])).toEqual([[3, "Left out"]]);
+    expect(result.problems.map((p) => p.problem)).toEqual([
+      "Expenses:Old isn't an open account here",
+    ]);
+    expect(result.mapping["Assets:Old Bank:Checking"]).toBe("Assets:Bank:Checking");
   });
 
   it("opens what has no balance first, by name, so nodes come before what's under them", () => {

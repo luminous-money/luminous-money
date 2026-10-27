@@ -65,6 +65,8 @@ export interface LedgerPort {
   /** A leaf by its full name (nodes on the way are made too), with any of AccountIn's extras:
    * an opening balance, opening holdings. */
   createAccount(book: string, name: string, extra?: Partial<AccountIn>): Promise<Account>;
+  /** Open many accounts in one write, in order (a chart of accounts): all of them, or none. */
+  createAccounts(book: string, accounts: AccountIn[]): Promise<Account[]>;
   /** Rename or move an account and everything under it (every directive naming them). */
   renameAccount(book: string, account: string, to: string, updated_at?: string): Promise<Account>;
   /** Close an account and its subtree (after an optional closing transfer); the names closed. */
@@ -210,6 +212,13 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
         client.POST("/api/ledger/v1/books/{book_id}/accounts", {
           params: { path: { book_id: book } },
           body: { name, kind: "leaf", ...extra },
+        })
+      ),
+    createAccounts: (book, accounts) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/accounts/batch", {
+          params: { path: { book_id: book } },
+          body: accounts,
         })
       ),
     renameAccount: (book, account, to, updated_at) =>

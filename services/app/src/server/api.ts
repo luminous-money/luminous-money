@@ -40,6 +40,9 @@ import {
 import type { Categorizer } from "./categorize/types.js";
 import { ruleProblem } from "./categorize/rules.js";
 import { aiCategorizer } from "./categorize/ai.js";
+import { migrationRoutes } from "./migrate/routes.js";
+import { seenFrom } from "./migrate/history.js";
+import { MigrationStore } from "./migrate/store.js";
 import { applyRule, coveredBy, settle, suggestUnconfirmed } from "./categorize/service.js";
 import type { CategoryRuleIn, CategoryRulePatch } from "../shared/rules.js";
 import { LedgerError, type Book, type DivideIn, type LedgerPort, type Member } from "./ledger.js";
@@ -83,6 +86,10 @@ export function createApi({
   system?: { facts: System; admins: Set<string> };
 }) {
   const api = new Hono<Env>().basePath("/api/app/v1");
+  const migrations = new MigrationStore(db.db);
+  /** A book's imported history, for the AI's reference: only once its migration turned it on. */
+  const referenceFor = (book: string) =>
+    migrations.migration(book)?.state.reference ? seenFrom(migrations.history(book)) : undefined;
 
   api.get("/health", (c) => c.json({ status: "ok" }));
 
@@ -292,6 +299,7 @@ export function createApi({
           ai: aiFor?.(c.get("user")),
           db,
           categorizers,
+          reference: referenceFor(book),
           book,
           transaction: id,
           itemize: typeof form["itemize"] === "string" ? form["itemize"] === "yes" : null,
@@ -335,6 +343,7 @@ export function createApi({
           ai: aiFor?.(c.get("user")),
           db,
           categorizers,
+          reference: referenceFor(book),
           book,
           file: {
             name: file.name,
@@ -511,6 +520,30 @@ export function createApi({
 
   // Categorization: rules, proposals, suggesting, acceptance
 
+  /** The chain with the book's AI at the end, when it's set up: with the reference, if the
+   * book's migration turned it on. `error` says why the AI couldn't answer, if it couldn't. */
+  const chainFor = async (user: string, book: string, currency: string) => {
+    const ai = aiFor?.(user);
+    const settings = ai ? await ai.settings(book) : null;
+    let error: string | null = null;
+    if (!ai || !settings?.ready) return { categorizers, ai: false, error: () => error };
+    return {
+      categorizers: [
+        ...categorizers,
+        aiCategorizer(
+          ai,
+          book,
+          currency,
+          !!settings.create_accounts,
+          (reason) => (error = reason),
+          referenceFor(book)
+        ),
+      ],
+      ai: true,
+      error: () => error,
+    };
+  };
+
   /** The book, for categorizer requests (404 unless the caller owns it). */
   const bookOf = async (user: string, book: string) => {
     const found = await ledgerFor(user).book(book);
@@ -648,30 +681,18 @@ export function createApi({
     const ids = Array.isArray(body.transactions)
       ? body.transactions.filter((t): t is string => typeof t === "string")
       : undefined;
-    const ai = ids && aiFor?.(user);
-    const settings = ai ? await ai.settings(book) : null;
-    const withAi = !!(ai && settings?.ready);
-    let aiError: string | null = null;
+    const chain = ids
+      ? await chainFor(user, book, info.currency ?? "USD")
+      : { categorizers, ai: false, error: () => null };
     const suggested = await suggestUnconfirmed({
       db,
       ledger,
       book: { id: info.id, name: info.name },
-      categorizers: withAi
-        ? [
-            ...categorizers,
-            aiCategorizer(
-              ai!,
-              book,
-              info.currency ?? "USD",
-              !!settings!.create_accounts,
-              (reason) => (aiError = reason)
-            ),
-          ]
-        : categorizers,
+      categorizers: chain.categorizers,
       account: c.req.query("account") || undefined,
       ...(ids ? { ids } : {}),
     });
-    return c.json({ suggested, ai: withAi, ai_error: aiError });
+    return c.json({ suggested, ai: chain.ai, ai_error: chain.error() });
   });
 
   /** The categorizers, in chain order, with how often their proposals were accepted. */
@@ -1288,6 +1309,8 @@ export function createApi({
       ? c.json({ batch: found, rows: db.rows(batch) })
       : c.json({ detail: "not found" }, 404);
   });
+
+  migrationRoutes(api, { db, migrations, ledgerFor, chainFor, roleIn });
 
   return api;
 }

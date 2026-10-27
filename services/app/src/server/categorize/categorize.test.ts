@@ -13,7 +13,7 @@ import { importFile } from "../imports.js";
 import { FakeLedger } from "../testing.js";
 import { categorize, placed, SETTLE } from "./chain.js";
 import { external, providersFrom } from "./external.js";
-import { history } from "./history.js";
+import { history, historyCategorizer } from "./history.js";
 import { items } from "./items.js";
 import { rules } from "./rules.js";
 import { applyRule, coveredBy, settle, suggestUnconfirmed } from "./service.js";
@@ -168,6 +168,27 @@ describe("the chain", () => {
 describe("history", () => {
   const propose = async (t: Incoming, h: HistoryTransaction[]) =>
     (await history.categorize(request([t], h))).proposals[0];
+
+  it("learns from imported history after the book's own, less sure, toward open leaves", async () => {
+    const imported = [
+      past("Corner Cafe", "Expenses:Food:Coffee", { account: "Assets:Old-Bank:Checking" }),
+      past("Corner Cafe", "Expenses:Food:Coffee", { account: "Assets:Old-Bank:Checking" }),
+      past("Fake Grocer", "Expenses:Gone"), // not an account here: not learned
+    ];
+    const withImported = historyCategorizer(() => imported);
+    const ask = async (t: Incoming, own: HistoryTransaction[] = []) =>
+      (await withImported.categorize(request([t], own))).proposals[0];
+
+    const cafe = await ask(row("CORNER CAFE"));
+    expect(cafe).toMatchObject({ postings: [{ account: "Expenses:Food:Coffee" }] });
+    // Another account's (the old checking), from imported history: 2/2 × 2/3 × 0.8 × 0.8.
+    expect(cafe!.confidence).toBeCloseTo((2 / 3) * 0.8 * 0.8);
+    expect(cafe!.reason).toBe('2 of 2 past (imported) "corner cafe" → Expenses:Food:Coffee');
+    expect(await ask(row("FAKE GROCER"))).toBeUndefined();
+    // The book's own history wins.
+    const own = await ask(row("CORNER CAFE"), [past("CORNER CAFE", "Expenses:Food:Groceries")]);
+    expect(own).toMatchObject({ postings: [{ account: "Expenses:Food:Groceries" }] });
+  });
 
   it("proposes what the same payee was confirmed as, more sure with more agreement", async () => {
     const h = [

@@ -152,15 +152,29 @@ milestone starts.
       normalizer. [Built](milestones/chart-of-accounts-import/PLAN.md) 2026-10-26: a preview of
       what's added, already here or refused (and why), then one atomic write
       (`POST /accounts/batch`); descriptions on accounts; typing and suggestions title-case too.
+- [x] **Migrate from another system** (before M17; Kael, 2026-10-26): from the setup flow or
+      Accounts, until it's been done once: another system's chart and history (GnuCash first),
+      bank feeds and the AI if wanted, then a reference of the history by payee for the AI,
+      rules from history, and suggestions for everything uncategorized.
+      [Built](milestones/migrate-from-another-system/PLAN.md) 2026-10-26, with descriptions
+      going to the AI and a fix: making an account in a transaction's picker no longer submits
+      the transaction too.
 - [ ] **M17: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
       tag.
-- [ ] **M18: Suggested recurring transactions.** Nightly, analyze each account's last 14 months
-      of transactions and identify ones that look recurring, to suggest as schedules (M3).
-      (Moved after tagging, 2026-10-17.)
-- [ ] **M19: AI categorization.** Users set up an AI provider (one of those supported, with
+- [ ] **M18: Suggested recurring transactions.** Bi-weekly or on-demand via a button in the
+      schedules section, analyze each account's last 14 months of transactions and identify ones
+      that look recurring and are not already captured by an existing recurring transaction, to
+      suggest as schedules (M3). (Moved after tagging, 2026-10-17.)
+- [x] **M19: AI categorization.** Users set up an AI provider (one of those supported, with
       their API key) and standing instructions for categorizing, e.g. "I like highly detailed,
       deeply nested expense accounts. Accounts should always say WHAT, not WHY (tags say why, if
-      anything)". A new bulk action in review: "Categorize with AI".
+      anything)". A new bulk action in review: "Categorize with AI". **Built within M16**
+      (2026-10-18 and its second pass, 2026-10-19; found unchecked here 2026-10-26): the book's
+      AI page (Claude, its key sealed, guidance, account creation and how eagerly), the AI
+      categorizer at the end of the chain, and Select mode's Suggest categories asking it (the
+      bulk action), live since the first release. The migration's reference (2026-10-26) gives
+      it the book's history by payee. Still open: whether imports and bank feeds ask the AI by
+      themselves (they don't; see the open questions).
 - [ ] **M20: Design polish.**
 
 ## Notes collected so far
@@ -241,6 +255,9 @@ elaborated.
   - Can a resolver return a partial answer (e.g. a match with a suggested split)?
   - Should high-confidence matches ever auto-confirm, or does everything go through review?
 - **Cutover:** deferred until hydration.
+- **Should imports and bank feeds ask the AI by themselves?** Today they run rules, history and
+  item history; the AI is asked by receipts and by Suggest categories (a selection, or a
+  migration's last step). Asking on every sync costs a call per batch, every morning.
 
 ## Later (noted, not pressing)
 

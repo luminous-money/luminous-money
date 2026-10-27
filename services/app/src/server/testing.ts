@@ -134,6 +134,30 @@ export class FakeLedger implements LedgerPort {
     return this.accountList.at(-1)!;
   }
 
+  async createAccounts(book: string, accounts: AccountIn[]) {
+    const types: Record<string, Account["type"]> = {
+      Assets: "asset",
+      Liabilities: "liability",
+      Equity: "equity",
+      Income: "income",
+      Expenses: "expense",
+    };
+    const names = new Set(this.accountList.map((a) => a.name));
+    const taken = accounts.find((a) => names.has(a.name));
+    if (taken) throw new Error(`${taken.name} already exists`);
+    for (const a of accounts) {
+      const { name, kind, display_name, description, opening_balance, ...rest } = a;
+      await this.createAccount(book, name, { opening_balance, ...rest });
+      Object.assign(this.accountList.at(-1)!, {
+        kind,
+        type: types[name.split(":")[0]!] ?? null,
+        display_name: display_name ?? null,
+        description: description ?? null,
+      });
+    }
+    return accounts.map((a) => this.accountList.find((x) => x.name === a.name)!);
+  }
+
   async renameAccount(_book: string, account: string, to: string) {
     const found = this.accountList.find((a) => a.name === account)!;
     found.name = to;

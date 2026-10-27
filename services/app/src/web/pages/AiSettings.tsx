@@ -26,10 +26,6 @@ const EAGERNESS: [Eagerness, string][] = [
 ];
 
 export function AiSettings({ book }: { book: string }) {
-  const health = useAiHealth();
-  const settings = useAiSettings(book, !!health.data);
-  const role = useRole(book);
-  const manage = role === "owner" || role === "manage";
   return (
     <main className="stack">
       <header className="page-head">
@@ -39,6 +35,19 @@ export function AiSettings({ book }: { book: string }) {
         <h1>AI</h1>
         <p className="muted">Reading receipts into transactions, for this book.</p>
       </header>
+      <AiSettingsPanel book={book} />
+    </main>
+  );
+}
+
+/** The page's settings, also a migration's AI step. */
+export function AiSettingsPanel({ book }: { book: string }) {
+  const health = useAiHealth();
+  const settings = useAiSettings(book, !!health.data);
+  const role = useRole(book);
+  const manage = role === "owner" || role === "manage";
+  return (
+    <>
       {health.isPending && <p className="muted">Loading…</p>}
       {health.data === null && (
         <p className="card">
@@ -54,7 +63,7 @@ export function AiSettings({ book }: { book: string }) {
           manage={manage}
         />
       )}
-    </main>
+    </>
   );
 }
 

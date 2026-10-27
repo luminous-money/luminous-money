@@ -33,6 +33,7 @@ import { landsIn } from "../shared/divided.js";
 import { addDays } from "../shared/schedule.js";
 import type { AiPort } from "./ai.js";
 import { aiCategorizer } from "./categorize/ai.js";
+import type { Seen } from "./migrate/reference.js";
 import { categorize, placed, representative } from "./categorize/chain.js";
 import { buildRequest } from "./categorize/context.js";
 import { proposalRecord } from "./categorize/service.js";
@@ -248,6 +249,8 @@ type Reading = {
   db?: AppDb;
   /** The chain before the AI: rules, history, item history. */
   categorizers?: Categorizer[];
+  /** The book's imported history, for the AI's reference, if its migration turned it on. */
+  reference?: Seen[];
   book: string;
   file: ReceiptFile;
   today: string;
@@ -294,6 +297,7 @@ async function read({
   ai,
   db,
   categorizers = [],
+  reference,
   book,
   file,
   hints,
@@ -365,8 +369,13 @@ async function read({
     ...categorizers,
     ...(ready
       ? [
-          aiCategorizer(ai!, book, currency, !!settings!.create_accounts, (reason) =>
-            notes.push(`The AI couldn't categorize it: ${reason}.`)
+          aiCategorizer(
+            ai!,
+            book,
+            currency,
+            !!settings!.create_accounts,
+            (reason) => notes.push(`The AI couldn't categorize it: ${reason}.`),
+            reference
           ),
         ]
       : []),

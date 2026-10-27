@@ -19,8 +19,11 @@ GPL-2.0-or-later (Beancount is GPL-2.0-only). It wears the original app's look: 
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
 accounts), M11 (budgets), M12 (reports), M13 (sharing books), M14 (reconciliation), M15 (divided
-accounts) and M16 (receipt capture) are described in their plans, and so is the **chart of
-accounts import** slipped in before M17 (2026-10-26). The milestones ahead
+accounts) and M16 (receipt capture) are described in their plans, and so are the **chart of
+accounts import** and **migrating from another system**, slipped in before M17 (2026-10-26).
+**M19 (AI categorization) was built within M16** and is live; its PLAN.md entry was found
+unchecked and corrected on 2026-10-26 (what's left is a question: whether imports and bank feeds
+ask the AI by themselves). The milestones ahead
 (M17–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What an operator can do now (production readiness, phase 1; [docs/deploying.md](docs/deploying.md)):
@@ -107,6 +110,16 @@ What a user can do now:
 - **Transfers in review:** money out of one account and the same into another within 7 days,
   both imported, are paired into one transfer (after every import or sync), shown with what it
   was made of; "Reject" brings the two back and they're not paired again.
+- **Migrating from another system** (2026-10-26): setup's second step and Accounts offer
+  **Migrate** (to managers, until it's done once; existing books too). From GnuCash's two
+  exports: the **accounts** (the import below, with an old bank or card account "Same as" one
+  here, or left out), the **history** (kept for categorizing, never added: GnuCash's
+  transactions, accounts mapped), **bank feeds** (the Bank connections panel; it waits if
+  SimpleFIN needs another day), the **AI** (its panel), the **reference** (the history by payee
+  for the AI: shown, then Use it), **rules** (payees 90% one account, tick and Add), and
+  **suggestions** for everything uncategorized (in the background, with progress), then Review.
+  Progress is kept: leave and come back from Accounts. The history categorizer learns from the
+  imported history (after the book's own), and the AI gets the reference from then on.
 - **Importing a chart of accounts** (2026-10-26): Accounts → **Import**: a CSV with an Account
   column (full names) and any of Display name, Description, Opening balance with As of, Currency,
   Opened, Booking and Revalue every. The preview shows each name as it will be (title-cased,
@@ -114,7 +127,8 @@ What a user can do now:
   (nodes), what's already here (left alone) and which rows can't be added and why; **Add N
   accounts** opens them in one write. Accounts have a **Description** now (the editor's Name
   card, shown under the name). Every name the app makes from words is title-cased the same way,
-  typing in the name field included (`Coffee-Shops`, `Gifts-and-Giving`).
+  typing in the name field included (`Coffee-Shops`, `Gifts-and-Giving`). GnuCash's account tree
+  export works as it comes (types, placeholders, hidden accounts, its own accounts left out).
 - **Accounts (M10):** Menu → Accounts: one card, the tree by type, tap a node to open or close
   it, balances rolled up (one figure each), Find, "Show archived". A node's › opens its editor
   (with "Add an account under it"); a leaf opens its ledger, whose Edit opens the same editor:
@@ -214,6 +228,11 @@ How it's put together:
   5) and `categorize` (where splits belong; Claude Opus 5). It answers; `app` composes and stages
   (`src/server/receipts.ts`, the chain in `src/server/categorize`, its AI step `ai.ts`), and the
   ledger keeps the files (attachments, migration 10). Their shared types are `packages/ai-api`.
+- **Migrating** (`services/app/src/server/migrate`): `store.ts` (progress, imported history),
+  `gnucash.ts` (the transactions export), `reference.ts` (the derived reference, its entries for
+  a batch, rule suggestions), `suggest.ts` (the background suggestions), `routes.ts`; the chart
+  planner is `src/shared/chart.ts`, names `src/shared/names.ts`; the page is
+  `src/web/pages/Migrate.tsx`.
 - **Deploying:** `deploy/gateway` (the gateway image: Traefik pinned, the routes, its static
   config written at start by `entrypoint.sh`), `deploy/env.example`, `scripts/luminous-money` (the
   operator's command; its test is `scripts/cli-test.sh`), `ledger.snapshot` (whole-system
@@ -224,9 +243,9 @@ How it's put together:
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 191 tests, including the table lint
-    - auth: 24; app: 206; ai: 9; db: 10; csv-import: 22
+    - auth: 24; app: 218; ai: 10; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 91 API tests and 102 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 91 API tests and 104 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Its `.env` (not committed: its keys) sets `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand`, so it never
@@ -241,11 +260,10 @@ How it's put together:
    `LM_SOURCE=release`: the installer on 127.0.0.1:8080 behind Emmer's nginx, which has the
    certificate; then `70_dns.sh` and `80_web.sh`). The release's five images must be public on
    ghcr.io (a package's settings, once each) for an install to pull them.
-2. **Bootstrapping from the old books** (Kael's question, 2026-10-26: hundreds of
-   uncategorized transactions since July): proposed, awaiting a decision. The idea: an old
-   ledger's year of entries as context only (never committed), mapped onto the new chart, for
-   the history and AI categorizers, plus rules proposed from its consistent payees and a
-   by-payee view in review.
+2. **Kael migrates the live book on Emmer** (once released): Accounts → Migrate, with GnuCash's
+   two exports. Real Claude calls with a reference haven't been seen yet (no key in the repo);
+   watch the first suggestions' quality and `docker compose logs ai`. Not built from the
+   proposal: a by-payee view in review (categorize a payee's group at once).
 3. **M17 (transaction tagging):** see [its plan](docs/milestones/m17-transaction-tagging/PLAN.md).
 4. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
@@ -276,6 +294,13 @@ How it's put together:
   need every platform's binaries: `supportedArchitectures` in pnpm-workspace.yaml (linux x64 and
   arm64, glibc). Without it, 0.1.7's arm64 `app` had only x64's sharp and crash-looped on a Pi.
   The release checks `require('sharp')` on both before it tags `latest`.
+
+- **A dialog is a portal, and React carries a portal's events up the React tree:** a form in one
+  (Create account) submitted the form its picker sat in (a transaction's editor) as well, until
+  2026-10-26. A form in a portal stops its submit's propagation.
+- **The reference isn't stored:** `migrate/reference.ts` works it out from the imported history
+  and the book's own each time (Suggest categories, receipts, the migration's pages). Don't add
+  a table for it; it would go stale.
 
 - **Reconciliation's marks belong to reconciling:** the ledger keeps a posting's `reconciled:`
   through JSON edits and strips it from new transactions (`service._marked`). Write marks only

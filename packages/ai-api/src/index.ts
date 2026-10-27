@@ -56,7 +56,13 @@ export type ReceiptHints = {
 };
 
 /** An account in the chart, as categorizing sees it: the leaves it may choose from. */
-export type ChartAccount = { name: string; type: string | null; display_name: string | null };
+export type ChartAccount = {
+  name: string;
+  type: string | null;
+  display_name: string | null;
+  /** What it's for, in the person's words. */
+  description?: string | null;
+};
 
 /** A receipt as `app` sends it: base64, and its type (an image, or a PDF). */
 export type ReceiptFile = { data: string; media_type: string; filename?: string | null };
@@ -128,12 +134,35 @@ export type CategorizeHistory = {
   postings: { account: string; amount: string | null; memo: string | null }[];
 };
 
+/** What the person's history says about one payee (from another system's history and the
+ * book's own, recent transactions weighing more): where its transactions went, and for how
+ * much (as they moved those accounts: an expense is positive). */
+export type PayeeReference = {
+  /** As it was last written. */
+  payee: string;
+  /** How many transactions, and the last one's date. */
+  seen: number;
+  last: string;
+  /** The most usual first: its share (by weight, recent counting more), how many, and its
+   * amounts' middle, lowest and highest. */
+  accounts: {
+    account: string;
+    share: number;
+    seen: number;
+    typical: string | null;
+    low: string | null;
+    high: string | null;
+  }[];
+};
+
 /** `POST /api/ai/v1/books/:book/categorize`. */
 export type CategorizeIn = {
   transactions: CategorizeTransaction[];
   /** The leaves it may choose from. */
   accounts: ChartAccount[];
   history: CategorizeHistory[];
+  /** The reference's entries for payees like these transactions' (none: not used). */
+  reference?: PayeeReference[];
   currency: string;
 };
 

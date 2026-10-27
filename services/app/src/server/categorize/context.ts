@@ -46,6 +46,8 @@ export async function buildRequest(
         kind: a.kind,
         open: a.open ?? null,
         close: a.close ?? null,
+        display_name: a.display_name ?? null,
+        description: a.description ?? null,
       })),
       history: history.map((t) => ({
         id: t.id,

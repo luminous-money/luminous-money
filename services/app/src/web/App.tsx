@@ -27,6 +27,7 @@ import { Transactions } from "./pages/Transactions.js";
 import { Home } from "./pages/Home.js";
 import { Import } from "./pages/Import.js";
 import { ImportChart } from "./pages/ImportChart.js";
+import { Migrate } from "./pages/Migrate.js";
 import { Login } from "./pages/Login.js";
 import { Commodities } from "./pages/Commodities.js";
 import { Review } from "./pages/Review.js";
@@ -161,6 +162,7 @@ function Gate() {
           <Route path="/books/:book/accounts/import">
             {() => <ImportChart key={book!.id} book={book!} />}
           </Route>
+          <Route path="/books/:book/migrate">{() => <Migrate key={book!.id} book={book!} />}</Route>
           <Route path="/books/:book/accounts/:account/trade">
             {({ book: id, account }) => (
               <TradePage key={account} book={id} account={decodeURIComponent(account)} />

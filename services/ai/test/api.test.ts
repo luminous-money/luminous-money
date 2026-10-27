@@ -65,6 +65,30 @@ const CATEGORIZE: CategorizeIn = {
   currency: "USD",
 };
 
+const GROCER = {
+  payee: "Jewel-Osco",
+  seen: 12,
+  last: "2026-01-10",
+  accounts: [
+    {
+      account: "Expenses:Groceries",
+      share: 0.92,
+      seen: 11,
+      typical: "42.10",
+      low: "9.99",
+      high: "120.00",
+    },
+    {
+      account: "Expenses:Household",
+      share: 0.08,
+      seen: 1,
+      typical: "30.00",
+      low: "30.00",
+      high: "30.00",
+    },
+  ],
+};
+
 const useFake = () =>
   call("owner", "/books/b/settings", "PATCH", {
     updated_at: null,
@@ -132,6 +156,19 @@ describe("the two operations", () => {
         { index: 2, account: "Expenses:Groceries" },
       ],
       fallback: "Expenses:Groceries",
+    });
+
+    // The fake follows the reference, through the API, as Claude is told to.
+    const referenced = (await (
+      await call("writer", "/books/b/categorize", "POST", {
+        ...CATEGORIZE,
+        accounts: [...CATEGORIZE.accounts, { name: "Expenses:Household", type: "expense" }],
+        reference: [{ ...GROCER, accounts: [...GROCER.accounts].reverse() }],
+      })
+    ).json()) as CategorizeOut;
+    expect(referenced.proposals[0]).toMatchObject({
+      fallback: "Expenses:Household",
+      reason: "From the reference",
     });
   });
 
@@ -244,6 +281,28 @@ describe("Claude", () => {
       }).categorize({ ...CATEGORIZE, guidance: null, creation: null }, "sk-key")
     ).rejects.toBeInstanceOf(ReadFailed);
     expect(sonnet.asked[0]).not.toHaveProperty("fallbacks");
+  });
+
+  it("is told the reference for payees like these, and what accounts are for", async () => {
+    const opus = scripted({ proposals: [], new_accounts: [] });
+    await claude({ ...models, client: () => opus.client }).categorize(
+      {
+        ...CATEGORIZE,
+        accounts: [
+          { name: "Expenses:Groceries", type: "expense", display_name: null, description: "Food" },
+        ],
+        reference: [GROCER],
+        guidance: null,
+        creation: null,
+      },
+      "sk-key"
+    );
+
+    const asked = JSON.stringify(opus.asked[0]);
+    expect(asked).toContain("Expenses:Groceries (expense): Food");
+    expect(asked).toContain(
+      "Jewel-Osco (12 times, last 2026-01-10): Expenses:Groceries 92% (11, typically 42.10, 9.99 to 120.00); Expenses:Household 8% (1, typically 30.00)"
+    );
   });
 
   it("reads the fallback's answer when Opus declined partway through its own", async () => {

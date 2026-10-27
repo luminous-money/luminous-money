@@ -15,6 +15,10 @@
  *
  * Past transactions are seen from their balance-sheet side (an asset or liability), where an
  * import comes from.
+ *
+ * **Imported history** (another system's, from a migration) is learned from after the book's
+ * own: only if the book's own history has nothing for the payee, at 0.8 of the confidence, and
+ * only toward accounts that can take a proposal (open leaves).
  */
 import type { IncomingTransaction } from "../../shared/categorizer-api.js";
 import { keySimilarity, payeeKey, SIMILAR } from "../../shared/payees.js";
@@ -41,17 +45,28 @@ function learnable(history: History, balanceSheet: Set<string>): Past[] {
   });
 }
 
-function propose(row: IncomingTransaction, past: Past[]): InternalProposal | null {
+/** What imported history's confidence is, against the book's own. */
+const IMPORTED = 0.8;
+
+function propose(
+  row: IncomingTransaction,
+  past: Past[],
+  imported: Past[]
+): InternalProposal | null {
   const key = payeeKey(row.description);
   if (!key) return null;
   const tiers: [Past[], number, string][] = [];
-  for (const sameAccount of [true, false]) {
-    const pool = past.filter((p) => (p.account === row.account) === sameAccount);
-    const exact = pool.filter((p) => p.key === key);
-    const similar = pool.filter((p) => p.key !== key && keySimilarity(p.key, key) >= SIMILAR);
-    tiers.push([exact, sameAccount ? 1 : 0.8, "past"]);
-    tiers.push([similar, sameAccount ? 0.8 : 0.64, "similar past"]);
-  }
+  for (const [from, factor, where] of [
+    [past, 1, ""],
+    [imported, IMPORTED, " (imported)"],
+  ] as const)
+    for (const sameAccount of [true, false]) {
+      const pool = from.filter((p) => (p.account === row.account) === sameAccount);
+      const exact = pool.filter((p) => p.key === key);
+      const similar = pool.filter((p) => p.key !== key && keySimilarity(p.key, key) >= SIMILAR);
+      tiers.push([exact, (sameAccount ? 1 : 0.8) * factor, `past${where}`]);
+      tiers.push([similar, (sameAccount ? 0.8 : 0.64) * factor, `similar past${where}`]);
+    }
   const [found, factor, word] = tiers.find(([pool]) => pool.length) ?? [[], 0, ""];
   if (!found.length) return null;
 
@@ -77,20 +92,42 @@ function propose(row: IncomingTransaction, past: Past[]): InternalProposal | nul
   };
 }
 
-export const history: Categorizer = {
-  name: "history",
-  async categorize(request: Request) {
-    const balanceSheet = new Set(
-      request.context.accounts
-        .filter(
-          (a) =>
-            a.type === "asset" || a.type === "liability" || /^(Assets|Liabilities):/.test(a.name)
-        )
-        .map((a) => a.name)
-    );
-    const past = learnable(request.context.history, balanceSheet);
-    return {
-      proposals: request.transactions.flatMap((t) => propose(t, past) ?? []),
-    };
-  },
-};
+/**
+ * The history categorizer, learning from the book's own history in the request's context and,
+ * with `importedFor`, a book's imported history after it.
+ */
+export function historyCategorizer(importedFor?: (book: string) => History): Categorizer {
+  return {
+    name: "history",
+    async categorize(request: Request) {
+      const accounts = request.context.accounts;
+      const balanceSheet = new Set(
+        accounts
+          .filter(
+            (a) =>
+              a.type === "asset" || a.type === "liability" || /^(Assets|Liabilities):/.test(a.name)
+          )
+          .map((a) => a.name)
+      );
+      const past = learnable(request.context.history, balanceSheet);
+      const leaves = new Set(
+        accounts.filter((a) => a.kind === "leaf" && !a.close).map((a) => a.name)
+      );
+      const old = importedFor?.(request.book.id) ?? [];
+      // Its own side by name too: an old account that isn't here is still where it came from.
+      const sides = new Set([
+        ...balanceSheet,
+        ...old
+          .flatMap((t) => t.postings.map((p) => p.account))
+          .filter((a) => /^(Assets|Liabilities):/.test(a)),
+      ]);
+      const imported = old.length ? learnable(old, sides).filter((p) => leaves.has(p.other)) : [];
+      return {
+        proposals: request.transactions.flatMap((t) => propose(t, past, imported) ?? []),
+      };
+    },
+  };
+}
+
+/** The history categorizer without imported history. */
+export const history: Categorizer = historyCategorizer();

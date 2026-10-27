@@ -34,8 +34,6 @@ import {
  * into the book you're in. New transactions arrive every morning, or with "Sync now".
  */
 export function BankConnections({ book }: { book: string }) {
-  const connections = useBankConnections();
-  const attempts = useBankAttempts(book);
   return (
     <main className="stack">
       <header className="page-head">
@@ -48,6 +46,17 @@ export function BankConnections({ book }: { book: string }) {
           . Transactions arrive every morning and go through review, like an import.
         </p>
       </header>
+      <BankConnectionsPanel book={book} />
+    </main>
+  );
+}
+
+/** The page's connections and Connect, also a migration's bank feeds step. */
+export function BankConnectionsPanel({ book }: { book: string }) {
+  const connections = useBankConnections();
+  const attempts = useBankAttempts(book);
+  return (
+    <>
       {connections.isPending && <p className="muted">Loading…</p>}
       {connections.error && <p className="card error">{explain(connections.error)}</p>}
       {connections.data?.map((c) => (
@@ -59,7 +68,7 @@ export function BankConnections({ book }: { book: string }) {
         />
       ))}
       <Connect />
-    </main>
+    </>
   );
 }
 

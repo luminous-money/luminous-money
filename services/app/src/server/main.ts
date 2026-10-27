@@ -10,10 +10,12 @@ import { AppDb } from "./db.js";
 import { httpLedger } from "./ledger.js";
 import { httpAi } from "./ai.js";
 import { external, providersFrom } from "./categorize/external.js";
-import { history } from "./categorize/history.js";
+import { historyCategorizer } from "./categorize/history.js";
 import { items } from "./categorize/items.js";
 import { rules } from "./categorize/rules.js";
 import { startDaily } from "./daily.js";
+import { historyFrom } from "./migrate/history.js";
+import { MigrationStore } from "./migrate/store.js";
 import { createSystem } from "./system.js";
 import { pricesJob } from "./prices.js";
 import { schedulesJob } from "./schedules.js";
@@ -24,11 +26,13 @@ import { simplefinJob } from "./simplefin/sync.js";
 const { port, webRoot } = config;
 const db = new AppDb(join(config.dataDir, "app.sqlite"));
 const ledgerFor = (user: string) => httpLedger(config.ledgerUrl, user);
-// The categorization chain: the user's rules, then history (payees, then items), then any
-// configured providers. Receipts add the book's AI at the end (M16).
+// The categorization chain: the user's rules, then history (payees, with any imported history
+// from a migration, then items), then any configured providers. Receipts and Suggest categories
+// add the book's AI at the end (M16).
+const migrations = new MigrationStore(db.db);
 const categorizers = [
   rules((book) => db.rules(book)),
-  history,
+  historyCategorizer((book) => historyFrom(migrations.history(book))),
   items,
   ...providersFrom(config.categorizers).map((p) => external(p)),
 ];
@@ -39,6 +43,8 @@ const simplefin = {
   sealer: new Sealer(config.simplefin.encryptionKey, "SIMPLEFIN_ENCRYPTION_KEY"),
   policy: { hosts: config.simplefin.hosts, allowInsecure: config.simplefin.allowInsecure },
 };
+// Suggestions a migration was making when the app last stopped: they've stopped.
+if (migrations.stopInterrupted()) console.log("migration: suggestions interrupted by a restart");
 if (config.simplefin.mode === "on-demand")
   console.log(
     "LUMINOUS_MONEY_SIMPLEFIN_MODE is on-demand: bank feeds sync only when someone taps Sync now."

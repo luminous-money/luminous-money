@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 
+import { MigrateCard } from "../components/MigrateCard.js";
 import { displayName, shown } from "../lib/accounts.js";
 import { formatMoney } from "../lib/decimal.js";
 import type { TreeAccount } from "../lib/ledger.js";
@@ -184,6 +185,7 @@ export function ChartOfAccounts({ book }: { book: string }) {
           </div>
         )}
       </header>
+      <MigrateCard book={book} />
       <input
         type="search"
         className="chart-search"

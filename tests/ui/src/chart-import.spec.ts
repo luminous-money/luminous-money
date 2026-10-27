@@ -4,11 +4,11 @@ import { expect, test } from "@playwright/test";
 import { accounts, setUpUser } from "./support.js";
 
 const CSV = [
-  "Account,Display name,Description,Opening balance,As of,Type",
-  "expenses:dining out,Eating out,Restaurants and takeout,,,EXPENSE",
+  "Account,Display name,Description,Opening balance,As of,Color",
+  "expenses:dining out,Eating out,Restaurants and takeout,,,red",
   "Expenses:Gifts and giving,,,,,",
   "expenses:gifts and giving:friends,,,,,",
-  'liabilities:cards:chase visa,,The travel card,"1,250.00",01/31/2024,LIABILITY',
+  'liabilities:cards:chase visa,,The travel card,"1,250.00",01/31/2024,blue',
   "Assets:Bank:PNC-Checking,,,,,",
   "Assets:Bank:PNC-Checking:Padding,,,,,",
   "Stuff:Things,,,,,",
@@ -36,7 +36,7 @@ test("a chart of accounts is previewed with tidied names, then added at once", a
     "Expenses:Gifts-and-Giving:Friends",
     "Liabilities:Cards:Chase-Visa",
     "$1,250.00 on Jan 31, 2024",
-    "Columns not read: Type.",
+    "Columns not read: Color.",
   ])
     await expect(preview).toContainText(text);
   const refused = preview.getByRole("region", { name: "Can't be added" });

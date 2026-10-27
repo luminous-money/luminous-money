@@ -321,6 +321,28 @@ export const MIGRATIONS: Migration[] = [
   // 17: divided accounts (M15). A rule may say which part of a divided account its transactions'
   // own side lands in.
   ["ALTER TABLE category_rule ADD COLUMN part TEXT"],
+  // 18: migrating from another system. A book's migration, step by step (one per book, done
+  // once), and the history it brought: another system's transactions, its accounts mapped to
+  // the book's, kept for categorizing (never written to the ledger).
+  [
+    createTable("book_migration", [
+      "book_id TEXT PRIMARY KEY",
+      "user_id TEXT NOT NULL", // who started it
+      "source TEXT NOT NULL", // gnucash
+      "step TEXT NOT NULL",
+      "done INTEGER NOT NULL DEFAULT 0",
+      "state TEXT NOT NULL", // JSON: what each step did
+    ]),
+    createTable("reference_transaction", [
+      "id TEXT PRIMARY KEY",
+      "book_id TEXT NOT NULL",
+      "source_id TEXT", // the other system's ID for it
+      "date TEXT NOT NULL",
+      "description TEXT NOT NULL",
+      "postings TEXT NOT NULL", // JSON: [{account, amount, currency, memo}]
+    ]),
+    "CREATE INDEX reference_transaction_book ON reference_transaction (book_id, date)",
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -1090,7 +1112,7 @@ export class AppDb {
   /**
    * Follow an account that's been renamed (or moved) in the ledger, with everything under it:
    * stars, CSV profiles, import batches, schedules' templates, rules and proposals, bank links
-   * and link attempts. One transaction.
+   * and link attempts, and imported history. One transaction.
    */
   renameAccount(book: string, old: string, renamed: string): void {
     const to = (name: string) =>
@@ -1218,6 +1240,7 @@ export class AppDb {
       ["schedule", "id", ["template"]],
       ["category_rule", "id", ["conditions"]],
       ["proposal", "transaction_id", ["postings", "proposal"]],
+      ["reference_transaction", "id", ["postings"]],
     ]);
   }
 
@@ -1226,7 +1249,7 @@ export class AppDb {
    * its own postings in its main part. What's about the whole stays as it is (stars, CSV
    * profiles, import batches, bank links, rules' conditions, a reconciliation in progress);
    * what posts to it moves to the main part, since a node takes no postings: schedules'
-   * templates, rules' categories, open proposals. One transaction.
+   * templates, rules' categories, open proposals, imported history. One transaction.
    */
   divideAccount(book: string, whole: string, main: string): void {
     const to = (name: string) => (name === whole ? main : name);
@@ -1239,6 +1262,7 @@ export class AppDb {
       this.remapAccountFields(book, to, [
         ["schedule", "id", ["template"]],
         ["proposal", "transaction_id", ["postings", "proposal"]],
+        ["reference_transaction", "id", ["postings"]],
       ]);
     });
   }
@@ -1293,6 +1317,8 @@ export class AppDb {
         "DELETE FROM transfer_pair WHERE book_id = ?",
         "DELETE FROM book_invite WHERE book_id = ?",
         "DELETE FROM reconcile_draft WHERE book_id = ?",
+        "DELETE FROM book_migration WHERE book_id = ?",
+        "DELETE FROM reference_transaction WHERE book_id = ?",
       ])
         this.db.prepare(sql).run(book);
     });

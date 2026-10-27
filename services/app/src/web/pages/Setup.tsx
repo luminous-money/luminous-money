@@ -5,7 +5,8 @@ import { useLocation } from "wouter";
 import { AddAccountForm } from "../components/AddAccountForm.js";
 import { explain, useCreateBook } from "../lib/queries.js";
 
-/** A new user's first stop: name your books, then add an account. */
+/** A new user's first stop: name your books, then add an account, or migrate from another
+ * system. */
 export function Setup({ book, onDone }: { book: Book | undefined; onDone: () => void }) {
   const [, navigate] = useLocation();
   const create = useCreateBook();
@@ -46,17 +47,33 @@ export function Setup({ book, onDone }: { book: Book | undefined; onDone: () => 
           </div>
         </form>
       ) : (
-        <section className="card">
-          <h2 className="section-title">Add an account to {book.name}</h2>
-          <AddAccountForm
-            book={book.id}
-            submitLabel="Finish setup"
-            onAdded={() => {
-              onDone();
-              navigate("/");
-            }}
-          />
-        </section>
+        <>
+          <section className="card">
+            <h2 className="section-title">Add an account to {book.name}</h2>
+            <AddAccountForm
+              book={book.id}
+              submitLabel="Finish setup"
+              onAdded={() => {
+                onDone();
+                navigate("/");
+              }}
+            />
+          </section>
+          <section className="card migrate-card" aria-label="Migrate from another system">
+            <p className="small">
+              Or bring your accounts and history from the books you kept before (GnuCash).
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                onDone();
+                navigate(`/books/${book.id}/migrate`);
+              }}
+            >
+              Migrate from another system
+            </button>
+          </section>
+        </>
       )}
     </main>
   );

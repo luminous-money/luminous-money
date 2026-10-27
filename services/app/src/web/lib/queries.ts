@@ -52,6 +52,7 @@ import {
   type SchedulePatch,
 } from "./appApi.js";
 import { today } from "./format.js";
+import type { Migration } from "../../shared/migration.js";
 import type { CategoryRulePatch } from "../../shared/rules.js";
 import {
   api,
@@ -809,6 +810,25 @@ export function useCreateAccount(book: string) {
       void client.invalidateQueries({ queryKey: keys.accounts(book) });
     },
   });
+}
+
+/** The book's migration from another system (null: not started), checked every 2 seconds while
+ * it's suggesting categories in the background. */
+export function useMigration(book: string) {
+  return useQuery({
+    queryKey: ["book", book, "migration"],
+    queryFn: async () => (await appApi.migration.get(book)).migration,
+    refetchInterval: (query) => {
+      const job = query.state.data?.state.suggest;
+      return job && job !== "skipped" && job.status === "running" ? 2000 : false;
+    },
+  });
+}
+
+/** Keep a migration the server sent back as the book's. */
+export function useRememberMigration(book: string) {
+  const client = useQueryClient();
+  return (migration: Migration) => client.setQueryData(["book", book, "migration"], migration);
 }
 
 /** Open a chart of accounts' accounts, in one write. */

@@ -35,9 +35,18 @@ export type History = (Omit<HistoryTransaction, "postings"> & {
   postings: { account: string; amount: Money | null; memo?: string | null }[];
 })[];
 
+/** An account in the context, with its human words: for the AI (the external API has neither). */
+export type ContextAccount = CategorizeRequest["context"]["accounts"][number] & {
+  display_name?: string | null;
+  description?: string | null;
+};
+
 export type Request = Omit<CategorizeRequest, "transactions" | "context"> & {
   transactions: Incoming[];
-  context: Omit<CategorizeRequest["context"], "history"> & { history: History };
+  context: Omit<CategorizeRequest["context"], "history" | "accounts"> & {
+    history: History;
+    accounts: ContextAccount[];
+  };
 };
 
 /** A proposal, plus what only built-in categorizers may say. */

@@ -1606,6 +1606,52 @@ code.secret {
   display: block;
 }
 
+.chart-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.chart-choice select {
+  width: auto;
+  max-width: 100%;
+}
+
+/* Migrating from another system: the steps, each with what it did. */
+
+.migrate-steps {
+  margin: 0;
+  padding: 0.75rem 1rem 0.75rem 2.25rem;
+  display: grid;
+  gap: 0.25rem;
+  border-radius: 0.8rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+
+.migrate-steps li {
+  color: var(--muted);
+}
+
+.migrate-steps li.done .migrate-step-label {
+  color: var(--ink);
+}
+
+.migrate-steps li.current .migrate-step-label {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.migrate-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .chart {
   padding: 0;
   overflow: hidden;

@@ -18,6 +18,15 @@ import type {
   LinkPreview,
   LinkRequest,
 } from "../../shared/bank-feeds.js";
+import type { ChartChoice, ChartPlan } from "../../shared/chart.js";
+import type {
+  Migration,
+  MigrationState,
+  ReferenceSummary,
+  RuleSuggestion,
+  Source,
+  Step,
+} from "../../shared/migration.js";
 
 import { ApiError, type Attachment } from "./ledger.js";
 import type { PairedTransfer } from "../../shared/transfers.js";
@@ -142,6 +151,13 @@ async function json<T>(response: Response): Promise<T> {
     body.code
   );
 }
+
+/** A chart of accounts to plan or add: its text, and what to do with some of its rows. */
+export type ChartUpload = {
+  text: string;
+  include_hidden?: boolean;
+  choices?: Record<string, ChartChoice>;
+};
 
 const base = (book: string) => `/api/app/v1/books/${encodeURIComponent(book)}`;
 
@@ -412,6 +428,50 @@ export const appApi = {
     ),
 
   /** Import rows whose match is up for review. */
+  /** Migrating the book from another system: its progress, and each step's work. */
+  migration: {
+    get: async (book: string): Promise<{ migration: Migration | null }> =>
+      json(await apiFetch(`${base(book)}/migration`)),
+    start: async (book: string, source: Source): Promise<Migration> =>
+      json(await apiFetch(`${base(book)}/migration`, post({ source }))),
+    /** Its step, done, and what the page did itself, against the version read. */
+    change: async (
+      book: string,
+      changes: { updated_at: string; step?: Step; done?: boolean } & Partial<
+        Pick<MigrationState, "bank" | "ai" | "reference">
+      > & { rules?: "skipped"; suggest?: "skipped" }
+    ): Promise<Migration> =>
+      json(await apiFetch(`${base(book)}/migration`, post(changes, "PATCH"))),
+    previewAccounts: async (book: string, chart: ChartUpload): Promise<ChartPlan> =>
+      json(await apiFetch(`${base(book)}/migration/accounts/preview`, post(chart))),
+    addAccounts: async (
+      book: string,
+      chart: ChartUpload
+    ): Promise<{ migration: Migration; plan: ChartPlan }> =>
+      json(await apiFetch(`${base(book)}/migration/accounts`, post(chart))),
+    history: async (
+      book: string,
+      text: string
+    ): Promise<{
+      migration: Migration;
+      problems: { line: number; problem: string }[];
+      unmapped: Record<string, string | null>;
+    }> => json(await apiFetch(`${base(book)}/migration/history`, post({ text }))),
+    reference: async (book: string): Promise<ReferenceSummary> =>
+      json(await apiFetch(`${base(book)}/migration/reference`)),
+    rules: async (book: string): Promise<RuleSuggestion[]> =>
+      json(await apiFetch(`${base(book)}/migration/rules`)),
+    addRules: async (
+      book: string,
+      rules: Pick<RuleSuggestion, "key" | "match" | "account" | "payee">[]
+    ): Promise<{ migration: Migration; added: number }> =>
+      json(await apiFetch(`${base(book)}/migration/rules`, post({ rules }))),
+    uncategorized: async (book: string): Promise<{ count: number }> =>
+      json(await apiFetch(`${base(book)}/migration/uncategorized`)),
+    suggest: async (book: string): Promise<Migration> =>
+      json(await apiFetch(`${base(book)}/migration/suggest`, post({}))),
+  },
+
   /** Sharing a book (M13): who has it, and invitations by link. */
   sharing: {
     members: async (
