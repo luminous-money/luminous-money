@@ -10,11 +10,11 @@ _Updated 2026-10-29._ Keep this current: every finalized change set updates it (
 
 - **Funds, the next milestone, is being designed with Kael** and isn't started:
   [docs/milestones/funds/PLAN.md](docs/milestones/funds/PLAN.md) holds the problem, how we got
-  there, what's decided and the open questions. Kael means to answer Claude's latest reply,
-  which is verbatim (with the worked example it refers to) in
+  there, what's decided and the open questions, and stands on its own. Kael means to answer
+  Claude's latest reply; the whole conversation is verbatim in
   `docs/milestones/funds/discussion.private.md`: kept out of git (`.gitignore`:
-  `docs/**/*.private.md`) because it uses real figures. Don't build until Kael has answered;
-  continue the design conversation from there.
+  `docs/**/*.private.md`) because it uses real figures, so only Kael's machines have it. Don't
+  build until Kael has answered; continue the design conversation from there.
 - **M17 (tagging) is built and released as `v0.1.12`** (2026-10-29; see "Releases" below for
   its Release run): its [plan](docs/milestones/m17-transaction-tagging/PLAN.md) has the calls
   made without asking, design.md has "Tags (M17)". It needed ledger-graphs **0.1.2**

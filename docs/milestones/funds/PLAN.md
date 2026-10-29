@@ -4,9 +4,9 @@ Funds: plan
 > **Status: being designed (2026-10-29), with Kael.** The next milestone, after M17. Nothing is
 > built. This is meant to be enough on its own to carry the design forward: the problem, how we
 > got here (and why each turn was taken), what's decided, the model as it stands, Claude's
-> proposals waiting on Kael, and what hasn't been discussed yet. The verbatim conversation (Kael's
-> scenario, Claude's worked example, Kael's answers and Claude's latest reply, which Kael means to
-> answer) is in `discussion.private.md` beside this file. It uses real figures, so it's
+> proposals waiting on Kael, and what hasn't been discussed yet. The whole conversation, verbatim
+> (ten messages, ending with Claude's latest reply, which Kael means to answer), is in
+> `discussion.private.md` beside this file. It uses real figures, so it's
 > git-ignored (`docs/**/*.private.md`): it exists only on Kael's machines, and an agent working
 > from GitHub won't have it. Examples here use made-up figures and names.
 
