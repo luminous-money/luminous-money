@@ -1,19 +1,21 @@
 import type { Breakdown } from "@luminous-money/ledger-graphs-api";
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 import { BreakdownChart, CashFlowChart, NetWorthChart } from "../components/Charts.js";
+import { tagList, TagInput } from "../components/Tags.js";
 import { shortName } from "../lib/accounts.js";
 import type { BreakdownOptions } from "../lib/appApi.js";
 import { useChartTheme } from "../lib/chartTheme.js";
 import { formatAmount } from "../lib/format.js";
-import { withBack } from "../lib/navigation.js";
+import { useParams, withBack } from "../lib/navigation.js";
 import {
   explain,
   useBreakdownReport,
   useCashFlowReport,
   useLargestReport,
   useNetWorthReport,
+  useTags,
 } from "../lib/queries.js";
 
 // The same order as the charts' palette (lib/chartTheme.ts), so a row's dot matches its slice.
@@ -32,8 +34,19 @@ const PALETTE = [
  * Reports: cash flow over 6 months, where the money goes (or comes from) as a donut you can
  * drill into, this month's largest expenses, and net worth over 24 months. Each counts
  * unconfirmed transactions and those kept out of budgets.
+ *
+ * Filtered by tags (M17, `?tag=`, repeated): cash flow, the breakdown and the largest count only
+ * the transactions with every one; the breakdown starts on All time and the largest covers all
+ * time (a tag is usually a trip or a project, not this month's); net worth, which is balances,
+ * is set aside.
  */
 export function Reports({ book }: { book: string }) {
+  const [, navigate] = useLocation();
+  const tags = useParams("tag").filter(Boolean);
+  const bookTags = useTags(book);
+  const base = `/books/${book}/reports`;
+  const query = (chosen: string[]) =>
+    chosen.map((tag) => `tag=${encodeURIComponent(tag)}`).join("&");
   return (
     <main>
       <header className="page-head">
@@ -41,10 +54,39 @@ export function Reports({ book }: { book: string }) {
         <p className="muted">Unconfirmed transactions count.</p>
       </header>
       <div className="stack">
-        <CashFlowCard book={book} />
-        <BreakdownCard book={book} />
-        <LargestCard book={book} />
-        <NetWorthCard book={book} />
+        <section className="card report-filter" aria-label="Filter by tag">
+          <TagInput
+            label="Filter by tag"
+            value={tags}
+            choices={bookTags.data ?? []}
+            allowNew={false}
+            placeholder={bookTags.data?.length ? "Filter by tag" : "No tags yet"}
+            onChange={(chosen) =>
+              navigate(chosen.length ? `${base}?${query(chosen)}` : base, { replace: true })
+            }
+          />
+          {tags.length > 0 && (
+            <p className="small muted">
+              Only transactions tagged {tagList(tags)}.{" "}
+              <Link
+                href={withBack(
+                  `/books/${book}/transactions?${query(tags)}`,
+                  `${base}?${query(tags)}`
+                )}
+              >
+                See them
+              </Link>
+            </p>
+          )}
+        </section>
+        <CashFlowCard book={book} tags={tags} />
+        <BreakdownCard key={tags.join(" ")} book={book} tags={tags} />
+        <LargestCard book={book} tags={tags} />
+        {tags.length ? (
+          <p className="card small muted">Net worth isn't filtered by tag: it's balances.</p>
+        ) : (
+          <NetWorthCard book={book} />
+        )}
       </div>
     </main>
   );
@@ -58,8 +100,8 @@ function Pending({ error, height }: { error: unknown; height: number }) {
   );
 }
 
-function CashFlowCard({ book }: { book: string }) {
-  const report = useCashFlowReport(book);
+function CashFlowCard({ book, tags }: { book: string; tags: string[] }) {
+  const report = useCashFlowReport(book, tags);
   const theme = useChartTheme();
   const d = report.data;
   const money = (n: number) => formatAmount(n, d!.currency);
@@ -96,17 +138,26 @@ function CashFlowCard({ book }: { book: string }) {
   );
 }
 
-function BreakdownCard({ book }: { book: string }) {
+// What each window covers, as the chart's caption and the empty card say it.
+const WINDOWS = {
+  average: { caption: "a month, on average", nothing: "in the last 6 months" },
+  month: { caption: "this month", nothing: "this month" },
+  total: { caption: "in all", nothing: "with these tags" },
+} as const;
+
+function BreakdownCard({ book, tags }: { book: string; tags: string[] }) {
   const [side, setSide] = useState<BreakdownOptions["side"]>("expenses");
   const [depth, setDepth] = useState(1);
-  const [window, setWindow] = useState<BreakdownOptions["window"]>("average");
+  const [window, setWindow] = useState<BreakdownOptions["window"]>(
+    tags.length ? "total" : "average"
+  );
   // Drilled into: each level's account, outermost first.
   const [path, setPath] = useState<string[]>([]);
-  const report = useBreakdownReport(book, { side, depth, window, of: path.at(-1) });
+  const report = useBreakdownReport(book, { side, depth, window, of: path.at(-1), tags });
   const theme = useChartTheme();
   const d = report.data;
   const drill = (account: string) => setPath((p) => [...p, account]);
-  const caption = window === "average" ? "a month, on average" : "this month";
+  const { caption } = WINDOWS[window];
 
   return (
     <section className="card report" aria-label="Breakdown">
@@ -133,6 +184,7 @@ function BreakdownCard({ book }: { book: string }) {
             value={window}
             onChange={(e) => setWindow(e.target.value as BreakdownOptions["window"])}
           >
+            {tags.length > 0 && <option value="total">All time</option>}
             <option value="average">The 6-month average</option>
             <option value="month">This month</option>
           </select>
@@ -180,9 +232,7 @@ function BreakdownCard({ book }: { book: string }) {
       {!d ? (
         <Pending error={report.error} height={420} />
       ) : d.slices.length === 0 ? (
-        <p className="muted">
-          Nothing {window === "average" ? "in the last 6 months" : "this month"}.
-        </p>
+        <p className="muted">Nothing {WINDOWS[window].nothing}.</p>
       ) : (
         <>
           <BreakdownChart data={d} caption={caption} theme={theme} onSelect={drill} />
@@ -245,16 +295,20 @@ function BreakdownList({
   );
 }
 
-function LargestCard({ book }: { book: string }) {
-  const report = useLargestReport(book);
+function LargestCard({ book, tags }: { book: string; tags: string[] }) {
+  const report = useLargestReport(book, tags);
   const here = `/books/${book}/reports`;
   return (
     <section className="card report" aria-label="Largest transactions">
-      <h2 className="section-title">Largest transactions this month</h2>
+      <h2 className="section-title">
+        {tags.length ? "Largest tagged transactions" : "Largest transactions this month"}
+      </h2>
       {!report.data ? (
         <Pending error={report.error} height={240} />
       ) : report.data.transactions.length === 0 ? (
-        <p className="muted">No spending yet this month.</p>
+        <p className="muted">
+          {tags.length ? "No spending with these tags." : "No spending yet this month."}
+        </p>
       ) : (
         <ol className="largest-list">
           {report.data.transactions.map((t) => (

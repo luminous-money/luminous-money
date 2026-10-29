@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 
 import { JournalList } from "../components/JournalList.js";
-import { LedgerFilter, useLedgerView } from "../components/LedgerFilter.js";
+import { filteredLabel, LedgerFilter, useLedgerView } from "../components/LedgerFilter.js";
 import { JumpToDate, MoreBelow, NewerRow, usePaging } from "../components/Paged.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { bookHome } from "../lib/books.js";
@@ -22,14 +22,14 @@ import { useSelection } from "../lib/selection.js";
 /**
  * Every account's transactions together, newest first, paged as an account's ledger is: 200 at
  * a time as you scroll, or from a date back (`?date=`) with Load more above; filtered by
- * reconciliation (`?reconciled=`). Select mode's actions confirm, categorize or suggest
- * categories for several at once.
+ * reconciliation (`?reconciled=`) and tags (`?tag=`, M17). Select mode's actions confirm,
+ * categorize, tag or suggest categories for several at once.
  */
 export function Transactions({ book }: { book: string }) {
   const [, navigate] = useLocation();
   const base = `/books/${book}/transactions`;
-  const { date, reconciled, here, href } = useLedgerView(base);
-  const pages = useJournal(book, date, reconciled);
+  const { date, reconciled, tags, here, href } = useLedgerView(base);
+  const pages = useJournal(book, date, reconciled, tags);
   const canWrite = useCanWrite(book);
   const selection = useSelection();
   const accounts = useAccounts(book);
@@ -91,19 +91,21 @@ export function Transactions({ book }: { book: string }) {
         <JumpToDate
           key={date ?? ""}
           date={date}
-          onGo={(to) => navigate(href({ date: to, reconciled }))}
+          onGo={(to) => navigate(href({ date: to, reconciled, tags }))}
         />
         <LedgerFilter
+          book={book}
           reconciled={reconciled}
-          onChange={(to) => navigate(href({ date, reconciled: to }))}
+          tags={tags}
+          onChange={(view) => navigate(href({ date, ...view }))}
         />
       </div>
       {pages.isPending && <p className="muted">Loading…</p>}
       {pages.error && <p className="card error">{explain(pages.error)}</p>}
       {pages.data && rows.length === 0 && (
         <p className="card muted">
-          {reconciled !== undefined
-            ? `No ${reconciled ? "reconciled" : "unreconciled"} transactions${date ? ` on or before ${date}` : ""}.`
+          {reconciled !== undefined || tags.length
+            ? `No ${filteredLabel(reconciled, tags)}${date ? ` on or before ${date}` : ""}.`
             : date
               ? `Nothing on or before ${date}.`
               : "No transactions yet."}

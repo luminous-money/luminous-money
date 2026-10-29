@@ -3,8 +3,9 @@
  * brought in, then optionally bank feeds and the AI, the reference, rules from history, and
  * suggestions for everything uncategorized (docs/milestones/migrate-from-another-system). The
  * steps are listed with what each did; progress is kept on the server, so it can be left (to
- * wait a day for SimpleFIN, say) and picked up. Files aren't kept: a step that needs one asks
- * again. Finishing makes its entry points go.
+ * wait a day for SimpleFIN, say) and picked up. The history read from the files is kept; the
+ * files themselves aren't, so a step that needs one asks again. Finishing makes its entry points
+ * go.
  */
 import type { Book } from "@luminous-money/ledger-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -258,6 +259,10 @@ function FilesStep({ files, setFiles, busy, go }: StepProps) {
           onFile={(f) => void read(f).then((history) => setFiles({ ...files, history }))}
         />
       </label>
+      <p className="small muted">
+        The history read from them is kept with the book, for categorizing; the files themselves
+        aren&apos;t.
+      </p>
       <div className="actions">
         <button
           type="button"

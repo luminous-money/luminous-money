@@ -75,12 +75,16 @@ class Posting(Strict):
     meta: Meta = Field(default_factory=dict)
 
 
+# Beancount's `#tag`, without the `#` (M17)
+Tag = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9\-_/.]+$")]
+
+
 class TransactionIn(Strict):
     date: datetime.date
     flag: Flag = Field("!", description="`!` is staged for review; `*` is confirmed.")
     payee: str | None = None
     narration: str = ""
-    tags: list[str] = Field(default_factory=list)
+    tags: list[Tag] = Field(default_factory=list)
     links: list[str] = Field(default_factory=list)
     meta: Meta = Field(default_factory=dict)
     postings: list[Posting] = Field(min_length=1)
@@ -124,7 +128,7 @@ class TransactionPatch(Strict):
     flag: Flag | None = None
     payee: str | None = None
     narration: str | None = None
-    tags: list[str] | None = None
+    tags: list[Tag] | None = None
     links: list[str] | None = None
     meta: Meta | None = None
     postings: list[Posting] | None = Field(None, min_length=1)
@@ -441,6 +445,7 @@ class CompactTransaction(Api):
     payee: str | None
     narration: str | None
     budgeted: bool = Field(True, description="False with `budget: FALSE`: kept out of budgets (M11).")
+    tags: list[str] = Field(default_factory=list, description="Its tags, sorted (M17).")
     postings: list[CompactPosting]
 
 
@@ -467,6 +472,7 @@ class LedgerRow(Api):
     )
     counterpart: str | None = Field(description="The other split's account, for a two-split transaction; None for more.")
     splits: int
+    tags: list[str] = Field(default_factory=list, description="Its tags, sorted (M17).")
     reconciled: datetime.date | None = Field(
         None, description="Once all its postings in the account are reconciled: the (latest) statement's date."
     )
@@ -566,11 +572,21 @@ class JournalRow(Api):
     payee: str | None
     narration: str | None
     budgeted: bool
+    tags: list[str] = Field(default_factory=list, description="Its tags, sorted (M17).")
     postings: list[CompactPosting]
     reconciled: bool | None = Field(
         None, description="Whether its asset and liability postings are all reconciled; None when it has none."
     )
     updated_at: str
+
+
+class TagUse(Api):
+    """A tag the book's transactions have (M17): a tag exists while one does."""
+
+    name: str
+    transactions: int = Field(description="How many transactions have it.")
+    first: datetime.date = Field(description="The earliest of their dates.")
+    last: datetime.date = Field(description="The latest of their dates.")
 
 
 class JournalPage(Api):

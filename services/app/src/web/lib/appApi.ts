@@ -109,10 +109,17 @@ export type Invitation = BookInvite & {
 export type BreakdownOptions = {
   side: "expenses" | "income";
   depth: number;
-  window: "average" | "month";
+  /** "total": all of it, summed (offered when filtering by tag, M17). */
+  window: "average" | "month" | "total";
   /** Drilled into: the accounts just under it. */
   of?: string;
+  /** Only the transactions with every one (M17). */
+  tags?: string[];
 };
+
+/** `&tag=…` for each tag (M17). */
+const tagQuery = (tags: string[] = []) =>
+  tags.map((tag) => `&tag=${encodeURIComponent(tag)}`).join("");
 
 export type BookSettings = {
   time_zone: string | null;
@@ -528,8 +535,8 @@ export const appApi = {
   reports: {
     spending: async (book: string, on: string): Promise<SpendingThisMonth> =>
       json(await apiFetch(`${base(book)}/reports/spending?on=${on}`)),
-    cashFlow: async (book: string, on: string): Promise<CashFlow> =>
-      json(await apiFetch(`${base(book)}/reports/cash-flow?on=${on}`)),
+    cashFlow: async (book: string, on: string, tags: string[] = []): Promise<CashFlow> =>
+      json(await apiFetch(`${base(book)}/reports/cash-flow?on=${on}${tagQuery(tags)}`)),
     breakdown: async (book: string, on: string, options: BreakdownOptions): Promise<Breakdown> =>
       json(
         await apiFetch(
@@ -539,11 +546,11 @@ export const appApi = {
             depth: String(options.depth),
             window: options.window,
             ...(options.of ? { of: options.of } : {}),
-          })}`
+          })}${tagQuery(options.tags)}`
         )
       ),
-    largest: async (book: string, on: string): Promise<LargestTransactions> =>
-      json(await apiFetch(`${base(book)}/reports/largest?on=${on}`)),
+    largest: async (book: string, on: string, tags: string[] = []): Promise<LargestTransactions> =>
+      json(await apiFetch(`${base(book)}/reports/largest?on=${on}${tagQuery(tags)}`)),
     netWorth: async (book: string, on: string): Promise<NetWorth> =>
       json(await apiFetch(`${base(book)}/reports/net-worth?on=${on}`)),
     typical: async (book: string, on: string, account: string): Promise<TypicalPeriods> =>

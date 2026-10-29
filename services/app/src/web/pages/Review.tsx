@@ -5,6 +5,7 @@ import { Link, useLocation } from "wouter";
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { ReceiptNote } from "../components/ReceiptNote.js";
+import { TagChips } from "../components/Tags.js";
 import { useBulkActions } from "../lib/bulk.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
@@ -302,7 +303,12 @@ function QueueItem({
               </span>
             )}
           </div>
-          {t.payee && <div className="payee">{t.payee}</div>}
+          {(t.payee || !!t.tags?.length) && (
+            <div className="payee">
+              {t.payee}
+              <TagChips tags={t.tags} />
+            </div>
+          )}
           <input
             className="description"
             aria-label="Description"

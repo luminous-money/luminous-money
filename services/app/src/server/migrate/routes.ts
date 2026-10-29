@@ -1,8 +1,8 @@
 /**
  * Migrating from another system: `/books/:book/migration` (docs/milestones/migrate-from-another-system).
  * Reading it is any member's; everything else a manager's, since it sets up the book's AI and
- * rules as well as its accounts. The files aren't kept: the chart is planned (and added) from
- * its text each time, and the history is kept once it's read, mapped.
+ * rules as well as its accounts. The history is kept (once it's read, mapped); the files
+ * uploaded aren't: the chart is planned (and added) from its text each time.
  */
 import type { Context, Hono } from "hono";
 

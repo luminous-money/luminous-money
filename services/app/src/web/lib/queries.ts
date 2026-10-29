@@ -384,21 +384,32 @@ export const useAccountLedger = (
   book: string,
   account: string,
   date?: string,
-  reconciled?: boolean
+  reconciled?: boolean,
+  tags: string[] = []
 ) =>
   usePages(
-    [...keys.ledger(book, account), reconciled ?? null],
-    (at) => api.accountLedger(book, account, at, reconciled),
+    [...keys.ledger(book, account), reconciled ?? null, ...tags],
+    (at) => api.accountLedger(book, account, at, reconciled, tags),
     date
   );
 
 /** The book's journal: every account's transactions, newest first, paged as a ledger is. */
-export const useJournal = (book: string, date?: string, reconciled?: boolean) =>
+export const useJournal = (
+  book: string,
+  date?: string,
+  reconciled?: boolean,
+  tags: string[] = []
+) =>
   usePages(
-    [...keys.book(book), "journal", reconciled ?? null],
-    (at) => api.journal(book, at, reconciled),
+    [...keys.book(book), "journal", reconciled ?? null, ...tags],
+    (at) => api.journal(book, at, reconciled, tags),
     date
   );
+
+/** The book's tags (M17), for pickers and filters. Under the book's key, so every edit
+ * refreshes it. */
+export const useTags = (book: string) =>
+  useQuery({ queryKey: [...keys.book(book), "tags"], queryFn: () => api.tags(book) });
 
 /** Keyset pages loading either way: older below (`fetchNextPage`), newer above
  * (`fetchPreviousPage`), from the newest or from `date` back. */
@@ -779,6 +790,7 @@ function remember(book: string, saved: Transaction) {
   void queryClient.invalidateQueries({ queryKey: ["book", book, "summary"] });
   void queryClient.invalidateQueries({ queryKey: ["book", book, "ledger"] });
   void queryClient.invalidateQueries({ queryKey: ["book", book, "tree"] });
+  void queryClient.invalidateQueries({ queryKey: ["book", book, "tags"] });
 }
 
 export function useEditTransaction(book: string, id: string) {
@@ -1014,10 +1026,10 @@ export const useSpendingReport = (book: string) =>
     queryFn: () => appApi.reports.spending(book, today()),
   });
 
-export const useCashFlowReport = (book: string) =>
+export const useCashFlowReport = (book: string, tags: string[] = []) =>
   useQuery({
-    queryKey: reportKey(book, "cash-flow"),
-    queryFn: () => appApi.reports.cashFlow(book, today()),
+    queryKey: reportKey(book, "cash-flow", tags),
+    queryFn: () => appApi.reports.cashFlow(book, today(), tags),
   });
 
 export const useBreakdownReport = (book: string, options: BreakdownOptions) =>
@@ -1027,10 +1039,10 @@ export const useBreakdownReport = (book: string, options: BreakdownOptions) =>
     placeholderData: (previous) => previous, // keep the donut while the next level loads
   });
 
-export const useLargestReport = (book: string) =>
+export const useLargestReport = (book: string, tags: string[] = []) =>
   useQuery({
-    queryKey: reportKey(book, "largest"),
-    queryFn: () => appApi.reports.largest(book, today()),
+    queryKey: reportKey(book, "largest", tags),
+    queryFn: () => appApi.reports.largest(book, today(), tags),
   });
 
 export const useNetWorthReport = (book: string) =>

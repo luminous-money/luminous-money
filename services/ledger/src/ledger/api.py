@@ -34,6 +34,9 @@ VersionParam = Annotated[str, Query(description="The `updated_at` this edit was 
 ReconciledParam = Annotated[
     bool | None, Query(description="Only reconciled transactions (true), or only those not (false).")
 ]
+TagParam = Annotated[
+    list[str] | None, Query(description="Only transactions with every tag given (M17); repeat it for several.")
+]
 
 class Filters:
     """Query parameters shared by the list endpoints."""
@@ -397,11 +400,12 @@ def create_app(ledger: Ledger) -> FastAPI:
         date: Annotated[datetime.date | None, Query(description="The page starting on or before this date.")] = None,
         limit: Annotated[int, Query(ge=1, le=1000)] = 200,
         reconciled: ReconciledParam = None,
+        tag: TagParam = None,
     ) -> models.LedgerPage:
         if sum(x is not None for x in (cursor, after, date)) > 1:
             raise HTTPException(422, "pass one of cursor, after and date")
         return ledger.account_ledger(
-            book_id, account, cursor=cursor, after=after, date=date, limit=limit, reconciled=reconciled
+            book_id, account, cursor=cursor, after=after, date=date, limit=limit, reconciled=reconciled, tags=tag
         )
 
     @api.get("/books/{book_id}/journal")
@@ -412,12 +416,21 @@ def create_app(ledger: Ledger) -> FastAPI:
         date: Annotated[datetime.date | None, Query(description="The page starting on or before this date.")] = None,
         limit: Annotated[int, Query(ge=1, le=1000)] = 200,
         reconciled: ReconciledParam = None,
+        tag: TagParam = None,
     ) -> models.JournalPage:
         """Every transaction in the book (every account's), newest first, paged as an account's
         ledger is."""
         if sum(x is not None for x in (cursor, after, date)) > 1:
             raise HTTPException(422, "pass one of cursor, after and date")
-        return ledger.journal(book_id, cursor=cursor, after=after, date=date, limit=limit, reconciled=reconciled)
+        return ledger.journal(
+            book_id, cursor=cursor, after=after, date=date, limit=limit, reconciled=reconciled, tags=tag
+        )
+
+    @api.get("/books/{book_id}/tags")
+    def tags(book_id: MemberBook) -> list[models.TagUse]:
+        """The book's tags (M17), alphabetically: each with how many transactions have it, and
+        the first and last of their dates. A tag exists while a transaction has it."""
+        return ledger.tags(book_id)
 
     # Reconciliation (M14)
 
@@ -488,12 +501,15 @@ def create_app(ledger: Ledger) -> FastAPI:
     @api.get("/books/{book_id}/transactions/compact")
     def compact_transactions(
         book_id: MemberBook,
-        date_from: Annotated[datetime.date, Query(alias="from", description="The first date included.")],
+        date_from: Annotated[
+            datetime.date | None, Query(alias="from", description="The first date included; every one without it.")
+        ] = None,
+        tag: TagParam = None,
     ) -> list[models.CompactTransaction]:
         """Every transaction from a date on, oldest first, with only payee, narration, whether it
-        counts against budgets, and each posting's account and amount: the context categorizers
-        work from, and reports' posting stream. Not paged."""
-        return ledger.compact(book_id, date_from)
+        counts against budgets, its tags, and each posting's account and amount: the context
+        categorizers work from, and reports' posting stream. Not paged."""
+        return ledger.compact(book_id, date_from, tag)
 
     @api.get("/books/{book_id}/transactions")
     def list_transactions(book_id: MemberBook, filters: Annotated[Filters, Depends()]) -> list[models.Transaction]:

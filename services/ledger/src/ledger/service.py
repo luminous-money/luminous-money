@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from . import engine, investments, models
-from .store import Row, Store
+from .store import Row, Store, split_tags
 
 # New books: dollars, and sales draw on the oldest lots first (US tax reporting's default).
 DEFAULT_HEADER = ['option "operating_currency" "USD"', 'option "booking_method" "FIFO"']
@@ -596,12 +596,15 @@ class Ledger:
 
     OPENING_BALANCES = "Equity:Opening-Balances"
 
-    def compact(self, book_id: str, date_from: datetime.date) -> list[models.CompactTransaction]:
-        """Every transaction dated `date_from` or later, oldest first, in compact form: the
-        context categorizers work from, read with plain SQL so a long window stays fast."""
+    def compact(
+        self, book_id: str, date_from: datetime.date | None, tags: list[str] | None = None
+    ) -> list[models.CompactTransaction]:
+        """Every transaction dated `date_from` or later (or every one), oldest first, in compact
+        form: the context categorizers work from, and reports' posting stream, read with plain SQL
+        so a long window stays fast. With `tags`, only those with all of them (M17)."""
         self._header(book_id)
         out: list[models.CompactTransaction] = []
-        for r in self.store.compact(book_id, date_from.isoformat()):
+        for r in self.store.compact(book_id, date_from.isoformat() if date_from else None, tags):
             if not out or out[-1].id != r["id"]:
                 out.append(
                     models.CompactTransaction(
@@ -611,6 +614,7 @@ class Ledger:
                         payee=r["payee"],
                         narration=r["narration"],
                         budgeted=bool(r["budgeted"]),
+                        tags=split_tags(r["tags"]),
                         postings=[],
                     )
                 )
@@ -623,6 +627,12 @@ class Ledger:
                 )
             )
         return out
+
+    def tags(self, book_id: str) -> list[models.TagUse]:
+        """The book's tags, alphabetically, with how many transactions have each and their first
+        and last dates (M17)."""
+        self._header(book_id)
+        return [models.TagUse(**dict(r)) for r in self.store.tags(book_id)]
 
     def summary(self, book_id: str, names: list[str]) -> list[models.AccountSummary]:
         """The named accounts (those that exist, in the order asked), with their balances and the
@@ -675,6 +685,7 @@ class Ledger:
         date: datetime.date | None = None,
         limit: int = 200,
         reconciled: bool | None = None,
+        tags: list[str] | None = None,
     ) -> models.LedgerPage:
         """One account's ledger: its transactions newest first, with running balances.
 
@@ -684,8 +695,8 @@ class Ledger:
         or before it. Each page names the cursors either side of it, so pages can be loaded
         outward from any one until the whole ledger is. Running balances accumulate from the
         oldest transaction, unconfirmed ones included; after an amount only booking could work
-        out, they're unknown (None). With `reconciled`, only the rows that are (or aren't): the
-        balances stay the account's.
+        out, they're unknown (None). With `reconciled`, only the rows that are (or aren't); with
+        `tags`, only those with all of them (M17): either way, the balances stay the account's.
         """
         rows = []
         totals: dict[str, Decimal] | None = {}
@@ -723,6 +734,7 @@ class Ledger:
                         balances=[_amount((n, c)) for c, n in sorted((totals or {}).items()) if n != 0],
                         counterpart=others[0] if entry["splits"] == 2 and len(others) == 1 else None,
                         splits=entry["splits"],
+                        tags=split_tags(entry["tags"]),
                         reconciled=entry["reconciled"] if not entry["unreconciled"] else None,
                         parts=_parts(entry["parts"]) if is_node else [],
                         updated_at=entry["updated_at"],
@@ -732,6 +744,8 @@ class Ledger:
         rows.reverse()
         if reconciled is not None:
             rows = [r for r in rows if (r[1].reconciled is not None) == reconciled]
+        if tags:
+            rows = [r for r in rows if set(tags) <= set(r[1].tags)]
         if after:  # the `limit` rows just newer, so up to the row it names
             end = sum(1 for r in rows if r[0] > _ledger_key(after))
             top = max(end - limit, 0)
@@ -760,16 +774,18 @@ class Ledger:
         date: datetime.date | None = None,
         limit: int = 200,
         reconciled: bool | None = None,
+        tags: list[str] | None = None,
     ) -> models.JournalPage:
         """Every transaction in the book, newest first, in keyset pages as an account's ledger
         has them (`cursor`: older than a row; `after`: just newer; `date`: from it back), read
         with plain SQL a page at a time. With `reconciled`, only those whose asset and liability
-        postings all are, or those with one that isn't."""
+        postings all are, or those with one that isn't; with `tags`, only those with all of them
+        (M17)."""
         roots = self.reconciling_roots(self._header(book_id))
         filtered = None if reconciled is None else (reconciled, roots)
 
         def page_of(**where):
-            return self.store.journal(book_id, reconciled=filtered, **where)
+            return self.store.journal(book_id, reconciled=filtered, tags=tags, **where)
 
         def key(row) -> tuple[str, int]:
             return row["date"], row["ordinal"]
@@ -813,6 +829,7 @@ class Ledger:
                     payee=r["payee"],
                     narration=r["narration"],
                     budgeted=bool(r["budgeted"]),
+                    tags=split_tags(r["tags"]),
                     postings=postings.get(r["id"], []),
                     reconciled=is_reconciled(postings.get(r["id"], [])),
                     updated_at=r["updated_at"],

@@ -1,28 +1,39 @@
 /**
- * A ledger's view, as its URL has it (so Back keeps it), and its filter (M14): a funnel button
- * beside "Go to date" opening the options, the first being Reconciliation (all, reconciled, or
- * not). Filtering is the server's, so pages stay full and running balances stay the account's.
+ * A ledger's view, as its URL has it (so Back keeps it), and its filter (M14, M17): a funnel
+ * button beside "Go to date" opening the options: Reconciliation (all, reconciled, or not) and
+ * Tags (only transactions with every tag chosen). Filtering is the server's, so pages stay full
+ * and running balances stay the account's.
  */
 import { useState } from "react";
 
-import { useParam } from "../lib/navigation.js";
+import { useParam, useParams } from "../lib/navigation.js";
+import { useTags } from "../lib/queries.js";
+import { tagList, TagInput } from "./Tags.js";
 
-export type LedgerView = { date?: string; reconciled?: boolean };
+export type LedgerView = { date?: string; reconciled?: boolean; tags?: string[] };
 
-/** The view in the URL: `?date=` (a partial view, from that date back) and
- * `?reconciled=yes|no`; `href` builds the URL for another view of the same ledger. */
+/** The view in the URL: `?date=` (a partial view, from that date back), `?reconciled=yes|no`
+ * and `?tag=` (repeated); `href` builds the URL for another view of the same ledger. */
 export function useLedgerView(base: string) {
   const date = useParam("date")?.match(/^\d{4}-\d{2}-\d{2}$/)?.[0];
   const param = useParam("reconciled");
   const reconciled = param === "yes" ? true : param === "no" ? false : undefined;
+  const tags = useParams("tag").filter(Boolean);
   const href = (view: LedgerView) => {
     const query = new URLSearchParams();
     if (view.date) query.set("date", view.date);
     if (view.reconciled !== undefined) query.set("reconciled", view.reconciled ? "yes" : "no");
+    for (const tag of view.tags ?? []) query.append("tag", tag);
     const text = query.toString();
     return text ? `${base}?${text}` : base;
   };
-  return { date, reconciled, here: href({ date, reconciled }), href };
+  return { date, reconciled, tags, here: href({ date, reconciled, tags }), href };
+}
+
+/** What a filter shows, for an empty list: "reconciled transactions tagged #trip". */
+export function filteredLabel(reconciled: boolean | undefined, tags: readonly string[]) {
+  const kind = reconciled === undefined ? "" : reconciled ? "reconciled " : "unreconciled ";
+  return `${kind}transactions${tags.length ? ` tagged ${tagList(tags)}` : ""}`;
 }
 
 const CHOICES = [
@@ -32,14 +43,25 @@ const CHOICES = [
 ] as const;
 
 export function LedgerFilter({
+  book,
   reconciled,
+  tags,
   onChange,
 }: {
+  book: string;
   reconciled?: boolean;
-  onChange: (reconciled?: boolean) => void;
+  tags: string[];
+  onChange: (view: { reconciled?: boolean; tags: string[] }) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const active = reconciled !== undefined;
+  const bookTags = useTags(book);
+  const active = reconciled !== undefined || tags.length > 0;
+  const shown = [
+    reconciled === undefined ? null : reconciled ? "Reconciled" : "Not reconciled",
+    tags.length ? `${reconciled === undefined ? "Tagged" : "tagged"} ${tagList(tags)}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
   return (
     <div className="ledger-filter">
       <button
@@ -71,18 +93,27 @@ export function LedgerFilter({
                 role="radio"
                 aria-checked={reconciled === value}
                 className={reconciled === value ? "on" : ""}
-                onClick={() => onChange(value)}
+                onClick={() => onChange({ reconciled: value, tags })}
               >
                 {label}
               </button>
             ))}
           </div>
+          <span className="small muted">Tags (all of them)</span>
+          <TagInput
+            label="Filter by tag"
+            value={tags}
+            choices={bookTags.data ?? []}
+            allowNew={false}
+            placeholder={bookTags.data?.length ? undefined : "No tags yet"}
+            onChange={(chosen) => onChange({ reconciled, tags: chosen })}
+          />
         </div>
       )}
       {active && !open && (
         <p className="small muted filter-note">
-          {reconciled ? "Reconciled only." : "Not reconciled only."}{" "}
-          <button type="button" className="plain" onClick={() => onChange(undefined)}>
+          {shown} only.{" "}
+          <button type="button" className="plain" onClick={() => onChange({ tags: [] })}>
             Show all
           </button>
         </p>

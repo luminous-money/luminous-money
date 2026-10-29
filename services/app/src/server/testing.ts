@@ -12,6 +12,7 @@ import type {
 } from "@luminous-money/ledger-client";
 
 import { add, isZero, negate } from "../shared/decimal.js";
+import { hasTags } from "../shared/tags.js";
 import {
   LedgerError,
   type Attachment,
@@ -314,9 +315,9 @@ export class FakeLedger implements LedgerPort {
     return found;
   }
 
-  async compact(_book: string, from: string): Promise<CompactTransaction[]> {
+  async compact(_book: string, from?: string, tags: string[] = []): Promise<CompactTransaction[]> {
     return this.transactions
-      .filter((t) => t.date >= from)
+      .filter((t) => (!from || t.date >= from) && hasTags(t.tags, tags))
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((t) => ({
         id: t.id,
@@ -325,6 +326,7 @@ export class FakeLedger implements LedgerPort {
         payee: t.payee ?? null,
         narration: t.narration ?? null,
         budgeted: t.meta?.budget !== false,
+        tags: [...(t.tags ?? [])].sort(),
         postings: t.postings.map((p) => ({
           account: p.account,
           amount: p.units ?? null,

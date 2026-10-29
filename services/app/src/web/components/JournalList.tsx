@@ -6,10 +6,11 @@ import { accountsLabel, movement } from "../lib/journal.js";
 import type { JournalRow } from "../lib/ledger.js";
 import { withBack } from "../lib/navigation.js";
 import type { Selection } from "../lib/selection.js";
+import { TagChips } from "./Tags.js";
 
 /**
- * Transactions from every account, as a ledger's rows: the date, who, where the money went
- * (from → to), how much, and ✓ once reconciled. Tapping one opens it, coming back to `here`;
+ * Transactions from every account, as a ledger's rows: the date, who (and its tags), where the
+ * money went (from → to), how much, and ✓ once reconciled. Tapping one opens it, coming back to `here`;
  * in Select mode, it's selected instead.
  */
 export function JournalList({
@@ -54,6 +55,7 @@ export function JournalList({
               <span className="ledger-what">
                 <span className="ledger-payee">
                   {row.payee ?? row.narration ?? "(no description)"}
+                  <TagChips tags={row.tags} />
                 </span>
                 <span className="ledger-account muted">
                   {row.reconciled && (

@@ -8,3 +8,6 @@ dist/
 test-results/
 playwright-report/
 /.env
+
+# Private notes beside the docs (real figures): never committed
+docs/**/*.private.md

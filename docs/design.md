@@ -1005,6 +1005,39 @@ same money in through another's, a day or so later. Both would sit in review, un
     migration's last step), not imports or bank feeds: whether those should ask it by themselves
     is an open question (PLAN.md).
 
+### Tags (M17)
+
+- **A tag says why, or what a transaction was part of** (a trip, a project, something to claim
+  back); an account says what the money was for. Tags cut across accounts, so the questions
+  they answer are "what did the trip cost, and on what?" and "which are still to claim?"
+- **Beancount's own `#tag`s, on transactions:** exports carry them and imported books keep
+  theirs (`pushtag` blocks included). Not on splits: Beancount has none there, and "part of
+  the trip" is about the whole transaction. No registry: a tag exists while a transaction has
+  it, without colors, descriptions or a hierarchy.
+- **Read with SQL:** a derived `transaction_tag` table (ledger migration 12), written with the
+  postings on every write, like `posting`; the text stays the source of truth. The ledger
+  lists a book's tags (`GET /books/{b}/tags`: each with its count and first and last dates)
+  and filters the journal, an account's ledger and the compact stream by `tag` (repeated:
+  only transactions with every one). An account's ledger filters after its running balances
+  are worked out, as the reconciliation filter does.
+- **What's typed is made a tag by one normalizer** (`shared/tags.ts`, as `names.ts` makes
+  account names): lowercased, accents off, anything Beancount doesn't allow in a tag made one
+  dash ("Trip to Italy!" is `trip-to-italy`), so `Vacation` and `vacation` can't be two tags.
+  The ledger accepts any tag Beancount does (an imported `#Trip2019` keeps its capitals) and
+  refuses the rest with a 422 rather than a parse error.
+- **Tagging:** the transaction page's Tags field (saved with the page), and Select mode's
+  **Add tag…** and **Remove tag…** (the latter offering only the selection's tags), each a
+  versioned PATCH per transaction like the other bulk actions. Changing tags doesn't ask
+  about a reconciled transaction: they don't touch amounts.
+- **Filtering:** ledgers and Transactions (the funnel's Tags, `?tag=`), and Reports (a filter at
+  the top, `?tag=`): cash flow, the breakdown and the largest count only the tagged ones. The
+  breakdown gains **All time** (ledger-graphs' `total` window, 0.1.2) and starts on it, and the
+  largest covers all time, since a tag usually marks a trip or a project rather than this
+  month's spending. Net worth (balances) isn't filtered and is set aside, saying so; home's
+  "Spent this month" and an account's "Typically" aren't filtered.
+- **Not funds:** a tag overlaps others and adds up to nothing, while setting money aside needs
+  something exclusive and conserved. That's the Funds milestone's (milestones/funds/PLAN.md).
+
 ### Bank feeds: SimpleFIN (M9)
 
 [SimpleFIN](https://www.simplefin.org/protocol.html), usually through the SimpleFIN Bridge, is the

@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { usePopover } from "../lib/popover.js";
 import { AccountPicker, type AccountCreation } from "./AccountPicker.js";
+import { TagInput, type TagChoice } from "./Tags.js";
 
 /** Something Select mode can do to what's selected. Disabled, it says why. */
 export type BulkAction = {
@@ -9,19 +10,26 @@ export type BulkAction = {
   /** Why it can't be done now, if it can't. */
   disabled?: string | false;
 } & (
-  | { run: () => void; pick?: undefined }
+  | { run: () => void; pick?: undefined; pickTag?: undefined }
   /** One that needs an account first ("Categorize as…"): the bar shows a picker. */
   | {
       pick: { accounts: string[]; create?: AccountCreation; prefer?: string[] };
+      pickTag?: undefined;
       run: (account: string) => void;
+    }
+  /** One that needs a tag first ("Add tag…", M17): the bar shows a tag picker. */
+  | {
+      pickTag: { choices: TagChoice[]; allowNew: boolean };
+      pick?: undefined;
+      run: (tag: string) => void;
     }
 );
 
 /**
  * Select mode's bar, sticky across the top of review and ledgers: how many are selected,
  * "Select all" (what's shown: a filtered list's rows, loaded so far), the **Actions** menu (what
- * the page can do in bulk: confirm, categorize, suggest categories…), and "Done". An action
- * that needs an account opens a picker in the bar.
+ * the page can do in bulk: confirm, categorize, tag, suggest categories…), and "Done". An action
+ * that needs an account or a tag opens a picker in the bar.
  */
 export function SelectBar({
   count,
@@ -74,7 +82,7 @@ export function SelectBar({
                   title={action.disabled || undefined}
                   onClick={() => {
                     menu.setOpen(false);
-                    if (action.pick) setPicking(action);
+                    if (action.pick || action.pickTag) setPicking(action);
                     else action.run();
                   }}
                 >
@@ -89,6 +97,24 @@ export function SelectBar({
           Done
         </button>
       </div>
+      {picking?.pickTag && (
+        <div className="select-bar-row">
+          <TagInput
+            label={picking.label.replace(/…$/, "")}
+            value={[]}
+            choices={picking.pickTag.choices}
+            allowNew={picking.pickTag.allowNew}
+            autoFocus
+            onChange={([tag]) => {
+              setPicking(null);
+              if (tag) picking.run(tag);
+            }}
+          />
+          <button type="button" className="plain" onClick={() => setPicking(null)}>
+            Cancel
+          </button>
+        </div>
+      )}
       {picking?.pick && (
         <div className="select-bar-row">
           <AccountPicker

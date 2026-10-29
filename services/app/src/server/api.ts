@@ -398,32 +398,49 @@ export function createApi({
     "/books/:book/reports/spending",
     report((c, book, ledger) => spendingReport(ledger, book, reportOn(c, book)))
   );
+  // Cash flow, breakdowns and the largest take `tag` (repeated): only the transactions with
+  // every one (M17).
+  const tagsOf = (c: Context) => c.req.queries("tag") ?? [];
   /** Income and expenses for each of the last `months` (6) months. */
   api.get(
     "/books/:book/reports/cash-flow",
     report((c, book, ledger) =>
-      cashFlowReport(ledger, book, reportOn(c, book), count(c.req.query("months"), 1, 24, 6))
+      cashFlowReport(
+        ledger,
+        book,
+        reportOn(c, book),
+        count(c.req.query("months"), 1, 24, 6),
+        tagsOf(c)
+      )
     )
   );
   /** The largest categories: `side` expenses or income, `depth`, `slices`, `window` (average
-   * over 6 months, or this month), or the accounts just under `of`. */
+   * over 6 months, this month, or `total`: all of it), or the accounts just under `of`. */
   api.get(
     "/books/:book/reports/breakdown",
-    report((c, book, ledger) =>
-      breakdownReport(ledger, book, reportOn(c, book), {
+    report((c, book, ledger) => {
+      const window = c.req.query("window");
+      return breakdownReport(ledger, book, reportOn(c, book), {
         side: c.req.query("side") === "income" ? "income" : "expenses",
         of: c.req.query("of") || undefined,
         depth: count(c.req.query("depth"), 1, 4, 1),
         slices: count(c.req.query("slices"), 2, 12, 6),
-        window: c.req.query("window") === "month" ? "month" : "average",
-      })
-    )
+        window: window === "month" || window === "total" ? window : "average",
+        tags: tagsOf(c),
+      });
+    })
   );
-  /** This month's largest expenses. */
+  /** This month's largest expenses; with tags, the largest of all time. */
   api.get(
     "/books/:book/reports/largest",
     report((c, book, ledger) =>
-      largestReport(ledger, book, reportOn(c, book), count(c.req.query("limit"), 1, 50, 8))
+      largestReport(
+        ledger,
+        book,
+        reportOn(c, book),
+        count(c.req.query("limit"), 1, 50, 8),
+        tagsOf(c)
+      )
     )
   );
   /** Assets, liabilities and net worth at each of the last `months` (24) month ends. */

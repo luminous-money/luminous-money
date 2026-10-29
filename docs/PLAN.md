@@ -159,12 +159,22 @@ milestone starts.
       [Built](milestones/migrate-from-another-system/PLAN.md) 2026-10-26, with descriptions
       going to the AI and a fix: making an account in a transaction's picker no longer submits
       the transaction too.
-- [ ] **M17: Transaction tagging.** Tag transactions (a bulk action too), and filter reports by
-      tag.
-- [ ] **M18: Suggested recurring transactions.** Bi-weekly or on-demand via a button in the
-      schedules section, analyze each account's last 14 months of transactions and identify ones
+- [x] **M17: Transaction tagging.** Tag transactions with one or more tags. Remove tags. Per-
+      transaction or via bulk actions. Filter reports by one or more tags (AND for now).
+      [Built](milestones/m17-transaction-tagging/PLAN.md) 2026-10-29: Beancount's `#tag`s, a
+      Tags field on a transaction's page, Add tag… and Remove tag… in Select mode, tags on rows,
+      a tag filter on ledgers, Transactions and Reports (whose breakdown gains All time).
+- [ ] **Funds** (next, after M17; Kael, 2026-10-29): what money is *for*, as a ledger of its own
+      beside the accounts (where it is). Every dollar of net worth (every asset, the house and
+      retirement included) is in exactly one fund, Unallocated holding the rest; splits say
+      which, by choice or by rules (defaults per account, a spend order, autofill to targets).
+      It replaces divided accounts as the way to set money aside. **Being designed** with Kael:
+      [its plan](milestones/funds/PLAN.md) holds the decisions so far and the open questions.
+- [ ] **M18: Suggested recurring transactions and matching rules.** Bi-weekly or on-demand via
+      a button in the schedules section (recurring transactions) or somewhere TBD for matching
+      rules. Analyze each account's last 14 months of transactions and identify ones
       that look recurring and are not already captured by an existing recurring transaction, to
-      suggest as schedules (M3). (Moved after tagging, 2026-10-17.)
+      suggest as schedules (M3) or for matching rules. Don't re-ask. (Moved after tagging, 2026-10-17.)
 - [x] **M19: AI categorization.** Users set up an AI provider (one of those supported, with
       their API key) and standing instructions for categorizing, e.g. "I like highly detailed,
       deeply nested expense accounts. Accounts should always say WHAT, not WHY (tags say why, if
@@ -244,7 +254,6 @@ elaborated.
 
 ## Deferred
 
-- Cati as an `external` resolver
 - Archiving closed periods (only if the Pi benchmark calls for it)
 - A native mobile app
 
@@ -261,6 +270,9 @@ elaborated.
 
 ## Later (noted, not pressing)
 
+- **Tags, more** (M17): rules that add tags (a payee always `#business`), the AI suggesting
+  tags, renaming or merging a tag everywhere, OR filters ("any of"), tags on schedules'
+  template transactions, and tag-filtered budgets or "Spent this month".
 - **Email, once there's an email system:** invitations sent by email (M13), and accounts
   required to verify their email (M8's question 1).
 - **Transferring a book's ownership** to a manager (M13).

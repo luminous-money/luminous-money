@@ -103,6 +103,21 @@ def _backfill_split_flags(conn: sqlite3.Connection) -> None:
                 )
 
 
+def _backfill_tags(conn: sqlite3.Connection) -> None:
+    """Fill in migration 12's table from the transactions written before it."""
+    from . import engine
+
+    rows = conn.execute(
+        "SELECT id, book_id, text FROM directive WHERE deleted = 0 AND kind = 'transaction' AND text LIKE '%#%'"
+    ).fetchall()
+    for row in rows:
+        stamp = now()
+        conn.executemany(
+            "INSERT INTO transaction_tag (directive_id, book_id, tag, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            [(row[0], row[1], tag, stamp, stamp) for tag in engine.parse_one(row[2], row[0]).tags],
+        )
+
+
 def _backfill_prices(conn: sqlite3.Connection) -> None:
     """Fill in migration 4's price table from the price directives written before it."""
     from . import engine
@@ -242,6 +257,21 @@ MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
     # 11: split flags (M16). Each posting's flag (`!`: a split still to confirm) and `memo:` (what
     # it is, a receipt's line), so categorizers' history reads them with SQL.
     ["ALTER TABLE posting ADD COLUMN flag TEXT", "ALTER TABLE posting ADD COLUMN memo TEXT", _backfill_split_flags],
+    # 12: tags (M17). Each transaction's Beancount tags, so lists and reports filter by them with
+    # SQL; the text still holds them.
+    [
+        create_table(
+            "transaction_tag",
+            [
+                "directive_id TEXT NOT NULL REFERENCES directive(id) ON DELETE CASCADE",
+                "book_id TEXT NOT NULL",
+                "tag TEXT NOT NULL",
+            ],
+            ["PRIMARY KEY (directive_id, tag)"],
+        ),
+        "CREATE INDEX transaction_tag_book ON transaction_tag(book_id, tag)",
+        _backfill_tags,
+    ],
 ]
 
 

@@ -1,8 +1,9 @@
 /**
  * Select mode's bulk actions, built once for every page that selects transactions (review, an
  * account's ledger, Transactions), so they all offer the same: **Confirm** the selection,
- * **Categorize as…** an account (where the page knows how), and **Suggest categories** (rules,
- * history, and the book's AI when it's set up). Each says why it can't run, when it can't.
+ * **Categorize as…** an account (where the page knows how), **Add tag…** and **Remove tag…**
+ * (M17), and **Suggest categories** (rules, history, and the book's AI when it's set up). Each
+ * says why it can't run, when it can't.
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -13,7 +14,8 @@ import type { AccountCreation } from "../components/AccountPicker.js";
 import type { BulkAction } from "../components/SelectBar.js";
 import { appApi } from "./appApi.js";
 import type { TransactionChanges } from "./ledger.js";
-import { explain, useBulkEdit } from "./queries.js";
+import { explain, useBulkEdit, useTags } from "./queries.js";
+import { tagList } from "../components/Tags.js";
 import { aiCostSentence } from "./ai.js";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -29,8 +31,8 @@ export function useBulkActions({
   onConfirmed,
 }: {
   book: string;
-  /** What's selected. */
-  chosen: { id: string; flag: string }[];
+  /** What's selected, with its tags. */
+  chosen: { id: string; flag: string; tags?: string[] }[];
   /** Accounts to categorize as. */
   accounts?: string[];
   create?: AccountCreation;
@@ -47,6 +49,29 @@ export function useBulkActions({
   const bulk = useBulkEdit(book);
   const [note, setNote] = useState<string | null>(null);
   const unconfirmed = chosen.filter((t) => t.flag === "!");
+  const bookTags = useTags(book);
+  // The tags the selection has, most common first: what Remove tag… offers.
+  const counts = new Map<string, number>();
+  for (const t of chosen)
+    for (const tag of t.tags ?? []) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  const theirTags = [...counts].map(([name, transactions]) => ({ name, transactions }));
+  /** Change each selected transaction's tags; `edit` gives its new ones, or null to leave it. */
+  const retag = (edit: (tags: string[]) => string[] | null, said: (changed: number) => string) => {
+    let changed = 0;
+    setNote(null);
+    bulk.mutate(
+      {
+        transactions: chosen,
+        change: (t) => {
+          const tags = edit(t.tags ?? []);
+          if (!tags) return null;
+          changed++;
+          return { tags };
+        },
+      },
+      { onSuccess: () => setNote(said(changed)), onError: (e) => setNote(explain(e)) }
+    );
+  };
   const suggest = useMutation({
     mutationFn: () =>
       appApi.suggest(
@@ -119,6 +144,27 @@ export function useBulkActions({
           } satisfies BulkAction,
         ]
       : []),
+    {
+      label: "Add tag…",
+      pickTag: { choices: bookTags.data ?? [], allowNew: true },
+      run: (tag: string) =>
+        retag(
+          (tags) => (tags.includes(tag) ? null : [...tags, tag].sort()),
+          (changed) =>
+            `Tagged ${plural(changed, "transaction")} ${tagList([tag])}` +
+            (changed < chosen.length ? `; ${chosen.length - changed} had it already.` : ".")
+        ),
+    } satisfies BulkAction,
+    {
+      label: "Remove tag…",
+      disabled: !theirTags.length && "none of them has a tag",
+      pickTag: { choices: theirTags, allowNew: false },
+      run: (tag: string) =>
+        retag(
+          (tags) => (tags.includes(tag) ? tags.filter((t) => t !== tag) : null),
+          (changed) => `Removed ${tagList([tag])} from ${plural(changed, "transaction")}.`
+        ),
+    } satisfies BulkAction,
     {
       label: "Suggest categories",
       disabled: !unconfirmed.length && "only unconfirmed ones are categorized",

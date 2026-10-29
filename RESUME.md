@@ -1,79 +1,41 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-27._ Keep this current: every finalized change set updates it (see
+_Updated 2026-10-29._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Hand-off (2026-10-27): the run in progress
+## Hand-off (2026-10-29): M17 released; Funds is next, and being designed
 
-**Read this first.** The last session ran out of budget partway through a change set.
+**Read this first.**
 
-### Done and released
-
-- **`v0.1.10`** (pushed, tagged, Release workflow green, the latest release): the chart of accounts
-  import (Accounts → Import), title-casing names everywhere (`shared/names.ts`), account
-  descriptions, the ledger's `POST /accounts/batch`, and **Migrate from another system**
-  (docs/milestones/migrate-from-another-system/PLAN.md), plus two fixes: New transaction's draft
-  no longer resets on a refetch, and Create account in a picker no longer submits the
-  transaction around it. Kael was told to upgrade the live server (Emmer) to it and run the
-  migration there.
-- M19 was found built (within M16) and PLAN.md corrected.
-
-### What the AI costs: committed and tagged `v0.1.11` (2026-10-27)
-
-Kael asked: log every AI call with its cost; show each operation's cost in the UI after it runs;
-show month-to-date on the AI settings page; then **publish a new version (`v0.1.11`)**.
-
-Built:
-- `packages/ai-api`: `AiCall`, `AiCost`, `NO_COST`, `addCost`, `formatUsd`, `AiUsage`,
-  `ExtractOut`; `CategorizeOut.cost`.
-- `services/ai`: `src/pricing.ts` (list prices per model, `usage.iterations` for fallbacks),
-  a `meter` through `providers/claude.ts` and `providers/fake.ts` (made-up $0.0042 a call),
-  `api.ts` logging each call and each operation, recording it (`ai_usage`, migration 2 in
-  `db.ts`), returning `cost` (on 422s too), and `GET /books/:book/usage?month=`. Tests:
-  `test/pricing.test.ts`, and additions in `test/api.test.ts`.
-- `services/app`: `ai.ts` (a failed answer's `cost`), `categorize/ai.ts` (options object now,
-  with `onCost`), `api.ts` (`chainFor` gives `cost()`; `/suggest` returns `ai_cost`),
-  `receipts.ts` (`Captured.ai_cost`: reading plus categorizing), `migrate/suggest.ts`
-  (`SuggestJob.ai_cost`). PWA: Select mode's note (`lib/bulk.ts`), review after a receipt
-  (`?ai_cost=` from CaptureReceipt and Attachments), the migration's suggestions step, and the
-  AI page's **This month** card (`AiSettings.tsx`, `useAiUsage`).
-- Docs: design.md ("What the AI costs"), PLAN.md (Polish item), and this file's user-facing and
-  gotcha notes.
-- Browser tests added (not yet run): m16.spec ("what the AI cost…"), cost lines in m4.spec's AI
-  Select-mode test and migrate.spec.
-
-Verified locally: `pnpm test` passes (ai 14, app 218, auth 24, db 10, csv-import 22, ledger 191;
-drift, typechecks, Prettier). `pnpm e2e` wasn't run locally (Kael asked to publish to save
-budget): the Release workflow runs it before publishing, so if `v0.1.11` has no release, look at
-its run (`gh run list`, `gh run view --log-failed`).
-
-### Left to do, in order
-
-1. If `v0.1.11`'s Release run failed: fix what it caught, then tag `v0.1.12` (don't move
-   tags). The likeliest:
-   - **m16 spec:** the cost text ("$0.0084" assumes the fake was asked twice: extract, then
-     categorize).
-   - **AI page card:** the operations' order (alphabetical: categorize before extract).
-2. Update the test counts in this file (ai is now 14; the browser count from the next e2e run).
-   Commit with `git add -A -- . ':!docs/milestones/m16-receipt-capture/notes.md'` (never commit
-   that file), ending the message with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-3. Tell Kael which version is live.
-4. Answer Kael's open question (asked with this request, not yet answered): *"If we don't save the
-   history file and don't create a durable artifact, how does the AI categorizer keep using the
-   migration's data?"* The raw CSV isn't kept, but the history read from it is, durably:
-   - **What's stored:** every transaction, normalized and mapped, in `app.sqlite`'s
-     `reference_transaction` table. Whole-system backups carry it. It follows renames, merges and
-     divisions, and is replaced only by reading another file.
-   - **What isn't stored:** only the per-payee *summary* (the reference). It's recomputed from
-     those stored rows plus the book's own confirmed transactions each time it's used, so it
-     can't go stale.
-   - **Who uses it:** the history categorizer reads the table on every import, sync and suggest.
-     The AI gets the summary whenever the book's migration has `reference: true`.
-   - The wording "files aren't kept" in the migration's docs and UI caused the confusion; consider
-     saying "the history is kept; the files you upload aren't".
-5. Still open, not started: a by-payee grouping in review (from the bootstrapping proposal), and
-   whether imports and bank feeds should ask the AI by themselves (PLAN.md open questions).
+- **Funds, the next milestone, is being designed with Kael** and isn't started:
+  [docs/milestones/funds/PLAN.md](docs/milestones/funds/PLAN.md) holds the problem, how we got
+  there, what's decided and the open questions. Kael means to answer Claude's latest reply,
+  which is verbatim (with the worked example it refers to) in
+  `docs/milestones/funds/discussion.private.md`: kept out of git (`.gitignore`:
+  `docs/**/*.private.md`) because it uses real figures. Don't build until Kael has answered;
+  continue the design conversation from there.
+- **M17 (tagging) is built and released as `v0.1.12`** (2026-10-29; see "Releases" below for
+  its Release run): its [plan](docs/milestones/m17-transaction-tagging/PLAN.md) has the calls
+  made without asking, design.md has "Tags (M17)". It needed ledger-graphs **0.1.2**
+  (breakdown's `total` window), published from its own repository first.
+- **The live server is at `https://luminous.money`** (Emmer, on 0.1.11; moved 2026-10-27).
+  `luminous.money` is an ANAME for `emmer.kaelshipman.me` (an apex can't be a CNAME; name.com
+  answers with Emmer's address, so it follows Emmer's dynamic DNS); `www`, `app` (the original
+  system's) and `luminous.kaelshipman.me` redirect to it, and an app installed from the old
+  address gets a service worker that removes itself, so it follows. The original system's
+  other names were removed. ~/Setup has it all (`docs/emmer.md`, section 6). Upgrading Emmer to
+  0.1.12 is Kael's: `/srv/luminous-money/luminous-money upgrade` (it backs up first).
+- **A bug found on the live server, not fixed:** a linked brokerage opened with its lots at a
+  $0.00 cost basis, so its gains (and any sale's capital gains) are wrong. The likely cause:
+  `openingHoldings` (`services/app/src/server/simplefin/holdings.ts`) takes a reported
+  `cost_basis` of `0` as a real cost rather than as unknown (which would let the ledger use the
+  day's price). Fixing the code is small; the live book's lots need Kael's say.
+- **Still open, not started:** a by-payee grouping in review, and whether imports and bank
+  feeds ask the AI by themselves (PLAN.md's open questions).
+- **Committing:** `git add -A -- . ':!docs/milestones/m16-receipt-capture/notes.md'` (never
+  commit changes to that file; the private files are ignored), ending the message with
+  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ### Standing rules for this repo (from Kael)
 
@@ -94,16 +56,16 @@ repositories) is archived on GitHub and kept locally in `../.archive/system`. Ev
 GPL-2.0-or-later (Beancount is GPL-2.0-only). It wears the original app's look: its palette
 (light gray and blue; deep blue and cyan in dark mode) and its Lu logo (design.md, "Its look").
 
-**M1 through M16 are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M17 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
 accounts), M11 (budgets), M12 (reports), M13 (sharing books), M14 (reconciliation), M15 (divided
-accounts) and M16 (receipt capture) are described in their plans, and so are the **chart of
+accounts), M16 (receipt capture) and M17 (tagging) are described in their plans, and so are the **chart of
 accounts import** and **migrating from another system**, slipped in before M17 (2026-10-26).
 **M19 (AI categorization) was built within M16** and is live; its PLAN.md entry was found
 unchecked and corrected on 2026-10-26 (what's left is a question: whether imports and bank feeds
-ask the AI by themselves). The milestones ahead
-(M17–M20, then Polish) are in [docs/PLAN.md](docs/PLAN.md).
+ask the AI by themselves). The milestones ahead (**Funds**, being designed, then M18, M20 and
+Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What an operator can do now (production readiness, phase 1; [docs/deploying.md](docs/deploying.md)):
 `luminous-money install` sets a deployment up (a laptop, or a public server with built-in HTTPS),
@@ -124,10 +86,19 @@ from github.com's redirect, not the API, whose 60-an-hour limit for an address h
 **`v0.1.3`** adds private instances (`LUMINOUS_MONEY_SERVICE_MODE`, `LUMINOUS_MONEY_ALLOWED_EMAILS`), and **`v0.1.4`**
 `LUMINOUS_MONEY_SIMPLEFIN_MODE`; **`v0.1.5`** names them all `LUMINOUS_MONEY_*` (they were `LM_*`);
 **`v0.1.10`** (2026-10-27) brings the chart of accounts import and migrating from another
-system, and **`v0.1.11`** what the AI costs. The history was rewritten once before
+system, **`v0.1.11`** what the AI costs, and **`v0.1.12`** (2026-10-29) tags (M17) and the
+migration's clearer word on what's kept. The history was rewritten once before
 the first push (an email taken out of RESUME), so commit IDs from before then are gone.
 
 What a user can do now:
+- **Tags (M17):** a transaction's page has **Tags** (type to add: suggestions from the book's
+  tags, or a new one, made lowercase and dashed: "Trip to Italy" is `#trip-to-italy`; × removes
+  one). Select mode (review, ledgers, Transactions) adds a tag to the selection (**Add tag…**) or
+  removes one it has (**Remove tag…**). Rows and review cards show tags. The funnel on ledgers
+  and Transactions filters by tags (every one chosen; `?tag=` in the URL); Reports has a tag
+  filter at the top: cash flow, the breakdown (starting on **All time**) and the largest count
+  only what's tagged, net worth is set aside, and "See them" opens Transactions filtered the
+  same.
 - **Receipts (M16):** Menu → AI turns a book's AI on (Claude, with an API key kept encrypted;
   itemize by default; whether the AI may open accounts, how eagerly, with what guidance). Once
   it's ready, the masthead's **camera** opens Capture receipt: the live camera (or Upload
@@ -328,10 +299,10 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 191 tests, including the table lint
-    - auth: 24; app: 218; ai: 10; db: 10; csv-import: 22
+    - ledger: 198 tests, including the table lint
+    - auth: 24; app: 222; ai: 14; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 91 API tests and 104 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 94 API tests and 108 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Its `.env` (not committed: its keys) sets `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand`, so it never
@@ -341,24 +312,23 @@ How it's put together:
 
 ## Next steps
 
-1. **The first live deployment, on Emmer,** is up at `https://luminous.kaelshipman.me` (later
-   `luminous.money`), on 0.1.9 (2026-10-25), with Kael's real bank feed. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
+1. **The first live deployment, on Emmer,** is up at `https://luminous.money` (since
+   2026-10-27; see the hand-off above), on 0.1.11, with Kael's real bank feed. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
    `LM_SOURCE=release`: the installer on 127.0.0.1:8080 behind Emmer's nginx, which has the
    certificate; then `70_dns.sh` and `80_web.sh`). The release's five images must be public on
-   ghcr.io (a package's settings, once each) for an install to pull them. Now luminous.money is
-   free and we need to add it and the relevant subdomains to the dynamic DNS configuration on
-   Emmer and update the deployment URL.
+   ghcr.io (a package's settings, once each) for an install to pull them.
 2. **Kael migrates the live book on Emmer** (once released): Accounts → Migrate, with GnuCash's
    two exports. Real Claude calls with a reference haven't been seen yet (no key in the repo);
    watch the first suggestions' quality and `docker compose logs ai`. Not built from the
    proposal: a by-payee view in review (categorize a payee's group at once).
-3. **M17 (transaction tagging):** see [its plan](docs/milestones/m17-transaction-tagging/PLAN.md).
+3. **Funds** (next): being designed with Kael; see [its plan](docs/milestones/funds/PLAN.md) and
+   the hand-off above. Then M18 (suggested recurring transactions and matching rules).
 4. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
 
 ## The ledger-graphs libraries
 
-- **The app depends on them from npm** (`@luminous-money/ledger-graphs-api` and `-ui`, `^0.1.1`).
+- **The app depends on them from npm** (`@luminous-money/ledger-graphs-api` and `-ui`, `^0.1.2`).
   Their home is [luminous-money/ledger-graphs](https://github.com/luminous-money/ledger-graphs)
   (public, ISC; `libs/api`, `libs/ui`; CI on every push). Local clone:
   `~/Repos/luminous-money/ledger-graphs`.
@@ -369,6 +339,12 @@ How it's put together:
   release install here at once.
 
 ## Gotchas
+
+- **After `pnpm generate`, rebuild the client before a local typecheck** (`pnpm --filter
+  @luminous-money/ledger-client build`): the services read its built `dist` types, so they see
+  the old API until then. (`pnpm test` builds it in Docker.)
+- **Tags live in the transaction's text; `transaction_tag` is derived** (written by
+  `store.put`, like `posting`). Change tags through the transaction, never the table.
 
 - **Behind a TLS proxy, session cookies are `__Host-lm_access` / `__Secure-lm_refresh`;** on
   plain HTTP, `lm_access` / `lm_refresh`. auth reads either (prefixed first), because a request
@@ -401,6 +377,8 @@ How it's put together:
   reconciled with it and before). Don't turn statements back into `balance` directives: a
   transfer two banks date apart can't satisfy both sides by date.
 - **Loans and withheld taxes:** how to record them is in [docs/loans-and-taxes.md](docs/loans-and-taxes.md).
+- **The command's test failed once at sign-up** (2026-10-29: a 422 from `/signup` in
+  `scripts/cli-test.sh`) and passed on the rerun with nothing changed: rerun it before digging.
 - **The first browser tests of a cold e2e stack** can time out waiting for review to load (seen
   once, 2026-10-17: three of accounts.spec, passing on a rerun). m1.spec's "a file in another
   layout" failed now and then (no import results) until 2026-10-23: a file chosen before the

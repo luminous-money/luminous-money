@@ -37,6 +37,7 @@ export type BudgetBasis = BudgetStatus["basis"];
 export type Reconciliations = Components["schemas"]["Reconciliations"];
 export type Reconciliation = Components["schemas"]["Reconciliation"];
 export type Attachment = Components["schemas"]["Attachment"];
+export type TagUse = Components["schemas"]["TagUse"];
 
 export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"], "updated_at">;
 export type AccountKind = components["schemas"]["AccountIn"]["kind"];
@@ -178,22 +179,38 @@ export const api = {
     book_id: string,
     account: string,
     page: LedgerPageAt = {},
-    reconciled?: boolean
+    reconciled?: boolean,
+    tags: string[] = []
   ): Promise<LedgerPage> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/ledger", {
-        params: { path: { book_id, account }, query: { ...page, limit: 200, reconciled } },
+        params: {
+          path: { book_id, account },
+          query: { ...page, limit: 200, reconciled, tag: tags.length ? tags : undefined },
+        },
       })
     ),
 
   /** A page of the book's journal: every account's transactions, newest first, paged as an
-   * account's ledger is. */
-  journal: (book_id: string, page: LedgerPageAt = {}, reconciled?: boolean): Promise<JournalPage> =>
+   * account's ledger is. With `tags`, only those with every one (M17). */
+  journal: (
+    book_id: string,
+    page: LedgerPageAt = {},
+    reconciled?: boolean,
+    tags: string[] = []
+  ): Promise<JournalPage> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/journal", {
-        params: { path: { book_id }, query: { ...page, limit: 200, reconciled } },
+        params: {
+          path: { book_id },
+          query: { ...page, limit: 200, reconciled, tag: tags.length ? tags : undefined },
+        },
       })
     ),
+
+  /** The book's tags (M17), alphabetically, each with how many transactions have it. */
+  tags: (book_id: string): Promise<TagUse[]> =>
+    unwrap(ledger.GET("/api/ledger/v1/books/{book_id}/tags", { params: { path: { book_id } } })),
 
   /** A transaction's attachments (M16), oldest first. */
   attachments: (book_id: string, transaction: string): Promise<Attachment[]> =>

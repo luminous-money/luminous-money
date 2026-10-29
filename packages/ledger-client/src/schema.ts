@@ -815,6 +815,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/tags": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Tags
+     * @description The book's tags (M17), alphabetically: each with how many transactions have it, and
+     *     the first and last of their dates. A tag exists while a transaction has it.
+     */
+    get: operations["tags_api_ledger_v1_books__book_id__tags_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/transactions": {
     parameters: {
       query?: never;
@@ -884,8 +905,8 @@ export interface paths {
     /**
      * Compact Transactions
      * @description Every transaction from a date on, oldest first, with only payee, narration, whether it
-     *     counts against budgets, and each posting's account and amount: the context categorizers
-     *     work from, and reports' posting stream. Not paged.
+     *     counts against budgets, its tags, and each posting's account and amount: the context
+     *     categorizers work from, and reports' posting stream. Not paged.
      */
     get: operations["compact_transactions_api_ledger_v1_books__book_id__transactions_compact_get"];
     put?: never;
@@ -1582,6 +1603,11 @@ export interface components {
       payee: string | null;
       /** Postings */
       postings: components["schemas"]["CompactPosting"][];
+      /**
+       * Tags
+       * @description Its tags, sorted (M17).
+       */
+      tags?: string[];
     };
     /**
      * Cost
@@ -1837,6 +1863,11 @@ export interface components {
        * @description Whether its asset and liability postings are all reconciled; None when it has none.
        */
       reconciled?: boolean | null;
+      /**
+       * Tags
+       * @description Its tags, sorted (M17).
+       */
+      tags?: string[];
       /** Updated At */
       updated_at: string;
     };
@@ -1907,6 +1938,11 @@ export interface components {
       reconciled?: string | null;
       /** Splits */
       splits: number;
+      /**
+       * Tags
+       * @description Its tags, sorted (M17).
+       */
+      tags?: string[];
       /** Updated At */
       updated_at: string;
     };
@@ -2288,6 +2324,31 @@ export interface components {
        */
       date: string;
       value: components["schemas"]["Amount"];
+    };
+    /**
+     * TagUse
+     * @description A tag the book's transactions have (M17): a tag exists while one does.
+     */
+    TagUse: {
+      /**
+       * First
+       * Format: date
+       * @description The earliest of their dates.
+       */
+      first: string;
+      /**
+       * Last
+       * Format: date
+       * @description The latest of their dates.
+       */
+      last: string;
+      /** Name */
+      name: string;
+      /**
+       * Transactions
+       * @description How many transactions have it.
+       */
+      transactions: number;
     };
     /**
      * TradeIn
@@ -3333,6 +3394,8 @@ export interface operations {
         limit?: number;
         /** @description Only reconciled transactions (true), or only those not (false). */
         reconciled?: boolean | null;
+        /** @description Only transactions with every tag given (M17); repeat it for several. */
+        tag?: string[] | null;
       };
       header?: never;
       path: {
@@ -4258,6 +4321,8 @@ export interface operations {
         limit?: number;
         /** @description Only reconciled transactions (true), or only those not (false). */
         reconciled?: boolean | null;
+        /** @description Only transactions with every tag given (M17); repeat it for several. */
+        tag?: string[] | null;
       };
       header?: never;
       path: {
@@ -4556,6 +4621,37 @@ export interface operations {
       };
     };
   };
+  tags_api_ledger_v1_books__book_id__tags_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TagUse"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   list_transactions_api_ledger_v1_books__book_id__transactions_get: {
     parameters: {
       query?: {
@@ -4708,9 +4804,11 @@ export interface operations {
   };
   compact_transactions_api_ledger_v1_books__book_id__transactions_compact_get: {
     parameters: {
-      query: {
-        /** @description The first date included. */
-        from: string;
+      query?: {
+        /** @description The first date included; every one without it. */
+        from?: string | null;
+        /** @description Only transactions with every tag given (M17); repeat it for several. */
+        tag?: string[] | null;
       };
       header?: never;
       path: {

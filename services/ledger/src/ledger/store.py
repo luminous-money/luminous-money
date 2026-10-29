@@ -28,6 +28,27 @@ from dataclasses import dataclass
 from .engine import Directive
 from .migrations import after, migrate, now
 
+# A transaction's tags, space-separated (tags can't hold spaces), for a query's select list; `%`
+# the directive table's alias (M17)
+TAGS = "SELECT GROUP_CONCAT(t.tag, ' ') FROM transaction_tag t WHERE t.directive_id = %s.id"
+
+
+def tagged(alias: str, tags: list[str]) -> tuple[str, list[str | int]]:
+    """A WHERE clause (and its arguments) keeping the transactions with every one of `tags`."""
+    wanted = sorted(set(tags))
+    marks = ",".join("?" * len(wanted))
+    return (
+        f"{alias}.id IN (SELECT directive_id FROM transaction_tag WHERE tag IN ({marks})"
+        " GROUP BY directive_id HAVING COUNT(*) = ?)",
+        [*wanted, len(wanted)],
+    )
+
+
+def split_tags(text: str | None) -> list[str]:
+    """`TAGS`' column as a sorted list."""
+    return sorted(text.split(" ")) if text else []
+
+
 class StaleVersion(Exception):
     """A write named a version that's no longer current."""
 
@@ -272,6 +293,11 @@ class Store:
                     for i, p in enumerate(d.postings)
                 ],
             )
+            self._conn.execute("DELETE FROM transaction_tag WHERE directive_id = ?", (d.id,))
+            self._conn.executemany(
+                "INSERT INTO transaction_tag (directive_id, book_id, tag, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                [(d.id, book_id, tag, stamp, stamp) for tag in d.tags],
+            )
             self._conn.execute("DELETE FROM price WHERE directive_id = ?", (d.id,))
             if d.price is not None:
                 commodity, number, currency = d.price
@@ -297,6 +323,7 @@ class Store:
                 (seq, after(row["updated_at"]), directive_id),
             )
             self._conn.execute("DELETE FROM posting WHERE directive_id = ?", (directive_id,))
+            self._conn.execute("DELETE FROM transaction_tag WHERE directive_id = ?", (directive_id,))
             self._conn.execute("DELETE FROM price WHERE directive_id = ?", (directive_id,))
             for attachment in self.attachments_of(book_id, [directive_id]):
                 self.delete_attachment(book_id, attachment["id"])
@@ -396,7 +423,8 @@ class Store:
         currency" pairs, with "?" for an amount only booking could say), and how many of the
         subtree's postings in it aren't reconciled (`unreconciled`) and the latest mark of those
         that are (`reconciled`), and each of those postings' account and amount (`parts`: "account
-        number currency", or "account ?"). For a leaf, the subtree is just the account."""
+        number currency", or "account ?"), and its tags (space-separated, unordered). For a leaf,
+        the subtree is just the account."""
         mine = "(%s.account = :account OR %s.account LIKE :under)"
         return self._conn.execute(
             f"""
@@ -411,7 +439,8 @@ class Store:
                    (SELECT COUNT(*) FROM posting r WHERE r.directive_id = d.id AND {mine % ("r", "r")}
                      AND r.reconciled IS NULL) AS unreconciled,
                    (SELECT MAX(r.reconciled) FROM posting r WHERE r.directive_id = d.id
-                     AND {mine % ("r", "r")}) AS reconciled
+                     AND {mine % ("r", "r")}) AS reconciled,
+                   ({TAGS % "d"}) AS tags
             FROM directive d
             WHERE d.book_id = :book AND d.deleted = 0 AND d.kind = 'transaction'
               AND d.id IN (SELECT directive_id FROM posting p WHERE {mine % ("p", "p")})
@@ -432,20 +461,42 @@ class Store:
         ).fetchall()
         return {account: date for account, date in rows}
 
-    def compact(self, book_id: str, date_from: str) -> list[sqlite3.Row]:
-        """Every live transaction dated `date_from` or later, oldest first, one row per posting:
-        the directive's id, date, flag, payee, narration and `budgeted`, and the posting's account,
-        amount (NULL where only booking could say), mark, flag and memo. For resolvers' context and
-        reports: plain SQL, no parsing."""
+    def compact(self, book_id: str, date_from: str | None, tags: list[str] | None = None) -> list[sqlite3.Row]:
+        """Every live transaction dated `date_from` or later (or every one), oldest first, one row
+        per posting: the directive's id, date, flag, payee, narration, `budgeted` and tags
+        (space-separated), and the posting's account, amount (NULL where only booking could say),
+        mark, flag and memo. With `tags`, only transactions with all of them. For resolvers'
+        context and reports: plain SQL, no parsing."""
+        where, args = ["d.book_id = ?", "d.deleted = 0", "d.kind = 'transaction'"], [book_id]
+        if date_from is not None:
+            where.append("d.date >= ?")
+            args.append(date_from)
+        if tags:
+            clause, more = tagged("d", tags)
+            where.append(clause)
+            args += more
         return self._conn.execute(
-            """
-            SELECT d.id, d.date, d.flag, d.payee, d.narration, d.budgeted, p.idx, p.account, p.amount,
-                   p.amount_currency, p.reconciled, p.flag AS posting_flag, p.memo
+            f"""
+            SELECT d.id, d.date, d.flag, d.payee, d.narration, d.budgeted, ({TAGS % "d"}) AS tags, p.idx,
+                   p.account, p.amount, p.amount_currency, p.reconciled, p.flag AS posting_flag, p.memo
             FROM directive d JOIN posting p ON p.directive_id = d.id
-            WHERE d.book_id = ? AND d.deleted = 0 AND d.kind = 'transaction' AND d.date >= ?
+            WHERE {" AND ".join(where)}
             ORDER BY d.date, d.ordinal, p.idx
             """,
-            (book_id, date_from),
+            args,
+        ).fetchall()
+
+    def tags(self, book_id: str) -> list[sqlite3.Row]:
+        """The book's tags, alphabetically: name, how many live transactions have it, and the first
+        and last of their dates."""
+        return self._conn.execute(
+            """
+            SELECT t.tag AS name, COUNT(*) AS transactions, MIN(d.date) AS first, MAX(d.date) AS last
+            FROM transaction_tag t JOIN directive d ON d.id = t.directive_id
+            WHERE t.book_id = ? AND d.deleted = 0
+            GROUP BY t.tag ORDER BY t.tag
+            """,
+            (book_id,),
         ).fetchall()
 
     def latest_prices(self, book_id: str, on: str) -> list[sqlite3.Row]:
@@ -490,14 +541,20 @@ class Store:
         newer_than: tuple[str, int] | None = None,
         through: str | None = None,
         reconciled: tuple[bool, list[str]] | None = None,
+        tags: list[str] | None = None,
         limit: int,
     ) -> list[sqlite3.Row]:
         """Live transactions, a keyset page: newest first, older than a row's key (date,
         ordinal) and dated `through` or earlier if given; or, `newer_than` a key, the closest
         newer ones first (oldest first). With `reconciled` (wanted, and the roots whose postings
         reconcile), only those whose postings under the roots are all reconciled, or those with
-        one that isn't."""
+        one that isn't; with `tags`, only those with all of them. Each row has its tags
+        (space-separated)."""
         where, args = ["book_id = ?", "deleted = 0", "kind = 'transaction'"], [book_id]
+        if tags:
+            clause, more = tagged("directive", tags)
+            where.append(clause)
+            args += more
         if reconciled is not None:
             wanted, roots = reconciled
             under = " OR ".join(["p.account LIKE ?"] * len(roots)) or "0"
@@ -518,7 +575,8 @@ class Store:
             args.append(through)
         order = "ASC" if newer_than is not None else "DESC"
         return self._conn.execute(
-            "SELECT id, date, ordinal, flag, payee, narration, budgeted, updated_at FROM directive"
+            f"SELECT id, date, ordinal, flag, payee, narration, budgeted, updated_at, ({TAGS % 'directive'}) AS tags"
+            " FROM directive"
             f" WHERE {' AND '.join(where)} ORDER BY date {order}, ordinal {order} LIMIT ?",
             (*args, limit),
         ).fetchall()

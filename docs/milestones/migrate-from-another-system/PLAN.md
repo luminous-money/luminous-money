@@ -42,8 +42,8 @@ Migrate from another system: plan
 
 The page is `/books/:book/migrate`: the steps listed, each done, skipped or to come, and the
 current one below. Progress is kept on the server (`book_migration` in `app.sqlite`), so it can
-be left and picked up (from either entry point) at the step it was on; files aren't kept, so a
-step that needs one asks again.
+be left and picked up (from either entry point) at the step it was on. The history is kept
+(`reference_transaction`); the files uploaded aren't, so a step that needs one asks again.
 
 1. **Files.** The system (GnuCash for now) and its two exports, with how to make them:
    - **Accounts:** File → Export → Export Account Tree to CSV.

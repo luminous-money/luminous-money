@@ -11,7 +11,8 @@ import { BudgetGlance } from "../components/Budget.js";
 import { TypicalPeriods } from "../components/TypicalPeriods.js";
 import { HoldingsPanel } from "../components/Holdings.js";
 import { JumpToDate, MoreBelow, NewerRow, usePaging } from "../components/Paged.js";
-import { LedgerFilter, useLedgerView } from "../components/LedgerFilter.js";
+import { filteredLabel, LedgerFilter, useLedgerView } from "../components/LedgerFilter.js";
+import { TagChips } from "../components/Tags.js";
 import { ReconcileStatus } from "../components/ReconcileStatus.js";
 import { partOf, reconciledItself } from "../../shared/divided.js";
 import { MoveMoney, PartsCard, partsOf } from "../components/Parts.js";
@@ -73,8 +74,8 @@ function partsLabel(row: LedgerRow, account: string): string | null {
 export function AccountLedger({ book, account }: { book: string; account: string }) {
   const [, navigate] = useLocation();
   const base = `/books/${book}/accounts/${encodeURIComponent(account)}`;
-  const { date, reconciled, here, href } = useLedgerView(base);
-  const ledger = useAccountLedger(book, account, date, reconciled);
+  const { date, reconciled, tags, here, href } = useLedgerView(base);
+  const ledger = useAccountLedger(book, account, date, reconciled, tags);
   const summary = useSummary(book, [account]);
   const info = summary.data?.[0];
   const stars = useStars(book);
@@ -259,11 +260,13 @@ export function AccountLedger({ book, account }: { book: string; account: string
         <JumpToDate
           key={date ?? ""}
           date={date}
-          onGo={(to) => navigate(href({ date: to, reconciled }))}
+          onGo={(to) => navigate(href({ date: to, reconciled, tags }))}
         />
         <LedgerFilter
+          book={book}
           reconciled={reconciled}
-          onChange={(to) => navigate(href({ date, reconciled: to }))}
+          tags={tags}
+          onChange={(view) => navigate(href({ date, ...view }))}
         />
       </div>
 
@@ -271,8 +274,8 @@ export function AccountLedger({ book, account }: { book: string; account: string
       {ledger.error && <p className="card error">{explain(ledger.error)}</p>}
       {ledger.data && rows.length === 0 && (
         <p className="card muted">
-          {reconciled !== undefined
-            ? `No ${reconciled ? "reconciled" : "unreconciled"} transactions${date ? ` on or before ${date}` : ""}.`
+          {reconciled !== undefined || tags.length
+            ? `No ${filteredLabel(reconciled, tags)}${date ? ` on or before ${date}` : ""}.`
             : date
               ? `Nothing on or before ${date}.`
               : "No transactions yet."}
@@ -282,7 +285,8 @@ export function AccountLedger({ book, account }: { book: string; account: string
       {ahead.length > 0 &&
         !selection.selecting &&
         !ledger.hasPreviousPage &&
-        reconciled === undefined && (
+        reconciled === undefined &&
+        !tags.length && (
           <ol className="ledger upcoming-rows" aria-label="Upcoming">
             {ahead.map((row) => (
               <li key={row.key}>
@@ -342,6 +346,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
                     </span>
                   )}
                   {row.payee ?? row.narration ?? "(no description)"}
+                  <TagChips tags={row.tags} />
                 </span>
                 <span className="ledger-account muted">
                   {row.reconciled && (

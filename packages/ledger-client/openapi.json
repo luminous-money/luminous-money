@@ -1530,6 +1530,14 @@
             },
             "title": "Postings",
             "type": "array"
+          },
+          "tags": {
+            "description": "Its tags, sorted (M17).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
           }
         },
         "required": [
@@ -2165,6 +2173,14 @@
             "description": "Whether its asset and liability postings are all reconciled; None when it has none.",
             "title": "Reconciled"
           },
+          "tags": {
+            "description": "Its tags, sorted (M17).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "updated_at": {
             "title": "Updated At",
             "type": "string"
@@ -2338,6 +2354,14 @@
           "splits": {
             "title": "Splits",
             "type": "integer"
+          },
+          "tags": {
+            "description": "Its tags, sorted (M17).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
           },
           "updated_at": {
             "title": "Updated At",
@@ -3184,6 +3208,40 @@
         "title": "RevalueIn",
         "type": "object"
       },
+      "TagUse": {
+        "description": "A tag the book's transactions have (M17): a tag exists while one does.",
+        "properties": {
+          "first": {
+            "description": "The earliest of their dates.",
+            "format": "date",
+            "title": "First",
+            "type": "string"
+          },
+          "last": {
+            "description": "The latest of their dates.",
+            "format": "date",
+            "title": "Last",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "transactions": {
+            "description": "How many transactions have it.",
+            "title": "Transactions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "transactions",
+          "first",
+          "last"
+        ],
+        "title": "TagUse",
+        "type": "object"
+      },
       "TradeIn": {
         "additionalProperties": false,
         "description": "A trade, as the forms describe it: the ledger writes the transaction.",
@@ -3432,6 +3490,7 @@
           },
           "tags": {
             "items": {
+              "pattern": "^[A-Za-z0-9\\-_/.]+$",
               "type": "string"
             },
             "title": "Tags",
@@ -3602,6 +3661,7 @@
             "anyOf": [
               {
                 "items": {
+                  "pattern": "^[A-Za-z0-9\\-_/.]+$",
                   "type": "string"
                 },
                 "type": "array"
@@ -3697,6 +3757,7 @@
           },
           "tags": {
             "items": {
+              "pattern": "^[A-Za-z0-9\\-_/.]+$",
               "type": "string"
             },
             "title": "Tags",
@@ -3824,6 +3885,7 @@
             "anyOf": [
               {
                 "items": {
+                  "pattern": "^[A-Za-z0-9\\-_/.]+$",
                   "type": "string"
                 },
                 "type": "array"
@@ -3919,6 +3981,7 @@
           },
           "tags": {
             "items": {
+              "pattern": "^[A-Za-z0-9\\-_/.]+$",
               "type": "string"
             },
             "title": "Tags",
@@ -5206,6 +5269,27 @@
               ],
               "description": "Only reconciled transactions (true), or only those not (false).",
               "title": "Reconciled"
+            }
+          },
+          {
+            "description": "Only transactions with every tag given (M17); repeat it for several.",
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only transactions with every tag given (M17); repeat it for several.",
+              "title": "Tag"
             }
           }
         ],
@@ -6728,6 +6812,27 @@
               "description": "Only reconciled transactions (true), or only those not (false).",
               "title": "Reconciled"
             }
+          },
+          {
+            "description": "Only transactions with every tag given (M17); repeat it for several.",
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only transactions with every tag given (M17); repeat it for several.",
+              "title": "Tag"
+            }
           }
         ],
         "responses": {
@@ -7135,6 +7240,50 @@
         "summary": "Query"
       }
     },
+    "/api/ledger/v1/books/{book_id}/tags": {
+      "get": {
+        "description": "The book's tags (M17), alphabetically: each with how many transactions have it, and\nthe first and last of their dates. A tag exists while a transaction has it.",
+        "operationId": "tags_api_ledger_v1_books__book_id__tags_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TagUse"
+                  },
+                  "title": "Response Tags Api Ledger V1 Books  Book Id  Tags Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tags"
+      }
+    },
     "/api/ledger/v1/books/{book_id}/transactions": {
       "get": {
         "operationId": "list_transactions_api_ledger_v1_books__book_id__transactions_get",
@@ -7420,7 +7569,7 @@
     },
     "/api/ledger/v1/books/{book_id}/transactions/compact": {
       "get": {
-        "description": "Every transaction from a date on, oldest first, with only payee, narration, whether it\ncounts against budgets, and each posting's account and amount: the context categorizers\nwork from, and reports' posting stream. Not paged.",
+        "description": "Every transaction from a date on, oldest first, with only payee, narration, whether it\ncounts against budgets, its tags, and each posting's account and amount: the context\ncategorizers work from, and reports' posting stream. Not paged.",
         "operationId": "compact_transactions_api_ledger_v1_books__book_id__transactions_compact_get",
         "parameters": [
           {
@@ -7433,15 +7582,43 @@
             }
           },
           {
-            "description": "The first date included.",
+            "description": "The first date included; every one without it.",
             "in": "query",
             "name": "from",
-            "required": true,
+            "required": false,
             "schema": {
-              "description": "The first date included.",
-              "format": "date",
-              "title": "From",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The first date included; every one without it.",
+              "title": "From"
+            }
+          },
+          {
+            "description": "Only transactions with every tag given (M17); repeat it for several.",
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only transactions with every tag given (M17); repeat it for several.",
+              "title": "Tag"
             }
           }
         ],

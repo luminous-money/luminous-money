@@ -109,6 +109,7 @@ class Directive:
     narration: str | None = None  # transactions only
     price: tuple[str, Decimal, str] | None = None  # price directives only: commodity, number, currency
     budgeted: bool = True  # transactions only: False with `budget: FALSE`, kept out of budgets (M11)
+    tags: tuple[str, ...] = ()  # transactions only, sorted (M17)
 
 
 @dataclass(frozen=True)
@@ -219,6 +220,7 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
         narration=getattr(entry, "narration", None),
         price=(entry.currency, entry.amount.number, entry.amount.currency) if isinstance(entry, data.Price) else None,
         budgeted=not (isinstance(entry, data.Transaction) and entry.meta.get(BUDGET_KEY) is False),
+        tags=tuple(sorted(entry.tags or ())) if isinstance(entry, data.Transaction) else (),
     )
 
 

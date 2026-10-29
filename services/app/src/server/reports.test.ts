@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { BudgetStatus } from "./ledger.js";
 import {
   breakdownReport,
+  cashFlowReport,
+  largestReport,
   netWorthReport,
   spendingReport,
   topExpenseBudgets,
@@ -13,13 +15,13 @@ import { FakeLedger } from "./testing.js";
 const BANK = "Assets:Bank";
 let ledger: FakeLedger;
 const usd = (number: string) => ({ number, currency: "USD" });
-const spend = (date: string, account: string, amount: string, meta = {}) =>
+const spend = (date: string, account: string, amount: string, meta = {}, tags: string[] = []) =>
   ledger.addTransaction({
     date,
     flag: "*",
     payee: null,
     narration: account,
-    tags: [],
+    tags,
     links: [],
     meta,
     postings: [
@@ -46,6 +48,36 @@ const status = (lines: [string, string][], budget: string | null): BudgetStatus 
   }) as BudgetStatus;
 
 describe("reports", () => {
+  it("count only the transactions with every tag asked for, the largest and All time from the start", async () => {
+    spend("2025-04-03", "Expenses:Home", "600.00", {}, ["italy-2025", "reimbursable"]);
+    spend("2025-04-09", "Expenses:Food", "90.00", {}, ["italy-2025"]);
+    spend("2026-10-03", "Expenses:Food", "40.00");
+
+    const all = await breakdownReport(ledger, "b", "2026-10-15", {
+      side: "expenses",
+      window: "total",
+      tags: ["italy-2025"],
+    });
+    expect(all.slices.map((s) => [s.label, s.amount])).toEqual([
+      ["Home", 600],
+      ["Food", 90],
+    ]);
+    const both = await breakdownReport(ledger, "b", "2026-10-15", {
+      side: "expenses",
+      window: "total",
+      tags: ["italy-2025", "reimbursable"],
+    });
+    expect(both.total).toBe(600);
+
+    const largest = await largestReport(ledger, "b", "2026-10-15", 8, ["italy-2025"]);
+    expect(largest.transactions.map((t) => t.amount)).toEqual([600, 90]);
+    const thisMonth = await largestReport(ledger, "b", "2026-10-15");
+    expect(thisMonth.transactions.map((t) => t.amount)).toEqual([40]);
+
+    const flow = await cashFlowReport(ledger, "b", "2026-10-15", 6, ["italy-2025"]);
+    expect(flow.totals.expenses).toBe(0); // the trip was more than 6 months ago
+  });
+
   it("measure spending under the highest-level expense budgets, against them", async () => {
     spend("2026-09-03", "Expenses:Food", "100.00");
     spend("2026-10-03", "Expenses:Food", "40.00");
