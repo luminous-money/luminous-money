@@ -170,6 +170,11 @@ milestone starts.
       which, by choice or by rules (defaults per account, a spend order, autofill to targets).
       It replaces divided accounts as the way to set money aside. **Being designed** with Kael:
       [its plan](milestones/funds/PLAN.md) holds the decisions so far and the open questions.
+- [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules
+      that add tags, a Tags field on schedules (their templates carry tags already, unseen) and
+      on Capture receipt, the AI and history proposing the book's own tags, and transfers
+      keeping their sides' tags. [Planned](milestones/tags-more/PLAN.md) 2026-10-29, not
+      started; its decisions to review await Kael.
 - [ ] **M18: Suggested recurring transactions and matching rules.** Bi-weekly or on-demand via
       a button in the schedules section (recurring transactions) or somewhere TBD for matching
       rules. Analyze each account's last 14 months of transactions and identify ones
@@ -270,9 +275,9 @@ elaborated.
 
 ## Later (noted, not pressing)
 
-- **Tags, more** (M17): rules that add tags (a payee always `#business`), the AI suggesting
-  tags, renaming or merging a tag everywhere, OR filters ("any of"), tags on schedules'
-  template transactions, and tag-filtered budgets or "Spent this month".
+- **Tags, later still** (M17): renaming or merging a tag everywhere, OR filters ("any
+  of"), tag-only rules, and tag-filtered budgets or "Spent this month". Tags in rules,
+  schedules, receipts and the AI are the **Tags, more** milestone above.
 - **Email, once there's an email system:** invitations sent by email (M13), and accounts
   required to verify their email (M8's question 1).
 - **Transferring a book's ownership** to a manager (M13).

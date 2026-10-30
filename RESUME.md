@@ -31,6 +31,10 @@ _Updated 2026-10-29._ Keep this current: every finalized change set updates it (
   `openingHoldings` (`services/app/src/server/simplefin/holdings.ts`) takes a reported
   `cost_basis` of `0` as a real cost rather than as unknown (which would let the ledger use the
   day's price). Fixing the code is small; the live book's lots need Kael's say.
+- **Tags in rules, schedules, receipts and the AI are planned, not started:**
+  [docs/milestones/tags-more/PLAN.md](docs/milestones/tags-more/PLAN.md) (2026-10-29). M17
+  left them out on purpose. Schedules already carry a template's tags but have no field for
+  them, and pairing a transfer drops its sides' tags. The plan's decisions await Kael.
 - **Still open, not started:** a by-payee grouping in review, and whether imports and bank
   feeds ask the AI by themselves (PLAN.md's open questions).
 - **Committing:** `git add -A -- . ':!docs/milestones/m16-receipt-capture/notes.md'` (never
