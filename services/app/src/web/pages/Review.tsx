@@ -8,7 +8,7 @@ import { ReceiptNote } from "../components/ReceiptNote.js";
 import { TagChips } from "../components/Tags.js";
 import { useBulkActions } from "../lib/bulk.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
-import { FundChoice } from "../components/Funds.js";
+import { FundChoice, shapesFor } from "../components/Funds.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
 import { BaseChoice } from "../components/BaseChoice.js";
 import { PartChoice } from "../components/PartChoice.js";
@@ -31,14 +31,19 @@ import {
   useConfirmMatch,
   useDropOccurrence,
   useEditTransaction,
+  useFunds,
   useProposals,
   useScheduled,
   useBankStatus,
   useReviewQueue,
+  useShort,
   writeSkipped,
 } from "../lib/queries.js";
 import { chosen, simple, UNCATEGORIZED, unresolved, withCounterpart } from "../lib/split.js";
 import { aiCostSentence } from "../lib/ai.js";
+import { holdingsOf, suggestedFund } from "../lib/funds.js";
+import { wholeLines } from "../../shared/funds.js";
+import type { ShortTransaction } from "../lib/ledger.js";
 
 /**
  * The review queue: unconfirmed transactions to categorize and confirm, and imported rows matched
@@ -74,8 +79,14 @@ export function Review({ book }: { book: string }) {
     if (items.length) setSeen(true);
     else if (seen) navigate(back);
   }, [only, queue.items, items.length, seen, back, navigate]);
+  // A sale that takes shares no fund has comes first (Funds B): it can't be confirmed until
+  // it's given one.
+  const shortList = useShort(book).data ?? [];
+  const short = new Map(shortList.map((s) => [s.id, s]));
+  const waiting = items.filter((i) => !skipped.includes(i.transaction.id));
   const ordered = [
-    ...items.filter((i) => !skipped.includes(i.transaction.id)),
+    ...waiting.filter((i) => short.has(i.transaction.id)),
+    ...waiting.filter((i) => !short.has(i.transaction.id)),
     ...skipped.flatMap((id) => items.filter((i) => i.transaction.id === id)),
   ];
   const queued = items.map((i) => i.transaction);
@@ -148,6 +159,7 @@ export function Review({ book }: { book: string }) {
               matches={matches}
               scheduled={!!scheduled.data?.[t.id]}
               notAtBank={notAtBank.has(t.id)}
+              short={short.get(t.id)}
               proposal={proposals.data?.[t.id]}
               similar={(account) => ({
                 account,
@@ -184,6 +196,8 @@ type ItemProps = {
   scheduled: boolean;
   /** Whether it's in a bank-linked account, in the bank's time, but the bank doesn't have it. */
   notAtBank: boolean;
+  /** What it takes from a fund that doesn't have it (Funds B), if it does. */
+  short?: ShortTransaction;
   /** What categorization proposed for it, if anything. */
   proposal: ProposalSummary | undefined;
   /** After picking `account` for it: the similar unconfirmed transactions to offer it to. */
@@ -207,6 +221,7 @@ function QueueItem({
   matches,
   scheduled,
   notAtBank,
+  short,
   proposal,
   similar,
   onCategorizeSimilar,
@@ -251,8 +266,33 @@ function QueueItem({
   };
   // Confirming carries the description too, in case it was edited without leaving the field;
   // it confirms the transaction if it's unconfirmed, and any matches proposed with it.
+  // A sale that takes shares no fund has: the only fund that could have made it is suggested, and
+  // confirming writes it; with none, confirming waits for a fund.
+  const listing = useFunds(book).data;
+  const suggested =
+    short && listing && !t.funds?.length
+      ? suggestedFund(
+          short.takes.map((s) => ({
+            fund: s.fund,
+            currency: s.amount.currency,
+            takes: s.amount.number,
+          })),
+          holdingsOf(listing),
+          listing.funds.filter((f) => !f.archived).map((f) => f.name)
+        )
+      : null;
+  const needsFund = !!short && !suggested;
   const confirm = async () => {
-    if (t.flag === "!" && !(await save({ flag: "*", narration }))) return false;
+    if (needsFund) {
+      setError("Say which fund's shares it sells first.");
+      return false;
+    }
+    const lines = suggested ? wholeLines(shapesFor(t.postings, listing?.currency), suggested) : [];
+    if (
+      t.flag === "!" &&
+      !(await save({ flag: "*", narration, ...(lines.length ? { funds: lines } : {}) }))
+    )
+      return false;
     try {
       for (const m of matches) await confirmMatch.mutateAsync(m);
       return true;
@@ -267,7 +307,7 @@ function QueueItem({
       handle={swipe}
       onConfirm={confirm}
       onSkip={onSkip}
-      canConfirm={!blocked}
+      canConfirm={!blocked && !needsFund}
       onBlocked={() => setNudge((n) => n + 1)}
       disabled={selecting}
     >
@@ -304,6 +344,18 @@ function QueueItem({
               </span>
             )}
           </div>
+          {short && (
+            <p className="small">
+              <span className="pill stale">Needs a fund</span>{" "}
+              <span className="muted">
+                It takes{" "}
+                {short.takes
+                  .map((s) => `${formatMoney(s.amount.number, s.amount.currency)} from ${s.fund}`)
+                  .join(" and ")}
+                , which doesn't have {short.takes.length === 1 ? "it" : "them"}.
+              </span>
+            </p>
+          )}
           {(t.payee || !!t.tags?.length) && (
             <div className="payee">
               {t.payee}
@@ -425,6 +477,7 @@ function QueueItem({
             transaction={t}
             here={`/books/${book}/review`}
             disabled={busy}
+            suggested={suggested}
             onChange={(funds) => void save({ funds })}
           />
 

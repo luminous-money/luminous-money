@@ -30,11 +30,11 @@ import {
   type SchedulePatch,
   type UpcomingOccurrence,
 } from "../shared/schedule.js";
-import { linesProblem, shapeOf } from "../shared/funds.js";
+import { linesProblem, shapesOf } from "../shared/funds.js";
 import { StaleVersion, type AppDb, type StoredSchedule } from "./db.js";
 import type { DailyJob } from "./daily.js";
 import { fundChoices, type FundChoices } from "./funds.js";
-import type { LedgerPort } from "./ledger.js";
+import { STAGING, type LedgerPort } from "./ledger.js";
 
 export const SCHEDULE_KEY = "schedule";
 export const SCHEDULE_DATE_KEY = "schedule-date";
@@ -81,7 +81,7 @@ export function scheduleProblem(
   if (lines.length && funds) {
     const unknown = lines.find((l) => !funds.active.has(l.fund));
     if (unknown) return `${unknown.fund} isn't an active fund`;
-    const problem = linesProblem(shapeOf(postings, funds.currency), lines);
+    const problem = linesProblem(shapesOf(postings, funds.currency), lines);
     if (problem) return problem[0]!.toUpperCase() + problem.slice(1);
   }
   return null;
@@ -184,7 +184,7 @@ export async function editSchedule({
       forget.push(o.nominal);
     } else if (o.nominal > kept) kept = o.nominal; // confirmed or matched: it stays
   }
-  if (remove.length) await ledger.applyChanges(book, { create: [], delete: remove });
+  if (remove.length) await ledger.applyChanges(book, { create: [], delete: remove }, STAGING);
   db.forgetOccurrences(id, forget);
   db.updateSchedule(book, id, updated_at, {
     name: merged.name.trim(),
@@ -290,7 +290,8 @@ export async function runSchedules({
     try {
       const created = await ledgerFor(s.user_id).createTransactions(
         s.book_id,
-        occurrences.map((o) => occurrenceTransaction(s, o))
+        occurrences.map((o) => occurrenceTransaction(s, o)),
+        STAGING
       );
       db.recordOccurrences(
         s.id,

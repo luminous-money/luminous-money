@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 
 import { AccountPicker } from "../components/AccountPicker.js";
+import { DefaultFundCard } from "../components/DefaultFund.js";
 import { NewAccountField } from "../components/NewAccountField.js";
 import { displayName } from "../lib/accounts.js";
 import type {
@@ -26,6 +27,7 @@ import {
   useConfirmLink,
   useSyncBank,
   useUnlinkBank,
+  useFunds,
 } from "../lib/queries.js";
 
 /**
@@ -243,11 +245,29 @@ function BankAccountRow({
           </button>
         )}
       </div>
+      {link && link.book_id === book && <LinkedDefault book={book} account={link.account} />}
       {attempt && !link && <AttemptPanel book={book} attempt={attempt} />}
       {linking && !attempt && (
         <LinkForm book={book} connection={connection} account={account} onDone={onDone} />
       )}
     </>
+  );
+}
+
+/** A linked account's default fund (Funds B), folded away: "Default fund: Retirement". So a newly
+ * linked IRA or HSA can be its fund's from the start. Only when the book has funds. */
+function LinkedDefault({ book, account }: { book: string; account: string }) {
+  const listing = useFunds(book).data;
+  if (!listing || !listing.funds.some((f) => !f.archived)) return null;
+  const current = (listing.defaults ?? [])
+    .filter((d) => d.account === account && d.date <= today())
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .at(-1);
+  return (
+    <details className="small linked-default">
+      <summary>Default fund: {current?.fund ?? "none"}</summary>
+      <DefaultFundCard book={book} account={account} bare />
+    </details>
   );
 }
 

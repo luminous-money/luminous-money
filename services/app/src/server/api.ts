@@ -28,6 +28,7 @@ import { captureReceipt, readReceipt, ReceiptProblem, type ReceiptStep } from ".
 import { Jobs, wantsAsync, type Failure } from "./jobs.js";
 import type { System } from "./system.js";
 import { pairAfterImport, pairedTransfers, rejectTransfer, TransferProblem } from "./transfers.js";
+import { notifications } from "./notifications.js";
 import { UPCOMING_DAYS, type ScheduleIn, type SchedulePatch } from "../shared/schedule.js";
 import { StaleVersion } from "./db.js";
 import {
@@ -874,6 +875,19 @@ export function createApi({
       return c.json(renamed);
     })
   );
+
+  // Notifications (Funds B): what needs attention in the book, for those who can fix it (write).
+  api.get("/books/:book/notifications", async (c) => {
+    const { book } = c.req.param();
+    try {
+      const role = await roleIn(c.get("user"), book);
+      if (!role) return c.json({ detail: "not found" }, 404);
+      if (!atLeast(role, "write")) return c.json([]);
+      return c.json(await notifications(ledgerFor(c.get("user")), book));
+    } catch (error) {
+      return c.json(...ledgerStatus(error));
+    }
+  });
 
   // Funds (Funds A): the PWA reads and changes them at the ledger, but for renaming, which goes
   // through here so rules and schedules follow (the ledger first, then `app`, as accounts do).

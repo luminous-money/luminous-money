@@ -3122,3 +3122,180 @@ select.fund-pick {
   margin: 0.25rem 0 0;
   text-align: right;
 }
+
+/* Funds B: shares in funds. A share's line has its commodity after the amount; a trade's From
+   and To say what each gives or gets; a commodity's group when there are several. */
+
+.fund-line.shares {
+  grid-template-columns: 2.6rem minmax(0, 1fr) 5.5rem auto auto;
+}
+
+.fund-line .fund-gives {
+  grid-column: 3 / -1;
+  white-space: nowrap;
+}
+
+@media (max-width: 30rem) {
+  .fund-line .fund-gives {
+    grid-column: 2 / -1;
+  }
+}
+
+.fund-commodity {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.fund-commodity + .fund-commodity {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.fund-commodity > p {
+  margin: 0;
+}
+
+/* One fund on both sides of a trade: a neutral chip. */
+.fund-chip.both {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.fund-trade {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+}
+
+/* What a fund holds, when that's more than money. */
+.fund-holdings {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.fund-holdings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.fund-holdings-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 0.25rem 0;
+}
+
+.fund-holdings-table td {
+  padding: 0.3rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.fund-holdings-table .num {
+  text-align: right;
+  padding-left: 0.75rem;
+}
+
+.fund-entry-amount {
+  display: grid;
+  justify-items: end;
+}
+
+/* Move money's amounts: each an amount, what it's of, shares or dollars, ×. */
+.move-amounts {
+  display: grid;
+  gap: 0.6rem;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.move-amounts legend {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.move-amount .fund-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.move-amount .fund-line input {
+  flex: 1 1 7rem;
+  min-width: 6rem;
+}
+
+.move-amount p {
+  margin: 0.25rem 0 0;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+}
+
+/* The masthead's bell, beside the camera, with its count. */
+.bell-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--ink);
+}
+
+.bell-count {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.2rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.15rem;
+  text-align: center;
+}
+
+.notifications {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notification h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.notification p {
+  margin: 0.4rem 0 0;
+}
+
+.default-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.move-amount .segmented {
+  flex: 0 0 auto;
+}
+
+.move-amount .segmented button {
+  padding: 0.45rem 0.7rem;
+}
+
+.linked-default {
+  margin-top: 0.4rem;
+}
+
+.linked-default summary {
+  cursor: pointer;
+  color: var(--muted);
+}

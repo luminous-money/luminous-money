@@ -49,6 +49,13 @@ export type FundEntry = Components["schemas"]["FundEntry"];
 export type FundMove = Components["schemas"]["FundMove"];
 export type FundMoveIn = Components["schemas"]["FundMoveIn"];
 export type FundMovePatch = Components["schemas"]["FundMovePatch"];
+export type FundHolding = Components["schemas"]["FundHolding"];
+export type FundDefault = Components["schemas"]["FundDefault"];
+export type FundDefaultIn = Components["schemas"]["FundDefaultIn"];
+export type FundDefaultPatch = Components["schemas"]["FundDefaultPatch"];
+export type FundDefaultPreview = Components["schemas"]["FundDefaultPreview"];
+export type FundDefaultEffect = Components["schemas"]["FundDefaultEffect"];
+export type ShortTransaction = Components["schemas"]["ShortTransaction"];
 
 export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"], "updated_at">;
 export type AccountKind = components["schemas"]["AccountIn"]["kind"];
@@ -279,6 +286,67 @@ export const api = {
         body,
       })
     ),
+
+  /** Several moves in one write (a move with several amounts): all of them, or none. */
+  moveFundsBatch: (book_id: string, moves: FundMoveIn[]): Promise<FundMove[]> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/fund-moves/batch", {
+        params: { path: { book_id } },
+        body: { moves },
+      })
+    ),
+
+  /** A commodity's prices, newest first. */
+  prices: (book_id: string, commodity: string): Promise<PriceOut[]> =>
+    unwrap(
+      ledger.GET("/api/ledger/v1/books/{book_id}/prices", {
+        params: { path: { book_id }, query: { commodity } },
+      })
+    ),
+
+  /** Transactions that take a share a fund doesn't have (Funds B). */
+  shortTransactions: (book_id: string): Promise<ShortTransaction[]> =>
+    unwrap(
+      ledger.GET("/api/ledger/v1/books/{book_id}/funds/short", { params: { path: { book_id } } })
+    ),
+
+  /** An account's default fund from a day (Funds B; a manager). */
+  createDefault: (book_id: string, body: FundDefaultIn): Promise<FundDefault> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/fund-defaults", {
+        params: { path: { book_id } },
+        body,
+      })
+    ),
+
+  /** What making, changing or deleting a default fund would do to each fund. */
+  previewDefault: (book_id: string, body: FundDefaultPreview): Promise<FundDefaultEffect> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/fund-defaults/preview", {
+        params: { path: { book_id } },
+        body,
+      })
+    ),
+
+  patchDefault: (
+    book_id: string,
+    default_id: string,
+    body: FundDefaultPatch
+  ): Promise<FundDefault> =>
+    unwrap(
+      ledger.PATCH("/api/ledger/v1/books/{book_id}/fund-defaults/{default_id}", {
+        params: { path: { book_id, default_id } },
+        body,
+      })
+    ),
+
+  async deleteDefault(book_id: string, default_id: string, updated_at: string) {
+    const { response, error } = await ledger.DELETE(
+      "/api/ledger/v1/books/{book_id}/fund-defaults/{default_id}",
+      { params: { path: { book_id, default_id }, query: { updated_at } } }
+    );
+    if (!response.ok) throw new ApiError(response.status, describe(error) ?? "couldn't delete it");
+  },
 
   patchMove: (book_id: string, move_id: string, body: FundMovePatch): Promise<FundMove> =>
     unwrap(

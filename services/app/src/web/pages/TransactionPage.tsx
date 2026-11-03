@@ -142,14 +142,15 @@ function Editor({
   // Funds (Funds A): read from the splits as they're being edited.
   const listing = useFunds(book);
   const funds = useFundRows(
+    book,
     t.funds,
     t.postings,
     balance.state === "invalid" ? null : postings,
-    listing.data?.currency
+    { date, isNew }
   );
   // Lines are checked only when they change (as the ledger does): ones that no longer fit are
-  // said, not a reason the rest can't be saved.
-  const fundsBlocked = funds.changed && !!funds.problem;
+  // said, not a reason the rest can't be saved. A share no fund has to give is (Funds B).
+  const fundsBlocked = (funds.changed && !!funds.problem) || funds.short;
   const busy = edit.isPending || add.isPending;
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
   const names = accounts.data ? postable(accounts.data, date) : [];

@@ -17,6 +17,8 @@ import { Reconcile } from "./pages/Reconcile.js";
 import { AiSettings } from "./pages/AiSettings.js";
 import { CaptureReceipt } from "./pages/CaptureReceipt.js";
 import { ReceiptButton } from "./components/ReceiptButton.js";
+import { NotificationsBell } from "./components/NotificationsBell.js";
+import { NotificationsPage } from "./pages/Notifications.js";
 import { AddAccount } from "./pages/AddAccount.js";
 import { Books } from "./pages/Books.js";
 import { Budgets } from "./pages/Budgets.js";
@@ -150,6 +152,9 @@ function Gate() {
           <Route path="/books/:book/funds">
             {({ book: id }) => <FundsPage key={id} book={id} />}
           </Route>
+          <Route path="/books/:book/notifications">
+            {({ book: id }) => <NotificationsPage key={id} book={id} />}
+          </Route>
           <Route path="/books/:book/funds/:fund">
             {({ book: id, fund }) => (
               <FundPage key={fund} book={id} name={decodeURIComponent(fund)} />
@@ -262,6 +267,7 @@ function Masthead({ books, book }: { books?: BookInfo[]; book?: BookInfo }) {
       </Link>
       {books && (
         <div className="masthead-end">
+          {book && <NotificationsBell book={book.id} />}
           {book && <ReceiptButton book={book.id} />}
           <BookSwitcher books={books} book={book} />
           <Menu />

@@ -61,6 +61,8 @@ import {
   ApiError,
   type BudgetBasis,
   type BudgetIn,
+  type FundDefaultIn,
+  type FundDefaultPatch,
   type FundIn,
   type FundMoveIn,
   type FundMovePatch,
@@ -466,6 +468,46 @@ export const useDeleteFund = (book: string) =>
   );
 export const useMoveFunds = (book: string) =>
   useFundChange(book, (m: FundMoveIn) => api.moveFunds(book, m));
+/** Several moves at once (a move with several amounts). */
+export const useMoveFundsBatch = (book: string) =>
+  useFundChange(book, (moves: FundMoveIn[]) => api.moveFundsBatch(book, moves));
+
+/** A commodity's prices, newest first (for turning dollars into shares on a day). */
+export const usePrices = (book: string, commodity: string, enabled = true) =>
+  useQuery({
+    queryKey: [...keys.book(book), "prices", commodity],
+    queryFn: () => api.prices(book, commodity),
+    enabled: enabled && !!commodity,
+  });
+
+/** Transactions that take a share a fund doesn't have (Funds B): what review marks, and puts
+ * first. Under the book's key, so every edit refreshes it. */
+export const useShort = (book: string) =>
+  useQuery({
+    queryKey: [...keys.book(book), "funds", "short"],
+    queryFn: () => api.shortTransactions(book),
+  });
+
+/** The book's notifications (Funds B): the bell's queue. Under the book's key, so every edit
+ * refreshes it; and again when the app comes back into view. */
+export const useNotifications = (book: string) =>
+  useQuery({
+    queryKey: [...keys.book(book), "notifications"],
+    queryFn: () => appApi.notifications(book),
+    refetchOnWindowFocus: true,
+  });
+
+/** Default funds (Funds B; managers): made, changed and deleted. */
+export const useCreateDefault = (book: string) =>
+  useFundChange(book, (d: FundDefaultIn) => api.createDefault(book, d));
+export const usePatchDefault = (book: string) =>
+  useFundChange(book, ({ id, patch }: { id: string; patch: FundDefaultPatch }) =>
+    api.patchDefault(book, id, patch)
+  );
+export const useDeleteDefault = (book: string) =>
+  useFundChange(book, ({ id, updated_at }: { id: string; updated_at: string }) =>
+    api.deleteDefault(book, id, updated_at)
+  );
 export const usePatchMove = (book: string) =>
   useFundChange(book, ({ id, patch }: { id: string; patch: FundMovePatch }) =>
     api.patchMove(book, id, patch)

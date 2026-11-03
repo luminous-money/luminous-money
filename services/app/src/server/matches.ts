@@ -19,7 +19,7 @@ import type { TransactionIn } from "@luminous-money/ledger-client";
 import type { ProposedMatch } from "../shared/imports.js";
 import type { AppDb, HeldRow } from "./db.js";
 import { ensureUncategorized, stagedTransaction, type Stageable } from "./imports.js";
-import type { LedgerPort } from "./ledger.js";
+import { STAGING, type LedgerPort } from "./ledger.js";
 import { sameNumber } from "./pipeline/matcher.js";
 
 export type RowRef = { batch: string; line: number };
@@ -126,7 +126,7 @@ export async function assignRow({
   }
   const [created] =
     create.length || remove.length
-      ? await ledger.applyChanges(book, { create, delete: remove })
+      ? await ledger.applyChanges(book, { create, delete: remove }, STAGING)
       : [];
 
   const changes: Parameters<AppDb["setRows"]>[0] = [

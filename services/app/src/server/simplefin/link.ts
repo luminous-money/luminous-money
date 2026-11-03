@@ -35,7 +35,7 @@ import { add, isZero, negate } from "../../shared/decimal.js";
 import { isInternal, landsIn, partOf, within } from "../../shared/divided.js";
 import type { ImportRow } from "../../shared/imports.js";
 import { now } from "@luminous-money/db";
-import type { LedgerPort, TransactionEdit } from "../ledger.js";
+import { STAGING, type LedgerPort, type TransactionEdit } from "../ledger.js";
 import { assign } from "../pipeline/assign.js";
 import { runChain } from "../pipeline/chain.js";
 import { DEFAULT_WINDOW_DAYS, matcher } from "../pipeline/matcher.js";
@@ -320,10 +320,14 @@ export async function plan(
       apply: async () => {
         needHistory();
         await ensureEquity();
-        await ledger.applyChanges(book, {
-          create: [openingTransaction(bankOpening)],
-          delete: doomed.map((r) => ({ id: r.id, updated_at: r.updated_at })),
-        });
+        await ledger.applyChanges(
+          book,
+          {
+            create: [openingTransaction(bankOpening)],
+            delete: doomed.map((r) => ({ id: r.id, updated_at: r.updated_at })),
+          },
+          STAGING
+        );
         const made = link(S);
         await importLink(deps, made);
         return made;
@@ -434,7 +438,7 @@ export async function plan(
         await ensureEquity();
         create.push(openingTransaction(target));
       }
-      await ledger.applyChanges(book, { create, update, delete: [] });
+      await ledger.applyChanges(book, { create, update, delete: [] }, STAGING);
 
       // The bank's rows that matched hold their transactions, confirmed, as an import batch.
       const batchId = randomUUID().replace(/-/g, "");

@@ -158,10 +158,11 @@ function Form({
   // Funds (Funds A): every occurrence carries the template's lines.
   const listing = useFunds(book);
   const funds = useFundRows(
+    book,
     initial.template.funds,
     postings,
     splits.balance.state === "invalid" ? null : splits.postings,
-    listing.data?.currency
+    { date: start, isNew: true }
   );
 
   const parsedDays = unit === "month" ? parseDays(days) : [];

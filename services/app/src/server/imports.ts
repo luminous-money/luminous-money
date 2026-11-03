@@ -41,7 +41,7 @@ import { proposalRecord } from "./categorize/service.js";
 import type { Categorizer, Decision } from "./categorize/types.js";
 import { decidedLines, fundChoices, type FundChoices } from "./funds.js";
 import type { AppDb } from "./db.js";
-import type { LedgerPort } from "./ledger.js";
+import { STAGING, type LedgerPort } from "./ledger.js";
 import { assign } from "./pipeline/assign.js";
 import { buildContext } from "./pipeline/context.js";
 import { runChain } from "./pipeline/chain.js";
@@ -130,7 +130,11 @@ export async function stageCategorized(
   input: StageInput
 ): Promise<{ ids: string[]; proposals: (ProposalSummary | null)[] }> {
   const prepared = await prepareStage(input);
-  const created = await input.ledger.createTransactions(input.book.id, prepared.transactions);
+  const created = await input.ledger.createTransactions(
+    input.book.id,
+    prepared.transactions,
+    STAGING
+  );
   const ids = created.map((t) => t.id);
   prepared.record(ids);
   return { ids, proposals: prepared.proposals };

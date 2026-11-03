@@ -29,6 +29,8 @@ import {
   type Member,
   type LedgerPort,
   type PriceIn,
+  type ShortTransaction,
+  type Staging,
   type TransactionEdit,
   type TreeAccount,
 } from "./ledger.js";
@@ -307,7 +309,15 @@ export class FakeLedger implements LedgerPort {
     return { rows, next_cursor: null, prev_cursor: null };
   }
 
-  async createTransactions(_book: string, transactions: TransactionIn[]) {
+  /** The writes made as staging (Funds B), by method. */
+  staged: string[] = [];
+
+  private noteStaging(method: string, options?: Staging) {
+    if (options?.staging) this.staged.push(method);
+  }
+
+  async createTransactions(_book: string, transactions: TransactionIn[], options?: Staging) {
+    this.noteStaging("createTransactions", options);
     return transactions.map((t) => this.addTransaction(t));
   }
 
@@ -344,8 +354,10 @@ export class FakeLedger implements LedgerPort {
     changes: Partial<
       Pick<TransactionIn, "postings" | "payee" | "narration" | "flag" | "meta" | "funds">
     >,
-    _updated_at: string
+    _updated_at: string,
+    options?: Staging
   ) {
+    this.noteStaging("patch", options);
     const found = await this.transaction(book, id);
     Object.assign(found, changes);
     return confirmed(found);
@@ -362,15 +374,26 @@ export class FakeLedger implements LedgerPort {
       net_worth: zero,
       unallocated: zero,
       unpriced: [],
+      unallocated_holdings: [],
+      defaults: [],
       funds: this.fundList.map((f) => ({
         name: f.name,
         archived: f.archived ?? null,
         holdings: [],
         value: zero,
+        unpriced: [],
+        accounts: [],
         entries: 0,
         updated_at: "v1",
       })),
     };
+  }
+
+  /** What `/funds/short` answers (Funds B): set by tests. */
+  shortList: ShortTransaction[] = [];
+
+  async shortTransactions(_book: string): Promise<ShortTransaction[]> {
+    return this.shortList;
   }
 
   async renameFund(_book: string, fund: string, to: string): Promise<Fund> {
@@ -648,8 +671,10 @@ export class FakeLedger implements LedgerPort {
       create: TransactionIn[];
       update?: TransactionEdit[];
       delete: { id: string; updated_at: string }[];
-    }
+    },
+    options?: Staging
   ) {
+    this.noteStaging("applyChanges", options);
     for (const d of [...(changes.update ?? []), ...changes.delete]) {
       const found = await this.transaction(_book, d.id); // must exist
       if (found.updated_at !== d.updated_at) throw new LedgerError(409, "stale");

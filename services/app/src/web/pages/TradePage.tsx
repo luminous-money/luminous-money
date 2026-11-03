@@ -2,20 +2,26 @@ import type { TradeIn, TradePreview } from "@luminous-money/ledger-client";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
+import { FundsFieldset, fundsShown, useFundRows } from "../components/Funds.js";
 import { displayName } from "../lib/accounts.js";
 import { formatMoney, isDecimal } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
 import { api } from "../lib/ledger.js";
 import { useBack } from "../lib/navigation.js";
-import { explain, useHoldings, useSummary, useTrade } from "../lib/queries.js";
+import { explain, useFunds, useHoldings, useSummary, useTrade } from "../lib/queries.js";
 
 type Kind = TradeIn["kind"];
+
+/** A new trade's postings before it's previewed: none (a stable list, so its funds don't reset). */
+const NOTHING_YET: never[] = [];
 
 /**
  * Record a trade in an account (or a brokerage: everything under it): a buy (a lot at cost), a
  * sale (the ledger picks lots by the account's method and splits the gain short- and long-term),
  * or a dividend (optionally reinvested). "Preview" shows what will be written; a sale lists the
- * lots it draws on. Accounts that sell specific lots ask which.
+ * lots it draws on. Accounts that sell specific lots ask which. With funds, the preview has the
+ * Funds section (Funds B): a trade's From fund and To fund, a dividend's To fund; a sale whose
+ * shares are all one fund's starts with it.
  */
 export function TradePage({ book, account }: { book: string; account: string }) {
   const [, navigate] = useLocation();
@@ -38,6 +44,12 @@ export function TradePage({ book, account }: { book: string; account: string }) 
   const [choosing, setChoosing] = useState(false);
   const [preview, setPreview] = useState<TradePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const listing = useFunds(book);
+  const funds = useFundRows(book, null, NOTHING_YET, preview?.transaction.postings ?? null, {
+    date,
+    isNew: true,
+  });
+  const fundsBlocked = !!preview && ((funds.changed && !!funds.problem) || funds.short);
 
   const chosen = commodity || (kind !== "buy" ? (held[0]?.commodity ?? "") : "");
   const lotsOf = held.find((h) => h.commodity === chosen)?.lots ?? [];
@@ -59,6 +71,7 @@ export function TradePage({ book, account }: { book: string; account: string }) 
     narration: null,
     cash_account: null,
     holding_account: null,
+    funds: preview && funds.lines.length ? funds.lines : null,
   };
   const numbers = [
     ...(kind === "dividend" ? [amount] : [units, price]),
@@ -82,7 +95,12 @@ export function TradePage({ book, account }: { book: string; account: string }) 
       const message = explain(e);
       if (/choose which/.test(message)) setChoosing(true);
       setError(message);
-      setPreview(null);
+      // A sale whose shares are in funds says whose they are: its preview has the choice.
+      setPreview(
+        save && /which fund's/.test(message)
+          ? await api.previewTrade(book, account, body).catch(() => null)
+          : null
+      );
     }
   };
 
@@ -239,6 +257,9 @@ export function TradePage({ book, account }: { book: string; account: string }) 
             )}
           </section>
         )}
+        {preview && funds.ready && fundsShown(listing.data, null) && (
+          <FundsFieldset book={book} funds={funds} balanced />
+        )}
 
         <div className="actions pinned">
           <Link href={back} className="button">
@@ -250,7 +271,8 @@ export function TradePage({ book, account }: { book: string; account: string }) 
           <button
             type="button"
             className="primary"
-            disabled={!ready || trade.isPending}
+            disabled={!ready || trade.isPending || fundsBlocked}
+            title={fundsBlocked ? (funds.problem ?? undefined) : undefined}
             onClick={() => void run(true)}
           >
             Save

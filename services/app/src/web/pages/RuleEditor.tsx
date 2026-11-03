@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 import { partOf } from "../../shared/divided.js";
-import { shapeOf } from "../../shared/funds.js";
+import { shapesOf } from "../../shared/funds.js";
 import { payeeKey } from "../../shared/payees.js";
 import { AccountPicker } from "../components/AccountPicker.js";
 import { alphabetical, displayName, postable, shortName, sortedBy } from "../lib/accounts.js";
@@ -60,7 +60,7 @@ export function RuleEditor({ book, id }: { book: string; id?: string }) {
       part: whole && view.anchor.account !== main ? view.anchor.account : null,
       // A fund it was all for (Funds A): a rule's fund is always the whole amount.
       fund:
-        (t.funds?.[0] && wholeFund(t.funds, shapeOf(t.postings, t.funds[0].amount.currency))) ||
+        (t.funds?.[0] && wholeFund(t.funds, shapesOf(t.postings, t.funds[0].amount.currency))) ||
         null,
       auto_confirm: false,
     };

@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { AccountPicker } from "../components/AccountPicker.js";
 import { AccountSettings } from "../components/AccountSettings.js";
 import { BudgetForm, BudgetGlance } from "../components/Budget.js";
+import { DefaultFundCard } from "../components/DefaultFund.js";
 import { NewAccountField } from "../components/NewAccountField.js";
 import { partOf } from "../../shared/divided.js";
 import { displayName, shown, sortedBy, toSegment, TYPE_LABELS } from "../lib/accounts.js";
@@ -104,6 +105,9 @@ export function AccountEditor({ book, account }: { book: string; account: string
         ((found.kind === "leaf" && !found.implicit && !partOf(tree.data!, found.name)) ||
           found.divided) && <Cards book={book} account={found} />}
       {!found.close && found.type && <BudgetCard book={book} account={found} />}
+      {!isRoot && !found.close && (found.type === "asset" || found.type === "liability") && (
+        <DefaultFundCard book={book} account={found.name} opened={found.open} />
+      )}
       {found.close && <Unarchive book={book} account={found} />}
       {!isRoot && (!found.close || !found.protected) && (
         <div className="card disclosures">

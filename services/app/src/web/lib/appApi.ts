@@ -1,4 +1,5 @@
 /** The app API (imports and CSV profiles), at /api/app/v1 on the same origin. */
+import type { Notification } from "../../shared/notifications.js";
 import type { CsvProfile, ImportBatch, ImportResult, ProposedMatch } from "../../shared/imports.js";
 import {
   UPCOMING_DAYS,
@@ -484,6 +485,9 @@ export const reconciling = {
 export const appApi = {
   /** The user's books, oldest first, with their time zones. */
   books: async (): Promise<BookInfo[]> => json(await apiFetch("/api/app/v1/books")),
+  /** What needs attention in the book (Funds B), oldest first: the bell's queue. */
+  notifications: async (book: string): Promise<Notification[]> =>
+    json(await apiFetch(`${base(book)}/notifications`)),
 
   /** A new book in `time_zone`; with `text` (Beancount, e.g. an export), a copy of it. */
   createBook: async (body: { name: string; time_zone: string; text?: string }): Promise<BookInfo> =>

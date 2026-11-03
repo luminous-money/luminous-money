@@ -11,7 +11,7 @@ import {
   targetProblem,
   typedAmount,
 } from "../components/Funds.js";
-import { formatMoney, isNegative, negate } from "../lib/decimal.js";
+import { formatMoney, isMoney, isNegative, negate } from "../lib/decimal.js";
 import { formatDay, today } from "../lib/format.js";
 import { signedMoney } from "../lib/funds.js";
 import type { Fund, FundEntry, Funds } from "../lib/ledger.js";
@@ -48,11 +48,24 @@ function moveOf(fund: string, e: FundEntry): Move {
   };
 }
 
+/** A fund's history with a transaction's lines together (a trade: what it gave and got). */
+function grouped(entries: FundEntry[]): FundEntry[][] {
+  const out: FundEntry[][] = [];
+  for (const e of entries) {
+    const last = out.at(-1);
+    if (last && e.kind === "transaction" && last[0]!.kind === "transaction" && last[0]!.id === e.id)
+      last.push(e);
+    else out.push([e]);
+  }
+  return out;
+}
+
 /**
- * A fund's page: its balance, target and description; Move money (from or to it); for managers
- * Settings (name, description, target), Archive… (where what's left goes, and when) or
+ * A fund's page: its balance, target and description; what it holds (each holding's price and
+ * value) and the accounts it's the default fund of (Funds B); Move money (from or to it); for
+ * managers Settings (name, description, target), Archive… (where what's left goes, and when) or
  * Unarchive, and Delete (only with no history); and its history, newest first, with a running
- * balance. A transaction opens its page; a move opens to change or delete it.
+ * balance per commodity. A transaction opens its page; a move opens to change or delete it.
  */
 export function FundPage({ book, name }: { book: string; name: string }) {
   const [, navigate] = useLocation();
@@ -112,6 +125,51 @@ export function FundPage({ book, name }: { book: string; name: string }) {
             </span>
           </div>
           <TargetProgress fund={fund} />
+          {fund.holdings.some((h) => h.amount.currency !== fund.value.currency) && (
+            <table className="fund-holdings-table" aria-label="Holdings">
+              <thead>
+                <tr>
+                  <th>Holds</th>
+                  <th className="num">Price</th>
+                  <th className="num">Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fund.holdings.map((h) => (
+                  <tr key={h.amount.currency}>
+                    <td className={isNegative(h.amount.number) ? "negative" : undefined}>
+                      {isMoney(h.amount.currency) && h.amount.currency === fund.value.currency
+                        ? `Cash ${money(h.amount)}`
+                        : money(h.amount)}
+                    </td>
+                    <td className="num muted small">
+                      {h.price ? (
+                        <>
+                          {money(h.price)}
+                          {h.price_date && <span> · {formatDay(h.price_date)}</span>}
+                        </>
+                      ) : (
+                        ""
+                      )}
+                    </td>
+                    <td className="num">{h.value ? money(h.value) : "no price"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {fund.accounts && fund.accounts.length > 0 && (
+            <p className="small muted">
+              The default fund of{" "}
+              {fund.accounts.map((a, i) => (
+                <span key={a}>
+                  {i > 0 && ", "}
+                  <Link href={withBack(`/books/${book}/accounts/${a}`, here)}>{a}</Link>
+                </span>
+              ))}
+              : what changes there is {fund.name}&apos;s unless a transaction says otherwise.
+            </p>
+          )}
           {(canWrite || canManage) && (
             <div className="actions fund-actions">
               {canWrite && !fund.archived && (
@@ -174,7 +232,8 @@ export function FundPage({ book, name }: { book: string; name: string }) {
             </p>
           ) : (
             <ol className="ledger" aria-label="History">
-              {entries.map((e) => {
+              {grouped(entries).map((group) => {
+                const e = group[0]!;
                 const move = e.kind === "move";
                 const into = !isNegative(e.amount.number);
                 const title = move
@@ -205,10 +264,16 @@ export function FundPage({ book, name }: { book: string; name: string }) {
                         </span>
                       </span>
                       <span className="ledger-numbers">
-                        <span className={`amount ${into ? "in" : "out"}`}>
-                          {signedMoney(e.amount.number, e.amount.currency)}
-                        </span>
-                        <span className="muted small">{money(e.balance)}</span>
+                        {group.map((g) => (
+                          <span key={g.amount.currency} className="fund-entry-amount">
+                            <span
+                              className={`amount ${isNegative(g.amount.number) ? "out" : "in"}`}
+                            >
+                              {signedMoney(g.amount.number, g.amount.currency)}
+                            </span>
+                            <span className="muted small">{money(g.balance)}</span>
+                          </span>
+                        ))}
                       </span>
                     </button>
                   </li>
@@ -377,6 +442,14 @@ function ArchiveFund({
   const others = listing?.funds.filter((f) => !f.archived && f.name !== fund.name) ?? [];
   const early = !!last && date < last;
   const left = fund.value;
+  // What's left, when it's more than money: "$1,000.00, 100 FXAIX and 10 VTI, worth $25,000.00".
+  const what =
+    fund.holdings.length > 1 || fund.holdings.some((h) => h.amount.currency !== left.currency)
+      ? `${fund.holdings
+          .map((h) => money(h.amount))
+          .join(", ")
+          .replace(/, ([^,]*)$/, " and $1")}, worth ${money(left)}`
+      : money(left);
 
   const submit = async () => {
     if (early || archive.isPending) return;
@@ -397,8 +470,8 @@ function ArchiveFund({
         </p>
         <label>
           {isNegative(left.number)
-            ? `What it's short (${money(left)}) comes from`
-            : `What's left (${money(left)}) goes to`}
+            ? `What it's short (${what}) comes from`
+            : `What's left (${what}) goes to`}
           <select value={to} onChange={(e) => setTo(e.target.value)}>
             <option value={UNALLOCATED}>{UNALLOCATED}</option>
             {others.map((f) => (

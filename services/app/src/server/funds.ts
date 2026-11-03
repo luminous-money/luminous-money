@@ -1,12 +1,12 @@
 /**
- * Funds (Funds A) where the server writes them: a rule's fund on what it categorizes. A rule names
- * a fund; the transaction gets a line for all of it, the way it goes (from the fund for money out,
- * to it for money in, for it on a transfer). A fund that's archived or gone is left off rather
- * than failing the import.
+ * Funds (Funds A, B) where the server writes them: a rule's fund on what it categorizes. A rule
+ * names a fund; the transaction gets a line for all of it, the way it goes (from the fund for
+ * money out, to it for money in, for it on a transfer), one per commodity (a trade: both sides).
+ * A fund that's archived or gone is left off rather than failing the import.
  */
 import type { LedgerPort } from "./ledger.js";
 import type { Decision } from "./categorize/types.js";
-import { shapeOf, wholeLine, type FundLine } from "../shared/funds.js";
+import { shapesOf, wholeLines, type FundLine } from "../shared/funds.js";
 
 /** The funds a staged transaction may name (the active ones), and the book's currency. */
 export type FundChoices = { active: Set<string>; currency: string };
@@ -25,7 +25,7 @@ export async function fundChoices(
   };
 }
 
-type PostingLike = Parameters<typeof shapeOf>[0][number];
+type PostingLike = Parameters<typeof shapesOf>[0][number];
 
 /** A decision's fund as the transaction's line, when the fund is active and the transaction's
  * shape can be read. */
@@ -36,6 +36,6 @@ export function decidedLines(
 ): FundLine[] | undefined {
   const fund = decision.category?.fund;
   if (!fund || !choices?.active.has(fund)) return undefined;
-  const line = wholeLine(shapeOf(postings, choices.currency), fund);
-  return line ? [line] : undefined;
+  const lines = wholeLines(shapesOf(postings, choices.currency), fund);
+  return lines.length ? lines : undefined;
 }

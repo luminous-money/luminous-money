@@ -17,7 +17,7 @@ import type { Holding, TransactionIn } from "@luminous-money/ledger-client";
 
 import { add, isNegative, isZero, negate } from "../../shared/decimal.js";
 import { ensureUncategorized, UNCATEGORIZED } from "../imports.js";
-import type { LedgerPort } from "../ledger.js";
+import { STAGING, type LedgerPort } from "../ledger.js";
 import type { SfHolding } from "./client.js";
 import type { Link } from "./store.js";
 import type { SimplefinDeps } from "./sync.js";
@@ -158,11 +158,15 @@ export async function holdingChanges(deps: SimplefinDeps, link: Link): Promise<n
     for (const name of preview.opens) await ledger.createAccount(book, name).catch(() => undefined);
     const transaction: TransactionIn = { ...preview.transaction, flag: "!" };
     if (pair) {
-      await ledger.applyChanges(book, {
-        create: [],
-        update: [{ id: pair.id, updated_at: pair.updated_at, postings: transaction.postings }],
-        delete: [],
-      });
+      await ledger.applyChanges(
+        book,
+        {
+          create: [],
+          update: [{ id: pair.id, updated_at: pair.updated_at, postings: transaction.postings }],
+          delete: [],
+        },
+        STAGING
+      );
     } else {
       // No cash side seen: leave the other side for review.
       const other = selling ? UNCATEGORIZED.in : UNCATEGORIZED.out;
@@ -175,14 +179,18 @@ export async function holdingChanges(deps: SimplefinDeps, link: Link): Promise<n
           fingerprint: "",
         },
       ]);
-      await ledger.createTransactions(book, [
-        {
-          ...transaction,
-          postings: transaction.postings.map((p) =>
-            p.account === cash ? { ...p, account: other } : p
-          ),
-        },
-      ]);
+      await ledger.createTransactions(
+        book,
+        [
+          {
+            ...transaction,
+            postings: transaction.postings.map((p) =>
+              p.account === cash ? { ...p, account: other } : p
+            ),
+          },
+        ],
+        STAGING
+      );
     }
     staged += 1;
   }

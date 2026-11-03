@@ -11,14 +11,14 @@ import { useState } from "react";
 import type { Transaction } from "@luminous-money/ledger-client";
 
 import type { AccountCreation } from "../components/AccountPicker.js";
-import { shapeFor } from "../components/Funds.js";
+import { shapesFor } from "../components/Funds.js";
 import type { BulkAction } from "../components/SelectBar.js";
-import { UNALLOCATED, wholeLine } from "../../shared/funds.js";
+import { UNALLOCATED, wholeLines } from "../../shared/funds.js";
 import { appApi } from "./appApi.js";
 import { formatMoney } from "./decimal.js";
 import { sameLines } from "./funds.js";
 import type { TransactionChanges } from "./ledger.js";
-import { explain, useBulkEdit, useFunds, useTags } from "./queries.js";
+import { explain, useBulkEdit, useFunds, useShort, useTags } from "./queries.js";
 import { tagList } from "../components/Tags.js";
 import { aiCostSentence } from "./ai.js";
 
@@ -78,8 +78,8 @@ export function useBulkActions({
   };
   const listing = useFunds(book).data;
   const activeFunds = listing?.funds.filter((f) => !f.archived) ?? [];
-  /** Give each selected transaction `fund` for all of it (the way it goes), or clear its funds
-   * (Unallocated). One whose amounts funds can't read (not all in the book's currency) is left. */
+  /** Give each selected transaction `fund` for all of it (the way it goes, each commodity: a
+   * trade's both sides), or clear its funds (Unallocated). One whose amounts don't read is left. */
   const setFund = (fund: string) => {
     const currency = listing?.currency ?? "USD";
     let changed = 0;
@@ -90,9 +90,9 @@ export function useBulkActions({
       {
         transactions: chosen,
         change: (t) => {
-          const line =
-            fund === UNALLOCATED ? null : wholeLine(shapeFor(t.postings, currency), fund);
-          const funds = fund === UNALLOCATED ? [] : line && [line];
+          const whole =
+            fund === UNALLOCATED ? [] : wholeLines(shapesFor(t.postings, currency), fund);
+          const funds = fund === UNALLOCATED ? [] : whole.length ? whole : null;
           if (!funds) {
             unread++;
             return null;
@@ -113,7 +113,7 @@ export function useBulkActions({
                 (had ? `; ${had} had none` : "")
               : `Set the fund of ${plural(changed, "transaction")} to ${fund}` +
                 (had ? `; ${had} had it already` : "")) +
-              (unread ? `; skipped ${unread} not all in ${currency}.` : ".")
+              (unread ? `; skipped ${unread} whose amounts don't read.` : ".")
           ),
         onError: (e) => setNote(explain(e)),
       }
@@ -142,17 +142,32 @@ export function useBulkActions({
     onError: (e) => setNote(explain(e)),
   });
 
+  // A sale that takes shares no fund has can't be confirmed until it's given one (Funds B).
+  const short = new Set((useShort(book).data ?? []).map((t) => t.id));
+  const confirmable = unconfirmed.filter((t) => !short.has(t.id));
+  const flagged = unconfirmed.length - confirmable.length;
   const actions: BulkAction[] = [
     {
       label: `Confirm ${chosen.length}`,
-      disabled: confirmBlocked || (!unconfirmed.length && !afterConfirm && "confirmed already"),
+      disabled:
+        confirmBlocked ||
+        (!unconfirmed.length && !afterConfirm && "confirmed already") ||
+        (unconfirmed.length > 0 &&
+          !confirmable.length &&
+          (flagged === 1 ? "it needs a fund first" : "they need a fund first")),
       run: () => {
         setNote(null);
         bulk.mutate(
-          { transactions: unconfirmed, change: () => ({ flag: "*" }) },
+          { transactions: confirmable, change: () => ({ flag: "*" }) },
           {
             onSuccess: async () => {
               await afterConfirm?.();
+              if (flagged) {
+                setNote(
+                  `Confirmed ${confirmable.length}; skipped ${flagged} that ${flagged === 1 ? "needs" : "need"} a fund.`
+                );
+                return;
+              }
               onConfirmed();
             },
             onError: (e) => setNote(explain(e)),

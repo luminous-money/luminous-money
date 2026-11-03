@@ -2,18 +2,25 @@ import { useState } from "react";
 import { Link } from "wouter";
 
 import { UNALLOCATED } from "../../shared/funds.js";
-import { MoveMoneyDialog, NewFundDialog, TargetProgress } from "../components/Funds.js";
-import { add, formatMoney, isNegative, negate } from "../lib/decimal.js";
+import {
+  HoldingsLine,
+  MoveMoneyDialog,
+  NewFundDialog,
+  TargetProgress,
+} from "../components/Funds.js";
+import { add, formatMoney, isMoney, isNegative, negate } from "../lib/decimal.js";
 import { formatDay } from "../lib/format.js";
 import { explain, useCanManage, useCanWrite, useFunds } from "../lib/queries.js";
 
 const money = (a: { number: string; currency: string }) => formatMoney(a.number, a.currency);
 
 /**
- * Funds (Funds A): what the book's money is for. Net worth, what's in funds, and Unallocated (the
- * rest, the house and retirement included); each fund's balance (red below zero), description
- * and progress toward its target; Move money (write) and New fund (manage); archived funds folded
- * away below. With none yet, what funds are for and how to start.
+ * Funds (Funds A, B): what the book's money is for. Net worth, what's in funds, and Unallocated
+ * (the rest, the house and retirement included, and what it holds); each fund's balance (red
+ * below zero), what it holds when that's more than money, description and progress toward its
+ * target; Move money (write) and New fund (manage); archived funds folded away below. When funds
+ * claim shares the accounts don't have, a warning that leads to Notifications. With none yet,
+ * what funds are for and how to start.
  */
 export function FundsPage({ book }: { book: string }) {
   const listing = useFunds(book);
@@ -25,6 +32,10 @@ export function FundsPage({ book }: { book: string }) {
   const active = data?.funds.filter((f) => !f.archived) ?? [];
   const archived = data?.funds.filter((f) => f.archived) ?? [];
   const href = (name: string) => `/books/${book}/funds/${encodeURIComponent(name)}`;
+  // Funds claiming shares the accounts don't have: a sale nobody gave a fund to (Funds B).
+  const over = (data?.unallocated_holdings ?? []).filter(
+    (h) => !isMoney(h.amount.currency) && isNegative(h.amount.number)
+  );
 
   return (
     <main>
@@ -93,10 +104,21 @@ export function FundsPage({ book }: { book: string }) {
               </dd>
             </div>
           </dl>
+          <HoldingsLine holdings={data.unallocated_holdings} currency={data.currency} />
           <p className="small muted">
             {UNALLOCATED} is everything that isn&apos;t in a fund, your house and retirement
             accounts included.
           </p>
+          {over.length > 0 && (
+            <p className="small warning" role="alert">
+              Your funds hold{" "}
+              {over
+                .map((h) => formatMoney(negate(h.amount.number), h.amount.currency))
+                .join(" and ")}{" "}
+              more than your accounts do.{" "}
+              <Link href={`/books/${book}/notifications`}>See what needs a fund ›</Link>
+            </p>
+          )}
           {data.unpriced && data.unpriced.length > 0 && (
             <p className="small muted">
               Left out of net worth, with no price yet: {data.unpriced.join(", ")}.
@@ -115,6 +137,7 @@ export function FundsPage({ book }: { book: string }) {
                   {money(f.value)}
                 </span>
               </div>
+              <HoldingsLine holdings={f.holdings} currency={data!.currency} />
               {f.description && <p className="muted small">{f.description}</p>}
               <TargetProgress fund={f} />
             </Link>

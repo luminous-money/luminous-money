@@ -1,129 +1,178 @@
 import { describe, expect, it } from "vitest";
 
-import { fundName, linesProblem, mergedLines, shapeOf, wholeLine, type FundLine } from "./funds.js";
+import {
+  effectsOf,
+  fundFor,
+  fundName,
+  isTrade,
+  linesProblem,
+  mergedLines,
+  shapesOf,
+  wholeLines,
+  type FundLine,
+} from "./funds.js";
 
 const usd = (number: string) => ({ number, currency: "USD" });
-const line = (fund: string, number: string): FundLine => ({ fund, amount: usd(number) });
+const vti = (number: string) => ({ number, currency: "VTI" });
+const line = (fund: string, number: string, currency = "USD"): FundLine => ({
+  fund,
+  amount: { number, currency },
+});
+const buy = [
+  { account: "Assets:Brokerage:Cash", units: usd("-3000.00") },
+  {
+    account: "Assets:Brokerage:VTI",
+    units: vti("10"),
+    cost: { number: "300.00", currency: "USD" },
+  },
+];
 
-describe("shapeOf", () => {
+describe("shapesOf", () => {
   it("reads money in, money out and transfers from the asset and liability splits", () => {
     expect(
-      shapeOf(
+      shapesOf(
         [{ account: "Assets:PNC", units: usd("1000.00") }, { account: "Income:Salary" }],
         "USD"
       )
-    ).toEqual({
-      kind: "in",
-      size: "1000.00",
-      currency: "USD",
-    });
+    ).toEqual([{ kind: "in", size: "1000.00", currency: "USD" }]);
     expect(
-      shapeOf(
+      shapesOf(
         [{ account: "Liabilities:Visa", units: usd("-500.00") }, { account: "Expenses:Home" }],
         "USD"
       )
-    ).toEqual({
-      kind: "out",
-      size: "500.00",
-      currency: "USD",
-    });
+    ).toEqual([{ kind: "out", size: "500.00", currency: "USD" }]);
     expect(
-      shapeOf(
+      shapesOf(
         [{ account: "Assets:PNC", units: usd("-2000.00") }, { account: "Assets:Brokerage:Cash" }],
         "USD"
       )
-    ).toEqual({ kind: "transfer", size: "2000.00", currency: "USD" });
+    ).toEqual([{ kind: "transfer", size: "2000.00", currency: "USD" }]);
   });
 
-  it("counts a refund as money in and a trade as a transfer", () => {
+  it("reads a trade one commodity at a time (Funds B), the operating currency first", () => {
+    expect(shapesOf(buy, "USD")).toEqual([
+      { kind: "out", size: "3000.00", currency: "USD" },
+      { kind: "in", size: "10", currency: "VTI" },
+    ]);
+    expect(isTrade(shapesOf(buy, "USD"))).toBe(true);
+    // A refund is money in.
     expect(
-      shapeOf(
+      shapesOf(
         [
           { account: "Assets:PNC", units: usd("40.00") },
           { account: "Expenses:Home", units: usd("-40.00") },
         ],
         "USD"
-      ).kind
+      )?.[0]?.kind
     ).toBe("in");
-    const trade = shapeOf(
-      [
-        { account: "Assets:Brokerage:Cash", units: usd("-3000.00") },
-        {
-          account: "Assets:Brokerage:VTI",
-          units: { number: "10", currency: "VTI" },
-          cost: { number: "300.00", currency: "USD" },
-        },
-      ],
-      "USD"
-    );
-    expect(trade).toEqual({ kind: "transfer", size: "3000.00", currency: "USD" });
   });
 
-  it("can't say until the splits balance, or for another currency", () => {
-    expect(
-      shapeOf([{ account: "Assets:PNC" }, { account: "Expenses:Home" }], "USD").kind
-    ).toBeNull();
-    expect(
-      shapeOf(
-        [
-          { account: "Assets:Wallet", units: { number: "-20", currency: "EUR" } },
-          { account: "Expenses:Food" },
-        ],
-        "USD"
-      ).kind
-    ).toBeNull();
+  it("can't say until the splits read", () => {
+    expect(shapesOf([{ account: "Assets:PNC" }, { account: "Expenses:Home" }], "USD")).toBeNull();
   });
 });
 
-describe("wholeLine", () => {
-  it("puts all of it toward a fund, or takes all of it from one", () => {
-    expect(wholeLine({ kind: "in", size: "1000.00", currency: "USD" }, "Emergency")).toEqual(
-      line("Emergency", "1000.00")
-    );
-    expect(wholeLine({ kind: "out", size: "500.00", currency: "USD" }, "Emergency")).toEqual(
-      line("Emergency", "-500.00")
-    );
-    expect(wholeLine({ kind: "transfer", size: "2000.00", currency: "USD" }, "Emergency")).toEqual(
-      line("Emergency", "2000.00")
-    );
-    expect(wholeLine({ kind: null, size: "0", currency: "USD" }, "Emergency")).toBeNull();
+describe("wholeLines", () => {
+  it("puts all of it toward a fund, or takes all of it from one, each commodity", () => {
+    expect(wholeLines(shapesOf(buy, "USD"), "Emergency")).toEqual([
+      line("Emergency", "-3000.00"),
+      line("Emergency", "10", "VTI"),
+    ]);
+    expect(wholeLines([{ kind: "transfer", size: "2000.00", currency: "USD" }], "E")).toEqual([
+      line("E", "2000.00"),
+    ]);
+    expect(wholeLines(null, "Emergency")).toEqual([]);
   });
 });
 
 describe("linesProblem", () => {
-  const paycheck = { kind: "in", size: "1000.00", currency: "USD" } as const;
-  const repair = { kind: "out", size: "500.00", currency: "USD" } as const;
-  const transfer = { kind: "transfer", size: "2000.00", currency: "USD" } as const;
+  const paycheck = [{ kind: "in", size: "1000.00", currency: "USD" }] as const;
+  const repair = [{ kind: "out", size: "500.00", currency: "USD" }] as const;
+  const transfer = [{ kind: "transfer", size: "2000.00", currency: "USD" }] as const;
+  const trade = shapesOf(buy, "USD");
 
   it("takes what fits", () => {
     expect(
-      linesProblem(paycheck, [
-        line("Emergency", "500.00"),
-        line("Special Home Maintenance", "500.00"),
-      ])
+      linesProblem(
+        [...paycheck],
+        [line("Emergency", "500.00"), line("Special Home Maintenance", "500.00")]
+      )
     ).toBeNull();
-    expect(linesProblem(repair, [line("Emergency", "-500.00")])).toBeNull();
+    expect(linesProblem([...repair], [line("Emergency", "-500.00")])).toBeNull();
     expect(
-      linesProblem(transfer, [line("Emergency", "-2000.00"), line("Wedding", "2000.00")])
+      linesProblem([...transfer], [line("Emergency", "-2000.00"), line("Wedding", "2000.00")])
+    ).toBeNull();
+    expect(
+      linesProblem(trade, [line("Emergency", "-3000.00"), line("Emergency", "10", "VTI")])
     ).toBeNull();
   });
 
   it("words what doesn't as the ledger does", () => {
-    expect(linesProblem(paycheck, [line("Emergency", "-1.00")])).toBe(
+    expect(linesProblem([...paycheck], [line("Emergency", "-1.00")])).toBe(
       "money coming in goes to funds, not from them (Emergency)"
     );
-    expect(linesProblem(repair, [line("Emergency", "1.00")])).toBe(
+    expect(linesProblem([...repair], [line("Emergency", "1.00")])).toBe(
       "money going out comes from funds, not to them (Emergency)"
     );
-    expect(linesProblem(paycheck, [line("A", "600.00"), line("B", "600.00")])).toBe(
+    expect(linesProblem([...paycheck], [line("A", "600.00"), line("B", "600.00")])).toBe(
       "its funds get 1,200.00 USD, more than the 1,000.00 USD that came in"
     );
-    expect(linesProblem(repair, [line("Emergency", "-500.01")])).toBe(
-      "its funds give 500.01 USD, more than the 500.00 USD that went out"
-    );
-    expect(linesProblem(transfer, [line("Emergency", "2500.00")])).toBe(
+    expect(linesProblem([...transfer], [line("Emergency", "2500.00")])).toBe(
       "its funds get 2,500.00 USD, more than the 2,000.00 USD it moves"
     );
+    expect(linesProblem(trade, [line("Emergency", "11", "VTI")])).toBe(
+      "its funds get 11 VTI, more than the 10 VTI that came in"
+    );
+    expect(linesProblem(trade, [line("Emergency", "5", "FXAIX")])).toBe(
+      "it moves no FXAIX (Emergency)"
+    );
+  });
+});
+
+describe("default funds", () => {
+  const defaults = [
+    { account: "Assets:Retirement:Roth-IRA", fund: "Retirement", date: "2026-01-01" },
+    { account: "Assets:Retirement:Roth-IRA:Cash", fund: null, date: "2026-01-01" },
+  ];
+
+  it("come from the nearest account with one, by date", () => {
+    expect(fundFor(defaults, "Assets:Retirement:Roth-IRA:FXAIX", "2026-06-01")).toBe("Retirement");
+    // None of its own: the account above's.
+    expect(fundFor(defaults, "Assets:Retirement:Roth-IRA:Cash", "2026-06-01")).toBe("Retirement");
+    expect(fundFor(defaults, "Assets:Retirement:Roth-IRA", "2025-12-31")).toBe("Unallocated");
+    expect(fundFor(defaults, "Assets:Bank:Checking", "2026-06-01")).toBe("Unallocated");
+  });
+
+  it("take what a line doesn't, side by side", () => {
+    const contribution = [
+      { account: "Assets:Bank:Checking", units: usd("-500.00") },
+      { account: "Assets:Retirement:Roth-IRA:Cash", units: usd("500.00") },
+    ];
+    expect(effectsOf(contribution, [], defaults, "2026-11-06")).toEqual([
+      { fund: "Retirement", currency: "USD", number: "500.00" },
+      { fund: "Unallocated", currency: "USD", number: "-500.00" },
+    ]);
+    // From Emergency: the line takes over checking's side.
+    expect(effectsOf(contribution, [line("Emergency", "-500.00")], defaults, "2026-11-06")).toEqual(
+      [
+        { fund: "Emergency", currency: "USD", number: "-500.00" },
+        { fund: "Retirement", currency: "USD", number: "500.00" },
+      ]
+    );
+  });
+
+  it("leave Funds A as it was without any", () => {
+    expect(
+      effectsOf(
+        [{ account: "Assets:PNC", units: usd("1000.00") }, { account: "Income:Salary" }],
+        [line("Emergency", "400.00")],
+        [],
+        "2026-11-06"
+      )
+    ).toEqual([
+      { fund: "Emergency", currency: "USD", number: "400.00" },
+      { fund: "Unallocated", currency: "USD", number: "600.00" },
+    ]);
   });
 });
 

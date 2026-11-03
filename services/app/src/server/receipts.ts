@@ -46,7 +46,7 @@ import { proposalRecord } from "./categorize/service.js";
 import type { Categorizer, Incoming } from "./categorize/types.js";
 import type { AppDb } from "./db.js";
 import { KEPT_LIMIT, normalized, UPLOAD_LIMIT, type FileIn } from "./images.js";
-import type { LedgerPort } from "./ledger.js";
+import { STAGING, type LedgerPort } from "./ledger.js";
 import { buildContext } from "./pipeline/context.js";
 import { DEFAULT_WINDOW_DAYS, matcher, sameNumber } from "./pipeline/matcher.js";
 
@@ -447,22 +447,27 @@ async function read({
           ...(notes.length ? { "receipt-note": sentences(notes) } : {}),
         },
       },
-      target.updated_at
+      target.updated_at,
+      STAGING
     );
     id = target.id;
   } else {
-    const [created] = await ledger.createTransactions(book, [
-      {
-        ...built.transaction,
-        payee,
-        postings: postings as TransactionIn["postings"],
-        meta: {
-          ...built.transaction.meta,
-          "receipt-read": today,
-          ...(notes.length ? { "receipt-note": sentences(notes) } : {}),
+    const [created] = await ledger.createTransactions(
+      book,
+      [
+        {
+          ...built.transaction,
+          payee,
+          postings: postings as TransactionIn["postings"],
+          meta: {
+            ...built.transaction.meta,
+            "receipt-read": today,
+            ...(notes.length ? { "receipt-note": sentences(notes) } : {}),
+          },
         },
-      },
-    ]);
+      ],
+      STAGING
+    );
     id = created!.id;
   }
   if (attach) await ledger.attach(book, id, file);

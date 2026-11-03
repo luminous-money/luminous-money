@@ -23,7 +23,7 @@ import { mergedLines } from "../shared/funds.js";
 import type { PairedTransfer } from "../shared/transfers.js";
 import type { AppDb, HeldRow, PairedOriginal, TransferPair } from "./db.js";
 import { UNCATEGORIZED } from "./imports.js";
-import type { LedgerPort } from "./ledger.js";
+import { STAGING, type LedgerPort } from "./ledger.js";
 import { sameNumber } from "./pipeline/matcher.js";
 
 export const PAIR_WINDOW_DAYS = 7;
@@ -164,12 +164,16 @@ export async function pairTransfers({
   }
   if (!pairs.length) return new Map();
 
-  const created = await ledger.applyChanges(book, {
-    create: pairs.map((p) => transferOf(p.out, p.into)),
-    delete: pairs.flatMap((p) =>
-      [p.out, p.into].map((s) => ({ id: s.transaction.id, updated_at: s.transaction.updated_at }))
-    ),
-  });
+  const created = await ledger.applyChanges(
+    book,
+    {
+      create: pairs.map((p) => transferOf(p.out, p.into)),
+      delete: pairs.flatMap((p) =>
+        [p.out, p.into].map((s) => ({ id: s.transaction.id, updated_at: s.transaction.updated_at }))
+      ),
+    },
+    STAGING
+  );
   db.recordPairs(
     book,
     pairs.map((p, i) => ({
@@ -228,10 +232,15 @@ export async function rejectTransfer({
   if (!pair) throw new TransferProblem(404, "that isn't a paired transfer");
   const transfer = await ledger.transaction(book, transactionId);
   if (transfer.flag !== "!") throw new TransferProblem(409, "it's confirmed: edit it instead");
-  const restored = await ledger.applyChanges(book, {
-    create: pair.originals.map((o) => o.transaction),
-    delete: [{ id: transfer.id, updated_at: transfer.updated_at }],
-  });
+  // What was staged comes back as it was staged.
+  const restored = await ledger.applyChanges(
+    book,
+    {
+      create: pair.originals.map((o) => o.transaction),
+      delete: [{ id: transfer.id, updated_at: transfer.updated_at }],
+    },
+    STAGING
+  );
   const ids = restored.map((t) => t.id);
   db.rejectPair(pair, ids);
   return ids;

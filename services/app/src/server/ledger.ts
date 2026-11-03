@@ -37,6 +37,7 @@ export type ReconcileState = components["schemas"]["ReconcileState"];
 export type ReconcileIn = components["schemas"]["ReconcileIn"];
 export type Funds = components["schemas"]["Funds"];
 export type Fund = components["schemas"]["Fund"];
+export type ShortTransaction = components["schemas"]["ShortTransaction"];
 export type Reconciled = components["schemas"]["Reconciled"];
 export type Reconciliations = components["schemas"]["Reconciliations"];
 export type DayBalances = components["schemas"]["DayBalances"];
@@ -97,7 +98,11 @@ export interface LedgerPort {
   previewTrade(book: string, account: string, trade: TradeIn): Promise<TradePreview>;
   accountLedger(book: string, account: string, cursor?: string): Promise<LedgerPage>;
   /** All of them or none. */
-  createTransactions(book: string, transactions: TransactionIn[]): Promise<Transaction[]>;
+  createTransactions(
+    book: string,
+    transactions: TransactionIn[],
+    options?: Staging
+  ): Promise<Transaction[]>;
   transaction(book: string, id: string): Promise<Transaction>;
   /** Every transaction from `from` on (or every one), oldest first, compactly: categorizers'
    * context and reports' stream. With `tags`, only those with every one (M17). */
@@ -109,10 +114,13 @@ export interface LedgerPort {
     changes: Partial<
       Pick<TransactionIn, "postings" | "payee" | "narration" | "flag" | "meta" | "funds">
     >,
-    updated_at: string
+    updated_at: string,
+    options?: Staging
   ): Promise<Transaction>;
   /** Every fund, with what it holds; net worth, and Unallocated (Funds A). */
   funds(book: string): Promise<Funds>;
+  /** Transactions that take a share a fund doesn't have, oldest added first (Funds B). */
+  shortTransactions(book: string): Promise<ShortTransaction[]>;
   /** Rename a fund everywhere it's named in the books, history included (a manager). */
   renameFund(book: string, fund: string, to: string, updated_at: string): Promise<Fund>;
   /** The book's unconfirmed (`!`) transactions. */
@@ -163,9 +171,22 @@ export interface LedgerPort {
       create: TransactionIn[];
       update?: TransactionEdit[];
       delete: { id: string; updated_at: string }[];
-    }
+    },
+    options?: Staging
   ): Promise<Transaction[]>;
 }
+
+/**
+ * A write `app` makes by itself (an import, a bank feed, a receipt, a schedule), not one a
+ * person made (Funds B): the ledger keeps a transaction that takes a share a fund doesn't have,
+ * and lists it as short, rather than refusing it.
+ */
+export type Staging = { staging?: boolean };
+
+/** Staging: what `app` writes by itself. */
+export const STAGING: Staging = { staging: true };
+
+const stagingQuery = (options?: Staging) => (options?.staging ? { staging: true } : {});
 
 export function httpLedger(baseUrl: string, userId: string): LedgerPort {
   const client = createLedgerClient({ baseUrl, headers: { "X-User-Id": userId } });
@@ -370,11 +391,17 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
           body: { to, updated_at },
         })
       ),
-    patch: (book, id, changes, updated_at) =>
+    patch: (book, id, changes, updated_at, options) =>
       unwrap(
         client.PATCH("/api/ledger/v1/books/{book_id}/transactions/{directive_id}", {
-          params: { path: { book_id: book, directive_id: id } },
+          params: { path: { book_id: book, directive_id: id }, query: stagingQuery(options) },
           body: { ...changes, updated_at },
+        })
+      ),
+    shortTransactions: (book) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/funds/short", {
+          params: { path: { book_id: book } },
         })
       ),
     fetchPrices: (book) =>
@@ -389,10 +416,10 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
           params: { path: { book_id: book }, query: { flag: "!", limit: 5000 } },
         })
       ),
-    applyChanges: (book, changes) =>
+    applyChanges: (book, changes, options) =>
       unwrap(
         client.POST("/api/ledger/v1/books/{book_id}/transactions/changes", {
-          params: { path: { book_id: book } },
+          params: { path: { book_id: book }, query: stagingQuery(options) },
           body: { ...changes, update: changes.update ?? [] },
         })
       ),
@@ -468,10 +495,10 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
           params: { path: { book_id: book, account }, query: { from, to } },
         })
       ),
-    createTransactions: (book, transactions) =>
+    createTransactions: (book, transactions, options) =>
       unwrap(
         client.POST("/api/ledger/v1/books/{book_id}/transactions/batch", {
-          params: { path: { book_id: book } },
+          params: { path: { book_id: book }, query: stagingQuery(options) },
           body: transactions,
         })
       ),

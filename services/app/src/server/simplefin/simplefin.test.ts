@@ -468,6 +468,9 @@ describe("brokerages", () => {
       ["Assets:Fidelity:VTI", "2", "VTI"],
       ["Assets:Fidelity:Cash", "-610.00", "USD"],
     ]);
+    // What came in by itself is written as staging (Funds B): a sale of a fund's shares is kept,
+    // and waits for a fund, rather than being refused.
+    expect(ledger.staged).toEqual(expect.arrayContaining(["createTransactions", "applyChanges"]));
   });
 });
 
