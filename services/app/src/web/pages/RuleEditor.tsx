@@ -5,7 +5,7 @@ import { partOf } from "../../shared/divided.js";
 import { shapeOf } from "../../shared/funds.js";
 import { payeeKey } from "../../shared/payees.js";
 import { AccountPicker } from "../components/AccountPicker.js";
-import { displayName, postable, shortName } from "../lib/accounts.js";
+import { alphabetical, displayName, postable, shortName, sortedBy } from "../lib/accounts.js";
 import type { CategoryRule, CategoryRuleIn } from "../lib/appApi.js";
 import { isDecimal } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
@@ -229,7 +229,7 @@ function Form({
             onChange={(e) => setAccount(e.target.value)}
           >
             <option value="">Any account</option>
-            {importable.map((a) => (
+            {[...importable].sort(alphabetical).map((a) => (
               <option key={a} value={a}>
                 {a}
               </option>
@@ -245,7 +245,7 @@ function Form({
                   "Its main part"}{" "}
                 (where new money lands)
               </option>
-              {parts
+              {sortedBy(parts, displayName)
                 .filter((p) => p.name !== whole.main_part)
                 .map((p) => (
                   <option key={p.name} value={p.name}>

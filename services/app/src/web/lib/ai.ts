@@ -11,6 +11,7 @@ import {
   type AiUsage,
 } from "@luminous-money/ai-api";
 
+import { statusMessage } from "./format.js";
 import { ApiError } from "./ledger.js";
 import { apiFetch } from "./session.js";
 
@@ -21,7 +22,10 @@ const base = (book: string) => `/api/ai/v1/books/${encodeURIComponent(book)}`;
 async function json<T>(response: Response): Promise<T> {
   if (response.ok) return (await response.json()) as T;
   const body = (await response.json().catch(() => ({}))) as { detail?: string };
-  throw new ApiError(response.status, body.detail ?? `${response.status} ${response.statusText}`);
+  throw new ApiError(
+    response.status,
+    body.detail ?? statusMessage(response.status, response.statusText)
+  );
 }
 
 const send = (method: string, body?: unknown): RequestInit => ({

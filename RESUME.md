@@ -4,31 +4,75 @@ Where We Left Off
 _Updated 2026-11-02._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-02): Funds A built, released as `v0.1.13`
+## Hand-off (2026-11-02): Funds A is out; Funds B is next
 
-**Funds A** ([its plan](docs/milestones/funds/A/PLAN.md); design.md, "Funds A") is built: a
-second ledger of funds beside the accounts, with no rules. A fund fills or drains only when a
-transaction says so (`funds:` lines: `+` into a fund, `-` out), or by a move between funds.
-Unallocated is net worth less every fund, never written. Funds hold dollars, kept with their
-commodity so shares can follow. It was built over two sessions (the ledger and app server first,
-then the PWA, its tests and a look at every screen on a phone and a desktop, light and dark).
+**Read this first.** Everything is committed, released and live: **`v0.1.13`** (Funds A) and
+**`v0.1.14`** (receipts read in the background, plainer errors, account lists A–Z), and Emmer
+runs 0.1.14. Nothing is half done.
 
-- **For Kael to review:** A's plan, "Decisions to review" (1 to 13 from planning, 14 to 23 made
-  while building the screens: when the Funds section shows, the first line holding what's left,
-  saved lines that no longer fit not stopping Save, "No fund" on transfers, and so on).
-- **Next: Funds B**, starting with **asset-aware funds** (Kael's guiding case: a Fidelity
-  brokerage whose four funds, Wedding, Emergency, Special Home Maintenance and Repair, and
-  Special Home Improvement, hold shares). Its material is in
-  [docs/milestones/funds/B/](docs/milestones/funds/B/PLAN.md): its plan (headed with what A
-  settled and where B starts), the example book and the 71 scenarios to gut-check with Kael. A
-  is shaped for it: every stored amount keeps its commodity, a fund reports `holdings` and
-  `value`, and A refuses other commodities in one check (`fundlines.py`, `funds._checked`).
-- **Working on funds:** the rules live twice, `services/ledger/src/ledger/fundlines.py` and
+### What was done (2026-11-02)
+
+- **Funds A** ([its plan](docs/milestones/funds/A/PLAN.md), which now describes what was built;
+  design.md, "Funds A"): a second ledger of funds beside the accounts, with no rules. A fund fills
+  or drains only when a transaction says so (`funds:` lines: `+` into a fund, `-` out), or by a
+  move between funds. Unallocated is net worth less every fund, never written. Funds hold
+  dollars, kept with their commodity so shares can follow. Built over two sessions: the ledger
+  and app server first, then the PWA, its tests, and a look at every screen on a phone and a
+  desktop, light and dark.
+- **A receipt that 504'd on Emmer** (Kael, 2026-11-03 00:53 UTC): reading it took about 76
+  seconds (two Sonnet calls to read it, then an Opus call to categorize it) in one request, and
+  Emmer's nginx gives up at 60, so the PWA showed a bare "504 Gateway Time-out". Now reading runs
+  as a job (`Prefer: respond-async`, `server/jobs.ts`) the PWA asks after, showing its step; and
+  failed responses are put in words (design.md, "Receipts and AI (M16)"). That receipt's
+  transaction was most likely made anyway, after nginx gave up: it should be in Review.
+- **Account lists are A–Z** in every selector (Kael), within their groups (design.md, under
+  "Pickers offer only leaves…").
+
+### What to do next
+
+1. **Kael reviews Funds A's decisions** (A's plan, "Decisions to review": 1 to 13 from planning,
+   14 to 23 made while building the screens).
+2. **Funds B**, starting with **asset-aware funds** (Kael's guiding case: a Fidelity brokerage
+   whose four funds, Wedding, Emergency, Special Home Maintenance and Repair, and Special Home
+   Improvement, hold shares). Start at [B's plan](docs/milestones/funds/B/PLAN.md), "Picking up
+   B": what to do first, what A settled (and which of B's older decisions it replaced: lines
+   live on the transaction, not on splits), every place A assumes the operating currency, and
+   the questions to settle with Kael before building. Then the 71
+   [scenarios](docs/milestones/funds/B/scenarios.md) with Kael.
+3. Then M18 (suggested recurring transactions and matching rules); see "Next steps" below.
+
+### Working on it
+
+- **Funds' code:** the rules live twice, `services/ledger/src/ledger/fundlines.py` and
   `services/app/src/shared/funds.ts` (same wording), so the PWA says what the ledger would; the
   PWA's rows and the line that follows the transaction are `web/lib/funds.ts`; the screens are
-  `web/components/Funds.tsx`, `web/pages/Funds.tsx` and `web/pages/FundPage.tsx`. Ledger tests
-  without uv: `cd services/ledger && docker run --rm -v "$PWD/src:/srv/src" -v
+  `web/components/Funds.tsx`, `web/pages/Funds.tsx` and `web/pages/FundPage.tsx`. A's plan, "As
+  built", maps the rest.
+- **Ledger tests without uv:** `cd services/ledger && docker run --rm -v "$PWD/src:/srv/src" -v
   "$PWD/tests:/srv/tests" -w /srv luminous-money/ledger:test pytest -q -p no:cacheprovider`.
+  App units: `cd services/app && npx vitest run`; typechecks: `npx tsc -p tsconfig.web.json
+  --noEmit` and `tsconfig.server.json`.
+- **One end-to-end file at a time,** against the e2e stack (after `docker buildx bake default
+  e2e ui-tests simplefin-fake`, and `docker compose -p luminous-money-e2e -f compose.yaml -f
+  compose.e2e.yaml up -d --wait traefik auth ledger app ai mailpit simplefin-fake`), with the
+  test sources mounted so edits need no rebuild: API, `… run --rm -v
+  "$PWD/tests/e2e/src:/repo/tests/e2e/src" -w /repo/tests/e2e e2e node --test
+  --experimental-strip-types --no-warnings=ExperimentalWarning src/funds.test.ts`; browser,
+  `… run --rm -v "$PWD/tests/ui/src:/repo/tests/ui/src" -w /repo/tests/ui ui npx playwright
+  test src/funds.spec.ts --reporter=line`. A change to the app itself needs `docker buildx
+  bake app` and `… up -d --wait app`. Take the stack down (`… down --volumes`) before `pnpm
+  e2e`, which wants it fresh.
+- **Looking at screens:** a throwaway Playwright spec kept outside the repo and mounted into the
+  same `ui` container (say at `/repo/tests/ui/src/shots`), which seeds a book through the API,
+  then for each surface sets the viewport (390×844, 1280×900) and `page.emulateMedia({
+  colorScheme })` and takes a full-page screenshot. In that image's fonts **bold renders as
+  regular**, so screenshots don't show weights; a dialog's page shows below it in full-page
+  shots.
+- **Emmer** (the live server): `ssh kael@emmer.local` from the home network (no `emmer` alias
+  here). The services are `luminous-money-<service>-1` (`docker logs -t …`); Traefik's access
+  log is in the `traefik` container's output, and nginx sits in front of it (60-second read
+  timeout). Reading logs is fine when Kael asks; the books there are his real data: don't read
+  them.
 
 ### Also
 
@@ -39,13 +83,14 @@ then the PWA, its tests and a look at every screen on a phone and a desktop, lig
   its Release run): its [plan](docs/milestones/m17-transaction-tagging/PLAN.md) has the calls
   made without asking, design.md has "Tags (M17)". It needed ledger-graphs **0.1.2**
   (breakdown's `total` window), published from its own repository first.
-- **The live server is at `https://luminous.money`** (Emmer, on 0.1.11; moved 2026-10-27).
+- **The live server is at `https://luminous.money`** (Emmer, on 0.1.14; moved 2026-10-27).
   `luminous.money` is an ANAME for `emmer.kaelshipman.me` (an apex can't be a CNAME; name.com
   answers with Emmer's address, so it follows Emmer's dynamic DNS); `www`, `app` (the original
   system's) and `luminous.kaelshipman.me` redirect to it, and an app installed from the old
   address gets a service worker that removes itself, so it follows. The original system's
-  other names were removed. ~/Setup has it all (`docs/emmer.md`, section 6). Upgrading Emmer to
-  0.1.13 is Kael's: `/srv/luminous-money/luminous-money upgrade` (it backs up first).
+  other names were removed. ~/Setup has it all (`docs/emmer.md`, section 6). Upgrading it:
+  `/srv/luminous-money/luminous-money upgrade` (it backs up first); Kael's to run unless he asks
+  (he asked for 0.1.14's, 2026-11-02).
 - **A bug found on the live server, not fixed:** a linked brokerage opened with its lots at a
   $0.00 cost basis, so its gains (and any sale's capital gains) are wrong. The likely cause:
   `openingHoldings` (`services/app/src/server/simplefin/holdings.ts`) takes a reported
@@ -111,7 +156,8 @@ from github.com's redirect, not the API, whose 60-an-hour limit for an address h
 `LUMINOUS_MONEY_SIMPLEFIN_MODE`; **`v0.1.5`** names them all `LUMINOUS_MONEY_*` (they were `LM_*`);
 **`v0.1.10`** (2026-10-27) brings the chart of accounts import and migrating from another
 system, **`v0.1.11`** what the AI costs, **`v0.1.12`** (2026-10-29) tags (M17) and the
-migration's clearer word on what's kept, and **`v0.1.13`** (2026-11-02) Funds A. The history was rewritten once before
+migration's clearer word on what's kept, **`v0.1.13`** (2026-11-02) Funds A, and **`v0.1.14`**
+(2026-11-02) receipts read in the background, plainer errors, and account lists A–Z. The history was rewritten once before
 the first push (an email taken out of RESUME), so commit IDs from before then are gone.
 
 What a user can do now:
@@ -143,7 +189,8 @@ What a user can do now:
   it's ready, the masthead's **camera** opens Capture receipt: the live camera (or Upload
   instead), the account it was paid from (the page you came from), Itemize?, and anything you
   know (total, date, payee, note). **Create transaction** reads it (what it says, then where its
-  splits belong: rules, history, items bought before, then the AI) and lands on it in review;
+  splits belong: rules, history, items bought before, then the AI; in the background, the button
+  saying which step it's on, since it can take a minute or two) and lands on it in review;
   itemized, each line is a split with its own account to pick. Confirming or skipping goes back
   to where you were. The account that paid is the one holding the receipt's **card** (an asset
   or liability's editor lists its **Payment cards**: brand and last four), else the page you
@@ -252,8 +299,9 @@ What a user can do now:
   - **Manage books:** create a book (empty, or from a Beancount file such as an export), open,
     rename, export, set the time zone, and delete (type the name; Export offered). Names are
     unique per user.
-- **Menu:** the book's Home, Review, Accounts, Budgets, Reports, Schedules, Rules,
-  Commodities, Bank connections and AI; Manage books; Your account; Log out.
+- **Menu:** the book's Home, Review, Transactions, Accounts, Budgets, Funds, Reports, Schedules,
+  Rules, Commodities, Bank connections and AI; Manage books; Your account; Log out. Every list of
+  accounts to choose from is A–Z (within its groups).
 - **Schedules:** a transaction plus a rule (every N days/weeks/months/years, days of the month,
   weekends moved or kept, an optional end), made new or with "Repeat…" on any transaction.
   - Due occurrences are staged (at startup, after saves, and daily after midnight in the book's
@@ -291,7 +339,8 @@ What a user can do now:
   similar", "Remember as a rule…" and Select mode (Suggest categories) speed it up. Acceptance
   per categorizer shows on the Rules page.
 - **Select mode** (review, account ledgers and Transactions): a sticky bar with **Actions ▾**
-  (Confirm, Categorize as…, Suggest categories: rules, history and the book's AI), Select all
+  (Confirm, Categorize as…, Add tag…, Remove tag…, Fund…, Suggest categories: rules, history and
+  the book's AI), Select all
   and Done; tap anywhere on a card or row to select. Suggest categories is only a bulk action
   now (the old button, rules and history alone, seemed to do nothing).
 - **Investments (M5):** starred brokerages and holdings show **value, unrealized gain** and how
@@ -320,13 +369,16 @@ How it's put together:
   (`src/server/pipeline`: matcher, then assignment), match review (`src/server/matches.ts`) and
   schedules (`src/shared/schedule.ts` for rules, `src/server/schedules.ts` for the generator), and
   categorization (`src/server/categorize`: the chain, context, `rules`, `history`, external
-  providers; the external API's types in `src/shared/categorizer-api.ts`), in `app.sqlite`.
+  providers; the external API's types in `src/shared/categorizer-api.ts`), and funds (the rules in
+  `src/shared/funds.ts`, a rule's fund on what it stages in `src/server/funds.ts`), in
+  `app.sqlite`.
 - **`services/ai`** (TypeScript, M16): each book's AI settings and sealed credential
   (`ai.sqlite`), the providers (`src/providers`: `claude`, and `fake` for test stacks, chosen
   by `AI_PROVIDERS`), and two operations: `receipts/extract` (a receipt's facts; Claude Sonnet
   5) and `categorize` (where splits belong; Claude Opus 5). It answers; `app` composes and stages
-  (`src/server/receipts.ts`, the chain in `src/server/categorize`, its AI step `ai.ts`), and the
-  ledger keeps the files (attachments, migration 10). Their shared types are `packages/ai-api`.
+  (`src/server/receipts.ts`, the chain in `src/server/categorize`, its AI step `ai.ts`; reading
+  runs as a background job when asked, `src/server/jobs.ts`), and the ledger keeps the files
+  (attachments, migration 10). Their shared types are `packages/ai-api`.
 - **Migrating** (`services/app/src/server/migrate`): `store.ts` (progress, imported history),
   `gnucash.ts` (the transactions export), `reference.ts` (the derived reference, its entries for
   a batch, rule suggestions), `suggest.ts` (the background suggestions), `routes.ts`; the chart
@@ -342,9 +394,9 @@ How it's put together:
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 228 tests, including the table lint
-    - auth: 24; app: 248; ai: 14; db: 10; csv-import: 22
+    - auth: 24; app: 254; ai: 14; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 100 API tests and 121 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 101 API tests and 121 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Its `.env` (not committed: its keys) sets `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand`, so it never
@@ -355,17 +407,18 @@ How it's put together:
 ## Next steps
 
 1. **The first live deployment, on Emmer,** is up at `https://luminous.money` (since
-   2026-10-27; see the hand-off above), on 0.1.11, with Kael's real bank feed. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
+   2026-10-27; see "Also" above), on 0.1.14, with Kael's real bank feed. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
    `LM_SOURCE=release`: the installer on 127.0.0.1:8080 behind Emmer's nginx, which has the
    certificate; then `70_dns.sh` and `80_web.sh`). The release's five images must be public on
    ghcr.io (a package's settings, once each) for an install to pull them.
 2. **Kael migrates the live book on Emmer** (once released): Accounts → Migrate, with GnuCash's
-   two exports. Real Claude calls with a reference haven't been seen yet (no key in the repo);
-   watch the first suggestions' quality and `docker compose logs ai`. Not built from the
+   two exports. Real Claude calls run there now (receipts, 2026-11-03: reading one and
+   categorizing it took about 76 seconds, hence background jobs), but none with a reference
+   yet; watch the first suggestions' quality and `docker compose logs ai`. Not built from the
    proposal: a by-payee view in review (categorize a payee's group at once).
-3. **Funds B**, starting with asset-aware funds ([its plan](docs/milestones/funds/B/PLAN.md)),
-   once Kael has looked over Funds A's decisions to review. Then M18 (suggested recurring
-   transactions and matching rules).
+3. **Funds B**, starting with asset-aware funds ([its plan](docs/milestones/funds/B/PLAN.md),
+   "Picking up B"), once Kael has looked over Funds A's decisions to review. Then M18
+   (suggested recurring transactions and matching rules).
 4. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
 
@@ -413,6 +466,10 @@ How it's put together:
 - **A dialog is a portal, and React carries a portal's events up the React tree:** a form in one
   (Create account) submitted the form its picker sat in (a transaction's editor) as well, until
   2026-10-26. A form in a portal stops its submit's propagation.
+- **Anything that can take more than ~30 seconds runs as a job** (`Prefer: respond-async`,
+  `server/jobs.ts`; the PWA's `awaited` in `web/lib/appApi.ts` asks after it): a proxy in front
+  of the app may cut a request off (Emmer's nginx at 60 seconds). Receipts do; jobs are in
+  memory, so a restart loses them, and the PWA says the work may have finished.
 - **AI prices are a table** (`services/ai/src/pricing.ts`, from platform.claude.com's pricing
   page, 2026-10-26): a new model, or a price change, needs a line there. Without one, its calls
   show as "an unknown amount" (and the month's total too) rather than a wrong figure.

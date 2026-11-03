@@ -45,9 +45,20 @@ describe("account search", () => {
     expect(search(NAMES, "res")[0]).toBe("Expenses:Food:Restaurant");
   });
 
-  it("lists preferred roots first when nothing is typed", () => {
+  it("lists preferred roots first when nothing is typed, each A–Z", () => {
     expect(search(NAMES, "", preferredRoots(true))[0]).toMatch(/^Expenses:/);
     expect(search(NAMES, "", preferredRoots(false))[0]).toMatch(/^Income:/);
+    // A–Z, not shortest first: Home:Rent is shorter than Food:Restaurant.
+    expect(search(NAMES, "", preferredRoots(true)).slice(0, 3)).toEqual([
+      "Expenses:Food:Groceries",
+      "Expenses:Food:Restaurant",
+      "Expenses:Home:Rent",
+    ]);
+    expect(search(["Assets:Card-10", "Assets:card-2", "Assets:Bank"], "")).toEqual([
+      "Assets:Bank",
+      "Assets:card-2",
+      "Assets:Card-10",
+    ]);
   });
 
   it("treats colons like spaces", () => {
@@ -228,9 +239,9 @@ describe("typing a new account's name", () => {
   it("suggests open node accounts that continue what's typed, ignoring case", () => {
     expect(completions("exp", tree)).toEqual([
       "Expenses",
-      "Expenses:Fun",
       "Expenses:Food",
       "Expenses:Food:Dining",
+      "Expenses:Fun",
     ]);
     expect(completions("Expenses:Fo", tree)).toEqual(["Expenses:Food", "Expenses:Food:Dining"]);
     expect(completions("Expenses:Food:", tree)).toEqual(["Expenses:Food:Dining"]); // not the leaf

@@ -52,3 +52,20 @@ export function formatAmount(n: number, currency: string, cents = false): string
     maximumFractionDigits: cents ? 2 : 0,
   }).format(n);
 }
+
+/**
+ * What a failed response means, when its body doesn't say (a proxy's error page, say: Emmer's
+ * nginx answered a long receipt read with a bare "504 Gateway Time-out", 2026-11-02).
+ */
+export function statusMessage(status: number, statusText = ""): string {
+  const code = `${status}${statusText ? ` ${statusText}` : ""}`;
+  if (status === 502)
+    return `The server couldn't reach the app behind it (${code}): it may be restarting. Try again in a minute.`;
+  if (status === 503)
+    return `The server isn't taking requests right now (${code}): it may be restarting. Try again in a minute.`;
+  if (status === 504)
+    return `The server stopped waiting for an answer (${code}). What you asked for may still finish: look before trying again.`;
+  if (status === 413) return `That's more than the server takes in one request (${code}).`;
+  if (status >= 500) return `Something went wrong on the server (${code}).`;
+  return `The server refused that (${code}).`;
+}

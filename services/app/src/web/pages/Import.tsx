@@ -5,7 +5,7 @@ import { Link } from "wouter";
 import { partOf } from "../../shared/divided.js";
 import { ImportResults } from "../components/ImportResults.js";
 import { ProfileEditor } from "../components/ProfileEditor.js";
-import { displayName } from "../lib/accounts.js";
+import { displayName, sortedBy } from "../lib/accounts.js";
 import { ImportError, type ImportResult } from "../lib/appApi.js";
 import { bookHome } from "../lib/books.js";
 import { useBack, useParam } from "../lib/navigation.js";
@@ -46,8 +46,15 @@ export function Import({ book }: { book: string }) {
       ((a.kind === "leaf" && !a.implicit && !partOf(accounts, a.name)) ||
         (a.divided && !!a.main_part))
   );
-  const starred = (stars.data ?? []).flatMap((name) => open.filter((a) => a.name === name));
-  const others = open.filter((a) => !stars.data?.includes(a.name));
+  // Starred first (each group A–Z by what it shows: starred ones by their display names).
+  const starred = sortedBy(
+    open.filter((a) => stars.data?.includes(a.name)),
+    displayName
+  );
+  const others = sortedBy(
+    open.filter((a) => !stars.data?.includes(a.name)),
+    (a) => a.name
+  );
   const back = useBack("/");
   const preset = useParam("account");
   const [account, setAccount] = useState(preset ?? "");

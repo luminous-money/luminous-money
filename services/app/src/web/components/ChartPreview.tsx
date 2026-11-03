@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { ChartChoice, ChartPlan } from "../../shared/chart.js";
+import { alphabetical } from "../lib/accounts.js";
 import { formatMoney } from "../lib/decimal.js";
 import { formatDay } from "../lib/format.js";
 
@@ -81,7 +82,7 @@ export function ChartPreview({
                   onChange={(e) => choose(r.name, e.target.value)}
                 >
                   <option value="add">Add it</option>
-                  {choices!.accounts.map((a) => (
+                  {[...choices!.accounts].sort(alphabetical).map((a) => (
                     <option key={a} value={`same:${a}`}>
                       Same as {a}
                     </option>

@@ -6,6 +6,15 @@ import { normalizeName, toSegment, typed } from "../../shared/names.js";
 
 export { normalizeName, shown, shownInverted, toSegment, typed };
 
+/** A–Z as people read it: case and accents aside, numbers by value ("Card 2" before "Card 10").
+ * Every list of accounts a selector offers is in this order (within its groups). */
+export const alphabetical = (a: string, b: string) =>
+  a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
+
+/** Items A–Z by what's shown for each (an account's display name, say). */
+export const sortedBy = <T>(items: readonly T[], label: (item: T) => string): T[] =>
+  [...items].sort((a, b) => alphabetical(label(a), label(b)));
+
 /** Accounts a transaction dated `date` (ISO) can post to: leaves, open on that date. */
 export function postable(accounts: Account[], date: string): string[] {
   return accounts
@@ -31,7 +40,7 @@ export function preferredRoots(outflow: boolean): string[] {
 /**
  * Account search for the picker. Every word of the query must appear in the name. Matches at the
  * start of a segment rank first (so "food rest" finds Expenses:Food:Restaurant), then preferred
- * roots, then shorter names.
+ * roots, then A–Z.
  */
 export function search(names: string[], query: string, prefer: string[] = []): string[] {
   const words = query
@@ -54,10 +63,7 @@ export function search(names: string[], query: string, prefer: string[] = []): s
   return scored
     .sort(
       (a, b) =>
-        b.score - a.score ||
-        rootRank(a.name) - rootRank(b.name) ||
-        a.name.length - b.name.length ||
-        a.name.localeCompare(b.name)
+        b.score - a.score || rootRank(a.name) - rootRank(b.name) || alphabetical(a.name, b.name)
     )
     .map((x) => x.name);
 }
@@ -109,7 +115,7 @@ export function suggestName(query: string, accounts: Account[], preferredRoot: s
 
 /**
  * Node accounts the name could continue into: the open nodes that start with what's typed
- * (ignoring case), other than exactly what's typed. Shortest first, then alphabetically.
+ * (ignoring case), other than exactly what's typed, A–Z (so a node comes before what's under it).
  */
 export function completions(input: string, accounts: Account[]): string[] {
   const prefix = input.toLowerCase();
@@ -117,7 +123,7 @@ export function completions(input: string, accounts: Account[]): string[] {
     .filter((a) => a.kind === "node" && !a.close)
     .map((a) => a.name)
     .filter((name) => name.toLowerCase().startsWith(prefix) && name.length > input.length)
-    .sort((a, b) => a.length - b.length || a.localeCompare(b));
+    .sort(alphabetical);
 }
 
 /**

@@ -251,6 +251,10 @@ function payingIndex(t: Transaction, accounts: Account[], card: string | null): 
   return paying.find((i) => t.postings[i]!.account === card) ?? paying[0] ?? -1;
 }
 
+/** Where reading a receipt is, for whoever's waiting: the AI reading it, then categorizing its
+ * splits (the chain, the AI last), then writing it. */
+export type ReceiptStep = "reading" | "categorizing" | "saving";
+
 type Reading = {
   ledger: LedgerPort;
   ai?: AiPort;
@@ -263,6 +267,8 @@ type Reading = {
   book: string;
   file: ReceiptFile;
   today: string;
+  /** Told each step as it starts (a background job's progress). */
+  onStep?: (step: ReceiptStep) => void;
 };
 
 /** The file as it's kept, if it's one a receipt can be. */
@@ -313,6 +319,7 @@ async function read({
   today,
   target: given,
   attach = true,
+  onStep,
 }: Reading & { hints: ReceiptHints; target?: Transaction; attach?: boolean }): Promise<Captured> {
   const [info, accounts] = await Promise.all([ledger.book(book), ledger.accounts(book)]);
   if (!info) throw new ReceiptProblem(422, "there's no such book");
@@ -329,6 +336,7 @@ async function read({
   if (!ai || !settings) notes.push("AI isn't available right now, so it wasn't read.");
   else if (!settings.ready) notes.push("The book's AI isn't set up, so it wasn't read.");
   else {
+    onStep?.("reading");
     const answer = await ai.extract(book, {
       file: {
         data: Buffer.from(file.bytes).toString("base64"),
@@ -395,6 +403,7 @@ async function read({
         ]
       : []),
   ];
+  if (!keeps) onStep?.("categorizing");
   const request = keeps
     ? null
     : await buildRequest(ledger, { id: book, name: info.name }, [incoming]);
@@ -408,6 +417,7 @@ async function read({
       ? [ownPosting, ...staged.slice(1)]
       : staged;
 
+  onStep?.("saving");
   // Open what it posts to that isn't there yet: the placeholders, and (with account creation
   // on) the accounts the AI proposed.
   const proposed = new Set(

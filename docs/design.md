@@ -159,6 +159,11 @@ Beancount:
   every load, so they'd run once more each time.
 - **Pickers offer only leaves open on the transaction's date** as posting targets, and only
   nodes as parents.
+- **Account lists are A–Z** (Kael, 2026-11-02), by what they show (a part or a starred account
+  by its display name), case and accents aside and numbers by value (`alphabetical` and
+  `sortedBy` in `web/lib/accounts.ts`). Groups stay: the search picker lists the root that fits
+  first (expenses for money out) and, while typing, the best matches first; Import keeps its
+  Starred group. Within each, A–Z (it used to be shortest first).
 
 ### Start fresh, no GnuCash conversion
 
@@ -924,6 +929,16 @@ same money in through another's, a day or so later. Both would sit in review, un
     chart, the history and the book's guidance; text only, the chart cached in the system
     prompt.
   Each is tested and tuned on its own, and a failure of either still leaves a transaction.
+- **Reading runs in the background** (2026-11-02): the two calls take a minute or more (76
+  seconds on Emmer, where nginx gave up at 60 and the PWA showed a bare 504). Capture and Read
+  receipt send `Prefer: respond-async`; `app` answers 202 with a job (`server/jobs.ts`, in
+  memory, an hour after it finishes) and the PWA asks after it every 1.5 seconds, showing its
+  step ("Reading the receipt…", "Finding where it belongs…", "Saving it…"), riding out a
+  minute of blips. Without the header the request waits, as before (scripts, the API suite).
+  When the outcome can't be known (a 504, a lost connection, a restart that lost the job), the
+  error says it may have finished and where to look. Failed responses whose body doesn't say
+  why are put in words by `statusMessage` (`web/lib/format.ts`), and an unreachable server is
+  "Couldn't reach the server" rather than "Failed to fetch".
 - **The total is the one place the prompt invests now:** defined as what was charged to the
   payment, with the usual traps spelled out (a signed slip's handwritten tip, savings lines,
   cash and change, split tender, holds, returns); the answer quotes where it read it; and if

@@ -8,6 +8,7 @@
 import { useRef, useState } from "react";
 import { useLocation } from "wouter";
 
+import { receiptStepWords, type ReceiptStep } from "../lib/appApi.js";
 import { api, type Attachment } from "../lib/ledger.js";
 import { withBack } from "../lib/navigation.js";
 import {
@@ -44,10 +45,13 @@ export function Attachments({
   const readable = useReceiptsReady(book) && canWrite && !!transaction;
   const [location, navigate] = useLocation();
   const [error, setError] = useState<string | null>(null);
+  // Where reading it is (it runs in the background on the server: a minute or more).
+  const [step, setStep] = useState<ReceiptStep | null>(null);
   const read = async (attachment: string) => {
     setError(null);
+    setStep(null);
     try {
-      const made = await readReceipt.mutateAsync(attachment);
+      const made = await readReceipt.mutateAsync({ attachment, onStep: setStep });
       navigate(
         withBack(
           `/books/${book}/review?only=${made.transaction_id}${made.ai_cost !== null ? `&ai_cost=${made.ai_cost}` : ""}`,
@@ -113,8 +117,10 @@ export function Attachments({
                 disabled={readReceipt.isPending}
                 onClick={a.read}
               >
-                {readReceipt.isPending && readReceipt.variables === a.key
-                  ? "Reading…"
+                {readReceipt.isPending && readReceipt.variables?.attachment === a.key
+                  ? step
+                    ? receiptStepWords[step]
+                    : "Sending it…"
                   : "Read receipt"}
               </button>
             )}

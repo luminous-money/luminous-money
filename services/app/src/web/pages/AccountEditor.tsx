@@ -6,7 +6,7 @@ import { AccountSettings } from "../components/AccountSettings.js";
 import { BudgetForm, BudgetGlance } from "../components/Budget.js";
 import { NewAccountField } from "../components/NewAccountField.js";
 import { partOf } from "../../shared/divided.js";
-import { displayName, shown, toSegment, TYPE_LABELS } from "../lib/accounts.js";
+import { displayName, shown, sortedBy, toSegment, TYPE_LABELS } from "../lib/accounts.js";
 import { formatMoney, isDecimal } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
 import type { PurgePreview } from "../lib/appApi.js";
@@ -350,8 +350,11 @@ function Divided({
   const [divided, setDivided] = useState(account.divided);
   const whole = partOf(accounts, account.name);
   const below = accounts.find((a) => a.divided && a.name.startsWith(`${account.name}:`));
-  const parts = accounts.filter(
-    (a) => a.name.startsWith(`${account.name}:`) && a.kind === "leaf" && !a.implicit && !a.close
+  const parts = sortedBy(
+    accounts.filter(
+      (a) => a.name.startsWith(`${account.name}:`) && a.kind === "leaf" && !a.implicit && !a.close
+    ),
+    displayName
   );
   const href = (name: string) => `/books/${book}/accounts/${encodeURIComponent(name)}`;
   return (

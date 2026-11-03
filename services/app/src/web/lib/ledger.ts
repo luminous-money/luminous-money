@@ -18,6 +18,7 @@ import {
   type TransactionIn,
 } from "@luminous-money/ledger-client";
 
+import { statusMessage } from "./format.js";
 import { apiFetch } from "./session.js";
 
 // Every call refreshes the session on a 401 (see session.ts).
@@ -76,7 +77,7 @@ export async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
   if (response.ok && data !== undefined) return data;
   throw new ApiError(
     response.status,
-    describe(error) ?? `${response.status} ${response.statusText}`
+    describe(error) ?? statusMessage(response.status, response.statusText)
   );
 }
 

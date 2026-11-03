@@ -24,7 +24,8 @@ import {
 import { finish, ReconcileProblem, reconcileView, saveDraft } from "./reconcile.js";
 import type { AiPort } from "./ai.js";
 import { normalized, UPLOAD_LIMIT } from "./images.js";
-import { captureReceipt, readReceipt, ReceiptProblem } from "./receipts.js";
+import { captureReceipt, readReceipt, ReceiptProblem, type ReceiptStep } from "./receipts.js";
+import { Jobs, wantsAsync, type Failure } from "./jobs.js";
 import type { System } from "./system.js";
 import { pairAfterImport, pairedTransfers, rejectTransfer, TransferProblem } from "./transfers.js";
 import { UPCOMING_DAYS, type ScheduleIn, type SchedulePatch } from "../shared/schedule.js";
@@ -292,34 +293,76 @@ export function createApi({
     const attachment = typeof form["attachment"] === "string" ? form["attachment"] : null;
     if (!(file instanceof File) && !attachment)
       return c.json({ detail: "send the receipt as `file`, or name an `attachment`" }, 422);
-    const ledger = ledgerFor(c.get("user"));
+    const user = c.get("user");
+    const ledger = ledgerFor(user);
+    const given =
+      file instanceof File
+        ? { name: file.name, type: file.type, bytes: new Uint8Array(await file.arrayBuffer()) }
+        : null;
+    return readNowOrLater(c, book, 200, async (onStep) =>
+      readReceipt({
+        ledger,
+        ai: aiFor?.(user),
+        db,
+        categorizers,
+        reference: referenceFor(book),
+        book,
+        transaction: id,
+        itemize: typeof form["itemize"] === "string" ? form["itemize"] === "yes" : null,
+        ...(given
+          ? { file: given }
+          : { file: await ledger.attachmentFile(book, attachment!), attached: true }),
+        today: bookToday(db, book),
+        onStep,
+      })
+    );
+  });
+
+  // Reading a receipt takes a minute or more of AI calls, longer than a proxy in front may wait
+  // for a request: with `Prefer: respond-async`, it runs as a job (jobs.ts) and the caller asks
+  // after it. Without, the request waits, as it always did (scripts, the API suite).
+  const jobs = new Jobs();
+  const failureOf = (error: unknown): Failure =>
+    error instanceof ReceiptProblem || error instanceof LedgerError
+      ? { status: error.status, detail: error.message }
+      : {
+          status: 500,
+          detail: `something went wrong on the server while reading it (${(error as Error).message})`,
+        };
+  /** Answer with what `work` makes (201 or 200), or start it as a job and answer 202. */
+  const readNowOrLater = async (
+    c: Context<Env>,
+    book: string,
+    status: 200 | 201,
+    work: (onStep: (step: ReceiptStep) => void) => Promise<unknown>
+  ) => {
+    if (wantsAsync(c.req.header("prefer"))) {
+      const id = jobs.start(book, c.get("user"), work, failureOf);
+      c.header("location", `/api/app/v1/books/${book}/jobs/${id}`);
+      return c.json({ id, state: "running", step: null }, 202);
+    }
     try {
-      return c.json(
-        await readReceipt({
-          ledger,
-          ai: aiFor?.(c.get("user")),
-          db,
-          categorizers,
-          reference: referenceFor(book),
-          book,
-          transaction: id,
-          itemize: typeof form["itemize"] === "string" ? form["itemize"] === "yes" : null,
-          ...(file instanceof File
-            ? {
-                file: {
-                  name: file.name,
-                  type: file.type,
-                  bytes: new Uint8Array(await file.arrayBuffer()),
-                },
-              }
-            : { file: await ledger.attachmentFile(book, attachment!), attached: true }),
-          today: bookToday(db, book),
-        })
-      );
+      return c.json(await work(() => {}), status);
     } catch (error) {
       if (error instanceof ReceiptProblem) return c.json({ detail: error.message }, error.status);
       return c.json(...ledgerStatus(error));
     }
+  };
+
+  /** A job started with `Prefer: respond-async` (a receipt being read): running (with its
+   * step), done (with what it made), or failed (with why). Only its starter sees it. */
+  api.get("/books/:book/jobs/:id", (c) => {
+    const { book, id } = c.req.param();
+    const job = jobs.get(id, book, c.get("user"));
+    if (!job)
+      return c.json(
+        {
+          detail:
+            "the server has no record of that work (it may have restarted): it may have finished before that, so look before trying again",
+        },
+        404
+      );
+    return c.json(job);
   });
 
   /** Capture a receipt (M16): multipart, with `file` and the hints (`account`, `itemize`
@@ -337,36 +380,29 @@ export function createApi({
     const total = text("total");
     if (total && !/^-?\d+(\.\d+)?$/.test(total))
       return c.json({ detail: "the total is a number, like -12.34" }, 422);
-    try {
-      return c.json(
-        await captureReceipt({
-          ledger: ledgerFor(c.get("user")),
-          ai: aiFor?.(c.get("user")),
-          db,
-          categorizers,
-          reference: referenceFor(book),
-          book,
-          file: {
-            name: file.name,
-            type: file.type,
-            bytes: new Uint8Array(await file.arrayBuffer()),
-          },
-          hints: {
-            account: text("account"),
-            total,
-            date: text("date"),
-            payee: text("payee"),
-            note: text("note"),
-            itemize: text("itemize") === null ? null : text("itemize") === "yes",
-          },
-          today: bookToday(db, book),
-        }),
-        201
-      );
-    } catch (error) {
-      if (error instanceof ReceiptProblem) return c.json({ detail: error.message }, error.status);
-      return c.json(...ledgerStatus(error));
-    }
+    const user = c.get("user");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    return readNowOrLater(c, book, 201, (onStep) =>
+      captureReceipt({
+        ledger: ledgerFor(user),
+        ai: aiFor?.(user),
+        db,
+        categorizers,
+        reference: referenceFor(book),
+        book,
+        file: { name: file.name, type: file.type, bytes },
+        hints: {
+          account: text("account"),
+          total,
+          date: text("date"),
+          payee: text("payee"),
+          note: text("note"),
+          itemize: text("itemize") === null ? null : text("itemize") === "yes",
+        },
+        today: bookToday(db, book),
+        onStep,
+      })
+    );
   });
 
   // Reports (M12): datasets from the ledger's postings, ready to draw. `on` is the caller's

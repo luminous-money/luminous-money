@@ -1,9 +1,10 @@
 Funds: scenarios
 ==================================================================================================
 
-> **For Funds B (2026-11-02):** Funds A, built first, has no rules at all: a fund changes only when
-> a transaction names it, or by a move. These scenarios are B's: start from [B's plan](PLAN.md),
-> "Picking up B".
+> **For Funds B (2026-11-02):** Funds A (built, `v0.1.13`) has no rules at all: a fund changes
+> only when a transaction names it, or by a move. These scenarios are B's: start from [B's
+> plan](PLAN.md), "Picking up B". In A, a fund is chosen on the transaction (its lines), not on a
+> split: read "marked" below that way.
 >
 > **Why this exists (2026-10-31):** the design got muddy, so we're restarting from cases. Below are
 > 71 events, simplest first, each saying what we'd expect funds to do. We work backward from them

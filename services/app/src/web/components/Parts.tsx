@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 
-import { displayName, shown } from "../lib/accounts.js";
+import { displayName, shown, sortedBy } from "../lib/accounts.js";
 import { add, formatMoney, isDecimal, isNegative, negate } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
 import type { TreeAccount } from "../lib/ledger.js";
@@ -172,7 +172,7 @@ export function MoveMoney({
       <label>
         From
         <select value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From">
-          {parts.map((p) => (
+          {sortedBy(parts, displayName).map((p) => (
             <option key={p.name} value={p.name}>
               {displayName(p)}
             </option>
@@ -182,7 +182,7 @@ export function MoveMoney({
       <label>
         To
         <select value={to} onChange={(e) => setTo(e.target.value)} aria-label="To">
-          {parts.map((p) => (
+          {sortedBy(parts, displayName).map((p) => (
             <option key={p.name} value={p.name}>
               {displayName(p)}
             </option>

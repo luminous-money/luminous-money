@@ -194,6 +194,65 @@ describe("M16: receipt capture", () => {
     );
   });
 
+  it("reads in the background when asked (Prefer: respond-async), so no proxy's timeout cuts it off", async () => {
+    const user = await newUser();
+    const book = await bookFor(user);
+    const settings = (await (await ai(user, `/books/${book}/settings`)).json()) as {
+      updated_at: string | null;
+    };
+    await ai(user, `/books/${book}/settings`, "PATCH", {
+      updated_at: settings.updated_at,
+      enabled: true,
+      provider: "fake",
+    });
+    const start = async (file: Blob, name: string) => {
+      const form = new FormData();
+      form.set("file", file, name);
+      form.set("account", CARD);
+      return user.app(`/books/${book}/receipts`, {
+        method: "POST",
+        body: form,
+        headers: { prefer: "respond-async" },
+      });
+    };
+    type Job = {
+      id: string;
+      state: string;
+      step?: string | null;
+      result?: { transaction_id: string; read: boolean };
+      status?: number;
+      detail?: string;
+    };
+    const finished = async (id: string) => {
+      for (let i = 0; i < 60; i++) {
+        const job = (await (await user.app(`/books/${book}/jobs/${id}`)).json()) as Job;
+        if (job.state !== "running") return job;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      throw new Error("the job never finished");
+    };
+
+    const started = await start(new Blob([PHOTO], { type: "image/jpeg" }), "jewel.jpg");
+    assert.equal(started.status, 202);
+    const { id } = (await started.json()) as Job;
+    assert.equal(started.headers.get("location"), `/api/app/v1/books/${book}/jobs/${id}`);
+    const done = await finished(id);
+    assert.equal(done.state, "done");
+    assert.equal(done.result!.read, true);
+    assert.equal((await transaction(user, book, done.result!.transaction_id)).flag, "!");
+
+    // Only whoever started it can ask after it.
+    const stranger = await newUser();
+    assert.equal((await stranger.app(`/books/${book}/jobs/${id}`)).status, 404);
+
+    // What would have been refused at once says why when asked after.
+    const refused = await start(new Blob(["not a receipt"], { type: "text/plain" }), "notes.txt");
+    assert.equal(refused.status, 202);
+    const failed = await finished(((await refused.json()) as Job).id);
+    assert.deepEqual([failed.state, failed.status], ["failed", 415]);
+    assert.match(failed.detail!, /a photo or a PDF/);
+  });
+
   it("makes one from what you typed when the book has no AI", async () => {
     const user = await newUser();
     const book = await bookFor(user);

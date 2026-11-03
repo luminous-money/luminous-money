@@ -10,6 +10,7 @@
  * since the refresh token rotates on every use. While the app is open it also refreshes ahead
  * of expiry (`keepFresh`), so plain links (exports) keep working.
  */
+import { statusMessage } from "./format.js";
 import { ApiError } from "./ledger.js";
 
 export type User = {
@@ -76,12 +77,29 @@ export function refresh(): Promise<boolean> {
   return refreshing;
 }
 
+/** The server couldn't be reached at all (no connection, or nothing answering). */
+export class Unreachable extends Error {
+  constructor() {
+    super("Couldn't reach the server: check the connection, then try again.");
+  }
+}
+
+/** `fetch`, saying so in words when the server can't be reached (the browser's own error is a
+ * bare "Failed to fetch" or "Load failed"). A cancelled request stays as it is. */
+async function reach(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    throw error instanceof TypeError ? new Unreachable() : error;
+  }
+}
+
 /** `fetch` for the APIs: on a 401, refresh once and retry; if that fails, the session is over. */
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const retry = input instanceof Request ? input.clone() : input;
-  const response = await fetch(input, init);
+  const response = await reach(input, init);
   if (response.status !== 401) return response;
-  if (await refresh()) return fetch(retry, init);
+  if (await refresh()) return reach(retry, init);
   window.dispatchEvent(new Event(LOGGED_OUT));
   return response;
 }
@@ -105,14 +123,17 @@ async function call<T>(
   init: RequestInit & { json?: unknown; own?: boolean } = {}
 ): Promise<T> {
   const { json, own, ...rest } = init;
-  const response = await (own ? apiFetch : fetch)(`${AUTH}${path}`, {
+  const response = await (own ? apiFetch : reach)(`${AUTH}${path}`, {
     ...rest,
     headers: json === undefined ? rest.headers : { "content-type": "application/json" },
     body: json === undefined ? rest.body : JSON.stringify(json),
   });
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { detail?: string };
-    throw new ApiError(response.status, body.detail ?? `${response.status} ${response.statusText}`);
+    throw new ApiError(
+      response.status,
+      body.detail ?? statusMessage(response.status, response.statusText)
+    );
   }
   return (
     response.status === 204 || response.status === 202 ? undefined : await response.json()

@@ -48,6 +48,7 @@ import {
   type CategoryRule,
   type CategoryRuleIn,
   type ProposedMatch,
+  type ReceiptStep,
   type Schedule,
   type ScheduleIn,
   type SchedulePatch,
@@ -1217,11 +1218,14 @@ export function useCaptureReceipt(book: string) {
       file,
       filename,
       hints,
+      onStep,
     }: {
       file: Blob;
       filename: string;
       hints: Record<string, string | null | undefined>;
-    }) => receipts.capture(book, file, filename, hints),
+      /** Told where reading it is, as it goes. */
+      onStep?: (step: ReceiptStep) => void;
+    }) => receipts.capture(book, file, filename, hints, onStep),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
   });
 }
@@ -1248,7 +1252,13 @@ export function useAttach(book: string, transaction: string) {
 export function useReadReceipt(book: string, transaction: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (attachment: string) => receipts.readInto(book, transaction, attachment),
+    mutationFn: ({
+      attachment,
+      onStep,
+    }: {
+      attachment: string;
+      onStep?: (step: ReceiptStep) => void;
+    }) => receipts.readInto(book, transaction, attachment, onStep),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
   });
 }

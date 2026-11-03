@@ -4,7 +4,7 @@
  * else about it changes, and the whole's balance doesn't move.
  */
 import { partOf } from "../../shared/divided.js";
-import { displayName } from "../lib/accounts.js";
+import { displayName, sortedBy } from "../lib/accounts.js";
 import { isNegative } from "../lib/decimal.js";
 import { useAccounts } from "../lib/queries.js";
 
@@ -27,8 +27,11 @@ export function PartChoice<P extends Posting>({
   if (index < 0) return null;
   const posting = postings[index]!;
   const whole = partOf(accounts, posting.account)!;
-  const parts = accounts.filter(
-    (a) => a.name.startsWith(`${whole}:`) && a.kind === "leaf" && !a.implicit && !a.close
+  const parts = sortedBy(
+    accounts.filter(
+      (a) => a.name.startsWith(`${whole}:`) && a.kind === "leaf" && !a.implicit && !a.close
+    ),
+    displayName
   );
   const out = posting.units ? isNegative(posting.units.number) : true;
   const label = out ? "Paid from" : "Into";

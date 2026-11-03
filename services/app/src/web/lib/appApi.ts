@@ -28,6 +28,7 @@ import type {
   Step,
 } from "../../shared/migration.js";
 
+import { statusMessage } from "./format.js";
 import { ApiError, type Attachment } from "./ledger.js";
 import type { PairedTransfer } from "../../shared/transfers.js";
 import type { SystemInfo } from "../../shared/system.js";
@@ -154,7 +155,7 @@ async function json<T>(response: Response): Promise<T> {
   const body = (await response.json().catch(() => ({}))) as { detail?: string; code?: string };
   throw new ImportError(
     response.status,
-    body.detail ?? `${response.status} ${response.statusText}`,
+    body.detail ?? statusMessage(response.status, response.statusText),
     body.code
   );
 }
@@ -300,29 +301,122 @@ const transactionPath = (book: string, transaction: string) =>
 
 /** Receipts (M16): the file and the hints, read by the ai service if the book has it, staged
  * unconfirmed with the receipt attached (or read into the bank's copy, if that's here). */
+/** Where reading a receipt is (server/receipts.ts): the AI reading it, then categorizing its
+ * splits, then saving it. */
+export type ReceiptStep = "reading" | "categorizing" | "saving";
+
+/** Work whose outcome isn't known: it may have finished though we couldn't hear back (a timeout,
+ * a lost connection, the server restarting). Pages say where to look before trying again. */
+export class OutcomeUnknown extends ApiError {}
+
+type JobView<T> = { id: string } & (
+  | { state: "running"; step: string | null }
+  | { state: "done"; result: T }
+  | { state: "failed"; status: number; detail: string }
+);
+
+const ASK_EVERY = 1500;
+/** How long blips while asking after a job (no connection for a moment, a proxy restarting) are
+ * ridden out, and how long a job is waited for at all. */
+const BLIPS_FOR = 60_000;
+const WAIT_FOR = 10 * 60_000;
+
+/**
+ * Background work (`Prefer: respond-async`, server/jobs.ts: reading a receipt is a minute or
+ * more of AI calls, longer than a proxy may wait for one request), asked after every 1.5 seconds
+ * until it's done, telling `onStep` where it is. An answer that isn't a job (done at once, or
+ * refused) is read as usual.
+ */
+async function awaited<T>(
+  book: string,
+  started: Response,
+  onStep?: (step: ReceiptStep) => void
+): Promise<T> {
+  if (started.status === 504) throw new OutcomeUnknown(504, statusMessage(504, started.statusText));
+  if (started.status !== 202) return json<T>(started);
+  const { id } = (await started.json()) as { id: string };
+  const until = Date.now() + WAIT_FOR;
+  let blipsSince: number | null = null;
+  let lastBlip = "";
+  while (Date.now() < until) {
+    await new Promise((resolve) => setTimeout(resolve, ASK_EVERY));
+    let response: Response | null = null;
+    try {
+      response = await apiFetch(`${base(book)}/jobs/${id}`);
+    } catch (error) {
+      lastBlip = (error as Error).message;
+    }
+    if (!response || [502, 503, 504].includes(response.status)) {
+      if (response) lastBlip = statusMessage(response.status, response.statusText);
+      blipsSince ??= Date.now();
+      if (Date.now() - blipsSince > BLIPS_FOR)
+        throw new OutcomeUnknown(
+          response?.status ?? 0,
+          `Lost touch with the server while it was working on this (${lastBlip}). It may still have finished: look before trying again.`
+        );
+      continue;
+    }
+    blipsSince = null;
+    if (response.status === 404) {
+      const body = (await response.json().catch(() => ({}))) as { detail?: string };
+      throw new OutcomeUnknown(404, body.detail ?? statusMessage(404, response.statusText));
+    }
+    const job = await json<JobView<T>>(response);
+    if (job.state === "done") return job.result;
+    if (job.state === "failed") throw new ApiError(job.status, job.detail);
+    if (job.step) onStep?.(job.step as ReceiptStep);
+  }
+  throw new OutcomeUnknown(
+    0,
+    "It's still being worked on after 10 minutes. It may yet finish: look before trying again."
+  );
+}
+
+const inBackground = { headers: { prefer: "respond-async" } };
+
 export const receipts = {
   capture: async (
     book: string,
     file: Blob,
     filename: string,
-    hints: Record<string, string | null | undefined>
+    hints: Record<string, string | null | undefined>,
+    onStep?: (step: ReceiptStep) => void
   ): Promise<Captured> => {
     const form = new FormData();
     form.set("file", file, filename);
     for (const [key, value] of Object.entries(hints)) if (value) form.set(key, value);
-    return json(await apiFetch(`${base(book)}/receipts`, { method: "POST", body: form }));
+    return awaited(
+      book,
+      await apiFetch(`${base(book)}/receipts`, { method: "POST", body: form, ...inBackground }),
+      onStep
+    );
   },
   /** Read a receipt the transaction holds into it, sending it back to review. */
-  readInto: async (book: string, transaction: string, attachment: string): Promise<Captured> => {
+  readInto: async (
+    book: string,
+    transaction: string,
+    attachment: string,
+    onStep?: (step: ReceiptStep) => void
+  ): Promise<Captured> => {
     const form = new FormData();
     form.set("attachment", attachment);
-    return json(
+    return awaited(
+      book,
       await apiFetch(`${transactionPath(book, transaction)}/receipt`, {
         method: "POST",
         body: form,
-      })
+        ...inBackground,
+      }),
+      onStep
     );
   },
+};
+
+/** What a receipt read is doing, in words, for a button or a status line. */
+export const receiptStepWords: Record<ReceiptStep, string> = {
+  reading: "Reading the receipt…",
+  categorizing: "Finding where it belongs…",
+  saving: "Saving it…",
 };
 
 /** Attachments (M16) go through the app, which keeps images as any browser shows them (an

@@ -13,6 +13,7 @@ import { AccountPicker } from "../components/AccountPicker.js";
 import { CameraView, prepared, useHasCamera } from "../components/Camera.js";
 import { baseAccounts } from "../../shared/accounts.js";
 import { displayName } from "../lib/accounts.js";
+import { OutcomeUnknown, receiptStepWords, type ReceiptStep } from "../lib/appApi.js";
 import { isDecimal, negate } from "../lib/decimal.js";
 import { useBack, useParam, withBack } from "../lib/navigation.js";
 import { explain, useAccounts, useAiSettings, useCaptureReceipt } from "../lib/queries.js";
@@ -36,6 +37,9 @@ export function CaptureReceipt({ book }: { book: string }) {
   const [date, setDate] = useState("");
   const [payee, setPayee] = useState("");
   const [note, setNote] = useState("");
+  // Where reading it is: the server reads it in the background (a minute or more of AI calls)
+  // and this asks after it.
+  const [step, setStep] = useState<ReceiptStep | null>(null);
 
   const chart = accounts.data ?? [];
   const bases = useMemo(() => baseAccounts(chart), [chart]);
@@ -49,6 +53,7 @@ export function CaptureReceipt({ book }: { book: string }) {
 
   const submit = async () => {
     if (!photo) return;
+    setStep(null);
     try {
       // Typed as spent (or refunded); stored as it moves the base account: a purchase takes
       // money out of a bank account, and adds to what's owed on a card, negative either way.
@@ -64,6 +69,7 @@ export function CaptureReceipt({ book }: { book: string }) {
           payee: payee.trim() || null,
           note: note.trim() || null,
         },
+        onStep: setStep,
       });
       navigate(
         withBack(
@@ -216,7 +222,23 @@ export function CaptureReceipt({ book }: { book: string }) {
                 <Link href={`/books/${book}/ai`}>Set it up</Link>
               </p>
             )}
-            {capture.error && <p className="error">{explain(capture.error)}</p>}
+            {capture.error && (
+              <p className="error" role="alert">
+                {explain(capture.error)}
+                {capture.error instanceof OutcomeUnknown && (
+                  <>
+                    {" "}
+                    <Link href={withBack(`/books/${book}/review`, back)}>Open Review</Link>
+                  </>
+                )}
+              </p>
+            )}
+            {capture.isPending && (
+              <p className="small muted" role="status">
+                {step ? receiptStepWords[step] : "Sending it…"} Reading a receipt can take a minute
+                or two.
+              </p>
+            )}
             <div className="actions">
               <button
                 type="submit"
@@ -225,7 +247,11 @@ export function CaptureReceipt({ book }: { book: string }) {
                 // own, `preset`, once it's there).
                 disabled={!photo || !totalOk || !accounts.data || capture.isPending}
               >
-                {capture.isPending ? "Reading it…" : "Create transaction"}
+                {capture.isPending
+                  ? step
+                    ? receiptStepWords[step]
+                    : "Sending it…"
+                  : "Create transaction"}
               </button>
             </div>
           </form>
