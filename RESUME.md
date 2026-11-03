@@ -89,8 +89,10 @@ runs 0.1.14. Nothing is half done.
   system's) and `luminous.kaelshipman.me` redirect to it, and an app installed from the old
   address gets a service worker that removes itself, so it follows. The original system's
   other names were removed. ~/Setup has it all (`docs/emmer.md`, section 6). Upgrading it:
-  `/srv/luminous-money/luminous-money upgrade` (it backs up first); Kael's to run unless he asks
-  (he asked for 0.1.14's, 2026-11-02).
+  `/srv/luminous-money/luminous-money upgrade` (it backs up first; a version is given without
+  its `v`, `upgrade 0.1.14`, or left out for the latest). Kael's to run unless he asks: he asked
+  for 0.1.14's, run 2026-11-03 02:57 UTC from 0.1.12 (its backups are in
+  `/srv/luminous-money/backups`), all healthy after.
 - **A bug found on the live server, not fixed:** a linked brokerage opened with its lots at a
   $0.00 cost basis, so its gains (and any sale's capital gains) are wrong. The likely cause:
   `openingHoldings` (`services/app/src/server/simplefin/holdings.ts`) takes a reported
