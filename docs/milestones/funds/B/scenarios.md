@@ -2,9 +2,10 @@ Funds: scenarios
 ==================================================================================================
 
 > **For Funds B (2026-11-02):** Funds A (built, `v0.1.13`) has no rules at all: a fund changes
-> only when a transaction names it, or by a move. These scenarios are B's: start from [B's
-> plan](PLAN.md), "Picking up B". In A, a fund is chosen on the transaction (its lines), not on a
-> split: read "marked" below that way.
+> only when a transaction names it, or by a move. These scenarios are B's: start from [the design
+> record](design-record.md), "Picking up B". In A, a fund is chosen on the transaction (its
+> lines), not on a split: read "marked" below that way. [B's plan](PLAN.md) takes shares in funds
+> first (2026-11-03), which settles what level 5 needs to pick funds by hand; the rest waits.
 >
 > **Why this exists (2026-10-31):** the design got muddy, so we're restarting from cases. Below are
 > 71 events, simplest first, each saying what we'd expect funds to do. We work backward from them
@@ -16,7 +17,8 @@ Each scenario has:
 - **Books:** the transaction as the books record it, with account names shortened.
 - **Expect:** what we'd want funds to do. This is Claude's first draft of the gut feel, for Kael to
   confirm or correct.
-- **Old rules:** what the model in [PLAN.md](PLAN.md) (as of 2026-10-30) does, summarized below.
+- **Old rules:** what the model in [the design record](design-record.md) (as of 2026-10-30)
+  does, summarized below.
 - **Question,** where the expectation isn't obvious.
 
 **⚠** marks a scenario where the old rules and the expectation part ways, or where the old rules
@@ -24,7 +26,7 @@ have no answer. [What the scenarios turn up](#what-the-scenarios-turn-up) groups
 
 ## The old rules, in brief
 
-PLAN.md has the reasons. These are what the "Old rules" lines apply:
+The design record has the reasons. These are what the "Old rules" lines apply:
 
 1. **Only asset and liability splits move funds,** by their amounts, so a transaction's fund
    changes equal its change in net worth, per asset.
@@ -122,8 +124,8 @@ running errands (Chores), $38 as a family (Family).
 - **Expect:** Social −18 (to $92), Chores −24 (to $116), Family −38 (to $142). Seen as budgets:
   Social has spent $58 of November's $150, Chores $84 of $200, Family $158 of $300. The account
   says *what* (restaurants), the fund says *why*.
-- **Old rules:** the same fund changes. How budget funds are shown isn't designed (PLAN.md, open
-  question 1).
+- **Old rules:** the same fund changes. How budget funds are shown isn't designed (the design
+  record, open question 1).
 
 ### 9. ⚠ Over budget
 
@@ -317,7 +319,7 @@ $50 on the Visa, `Auto:Fuel`, on a weekend road trip. No fund is for it.
 - **Expect:** unclear. Seeing what the trip cost (gas, food, a motel) is what a tag does
   (`#road-trip`). Having it come out of a "Fun" budget is what a fund does. Probably both.
 - **Old rules:** Unallocated −50.
-- **Question:** where does a tag end and a fund begin? (PLAN.md, open question 3.)
+- **Question:** where does a tag end and a fund begin? (The design record, open question 3.)
 
 ### 25. ⚠ A hotel bigger than what's left for it
 
@@ -721,7 +723,7 @@ On December 1, Social has $50 left, Chores is at −$30 and Family at $0.
 - **Expect** (if they're topped up from Unallocated on the 1st): Social +100, Chores +230, Family
   +300: $630 from Unallocated. If Unallocated has less cash than that on the 1st (payday is the
   5th), it goes negative for four days.
-- **Old rules:** none: budget funds aren't designed (PLAN.md, open question 1).
+- **Old rules:** none: budget funds aren't designed (the design record, open question 1).
 
 ### 66. A paycheck and a bill on the same day
 

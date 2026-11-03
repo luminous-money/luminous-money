@@ -1,565 +1,523 @@
 Funds B: Complex Fund Functionality: plan
 ==================================================================================================
 
-> **Status (2026-11-02): next, not started.** Funds was split in two (Kael, 2026-11-02).
-> [A: Basic Funds](../A/PLAN.md) is **built and released (`v0.1.13`)**: the dual ledger with no
-> rules, funds holding dollars. B is everything below, and **asset-aware funds are its first
-> step** (Kael's guiding case is a brokerage whose four funds hold shares). Most of this file is
-> the design record from before the split, made for the whole design; where A settled or
-> replaced a decision, "Picking up B" says so, and A's plan has what was built.
->
-> **Status before the split: back to the drawing board (Kael, 2026-10-31), restarting from
-> scenarios.** Nothing was built then. In an interview (2026-10-30) Kael answered most of the
-> open questions, added two new threads (funds as budgets for *why* money is spent, and big loans
-> as a special case), then found the design "getting really blurry" and decided to start it over.
-> **The restart:** [example-book.md](example-book.md) (a made-up household's accounts and funds)
-> and [scenarios.md](scenarios.md) (71 events, simplest first, each with what we'd expect funds
-> to do). Kael gut-checks the expectations; then we work backward to the rules and decide what to
-> cut. This file records everything up to the restart, so it can take what it wants from it: the problem, how we got here (and why each turn was taken), what was decided, the
-> model as it stood, and what's still open. Nothing here binds the fresh start. The whole
-> conversation, verbatim, is in `discussion.private.md` beside this file. It uses real figures,
-> so it's git-ignored (`docs/**/*.private.md`): it exists only on Kael's machines, and an agent
-> working from GitHub won't have it. Examples here use made-up figures and names.
+> **Status (2026-11-03): step 1 planned with Kael, nothing built.** B is built in steps (Kael,
+> 2026-11-03). **Step 1 is shares in funds:** a fund holds amounts of any commodity, not just
+> dollars, so that Kael can represent every one of his Fidelity accounts in funds. With it come
+> account default funds (the IRAs are Retirement's), a flag on a sale that says no fund, and a
+> Notifications queue. Houses, cars and loans wait. Kael's answers are under [Decided with
+> Kael](#decided-with-kael), and the calls made without asking under [Decisions to
+> review](#decisions-to-review). The rest of B comes after step 1 ships. Everything designed
+> before this (the old plan, rules included) is in [the design record](design-record.md), with
+> [the example book](example-book.md) and [71 scenarios](scenarios.md).
 
-## Picking up B
+## Step 1: shares in funds
 
-### What to do first
+### The goal (Kael, 2026-11-03)
 
-1. **Asset-aware funds** (Kael's guiding case: a Fidelity brokerage whose four funds, Wedding,
-   Emergency, Special Home Maintenance and Repair, and Special Home Improvement, hold shares).
-   Design it with Kael before building: the questions below under "Asset-aware funds: what A
-   leaves to decide". A was shaped so this mostly lifts restrictions (A's plan, "Toward assets").
-2. **Then walk [the scenarios](scenarios.md) with Kael,** against [the example
-   book](example-book.md): each "Expect" line is a draft for him to confirm or correct, and their
-   closing section groups where the old rules and the expectations part ways. Work backward from
-   them to the rules, and decide what to cut. Scenarios that only choose a fund on a transaction,
-   move money or archive a fund are settled by A and need no rules. Where a scenario says a split
-   is "marked", read it as A's line on the transaction (below).
-3. **Still open from before A** are under "Open questions": budget funds, fill priority, funds
-   against tags, big loans, a group's fund.
+"My use is limited by not being able to assign assets to funds." Step 1 is done when Kael can
+represent all of his Fidelity accounts in funds:
 
-### What A settled (and what it replaced here)
+- **The taxable brokerage,** linked over SimpleFIN (so the books hold `<account>:Cash` and an
+  account per holding), divided among Wedding, Emergency, Special Home Maintenance and Repair,
+  Special Home Improvement and Unallocated. Kael's three needs from the start (the design record,
+  "The problem"):
+  1. **Fluctuations follow the holdings:** each fund's value moves with what it holds.
+  2. **Holdings move between funds:** "move 10 shares from home maintenance to the wedding."
+  3. **Reinvestments land in a default,** to be moved by hand if wanted. In step 1 the default is
+     Unallocated (Kael).
+- **A Roth IRA and a traditional IRA,** both wholly Retirement's (Kael): Retirement is each one's
+  [default fund](#an-accounts-default-fund), so it holds everything in them without anything
+  being marked.
+- **The Fidelity Visa** needs nothing new: it's a card, so spending on it is money out, as in A.
 
-A's plan and design.md ("Funds A") have the reasons. B inherits these unless Kael reopens them:
+Two things come with it (Kael, 2026-11-03): a sale that takes shares no fund has to give is
+[flagged](#a-sale-that-says-no-fund), and flagged transactions that came in by themselves wait
+in [Notifications](#notifications), a bell beside the camera.
 
-- **Two ledgers over the same money,** accounts (where) and funds (what for). **Unallocated** is
-  net worth less every fund (the house and retirement included), worked out and never written:
-  not "a fund the system keeps" with entries of its own, as below.
-- **Lines are on the transaction, not its splits** (A's decision 1). This *replaces* "Stored …
-  as posting metadata (`fund:`)" under "Moving and storing" below, and changes what "marking a
-  split" means everywhere below: a transaction carries one `funds:` metadata string of signed
-  lines (`Emergency +500.00 USD; Wedding -20.00 USD`), with a derived `fund_line` table. Putting
-  funds on splits would mean cutting the bank's split in two, which breaks review cards,
-  matching and reconciliation. The old model's "only asset and liability splits move funds" and
-  its account defaults were per split; B has to say how defaults, the spend order and
-  conversions read against transaction-level lines (one way: the rules decide a transaction's
-  lines from its balance-sheet splits, and an explicit line wins).
-- **A transaction's kind comes from its change in net worth** (its asset and liability splits,
-  weighed in the operating currency): money in goes *to* funds (`+`), money out comes *from*
-  them (`−`), a transfer puts money *toward* them (`+`, and with More options `−` too). So a
-  refund is money in, an opening balance can start a fund, a trade is a transfer. A transfer's
-  `+` line takes from Unallocated (no spend order in A): "a transfer marked into a fund"
-  below, with its sending split going through the spend order, is B's to reconcile with this.
-- **The cap:** a transaction's lines add up to no more than it (what came in, went out, or
-  moved; each way for a transfer). To shift more, move money between funds.
-- **Lines are checked only when they change** (`fundlines.checked`), so recategorizing, pairing
-  and matching never fail on a fund. A rule-decided line in B would have to keep that promise.
-- **Funds may go below zero** (shown in red, noted on the transaction page). Unallocated may too.
-- **Moves** are `custom "fund-move"` directives (from, to, amount, note), either side possibly
-  Unallocated: as decided below.
-- **A fund** is `custom "fund"` (name, description, target, archived). Names are free text, unique
-  ignoring case. **Targets** are in the operating currency, display only (nothing fills in A).
-- **Archiving** moves what's left (to Unallocated or a fund) as a dated move, no earlier than
-  the fund's last entry: "Retiring a fund" below, as proposed.
-- **Roles** (answering "Scope and sharing" under "Not discussed yet"): managers set funds up;
-  writers choose funds on transactions and move money.
-- **Rules have a fund already, of a limited kind:** a categorization rule may name a fund, and
-  what it stages gets a line for all of it, the way it goes. Spend and fill rules (B) are a
-  different thing: they decide funds for transactions nobody chose one for.
-- **Exports and backups** carry funds as Beancount text ("Reports by fund, and funds in exports
-  and backups" below: the second half is done).
-- **Explaining** has a start: the transaction page says what it does to each fund, Unallocated
-  included, and a fund's page lists its history with a running balance. Rule-decided effects
-  would need "why" too.
+Not in step 1: houses, cars and loans (groups), spend and fill rules, budget funds, dividends
+following the shares that earned them, and gains per fund.
 
-### Asset-aware funds: where A assumes the operating currency
+### What it looks like
 
-Every stored amount already keeps its commodity, so lifting "dollars only" is a list of places:
+A made-up book holding only `Assets:Brokerage:Fidelity`: $6,000 in cash, 200 FXAIX at $200 and 50
+VTI at $300, worth $61,000.
 
-- **The refusals:** `fundlines.checked` ("funds hold USD for now", on a transaction's lines) and
-  `funds._checked` (the same, on moves), both in `services/ledger/src/ledger`. `funds._check_target`
-  keeps targets in the operating currency, which matches "Targets are in USD at today's value".
-- **Already per commodity in the ledger:** `funds.listing` sums each fund's holdings per
-  commodity and values them at `on`'s prices (`investments.rate`), so `Fund.holdings` and
-  `Fund.value` are ready; `funds.history` keeps a running balance per commodity; archiving moves
-  each commodity's remainder.
-- **The kind and size are one figure in the operating currency:** `fundlines.shape` (Python) and
-  `shapeOf` in `services/app/src/shared/funds.ts` give up (kind unknown) when a balance-sheet
-  split can't be weighed in it: a split in another currency with no cost or price, or a sale's
-  empty cost (`{}`) that only booking fills. A trade with its cost written is a transfer whose
-  size is the cost. Asset-aware funds need a kind and size per commodity (a trade moves USD out
-  and VTI in), and the cap per commodity. (`shapeOf` also assumes the roots are named `Assets`
-  and `Liabilities`; the ledger reads the book's own root names.)
-- **The app server:** `decidedLines` / `wholeLine` (a rule's fund) and Select mode's Fund…
-  (`web/lib/bulk.ts`) write one line in the operating currency, and skip a transaction they
-  can't read.
-- **The PWA's rows** (`web/lib/funds.ts`) have no commodity: `linesOf` stamps the operating
-  currency on every line, `fixed` writes every amount with cents (fine for dollars, odd for
-  share quantities), following and `effects` (Unallocated's change) are one figure, and
-  `belowZero` compares with a fund's `value`, not its holding of that commodity. The Funds
-  section's sentence for an unreadable kind says "its amounts aren't all in USD".
-- **The PWA's screens** show `value` only: the Funds page, a fund's page and home's card don't
-  list holdings; Move money's amount is always the operating currency (`MoveMoneyDialog`); a
-  fund's history shows each entry's own commodity already (`signedMoney` / `formatMoney`
-  print "10 VTI").
-- **Unallocated** is net worth less funds' values (`funds.listing`); per commodity it would be
-  net worth's holdings of each less the funds'.
+1. **Setting up.** Funds → **Move money**, from Unallocated to Emergency: $4,000 and 100 FXAIX, in
+   one move ("+ Another amount"). Then Wedding gets 50 FXAIX and 30 VTI, Special Home Maintenance
+   and Repair 20 VTI, and Special Home Improvement $8,000 of FXAIX, typed in dollars (40 FXAIX at
+   $200). The Funds page shows each fund's value and what it holds (Emergency: "$24,000.00",
+   then "$4,000.00 · 100 FXAIX"), and Unallocated's $2,000 and 10 FXAIX: what the accounts hold
+   that no fund does.
+2. **Prices move.** FXAIX rises to $210: Emergency is worth $25,000 and Wedding $19,500. Nothing
+   is written.
+3. **Moving shares.** "Move 10 VTI from Special Home Maintenance and Repair to Wedding" is a move
+   of 10 VTI. No account, lot or transaction changes.
+4. **A dividend, reinvested.** $60 of FXAIX dividends come in, and the reinvestment buys 0.3
+   FXAIX with them. Unmarked, both land in Unallocated, which ends up with 0.3 FXAIX more (its $60
+   came and went). Kael can mark them in review instead ("To Emergency", then the reinvestment's
+   "From fund: Emergency", which To follows), or move the shares later.
+5. **Buying with a fund's cash.** Kael buys 10 VTI for $3,000 with Emergency's cash. The bank
+   feed stages the position change; on its review card, Emergency writes `Emergency -3000.00 USD;
+   Emergency +10 VTI`. Emergency is worth the same, and now holds $1,000, 100 FXAIX and 10 VTI.
+6. **Selling a fund's shares.** A sale of 20 VTI for $6,100 comes in from the bank, unmarked.
+   Every VTI is in a fund, so the sale takes 20 VTI that Unallocated doesn't have. It's flagged
+   ("Needs a fund"), and the bell beside the camera shows 1. Notifications opens it, first in
+   Review, with From fund already set to Wedding (the only fund with 20 VTI). Confirming writes
+   `Wedding -20 VTI; Wedding +6100.00 USD`, and the notification is gone. Typed in by hand, the
+   same sale couldn't be saved until it said whose shares they were.
+7. **The IRAs.** Each IRA's default fund is Retirement. Retirement is worth both IRAs at once,
+   and keeps up through every dividend, reinvestment and trade inside them, with nothing marked.
+   A $500 contribution from checking takes $500 from Unallocated (or from a fund, if a line says
+   so) and gives it to Retirement.
 
-### Asset-aware funds: what A leaves to decide
+### The model: what changes from A
 
-- **How a line names shares:** a line per commodity (`Wedding +10 VTI`), and what a trade's
-  lines look like (a fund that bought shares gives USD and gets VTI: two lines for one fund,
-  which A's "no fund twice" refuses).
-- **The cap per commodity,** and whether a sale's proceeds go back to the fund whose shares
-  were sold by default (the old "conversion" rule) or to Unallocated.
-- **Moving shares between funds** (Move money with a commodity and a quantity), and how a move
-  of shares shows its value.
-- **Prices:** a fund's value moves with prices and never creates entries (decided below); how a
-  fund's page shows holdings, value and gains.
-- **Below zero per commodity:** "a fund at −$460 in cash while it still holds shares is short
-  of cash" (decided below, under "An explicit fund that overdraws").
-- **Starting out:** how a fund comes to hold shares already in a brokerage (a move of shares from
-  Unallocated, as Move money does for dollars).
+1. **Lines and moves in any commodity the book has** (A: the operating currency only), such as
+   `Wedding +10 VTI` and `custom "fund-move" "Unallocated" "Wedding" 50 FXAIX`. A fund holds the
+   sum of its lines and moves per commodity (`funds.listing` already keeps them that way), and
+   is worth each holding at today's price, as the chart values accounts.
+2. **Funds read a transaction one commodity at a time.** For each commodity, its balance-sheet
+   splits' units are summed: that commodity's change. Each commodity then has A's kind and size,
+   by A's rules. If there's more of it, it's *in*, with `+` lines ("to" a fund). If there's less,
+   it's *out*, with `−` lines ("from"). If none changed hands overall but some moved, it's a
+   *transfer*: `+` lines ("for"), and with More options `−` too. This replaces A's single kind
+   weighed in the operating currency (design.md, "Funds A"). It gives the same answer whenever
+   only one commodity is on the balance sheet, which is every transaction A could read except
+   trades.
+   - **A buy** (`Cash −3,000.00 USD · VTI +10 {300 USD}`): USD out 3,000, VTI in 10.
+   - **A sale** (`VTI −10 {…} · Cash +3,100.00 USD · Capital-Gains −100`): VTI out 10, USD in
+     3,100. The gain needs no line of its own: a fund that sold gets the proceeds.
+   - **A dividend reinvested in one transaction** (`VTI +0.17 {…} · Dividends −52`): VTI in 0.17.
+   - **Shares moved between brokerages:** a VTI transfer.
+   - Units need no booking, so a sale's empty cost (`{}`) no longer leaves a transaction
+     unreadable. A foreign currency is one more commodity. Fidelity doesn't need that, but it
+     comes free.
+3. **The cap is per commodity:** a commodity's lines add up to no more than its size, each way.
+   A line in a commodity the transaction doesn't move is refused ("it moves no VXUS").
+4. **A fund appears once per commodity** (A: once per transaction). A trade's fund gives one
+   commodity and gets the other: `Emergency -3000.00 USD; Emergency +10 VTI`. Marking only one
+   side is allowed and means just that: `Wedding +10 VTI` alone is shares bought for Wedding with
+   Unallocated's cash.
+5. **Unallocated per commodity:** for each commodity, what the balance-sheet accounts hold (the
+   chart's top-level asset and liability totals) less what funds hold. Its value is still net
+   worth less every fund's value. If it holds fewer than zero of a share, funds claim shares the
+   accounts don't have: the transaction that did it is [flagged](#a-sale-that-says-no-fund).
+6. **No fund goes below zero in a share** (Kael): not through a default, a line or a move. What
+   came in by itself and would is [flagged](#a-sale-that-says-no-fund); anything done by hand
+   that would is refused. Dollars stay as in A (allowed, shown in red).
+7. **Values follow prices; nothing else does.** A price change writes nothing (the design
+   record, decided). Targets stay in the operating currency and are judged by value. Funds
+   don't use cost basis, so the live brokerage's $0.00 lots (RESUME, "A bug found on the live
+   server") don't affect them.
+8. **Splits and other corporate actions don't follow the shares' holders yet** (scenario 41;
+   Kael: later, with the books). A 2-for-1 split reads as VTI coming in, so the new shares land
+   in Unallocated, and each fund holding VTI needs a move. The bank feed books a split as a buy
+   today, which is wrong in the accounts too, so both are fixed together in the rest of B.
+9. **An account can have a default fund:** what changes in it with no line saying otherwise is
+   that fund's (the IRAs' is Retirement): [below](#an-accounts-default-fund).
 
-### Known gaps in A (small, for whenever)
+**A's saved lines:** a USD-only transaction reads exactly as before. A trade with a `+` USD line
+(A took a trade as a transfer in dollars) now reads as money out. It isn't refused, since lines
+are checked only when they change, and its page says its lines don't fit. Expect few or none.
 
-Not built in A: funds proposed by receipts, history or the AI; reports by fund; a fund filter on
-ledgers and Transactions; a fund's holdings listed; paging a fund's history; balances as of a
-past date (`?on=` only picks prices; `store.fund_lines` already takes a date); targets with
-dates.
+### In the books
 
-## The problem
+Lines and moves already carry a commodity, and `fund_line` already has `currency`, so shares
+need no migration. A default fund is a dated directive (Kael): from that day, the account's
+unmarked changes are the fund's, until a later one for the account says otherwise (another
+fund, Unallocated, or none).
 
-Money is set aside for goals: an emergency fund, a vacation, home repairs, retirement. GnuCash
-users do it with sub-accounts, the only way double-entry accounting offers, and M15's divided
-accounts built the same thing here: an account's parts are its goals.
+```beancount
+2019-04-01 custom "fund-default" Assets:Retirement:Roth-IRA "Retirement"
 
-**What started it (Kael, 2026-10-27):** a taxable brokerage holding cash and two securities
-(emergency money and short- to medium-term investments, treated as near-cash), whose whole value
-is divided into four goals. What it must do:
+2026-11-04 custom "fund-move" "Unallocated" "Wedding" 50 FXAIX
+  note: "Setting up"
 
-1. **Fluctuations follow the holdings:** each goal's value moves with what it actually holds.
-2. **Holdings move between goals:** "move 10 shares from home maintenance to the vacation."
-3. **Reinvestments land in a default goal,** to be redistributed by internal moves if wanted.
+2026-11-06 * "Fidelity" "Bought 10 VTI"
+  funds: "Emergency -3000.00 USD; Emergency +10 VTI"
+  Assets:Brokerage:Fidelity:Cash  -3000.00 USD
+  Assets:Brokerage:Fidelity:VTI         10 VTI {300.00 USD}
+```
 
-Divided accounts couldn't: a linked brokerage's sub-accounts are its assets (`:Cash`, `:VTI`,
-`:VXUS`: the bank link creates and expects them; `simplefin/sync.ts` puts cash in
-`<account>:Cash`), a divided account's parts are its children, and an account tree can only
-spell out one dimension.
+A move with several amounts is one `fund-move` per commodity. They're written together, in one
+write, with the same date and note.
 
-**Kael's reframing (2026-10-28):** "A goal has nothing to do with *where* the money sits. We
-usually think of goals as accounts because we don't have richer systems to work with, but we're
-building a rich system now. Theoretically you should be able to allocate money from any account,
-and any asset, toward a single goal." So:
+### The ledger (Python)
 
-- **Accounts say where money is; funds say what it's for.** Two ledgers over the same money.
-- **Funds are comprehensive:** every dollar of net worth (every asset and liability, the house
-  and retirement included) is in exactly one fund. What isn't earmarked is in **Unallocated**, a
-  fund the system keeps. For every asset, the funds add up to net worth, always.
-- **"$50 of the vacation money is in checking" isn't a fact.** You have $50 for the vacation,
-  and you have $50 in checking. A hotel charged to a credit card draws the vacation fund when
-  it's charged; paying the card later moves no fund.
+- **`engine`:** `balance_sheet_units(text, roots)` gives each balance-sheet posting's units
+  (`_amounts` already fills in a lone blank amount). It's None when a blank can't be filled
+  without booking.
+- **`fundlines`:**
+  - `shape` becomes `shapes(text, header) -> dict[str, Shape] | None`, a `Shape` per commodity
+    (its kind and size, as now), with the operating currency first.
+  - `lines_problem(shapes, lines)` runs A's checks per commodity, worded with the commodity:
+    "its funds get 12 VTI, more than the 10 VTI that came in". It also refuses a line in a
+    commodity the transaction doesn't move: "it moves no VXUS (Wedding)". `_money` writes shares
+    as they're given ("12 VTI", not "12.00 VTI").
+  - `checked` drops "funds hold USD for now". "No fund twice" becomes per commodity ("Wedding is
+    in it twice in VTI"). A line's commodity must be one the book has: declared, or held in an
+    account.
+- **`funds`:**
+  - `listing`: each holding with its value and price (`FundHolding`: `amount`; `value`, null
+    when there's no price; `price` and `price_date`, as `Holding` has them). It also gives a
+    fund's `unpriced`, and `Funds.unallocated_holdings`: net worth's holdings per commodity
+    (`chart.tree`'s top-level totals, which `listing` already reads) less the funds', valued the
+    same way.
+  - `_checked` (moves): any commodity the book has, more than 0.
+  - `create_moves`: several moves in one write, `POST /books/{b}/fund-moves/batch` (write, like
+    `/accounts/batch` and `/transactions/batch`).
+  - `archive` and `history` already work per commodity.
+- **Models:** `FundHolding`; `Fund.holdings: list[FundHolding]` (it was `list[Amount]`, unused
+  by the PWA so far); `Fund.unpriced`; `Funds.unallocated_holdings`; `FundMovesIn`. Then `pnpm
+  generate`.
 
-**Funds as the *why* of spending (Kael, 2026-10-30):** "I want to be able to use funds as
-budgets so my chart of accounts can continue to track 'what' while my funds can indicate 'why'."
-The same restaurant three times in a month: once out with a friend (a Social fund), once grabbing
-food while running errands (Chores), once as a family (Family). Continuous funds, seen the way
-budgets are. This widens funds from saving toward goals to spending by purpose; how is open
-question 1.
+### app (TypeScript, server)
 
-## How we got here
+- **`shared/funds.ts`:** `shapeOf` becomes `shapesOf(postings, currency)`, giving A's `FundShape`
+  per commodity (its type already carries a currency). `wholeLines(shapes, fund)` gives the
+  whole of every commodity. `linesProblem(shapes, lines)` is worded as the ledger words it.
+  Unit tests mirror the ledger's. (`BALANCE_SHEET` still assumes the roots are named `Assets`
+  and `Liabilities`, as in A.)
+- **`server/funds.ts`:** `decidedLines` (a rule's fund on what it stages) writes whole lines per
+  commodity.
+- **Pairing** (`mergedLines`) already sums per fund and commodity.
+- **Schedules:** nothing new beyond the shared rules.
 
-1. **The brokerage, divided into goals (2026-10-27).** Claude laid out four ways:
-   - **Goals as the accounts:** divide the brokerage into goal parts, each holding cash and
-     securities together (a leaf may hold several commodities). Moving shares between parts is
-     a transfer carrying their lots (cost and date). Needs: the link landing cash and trades in
-     the main part, Divide… for a brokerage, holdings on each part. **The hard part is tax
-     lots:** the books book lots per account, the broker per real account (FIFO for a stock,
-     probably average cost for a mutual fund), so a sale booked inside one part can disagree with
-     the 1099-B. The fix would be booking sales on the whole and swapping lots between parts.
-     Claude recommended this one.
-   - **An overlay of quantities** (`custom` entries; the default goal is whatever's left), with
-     tax lots and the sync untouched; the cost is a second way to divide something, and goals
-     that aren't accounts.
-   - **Goal names as lot labels:** cash has no lots, FIFO sales use up whichever label is oldest,
-     and average cost merges lots. Rejected.
-   - **A goal under each asset** (`:VTI:Vacation`, `:Cash:Vacation`…): many accounts, and a
-     goal's total needs adding up across branches. Rejected.
+### The PWA
 
-   Kael then stepped back from goals as accounts altogether (the reframing above). Funds never
-   touch tax lots, which removes the first option's hard part.
-2. **Kael's first sketch (2026-10-28), and what became of each point:**
-   1. *"A separate overlay similar to tags; maybe they are tags."* Recorded as different things
-      (below), though Kael found the difference hazy (open question 3).
-   2. *"Applied at the split level; credits decrease a goal and debits increase it (reversed
-      from accounts?)."* Settled: funds move with the asset and liability splits, in those
-      splits' own sign, so a debit to an asset raises its fund, as with an asset account. The
-      reversed reading only arises from tagging the expense split.
-   3. *"Fund a goal in place with a transaction whose two splits are in the same account"*
-      (`PNC −50 [Unallocated] / PNC +50 [Vacation]`). Claude first objected (a non-double-entry
-      fact dressed as a transaction; with shares it would reduce and re-add tax lots), then
-      agreed it fits the split rule for cash. Kael chose fund-only moves instead (2026-10-30).
-   4. *"Transactions are untagged by default, so spending doesn't drain goals; but spending the
-      whole balance would overstate them."* Settled by the spend order: unmarked spending draws
-      Unallocated first and then the funds in order, worked out rather than stored.
-   5. *"The goals ledger isn't double-entry."* Agreed.
-3. **Goals located in accounts** (Claude's next take): a goal holds an amount of a commodity
-   *in* a particular account ("free = balance − what's set aside there"), and a goal entry has
-   its own amount, so $60 of a $100 purchase can come from the goal. **Dropped** after Kael's
-   reply: location isn't a real dimension of a goal. A purchase partly for a goal is split into
-   pairs (`PNC −60 / Equipment +60 [Vacation]` and `PNC −40 / Drinks +40`), and a hotel on the
-   Visa is `Visa −1,000 [Vacation] / Travel +1,000`, nothing more. Claude conceded.
-4. **Kael's implementation sketch (2026-10-28):** a separate ledger; every dollar tracked;
-   Unallocated by default; funds with a fill priority and a spend priority; accounts with an
-   optional default fund ("any money entering that account also enters the default fund");
-   every split with a fund (Unallocated by default); an expense split marked with a fund is an
-   egress from it; a transfer marked with a fund is an ingress into it; and "the asset and
-   liability balance of every transaction must be equal in both systems." One correction: an
-   unmarked transaction isn't zero movement (an unmarked expense lowers net worth, so a fund
-   must go down). The last bullet became the defining rule: funds move with asset and liability
-   splits.
-5. **Kael's scenario and Claude's worked example (2026-10-28):** an imagined book (checking, a
-   brokerage, a 401(k), a credit card, a house with a mortgage), four funds (Emergency:
-   continuous fill to a target, 10% of income; a goal fund: single fill to a target, 20%;
-   Retirement: manual, the 401(k)'s default; Unallocated: the rest), and twenty-odd events.
-   What it established is listed below. Kael answered its decisions on 2026-10-29, and Claude
-   explained the rest (defaults over conversions, same-day order, deposits toward single fill,
-   grouped assets in depth).
-6. **The interview (2026-10-30).** A new session put the open questions to Kael a few at a time,
-   with options. Answered: defaults win over conversions; each day's money in before its money
-   out; single fill counts moves net; grouped assets adopted, but **one fund per group** (no
-   units); shortfalls make Unallocated negative; an account's rule covers transfers in; no
-   per-account spend orders yet; reallocation by fund-only moves. Along the way:
-   - **Long-term debts** came up: a mortgage or student loan as plain USD would put Unallocated
-     tens of thousands below zero, so every unmarked purchase would draw on the real funds. Kael:
-     revalued accounts are grouped automatically, loans attached to their asset (or alone) when
-     funds are set up, other grouping (a 401(k)) an advanced setting, and each unsecured loan a
-     group of its own.
-   - **Big loans** (Kael): "a special case", to come back to both within funds and on their own
-     (open question 4; docs/PLAN.md's **Loans**).
-   - **Funds as budgets** (Kael's new idea, above). The questions it raised (how such a fund
-     fills each period, from where, how it's shown, what counts as spent) were put and dismissed
-     unanswered.
-7. **Back to the drawing board (Kael, 2026-10-31):** "This is all getting really blurry now. I
-   think we need to go back to the drawing board on this whole Funds thing."
-8. **Scenarios first (Kael, 2026-10-31):** rather than unwinding decisions one by one, list a wide
-   range of distinct events, from "buy a hot dog with cash" to "quarterly dividends reinvested
-   across a Roth IRA's mutual funds", run them against a written-down example book, and gut-check
-   what should happen in each; then work backward to the rules and see what to cut. Claude drafted
-   [example-book.md](example-book.md) and [scenarios.md](scenarios.md); the scenarios' "Expect"
-   lines are a first draft for Kael to confirm or correct, and their closing section groups where
-   the old rules and the expectations part ways.
+- **The Funds section** (a transaction's page, New transaction, a schedule's template):
+  - **One commodity on the balance sheet** (every USD transaction): as in A, unchanged.
+  - **A trade** (one commodity out, another in): "**Bought 10 VTI for $3,000.00.** Without a
+    fund, it's Unallocated's: its cash paid, and it holds the shares." Then two selects (Kael):
+    **From fund**, the side that gives (the cash on a buy, the shares on a sale), and **To
+    fund**, the side that gets. Each writes the whole of its side. To follows From until it's
+    changed, so one choice covers a whole trade; changing To says, for instance, "Emergency's
+    cash buys shares for Wedding". **Split it** (as More options) opens the groups below for
+    parts of a side, and is open on its own when the lines aren't whole sides.
+  - **Otherwise:** a group per commodity, each with A's rows and its own sentence ("$3,000.00
+    going out", "10 VTI coming in"), verb, following first line and "+ Another fund".
+  - **The summary** gives each fund's change across commodities, Unallocated last: "Emergency
+    −$3,000.00 and +10 VTI · Unallocated no change".
+  - **Below zero in a share is a problem,** and Save waits: "Emergency holds 8 VTI, not 10."
+    Below zero in dollars stays a note, as in A.
+  - **Share amounts are kept as typed;** money keeps its cents (A's decision 18).
+  - In `web/lib/funds.ts`, rows gain a commodity. `amountsOf`, `linesOf`, `rowsProblem`,
+    `effects`, `belowZero` and `wholeFund` take the per-commodity shapes, and `rowsFrom` groups
+    saved lines by commodity. `useFundRows` keeps its shape for its callers.
+- **Review cards** (`FundChoice`): A's one select (To fund, From fund or For fund) for one
+  commodity; on a trade, **From fund** and **To fund**, To following From, as on the page. Lines
+  that aren't whole sides show as chips with Edit…, as now. **Flagged sales come first** in
+  Review (Kael), marked "Needs a fund".
+- **Select mode's Fund…:** whole lines per commodity. "Skipped 1 not all in USD" goes. **Confirm
+  skips a flagged sale** (Kael) and confirms the rest: "Confirmed 9; skipped 1 that needs a
+  fund". The skipped one stays selected.
+- **Chips:** a fund on both sides of a trade is one neutral chip ("Emergency", Kael), whose
+  title has both lines. Different funds on each side get "from Emergency" and "to Wedding".
+- **An account's Trade dialog** (buy, sell, dividend; M5) gets the same Funds choices (Kael): a
+  trade's From fund and To fund (To following From, and the only-fund suggestion on a sale), a
+  dividend's To fund. A sale whose shares are all in funds is recorded in one go. The ledger's
+  `TradeIn` and `TradePreview` carry `funds`, checked as any transaction's are.
+- **Move money:**
+  - From and To as now. The amount becomes a row: Amount, and its commodity (a select: the
+    operating currency, then what From holds, A–Z). "+ Another amount" adds a row, each
+    commodity once.
+  - **Shares or dollars** (Kael): a share's row has a Shares / Dollars switch (Shares to start
+    with). In shares, it shows the value: "about $2,250.00 at $225.00 (Nov 3)". In dollars, it
+    shows what that comes to: "$5,000.00 is 23.810 FXAIX at $210.00 (Nov 3)", at the latest price
+    on or before the move's date (Kael). The move is saved
+    in shares, rounded to the places the book already writes that commodity's quantities in
+    (three, for most mutual funds). Dollars aren't offered for a commodity with no price.
+  - The effect: "Unallocated −$4,000.00 and −100 FXAIX → Emergency +$4,000.00 and +100 FXAIX".
+  - More dollars than From holds is a note, not a problem, as in A. More of a share than From
+    holds is a problem, and Move waits: "Unallocated holds 10 FXAIX."
+  - Several amounts are saved through `/fund-moves/batch`. Changing a move changes its one
+    amount, as now.
+- **The Funds page:** each fund's card gives its value, then its holdings in a muted line
+  ("$4,000.00 · 100 FXAIX"). Unallocated, in the summary card, does the same. When Unallocated
+  is below zero in a share: "Your funds hold 20 VTI more than your accounts do," linking to
+  Notifications, where the sale that did it waits.
+- **A fund's page:**
+  - A **Holdings** card under its balance: each commodity with its quantity, price and price
+    date (stale ones flagged, as on account pages), and value. The operating currency's row reads
+    "Cash".
+  - **History:** a transaction with two lines is one row with both amounts, each with its
+    commodity's running balance.
+  - **Archive…:** "What's left ($1,000.00, 100 FXAIX and 10 VTI, worth $25,000.00) goes to".
+- **Home's Funds card:** unchanged (values).
 
-## Decided so far
+### An account's default fund
 
-Decided under the model as it stood; starting over may revisit any of it. Who decided is noted
-where it matters: **Kael**; **agreed** (both); **Claude, unchallenged** (proposed and not
-objected to). Dates mark what the 2026-10-30 interview settled.
+Kael's Roth IRA and traditional IRA are wholly Retirement's. Marking every contribution,
+dividend, reinvestment and trade in them would be a chore that never ends. Kael's earlier
+**default fund** (the design record, "Decided so far": "any money entering that account also
+enters the default fund", 2026-10-28 to 10-30) is the answer, put so it fits A's lines on the
+transaction.
 
-**What a fund is:**
+- **Each balance-sheet split counts for its account's default fund,** per commodity, or
+  Unallocated where there's none. A node's default covers the accounts under it (a brokerage's
+  `:Cash` and holdings), unless one of them has its own.
+- **A line takes over from the side it's on:** a `+` line from the splits that went up, a `−`
+  line from the splits that went down, as much as it says; the rest of each side stays with its
+  accounts' defaults. A's kinds and caps (per commodity) still say what lines may be. With no
+  defaults anywhere, everything falls to Unallocated: exactly A.
+- **The IRAs, with Retirement as their default:**
+  - a dividend, a reinvestment or a trade inside: Retirement's, with nothing marked. Retirement
+    holds what the IRAs hold, unless money is moved out of it.
+  - a $500 contribution from checking (`Checking −500 · Roth-IRA:Cash +500`): Unallocated −$500
+    (checking's side) and Retirement +$500 (the IRA's). "From Emergency" on it takes over
+    checking's side: Emergency −$500 instead.
+  - a withdrawal to checking: Retirement down, Unallocated up.
+- **Setting one:** an asset or liability account's editor (managers), "Default fund: None,
+  Unallocated, or a fund", and **From** a date (Kael): the account's opening is offered first,
+  then today. **Linking a bank account** (Bank connections) asks too (Kael), so a newly linked
+  IRA or HSA starts out right: a new account's default starts at its opening, an existing
+  account's from the date chosen. From the opening, it gives the fund the account's whole
+  balance at once (everything its history brought in unmarked), so the IRAs need no setup moves.
+  Changing it later starts the new default from its own date, and what came before stays where
+  it was. The editor lists the account's defaults over time. **Before saving, it says what the
+  default will do** (Kael): "From the opening, Retirement gets $1,204.50 and 120.4 FXAIX:
+  everything in the Roth IRA now." (`POST /books/{b}/fund-defaults/preview`.)
+- **The default fund idea's goals, and how this meets them:**
+  1. *Money entering an account goes to its default with nothing marked:* income, dividends and
+     transfers in alike ("an account's rule covers everything entering it", Kael, 2026-10-30).
+     Met, per split.
+  2. *Defaults work both ways:* what leaves the account comes from its default (Kael). Met.
+  3. *A choice on the transaction overrides the default* ("an explicit fund on the receiving
+     split overrides it"). Met: a line takes over its side.
+  4. *Defaults win over conversions:* money entering an account with a default goes to it, even
+     when another fund paid (Kael, 2026-10-30). Met: a line on the paying side never touches the
+     receiving side.
+  5. *Defaults route money; they don't pin balances* (the example book: Savings holds $18,000,
+     Emergency's cash is $12,000). Met: money can be moved out of a default fund, and later
+     money still lands in it. This is why the IRAs get a default, not the "belongs to" this plan
+     first had: that pinned the fund to the account, with no way to override or redistribute.
+  6. *Reinvestments land in a default, to be redistributed by moves* (Kael's first message).
+     Met. The brokerage's default stays Unallocated for now (Kael).
+  7. *Unallocated as an account's explicit default,* to keep its income out of autofill (Kael).
+     The setting offers Unallocated apart from None; they act alike until fill rules exist.
+  8. *Defaults take precedence over fill rules* (Kael). Nothing fills yet; fill rules would only
+     see what defaults leave.
+  9. *Changing a setting never rewrites history* (Claude, unchallenged). Met: defaults are
+     dated (Kael).
+  10. *Richer account rules later* (70/30 into an account). They'd plug in where a split's fund
+      is decided.
 
-- **Named "funds"** (Kael). A separate ledger tracks them; nothing in it is double-entry
-  (agreed).
-- **Every dollar, every asset** (Kael): the house and the 401(k) included.
-- **Asset-aware** (Kael): a fund holds amounts of assets (USD, VTI, VXUS…), not just dollars,
-  and groups (below). Spending USD draws only on funds' USD; a fund's value is its holdings at
-  today's prices.
-- **Funds and tags are different things** (Claude; Kael found it hazy and hasn't confirmed it:
-  open question 3). Kael's argument: tag some income and some expenses "date night" and you have
-  a dynamic goal, so what you want from both is "income tagged to it versus expenses." Claude's
-  answer: a fund is exclusive and conserved (each split is in exactly one fund; together they're
-  net worth), while tags overlap (a transaction can be `#italy-2026` and `#reimbursable`) and add
-  up to nothing. Conservation is what makes a balance trustworthy, and what Unallocated,
-  priorities and defaults depend on. They can share machinery (pickers, chips, filters), and
-  tags stay useful across funds (a trip paid partly from Vacation, partly from Unallocated).
+  Left for the rest of B: the spend order (what's drawn once a default or Unallocated runs
+  out). Conversions by value aren't needed: units and lines do that job.
+- **Lines already saved** keep meaning what they did: a `+ Retirement` line on an old
+  contribution takes over the IRA's side, which is Retirement's anyway, so nothing counts twice.
+- **Limits:** a fund that's an account's default today can't be archived until the account has
+  another default or none; renaming the fund rewrites its defaults (`funds.rename`). A change
+  that would take a fund below zero in a share (a default from an earlier date, say) is refused,
+  as any write by hand is.
+- **A fund's page** lists the accounts it's the default of (each linking to its ledger), and its
+  history lists every transaction their defaults gave it (Kael), so the history adds up to its
+  balance. It gets long for the IRAs; it's one list, not paged, as in A.
+- **Where it's built:**
+  - the ledger: `custom "fund-default"` directives (`engine`: `FundDefault`,
+    `default_directive`, `default_of`), with their own small API, versioned as moves are:
+    `POST /books/{b}/fund-defaults` (account, fund or none, from), `PATCH` and `DELETE
+    /books/{b}/fund-defaults/{id}` (manage). `Account.default_fund` gives today's;
+  - `fundlines.effects(...)`: a transaction's change to each fund, per commodity, from its
+    splits, their accounts' defaults and its lines. It's used by the checks, `funds.listing` (for
+    transactions that touch an account with a default, beside `fund_line` for the rest) and
+    `funds.history`;
+  - `Funds.defaults` (each account's defaults, each with its fund and from when), so
+    `shared/funds.ts` works out the same effects for the PWA's Funds section and its summary
+    ("Retirement +$500.00 · Unallocated −$500.00").
 
-**How transactions move funds:**
+### A sale that says no fund
 
-- **Only asset and liability splits move funds,** by their exact amounts and in their own sign,
-  so a transaction's fund changes always equal its change in net worth, per asset (agreed).
-  Marking an expense line ("a vacation expense") puts the fund on the split that pays for it; a
-  transaction is split into pairs to keep that unambiguous, and a bill paid from two cards needs
-  a fund on each card's split.
-- **Which fund, in order:** a fund chosen on the split; else the account's rules; else the
-  global rules (Kael's spend rules, refined in the worked example):
-  - **a default fund** (Kael) takes everything entering the account and is first in line for
-    what leaves it: **defaults work both ways** (Kael). So a transfer between accounts with
-    different defaults moves money between funds (paying down a mortgage moves money from
-    Unallocated into the house's fund; a deposit into a brokerage joins its default);
-  - **defaults win over conversions** (Kael, 2026-10-30): money entering an account with a
-    default goes to the default even when another fund paid for it. Paying principal when
-    Unallocated is short of cash, the house's fund gets all of it and Emergency is simply down
-    cash (its continuous fill repairs that); Emergency never ends up owning part of the house.
-    So money into a defaulted account is always a reallocation. An explicit fund on the
-    receiving split overrides it;
-  - **money out** (spending): the account's default first, else Unallocated, then the funds in
-    the user's **spend order**, skipping any without that asset (Kael). **A fund can opt out of
-    the spend order** (Kael, 2026-10-30): only explicit marks and moves draw on it (the "never
-    draw down" for Retirement holding an ungrouped 401(k)). **No per-account spend orders for
-    now** (Kael, 2026-10-30): an account's default is its only say in what pays;
-  - **a conversion** (one asset out, another in: a trade), where no default applies: the
-    incoming asset goes to whichever funds gave up the outgoing one, in proportion to value
-    (Claude, unchallenged). The spend order applies to shares too, so an unmarked sale draws
-    Unallocated's shares first; mark the sale to choose. A trade's capital-gains line moves no
-    fund (the price had already counted the gain);
-  - **new money** (income): the fill rules.
-- **A transfer marked "into" a fund** puts the fund on the receiving split; the sending split
-  goes through the spend order, so a transfer can also move money between funds (Kael's
-  example).
-- **Spending on credit** draws funds when you spend; paying the card is fund-neutral (both sides
-  USD and unmarked, so they cancel) (Claude, unchallenged).
-- **An explicit fund that overdraws** a fund's holding of an asset is allowed and flagged
-  (Kael): a fund at −$460 in cash while it still holds shares is "short of cash"; selling some of
-  its shares, marked with it, fixes it.
-- **Shortfalls go to Unallocated** (Kael, 2026-10-30): when spending needs more of an asset than
-  the funds in the spend order hold (credit lets you spend USD no fund has), Unallocated goes
-  below zero ("you spent money you didn't have"), as overspending shows in envelope budgeting.
-  Kael's earlier idea, Retirement as the last resort, was dropped: reaching it means no USD in
-  other *funds*, not in other *accounts* (checking can hold $4,000 against $4,000 owed on a
-  card), so a grocery run would have read as retirement money spent.
-- **Same-day order** (Kael, 2026-10-30): the books have dates, not times, so the pass takes each
-  day's income first, then everything else in the books' order. A paycheck and rent on the same
-  day come out the same whichever the sync wrote first, and rent doesn't dip into Emergency when
-  the paycheck arrived that day.
+Kael: such a sale is flagged on the transaction. Typed in by hand, it can't be saved; if it
+came in by itself, it waits in Notifications until it's fixed.
 
-**Filling funds (autofill):**
+- **What it is:** a transaction that takes more of a share (any commodity but the operating
+  currency) from a fund than the fund holds: through a default, with no line saying so
+  (Unallocated where the account has no default), or through a line. Only when it's short
+  (Kael): selling 5 VTI while Unallocated holds 10 goes through quietly. "Holds" counts
+  everything else in the book, whatever its date, as balances do. Step 6 of the walkthrough is
+  one.
+- **Typed in by hand, it can't be saved:** a write that changes a transaction's balance-sheet
+  splits or its lines, or confirms it, and leaves it short, is refused (422: "It sells 20 VTI,
+  and Unallocated has none: say whose shares they are"). The Funds section says so first, and
+  Save waits, as it does for the cap. A write that does none of those (recategorizing, a note)
+  isn't checked, as A's lines aren't.
+- **Nor can anything else by hand make one:** a move, a default, or deleting a move or a
+  transaction that would leave a fund below zero in a share is refused, saying which.
+- **Come in by itself, it's saved and flagged:** imports, the bank feed's transactions and
+  position changes, receipts and schedule occurrences are written by `app`, which says it's
+  staging them, so the ledger keeps a short one, unconfirmed: a rule that would confirm it
+  automatically leaves it in review instead. It's marked on its review card, its row and its
+  page ("Needs a fund: it sells 20 VTI that Unallocated doesn't have"), and it waits in
+  [Notifications](#notifications).
+- **Fixed** by saving it with a line that makes it fit (the review card's From fund, or its page),
+  or by deleting it. Then it leaves Notifications by itself: Kael's "dismissed on a successful
+  save". **Confirm waits for a fund** (Kael): confirming is a save by hand, and the review
+  card's From fund is right beside it. Flagged sales come first in Review.
+- **The only fund that could have sold is suggested** (Kael): when exactly one fund holds enough
+  of the share, the review card and the transaction's page come with From fund set to it
+  ("Wedding, the only fund with 20 VTI"), and To following. It's written only when you confirm
+  or save, so nothing is decided for you. With no such fund, From fund starts empty.
+  (`web/lib/funds.ts`: `suggestedFund`, from the funds listing's holdings.)
+- **In the ledger:** `fundlines.short(...)` (what a transaction is short of, by fund and
+  commodity), `Transaction.short` on reads, the refusal on writes that don't say they're
+  staging, and `GET /books/{b}/funds/short`: the book's short transactions, each with when it
+  was added (its directive's `created_at`).
+- **The Funds page** still warns when Unallocated is below zero in a share, and links to
+  Notifications.
 
-- **A fund can autofill** (Kael): a share of each new income (a percentage), in a fill priority
-  order (what it decides is open question 2), up to an optional target, either **continuous**
-  (refills whenever its value is below target) or **single** (stops once its target has been
-  deposited, however much it has since spent). Funds can also be manual (no autofill).
-  Unallocated is the system's: continuous, no target, whatever the others don't take.
-- **Defaults take precedence over allocation rules** (Kael).
-- **Rules are global, with per-account rules over them** (Kael): income into an account with its
-  own rules follows them (a default fund is the simplest: 100% to one fund); other income
-  follows the global rules. Making Unallocated an account's default keeps, say, a brokerage's
-  dividends out of autofill (Kael). (Autofill limited to `Income:Salary` was rejected as too
-  fragile.)
-- **An account's rule covers everything entering it** (Kael, 2026-10-30): transfers as well as
-  income, as a default already does (the transfer into the 401(k)). A 70/30 rule on an account
-  splits transfers into it too; mark the transfer with a fund when that's not wanted.
-- **A full fund's unused share goes to Unallocated** (Kael).
-- **Targets are in USD at today's value** (Kael): price changes never create fund entries, but
-  a fund that rises above its target drops out of autofill, and one that falls below
-  (continuous fill) comes back in; so new income does make up market losses.
-- **Single fill counts deposits net** (Kael, 2026-10-30): autofill, transfers marked into the
-  fund and moves into it count; moves out subtract, so moving money in and straight back out
-  counts nothing; conversions and price changes don't count (the same money changing form);
-  spending never reduces it, since spending is what the fund is for.
-- **Refunds aren't income:** a grocery refund goes back to Unallocated, not through autofill
-  (Claude, in the worked example; not discussed further).
-- **Rounding:** each fund's share is rounded down to the cent and the remainder goes to
-  Unallocated (Claude, proposed).
+### Notifications
 
-**Moving and storing:**
+Kael: a "needs attention" queue, behind a bell at the top beside the camera.
 
-- **Moves between funds are entries of their own** (Kael, 2026-10-30): dated, of any asset,
-  with no account, transaction or tax lot changed. They're the only way to reallocate without
-  money moving: a transaction with both splits in one account (Kael's first sketch) isn't used.
-- **Retiring a fund** moves what's left to Unallocated or a chosen fund, as a dated move
-  (Claude, proposed).
-- **Stored in the ledger's database,** not `app`'s (*A kept the ledger, but stores a
-  transaction's lines on the transaction, not as posting metadata: see "Picking up B"*) (Kael asked why store anything "in
-  Beancount" when the app has a database; the answer follows). Nothing lives in a `.beancount`
-  file: SQLite is the system of record, and each row keeps its directive's Beancount text as
-  its canonical form plus derived columns. The ledger, not `app`, because a split's fund belongs
-  with the split, which only has an identity there (posting rows are rewritten on every edit;
-  renames, merges, divides, purges, imports and restores rewrite splits). As posting metadata
-  (`fund:`) with a derived table joined to postings, the M17 tags pattern, so it changes in the
-  split's own versioned write. Kael: storing it on the split "sounds reasonable", so long as it
-  stays efficient at scale; a separate table joined to splits is fine.
-- **What's chosen is stored; what the rules decide is worked out** (agreed): explicit funds and
-  defaults are written on the split; the spend order, conversions and fills come from one pass
-  over the book in order, cached until the book changes. Stored rule results would go stale
-  whenever an earlier transaction is edited.
-- **Settings are dated versions** (like budgets), so changing a rule never rewrites history
-  (Claude, unchallenged).
+- **The bell,** in the masthead beside the camera, for anyone who can write to the book. It's
+  always there (Kael), with a count only when something's waiting; with nothing, Notifications
+  says "Nothing needs you right now."
+- **The Notifications page** (`/books/:book/notifications`, from the bell): the queue in the
+  order things were added, oldest first. Each says what happened, when, and what to do, and
+  opens what needs fixing (a transaction's page, coming back here).
+- **Two kinds** (Kael): ones you can dismiss (×), and ones that go only when what's wrong is
+  fixed (no ×: "Goes once it's fixed"). "A sale needs a fund" is the second kind, and step 1's
+  only one (Kael): the queue is built for more, which come later.
+- **Per book** (Kael): the bell counts and lists only the book you're in, as the camera works
+  in it. Other books show theirs when you switch to them.
+- **Only in the app** (Kael): no email in step 1.
+- **A fixed problem can't linger:** a notification that waits on a condition isn't stored. It's
+  the condition, asked for when the queue is read (here, the ledger's short transactions), so a
+  fix made anywhere clears it. Dismissable ones will be stored in `app` (a `notification` table
+  through `createTable`: book, kind, subject, words, `dismissed_at`).
+  `GET /api/app/v1/books/:book/notifications` merges both, oldest first; `POST
+  …/notifications/:id/dismiss` dismisses one. The PWA refreshes the count after a save and when
+  the app comes back into view.
 
-## What the worked example showed
+### Tests
 
-Each with the rule above it rests on:
+- **Ledger** (`tests/test_funds.py`, A's 30 unchanged):
+  - per-commodity shapes: a buy, a sale with `{}`, a reinvestment, shares moved between
+    accounts, and a USD-only transaction reading as A
+  - the cap and its wording per commodity; a fund once per commodity; a commodity the book
+    doesn't have
+  - moves of shares, and the batch
+  - the listing's values, prices and unpriced holdings; Unallocated's holdings
+  - archiving a fund that holds shares
+  - default funds: a dividend, a trade and a contribution into an account with one; a line
+    taking over its side; an old line counting once; no defaults reading exactly as A; a fund's
+    history adding up to its balance; archiving refused while it's a default
+  - short sales: refused by hand, kept when staging, cleared by a line, listed by
+    `/funds/short`
+- **app units:** `shared/funds.test.ts` mirroring the ledger (effects with defaults included);
+  `web/lib/funds.test.ts` (per-commodity rows, following per group, To following From); bulk
+  Fund… on a trade; `decidedLines`; staging a short sale from an import and a position change;
+  the notifications list.
+- **API suite** (`tests/e2e/src/funds.test.ts`): the walkthrough above, on a brokerage opened
+  with holdings and prices, and an IRA with Retirement as its default.
+- **Browser suite** (`tests/ui/src/funds.spec.ts`, and `notifications.spec.ts`):
+  - Move money with two amounts, one typed in dollars
+  - the Funds page's holdings and its warning
+  - a fund's Holdings card, and the accounts it's the default of
+  - a trade's From fund and To fund, on its page, on a review card and in the Trade dialog
+  - a default fund chosen while linking a bank account
+  - Select mode's Fund… on a trade, and Confirm skipping a flagged sale
+  - an account editor's default fund, and the Funds section's summary with it
+  - a short sale typed by hand that Save won't take; a staged one in the bell and on the
+    Notifications page, gone once it's given a fund
+- **Looked at:** every changed surface on a phone and a desktop, light and dark (RESUME,
+  "Looking at screens"), with long fund names, fractional shares, negative holdings, an unpriced
+  commodity, and the bell with nothing, one and many waiting.
 
-- **Paycheck:** a full continuous fund takes nothing (its share to Unallocated); an unfinished
-  single fund takes its 20%; the rest to Unallocated.
-- **Groceries from an account with no default:** Unallocated pays.
-- **A transfer into the 401(k):** its default (Retirement) gets it; the sending side comes from
-  Unallocated by the spend order.
-- **A dividend in the 401(k):** Retirement (the default, both ways); its trades stay Retirement's.
-- **A reinvested dividend in a brokerage without a default:** Unallocated, once dividends don't
-  autofill (now: make Unallocated that account's default).
-- **An unmarked sale of shares:** the spend order picks whose shares; the proceeds go back to
-  them by value (a conversion, not income).
-- **A card purchase, then paying the card:** the fund is drawn at the purchase; the payment
-  moves nothing.
-- **A fund-only move of shares:** no account or lot changes.
-- **An explicit purchase bigger than a fund's cash:** the fund goes negative in cash and is
-  flagged; selling its shares fixes it.
-- **A price drop:** values change, holdings don't; a continuous fund now below target refills
-  from the next paycheck.
-- **A big unmarked purchase:** the spend order empties Unallocated's cash, then draws Emergency.
-- **A mortgage payment:** the cash comes by the spend order, and the principal goes to the
-  house's group, held by its fund (defaults win, whoever paid).
-- **A house revaluation:** changes the value of the house's group: no entries, no autofill.
-- **A late bank import dated in the past:** it changes the rule-decided effects after it
-  (Emergency drew more in a later event). Explicit and default funds never change this way.
-- **A change to a fund's allocation from a date:** nothing before that date changes.
-- **The end state:** the funds still added up to net worth in every asset.
+### Shipping
 
-## Grouped assets (adopted, Kael 2026-10-30)
+`v0.1.15`. Then Kael upgrades Emmer, gives both IRAs Retirement as their default fund, divides
+the brokerage among its funds (Move money from Unallocated, per the walkthrough), and works
+through whatever the bell has.
 
-- **The problem:** the books record some things in dollars that aren't spendable cash. A house
-  is an account with a USD balance, updated by revaluation entries; its mortgage is a USD
-  liability. If funds only see kinds, both are more dollars: Unallocated would appear to hold
-  its cash plus the house's equity in USD, groceries could be paid from "house dollars", and the
-  spend order would never reach Emergency even with an empty checking account. A big loan alone
-  has the opposite effect: as plain USD it would sink Unallocated far below zero, so every
-  unmarked purchase would draw on the other funds.
-- **A group is an asset of its own for funds:** some accounts together (a house, its mortgage
-  and any home-equity loan; a car and its loan) are one asset, as separate from USD as shares
-  are. Spending USD can't touch it. Paying principal is buying it with cash; selling the house
-  sells it for cash. Only the fund layer sees this; the books keep the house in dollars.
-- **One fund per group** (Kael): a group is held whole by one fund, its default, so it needs no
-  units: the fund's holding is the group's equity, and a revaluation changes it with no entry,
-  like a price change. A group can't be split across funds or partly moved. (Claude had
-  proposed unitizing, as mutual funds do: units issued at $1.00, a unit price of equity ÷ units,
-  so several funds could hold one house. Kael chose the simpler form.)
-- **Underwater** (equity at or below zero) needs no rule of its own now: the group's fund just
-  shows a negative holding. (Units couldn't be priced at zero; one fund per group has none.)
-  Claude's note, not discussed.
-- **What's grouped** (Kael):
-  - **revalued accounts** (their `open` carries `revalue-every`) are grouped automatically;
-  - **a loan** is attached, when funds are set up, to the asset it's secured on (the mortgage to
-    the house), or made a group of its own;
-  - **unsecured long-term debts** (a student loan, a personal loan) are each a group of their
-    own, with a negative value, held by one fund; payments buy it toward zero with cash.
-    Credit cards stay plain USD: spending on credit draws funds when you spend;
-  - **anything else** (a 401(k), an HSA, a 529) is the user's choice per account, an **advanced
-    setting** kept out of the way. Kael: only if it isn't complicated to build; Claude: it isn't,
-    since a 401(k) is a group of one, by the same mechanism as the house. Grouped, Retirement
-    holds "the 401(k)" as one asset at the account's value: trades and dividends inside never
-    touch funds, and its cash can't pay for groceries, but funds can't earmark specific shares
-    in it. Ungrouped, Retirement holds its cash and shares, and opting Retirement out of the
-    spend order keeps unmarked spending off it.
-- **Big loans** are parked as a special case (open question 4).
+### Decisions to review
 
-## The model as it stood
+Made without asking; each is easy to change.
 
-1. Two ledgers over the same money: accounts (where) and funds (what for). For every asset, the
-   funds add up to net worth.
-2. A fund holds assets: commodities, and groups (each held whole by one fund).
-3. Only asset and liability splits move funds, in their own sign; marking an expense line is the
-   gesture, applied to the split that pays.
-4. A fund is chosen explicitly, else by the account's rules (its default, which wins over
-   conversions, or its own fill rule, which covers everything entering), else by the global
-   rules: the spend order out (skipping funds that opted out), conversion for trades, fill rules
-   for new money.
-5. Moves between funds are their own dated entries, and the only way to reallocate without money
-   moving.
-6. Prices and revaluations change what funds are worth, not what they hold; targets are judged
-   at today's value.
-7. Unallocated holds what's left over, and takes shortfalls below zero.
-8. Explicit choices are stored on splits; everything the rules decide is worked out in one pass
-   in order (each day's income first); settings are dated versions.
+1. **Funds read a transaction per commodity,** replacing A's single kind by value. It's the same
+   for every USD-only transaction.
+2. **By units, not cost:** booking is never needed, and a sale's gain needs no line.
+3. **A fund once per commodity,** so a trade is one fund's two lines; marking one side alone is
+   allowed.
+4. **A line takes over from the side it's on;** the rest of each side stays with its accounts'
+   defaults. Where one side's splits have different defaults, each gives way in proportion.
+5. **Only commodities the book has** can be in a line or a move, so a typo can't make a new one.
+6. **A move is one commodity;** several amounts are several moves, written together
+   (`/fund-moves/batch`).
+7. **Share amounts are kept as typed;** money keeps its cents.
+8. **A fund's dollars are "Cash"** in its Holdings.
+9. **B's old plan is now [the design record](design-record.md),** so this file can be the plan.
+10. **Dollars become shares rounded** to the places the book already writes that commodity in,
+    and the move keeps shares, not dollars: its value floats with the price from then on.
+11. **"Short" counts the whole book, whatever the dates,** as balances do, so a backdated sale
+    is judged against what funds hold now.
+12. **"Came in by itself" means written by `app`'s pipelines** (imports, the bank feed, position
+    changes, receipts, schedule occurrences). Everything saved from the PWA counts as by hand,
+    and a transaction's write is checked only when it changes balance-sheet splits or lines, or
+    confirms it.
+13. **Notifications that wait on a condition aren't stored;** they're read from the condition,
+    so they can't outlive it.
 
-## Open questions (as of 2026-10-31)
+### Decided with Kael
 
-What the old design left open. [scenarios.md](scenarios.md) adds more, grouped by theme in its
-closing section (defaults on transfers, what a mark means, which income autofills, refunds, what
-shares earn, the spend order past Unallocated, restricted money, groups over time, history
-moving).
+Asked and answered on 2026-11-03:
 
-1. **Funds as budgets** (Kael, 2026-10-30; above, under "The problem"). Funds were designed for
-   saving toward goals; this makes them spending categories by purpose too. Put to Kael and
-   dismissed unanswered:
-   - **How such a fund fills each period.** Today's autofill is a percentage of income up to a
-     target, with no period at all. Options: **top up to an amount** (unspent money stays but
-     never builds past it; the next top-up covers an overspend: Claude's lean), **add an
-     amount** (rollover, YNAB-style, perhaps capped), or **reset to the amount** (leftovers and
-     overspending go to Unallocated; closest to an account budget).
-   - **Where its money comes from:** a dated move from Unallocated at each period's start (there
-     from day one; Unallocated may go negative, flagged: Claude's lean), or fixed claims on each
-     period's income ahead of the percentages (which would give the fill priority, question 2,
-     a real job).
-   - **How it's shown:** a "By fund" section on the Budgets page beside the account budgets, with
-     the same bars and period math (Claude's lean), or the Funds pages only.
-   - **What counts as spent this period:** spending drawn from it, explicit or by the spend
-     order, with marked refunds taking it back and moves and conversions shown apart (Claude's
-     lean), or every outflow.
-   - **Not yet asked:** marking. Every such purchase needs its fund chosen, so suggesting funds
-     in review (rules, history, the AI) matters far more than for savings goals; such funds would
-     likely opt out of the spend order. And how they sit beside M11's budgets, which limit
-     accounts (the *what*): side by side, or one replacing the other for spending.
-2. **Fill priority.** Kael's sketch fills funds "in some priority order" as well as by
-   percentages; what the order decides isn't settled. With percentages alone it could only break
-   ties past 100% (Claude's lean: require percentages to total 100% or less and drop the order).
-   Fixed-amount fills, such as budget funds claiming income, would give it a real job.
-3. **Funds and tags.** Recorded as different things (above), but Kael found the difference hazy
-   and hasn't confirmed it. Funds as *why* sharpen the question: M19's AI guidance already has
-   accounts say what and *tags* say why, and now funds would too.
-4. **Big loans** (Kael, 2026-10-30: "a special case"), to come back to both within funds and on
-   their own. Within funds, all that's decided is that a loan is grouped (with its asset, or
-   alone). On their own, Kael wants an amortization schedule loaded easily (read from a PDF or
-   image by the AI, a CSV, or typed in) to guide a scheduled payment, from any point in the loan
-   (say which payment is next); and the payments seen as monthly expenses, though the books
-   already recorded what they paid for. That's docs/PLAN.md's **Loans**.
-5. **Changing a group's fund.** With one fund per group, a group moves whole: presumably a dated
-   move of the entire holding, or a dated change to the group's default (Claude's assumption,
-   not discussed).
+1. **His other Fidelity accounts:** a Roth IRA and a traditional IRA, both wholly Retirement's.
+   The Fidelity Visa is a card, not an asset, and needs nothing new.
+2. **The brokerage's unmarked events** (dividends, reinvestments, and trades the bank feed
+   stages) land in **Unallocated** in step 1, to be marked in review or moved later: the
+   brokerage gets no default fund for now.
+3. **Moving shares: either shares or dollars.** Move money takes a share amount in shares or in
+   dollars, and dollars are turned into shares at the price on the move's date.
+4. **A sale that says no fund is flagged on the transaction.** Typed in by hand, it can't be
+   saved. Come in by itself, it goes into a "needs attention" queue: a **bell** at the top beside
+   the camera, opening a **Notifications** page that lists the queue in the order it was added.
+   Some notifications can be dismissed; others go only when what's wrong is fixed. This one is
+   the second kind, gone on a successful save of the flagged transaction.
+5. **The IRAs' "belongs to" was the default fund idea in another form,** and has to meet that
+   idea's goals. It's now [an account's default fund](#an-accounts-default-fund), which does,
+   goal by goal.
+6. **A sale needs a fund only when it's short:** when the fund it draws on doesn't hold enough
+   of the share, not whenever funds hold some.
+7. **Confirm waits for a fund** on a flagged sale in review, like any save by hand; a rule that
+   would confirm one automatically leaves it in review.
+8. **No fund goes below zero in a share by hand:** lines and moves that would are refused, as
+   the flag is. Dollars stay as in A.
+9. **Default funds are dated,** from the account's opening or a day you choose, so changing one
+   never rewrites history.
+10. **The bell carries only the flagged sale in step 1;** it's built for more kinds later.
+11. **The only fund that could have sold is suggested** on a flagged sale (when exactly one fund
+    holds enough of the share), and written only when you confirm or save. No "in proportion"
+    choice.
+12. **Splits and corporate actions wait** for the rest of B, to be fixed with how the books
+    record them.
+13. **A fund's page shows value only:** quantity, price and value per holding, no gains. Funds
+    hold shares, not lots.
+14. **Setting up is Move money** (several amounts, in shares or dollars): no table of its own.
+15. **They stay "Funds",** though they now hold mutual funds: holdings are always named by their
+    ticker (FXAIX), never "mutual fund", so the two rarely meet in a sentence.
+16. **The bell is always there,** with a count only when something's waiting.
+17. **The bell is per book:** the one you're in.
+18. **A fund's history lists every transaction its defaults gave it,** so it adds up to its
+    balance; it's one list, as in A.
+19. **Select mode's Confirm skips a flagged sale** and confirms the rest, saying so.
+20. **A trade has "From fund" and "To fund"** (Kael's words): From is the side that gives, To the
+    side that gets, and To follows From until it's changed.
+21. **Dollars become shares at the move's date's price** (the latest on or before it).
+22. **Flagged sales come first in Review,** marked, with From fund ready.
+23. **The Trade dialog gets From fund and To fund** (a dividend's To fund), with the only-fund
+    suggestion on a sale.
+24. **A default fund is set in the account's editor and when linking a bank account.**
+25. **The bell only, no email,** in step 1.
+26. **A trade one fund made is one chip,** "Emergency", with both lines in its title.
+27. **Divided accounts are left alone** in step 1; the rest of B decides whether to keep,
+    convert or retire them.
+28. **A default fund's editor says what it will do** before it's saved.
+29. **The bell is for writers only;** viewers still see a transaction's "Needs a fund" mark.
+30. **Step 1 ships as `v0.1.15`.**
 
-## Not discussed yet
+## The rest of B
 
-- **Scope and sharing:** funds belong to a book (books are independent); in a shared book, which
-  roles (read, write, manage: M13) may set up funds and rules, and which may mark splits.
-  *(A answered it for what it has: managers set funds up, writers choose them and move money.)*
-- **Currency:** "targets in USD" means the book's operating currency.
-- **Targets with dates** ("$15,000 by June"), progress toward them, and what a fund page shows.
-- **Explaining:** each transaction showing what it did to funds and why ("drawn from Unallocated
-  by the spend order"), a fund's own ledger, and **pinning** a rule's choice so it becomes
-  explicit and stops moving.
-- **Reports by fund,** and funds in exports and backups (posting metadata and `custom` entries
-  carry them as Beancount). *(A: exports and backups carry funds as text; reports by fund aren't
-  built.)*
-- **Divided accounts:** funds cover the reason they were built; keep them only for money a bank
-  itself keeps apart, migrate their parts to funds, or retire them.
-- **Tags and funds together:** a fund could name a tag, so spending tagged `#vacation` offers
-  "take it from the Vacation fund?" in review.
-- **The API and screens:** marking a split (and an expense line), moves, fund settings, the spend
-  order, grouping (and its advanced setting). *(A built marking a transaction, moves and fund
-  settings; the spend order and grouping are B's.)*
-- **Phasing** (Claude's lean): first funds, Unallocated, explicit and default funds, the spend
-  order, conversions, moves, grouped assets, dated settings and explanations; autofill second.
-
-## Prior art
-
-Envelope budgeting (YNAB, Actual): every dollar assigned to a category, "ready to assign" as the
-residual, overspending shown as negative, and the accounts beside the point. Funds are the same
-idea over net worth rather than a budget's cash, and they hold assets (shares, house equity),
-which envelopes don't. Funds as budgets (open question 1) would bring them closer still.
-
-## Technical fit (Claude's assessment so far)
-
-- **Viable, and a good fit:** additive, on existing patterns: the derived table of M17's tags
-  (the split's fund), `open` metadata like `main-part:` (an account's default, its rules, its
-  group), dated versions like budgets (fund settings), `custom` entries like statements (moves).
-  About the size of M15 or M16.
-- **The pass over the book** is linear over the postings stream the ledger already reads in one
-  query (`transactions/compact`; it would add each posting's fund and its account's group), plus
-  prices: milliseconds to tens of milliseconds for a decades-long book, to be measured on a Pi
-  (Emmer). Cached by the book's change sequence (the ledger already tracks it for backups); an
-  edit re-runs it from its date, from monthly checkpoints. In the ledger, next to the data and
-  the book's order, so every client agrees.
-- **Untouched:** booking and tax lots, reconciliation, bank feeds and imports (synced
-  transactions pick up account defaults with no new code), and tags.
-- **Risks:** explaining effects that depend on history (a late import changes later ones),
-  autofill's many cases (which income, continuous against single, value targets while holdings
-  float, unused shares, rounding), grouped assets being new, and the size of the UI.
+To be continued after we've shipped non-USD assets in funds.

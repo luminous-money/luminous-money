@@ -173,12 +173,19 @@ milestone starts.
       Fund…, a rule's fund, chips on rows, the Funds page, each fund's page, Move money and a
       home card.
 - [ ] **Funds B: Complex Fund Functionality** (next; Kael, 2026-11-02): everything else
-      designed for funds, **asset-aware funds first** (a brokerage whose funds hold shares, Kael's
-      guiding case), then spend and fill rules, account defaults, groups (a house and its
-      mortgage), budget funds for *why* money is spent, and loans in funds.
-      [Its plan](milestones/funds/B/PLAN.md) holds the design so far, with an
-      [example book](milestones/funds/B/example-book.md) and
-      [71 scenarios](milestones/funds/B/scenarios.md) still to gut-check.
+      designed for funds, built in steps.
+  - [ ] **Step 1: shares in funds** (Kael, 2026-11-03; [planned](milestones/funds/B/PLAN.md)
+        with Kael, ready to build): a fund holds any commodity, so Kael's Fidelity accounts
+        can be represented in funds. Funds read a transaction per commodity, moves take shares
+        (typed in shares or dollars), the Funds pages list holdings, and an account can have a
+        default fund (an IRA's is Retirement). A sale that says no fund is flagged: refused when
+        typed by hand, queued in a new **Notifications** page (a bell beside the camera) when it
+        came in by itself.
+  - [ ] **The rest,** after step 1 ships: spend and fill rules, account defaults, groups (a
+        house and its mortgage), budget funds for *why* money is spent, and loans in funds.
+        [The design record](milestones/funds/B/design-record.md) holds the design so far, with
+        an [example book](milestones/funds/B/example-book.md) and
+        [71 scenarios](milestones/funds/B/scenarios.md) still to gut-check.
 - [ ] **Loans** (Kael, 2026-10-30; not planned, its place in the order not decided): big loans as
       a special case, apart from funds and within them. An amortization schedule loaded easily
       (read from a PDF or image by the AI, a CSV, or typed in) guides a scheduled payment, from

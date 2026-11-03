@@ -338,8 +338,9 @@ so that step adds, rather than reworks:
   in). A keeps only the operating currency's figure. The next step keeps one per commodity.
 - **What it will need:** a commodity on amount inputs (picker lines, moves); Unallocated per
   commodity (net worth's holdings less funds'); prices for value and targets. The scenario work
-  ([B/scenarios.md](../B/scenarios.md)) has the cases, and [B's plan](../B/PLAN.md), "Picking up
-  B", lists every place A assumes the operating currency.
+  ([B/scenarios.md](../B/scenarios.md)) has the cases, and [B's design
+  record](../B/design-record.md), "Picking up B", lists every place A assumes the operating
+  currency. [B's plan](../B/PLAN.md) takes shares in funds as its first step.
 
 ## As built: where things are
 

@@ -1,16 +1,50 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-02._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-03._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Hand-off (2026-11-02): Funds A is out; Funds B is next
+## Hand-off (2026-11-03): Funds B step 1 (shares in funds) is planned
 
-**Read this first.** Everything is committed, released and live: **`v0.1.13`** (Funds A) and
+**Read this first.** Everything built is released and live: **`v0.1.13`** (Funds A) and
 **`v0.1.14`** (receipts read in the background, plainer errors, account lists A–Z), and Emmer
-runs 0.1.14. Nothing is half done.
+runs 0.1.14. Nothing is half built.
 
-### What was done (2026-11-02)
+### What was done (2026-11-03)
+
+- **Funds B is planned in steps** (Kael): [B's plan](docs/milestones/funds/B/PLAN.md) is new, and
+  holds only **step 1, shares in funds**, aimed at representing all of Kael's Fidelity accounts
+  in funds. The rest of B is "to be continued after we've shipped non-USD assets in funds". B's
+  old plan (the whole design before the split, "Picking up B" included) is now
+  [the design record](docs/milestones/funds/B/design-record.md); the scenarios and example book
+  point there.
+- **Step 1's model, in brief:** funds read a transaction **per commodity** (each commodity's
+  balance-sheet units get A's kind and cap), replacing A's single kind weighed in dollars. It's
+  the same for every USD-only transaction; a trade is one fund's two lines (`Emergency -3000.00
+  USD; Emergency +10 VTI`). Moves take shares (several at once), Unallocated is worked out per
+  commodity, and the Funds pages list holdings. Its plan has the ledger, server and PWA work,
+  the tests, 30 answers from Kael ("Decided with Kael") and 13 technical calls to review.
+- **Kael's first answers:** his Roth and traditional IRAs are wholly Retirement's; the
+  brokerage's unmarked events land in Unallocated for now; and Move money takes shares **or
+  dollars** (turned into shares at the price on the move's date).
+- **Then two directions from Kael:** a sale that says no fund (it takes shares the fund it
+  draws on doesn't have) is **flagged**: refused when typed by hand, and when it came in by
+  itself, queued in a new **Notifications** page behind a bell beside the camera (date-added
+  order; some notifications dismissable, this one gone only once the transaction is saved
+  fixed). And the IRAs' "belongs to" became **an account's default fund**, Kael's earlier idea:
+  each balance-sheet split counts for its account's default unless a line takes over its side,
+  which the plan checks against that idea's ten goals.
+- **Then rounds of questions, all answered** (the plan, "Decided with Kael", 6 to 30). A sale
+  is flagged only when it's short; Confirm waits for a fund (Select mode skips a flagged one),
+  and flagged sales come first in Review with the only fund that holds enough already chosen.
+  No fund goes below zero in a share by hand. Default funds are dated, set in the account editor
+  or while linking a bank account, with a preview first. A trade's choices read **From fund**
+  and **To fund** (To following From), in the Trade dialog too. The bell is always there, per
+  book, for writers, holds only flagged sales for now, and sends no email. A fund's page shows
+  value only, and its history lists every transaction its defaults gave it. Splits and divided
+  accounts wait for the rest of B. It ships as `v0.1.15`, and they stay "Funds".
+
+### Done before (2026-11-02)
 
 - **Funds A** ([its plan](docs/milestones/funds/A/PLAN.md), which now describes what was built;
   design.md, "Funds A"): a second ledger of funds beside the accounts, with no rules. A fund fills
@@ -30,16 +64,20 @@ runs 0.1.14. Nothing is half done.
 
 ### What to do next
 
-1. **Kael reviews Funds A's decisions** (A's plan, "Decisions to review": 1 to 13 from planning,
-   14 to 23 made while building the screens).
-2. **Funds B**, starting with **asset-aware funds** (Kael's guiding case: a Fidelity brokerage
-   whose four funds, Wedding, Emergency, Special Home Maintenance and Repair, and Special Home
-   Improvement, hold shares). Start at [B's plan](docs/milestones/funds/B/PLAN.md), "Picking up
-   B": what to do first, what A settled (and which of B's older decisions it replaced: lines
-   live on the transaction, not on splits), every place A assumes the operating currency, and
-   the questions to settle with Kael before building. Then the 71
-   [scenarios](docs/milestones/funds/B/scenarios.md) with Kael.
-3. Then M18 (suggested recurring transactions and matching rules); see "Next steps" below.
+1. **Kael looks over step 1's 13 technical calls** ([B's plan](docs/milestones/funds/B/PLAN.md),
+   "Decisions to review"), whenever suits; nothing waits on them.
+2. **Build Funds B step 1, shares in funds,** from that plan: the ledger first (per-commodity
+   shapes, moves of shares, holdings with values, Unallocated per commodity, default funds, the
+   short-sale flag), `pnpm generate`, then the app server (staging short sales, notifications)
+   and the PWA (including the bell and Notifications), the tests, and a look at every changed
+   screen. Release as `v0.1.15`. Kael's guiding case is his Fidelity brokerage,
+   whose four funds (Wedding, Emergency, Special Home Maintenance and Repair, and Special Home
+   Improvement) hold shares, beside two IRAs that are wholly Retirement's.
+3. **Kael reviews Funds A's decisions** (A's plan, "Decisions to review": 1 to 13 from planning,
+   14 to 23 made while building the screens), whenever suits.
+4. Then the rest of Funds B (the [design record](docs/milestones/funds/B/design-record.md), and
+   the 71 [scenarios](docs/milestones/funds/B/scenarios.md) with Kael), or M18 (suggested
+   recurring transactions and matching rules); see "Next steps" below.
 
 ### Working on it
 
@@ -418,9 +456,9 @@ How it's put together:
    categorizing it took about 76 seconds, hence background jobs), but none with a reference
    yet; watch the first suggestions' quality and `docker compose logs ai`. Not built from the
    proposal: a by-payee view in review (categorize a payee's group at once).
-3. **Funds B**, starting with asset-aware funds ([its plan](docs/milestones/funds/B/PLAN.md),
-   "Picking up B"), once Kael has looked over Funds A's decisions to review. Then M18
-   (suggested recurring transactions and matching rules).
+3. **Funds B, step 1: shares in funds** ([its plan](docs/milestones/funds/B/PLAN.md); planned
+   2026-11-03 with Kael, ready to build). Then the rest of B or M18 (suggested recurring
+   transactions and matching rules).
 4. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
 

@@ -73,11 +73,13 @@ Income accounts the scenarios use: `Income:Salary:Acme`, `Income:Employer-Match`
 | **Family** | family outings | $300 a month | | opted out | |
 
 - **Social, Chores and Family are budget funds** (Kael's 2026-10-30 idea: accounts say *what*,
-  funds say *why*). How they fill isn't decided (PLAN.md, open question 1). The scenarios assume
-  Claude's lean: each is **topped up to its monthly amount from Unallocated on the 1st**.
+  funds say *why*). How they fill isn't decided ([the design record](design-record.md), open
+  question 1). The scenarios assume Claude's lean: each is **topped up to its monthly amount from
+  Unallocated on the 1st**.
 - **Opted out** of the spend order means unmarked spending never draws on the fund; only a mark,
   its account's default, or a move does.
-- **Fill priority** (PLAN.md, open question 2) never matters here: the percentages total 30%.
+- **Fill priority** (the design record, open question 2) never matters here: the percentages
+  total 30%.
 
 ## Where each fund stands
 
