@@ -1,8 +1,10 @@
 Funds B: Complex Fund Functionality: plan
 ==================================================================================================
 
-> **Status (2026-11-03): step 1 planned with Kael, nothing built.** B is built in steps (Kael,
-> 2026-11-03). **Step 1 is shares in funds:** a fund holds amounts of any commodity, not just
+> **Status (2026-11-03): step 1 built and released as `v0.1.15`.** The ledger, the app server and
+> the PWA, with unit, API and browser tests, and looked at on a phone and a desktop, light and
+> dark. Where the build departed from the plan, [As built](#as-built-where-things-are) says so.
+> B is built in steps (Kael, 2026-11-03). **Step 1 is shares in funds:** a fund holds amounts of any commodity, not just
 > dollars, so that Kael can represent every one of his Fidelity accounts in funds. With it come
 > account default funds (the IRAs are Retirement's), a flag on a sale that says no fund, and a
 > Notifications queue. Houses, cars and loans wait. Kael's answers are under [Decided with
@@ -431,6 +433,61 @@ Kael: a "needs attention" queue, behind a bell at the top beside the camera.
 `v0.1.15`. Then Kael upgrades Emmer, gives both IRAs Retirement as their default fund, divides
 the brokerage among its funds (Move money from Unallocated, per the walkthrough), and works
 through whatever the bell has.
+
+### As built: where things are
+
+- **Ledger** (`services/ledger/src/ledger`):
+  - `engine.py`: `balance_sheet_units`, and the `fund-default` directive (`FundDefault`,
+    `default_directive`, `default_of`; renaming an account carries it, deleting one drops it);
+  - `fundlines.py`: per-commodity `shapes`, `lines_problem`, `checked`; `Defaults` (dated, the
+    nearest account up); `effects` (lines, then each side by its accounts' defaults);
+    `default_parts`, `fund_totals`, `share_holdings`; `guard` (no fund short of a share by hand)
+    and `short`;
+  - `funds.py`: `listing` (holdings with values and prices, `unpriced`, `accounts`,
+    `unallocated_holdings`, `defaults`), `history` (with what defaults gave), `short`, moves of any
+    commodity (`create_moves`, never leaving a fund short), defaults (`create_default`,
+    `patch_default`, `delete_default`, `preview_default`), archive refused while a fund is a
+    default, rename rewriting defaults;
+  - `service.py`: `_guard` on every transaction write and deletion, skipped with `staging`;
+    `investments.trade` takes `funds`; `store.py`: `balance_sheet_totals`,
+    `transactions_touching`; the routes in `api.py` (`?staging=true` on transaction writes and
+    directive deletes, `/fund-moves/batch`, `/fund-defaults` and `/preview`, `/funds/short`).
+- **app server** (`services/app/src`): `shared/funds.ts` (`shapesOf`, `wholeLines`, `isTrade`,
+  `linesProblem`, `fundFor`, `effectsOf`), `server/ledger.ts` (`Staging`, `STAGING`,
+  `shortTransactions`), the pipelines writing as staging (imports, the bank feed's holdings and
+  links, receipts, schedules, pairing and rejecting transfers, a match's "Not a match"),
+  `server/notifications.ts` and `shared/notifications.ts`, and the route in `server/api.ts`.
+- **PWA** (`services/app/src/web`): `lib/funds.ts` (rows per commodity, `effects`, `belowZero`,
+  `wholeSide`, `suggestedFund`), `components/Funds.tsx` (`useFundRows`, `FundsFieldset` with
+  `CommodityLines`, From and To for a trade, `FundChips`, `FundChoice`, `MoveMoneyDialog` with
+  `MoveAmount`, `HoldingsLine`), `components/DefaultFund.tsx`, `components/NotificationsBell.tsx`,
+  `pages/Notifications.tsx`, and the wiring in `Funds`, `FundPage`, `TransactionPage`,
+  `ScheduleEditor`, `TradePage`, `Review`, `lib/bulk.ts`, `AccountEditor`, `BankConnections`,
+  `App` (the bell and the route), `lib/queries.ts` and `lib/ledger.ts`; styles at the end of
+  `styles.css` ("Funds B").
+- **Tests:** the ledger's `tests/test_funds_b.py` (18, the walkthrough first; A's tests changed
+  only where trades and other currencies now read per commodity); app units (`shared/funds.test.ts`,
+  `web/lib/funds.test.ts`, `server/notifications.test.ts`, staging in the SimpleFIN test); the
+  API suite's `funds-b.test.ts` (2) and the browser suite's `funds-b.spec.ts` (4).
+
+**Where the build departed from the plan** (each easy to change):
+
+1. **Default funds have their own small API** (`/fund-defaults`, versioned like moves) rather
+   than the account's PATCH, and the editor reads them from the funds list (`Funds.defaults`);
+   there's no `Account.default_fund`.
+2. **On Bank connections, the default fund is set beside a linked account** ("Default fund:
+   none", folded away), once the link is made, rather than in the link form: links made in the
+   background are confirmed later, from their preview. It starts from the account's opening.
+3. **A rule that would confirm a short import isn't special-cased:** imports and bank feeds land
+   in cash (one commodity), and the bank feed's position changes are always staged unconfirmed,
+   so nothing short arrives confirmed except a schedule's auto-confirmed occurrence, which stays
+   confirmed and is listed.
+4. **No table for dismissable notifications yet:** step 1 has none.
+5. **Select mode's Confirm keeps the whole selection** when it skips a flagged sale (not just
+   the flagged one), and says how many it skipped.
+6. **The Trade page's Funds section comes with its preview;** a sale refused as short opens the
+   preview, so a fund can be chosen.
+7. **Share amounts are shown as plainly as they're held** (`10.000` is `10`).
 
 ### Decisions to review
 

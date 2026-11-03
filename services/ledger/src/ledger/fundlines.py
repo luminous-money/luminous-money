@@ -290,21 +290,26 @@ def fund_totals(
 
 
 def share_holdings(
-    store: Store, book_id: str, header: list[str], defaults: Defaults | None = None
+    store: Store,
+    book_id: str,
+    header: list[str],
+    defaults: Defaults | None = None,
+    currencies: set[str] | None = None,
 ) -> dict[tuple[str, str], Decimal]:
-    """What each fund holds of each commodity but the operating currency, by casefolded name,
-    with Unallocated's: what the accounts hold that no fund does."""
+    """What each fund holds of commodities but the operating currency (`currencies`, or those
+    funds hold), by casefolded name, with Unallocated's: what the accounts hold that no fund
+    does. Only those commodities' postings are read, so a book with no shares in funds reads
+    none."""
     operating = investments.operating_currency(header)
     held: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
     for (fund, currency), number in fund_totals(store, book_id, header, defaults).items():
-        if currency != operating:
+        if currency != operating and (currencies is None or currency in currencies):
             held[(fund.casefold(), currency)] += number
-    accounts = store.balance_sheet_totals(book_id, balance_sheet_roots(header))
-    for currency, number in accounts.items():
-        if currency == operating:
-            continue
+    wanted = {c for _, c in held} if currencies is None else currencies - {operating}
+    accounts = store.balance_sheet_totals(book_id, balance_sheet_roots(header), wanted)
+    for currency in wanted:
         in_funds = sum((n for (_, c), n in held.items() if c == currency), Decimal(0))
-        held[(UNALLOCATED.casefold(), currency)] = number - in_funds
+        held[(UNALLOCATED.casefold(), currency)] = accounts.get(currency, Decimal(0)) - in_funds
     return dict(held)
 
 
@@ -364,7 +369,9 @@ def guard(
             checked.append(new)
     if not any(delta.values()) and not any(any(v < 0 for v in e.values()) for e in checked):
         return
-    holdings = share_holdings(store, book_id, header, defaults)
+    holdings = share_holdings(
+        store, book_id, header, defaults, {c for _, c in delta} | {c for e in checked for _, c in e}
+    )
     names = _named(store, book_id)
 
     def held_after(key: tuple[str, str]) -> Decimal:

@@ -108,6 +108,8 @@ test("Reports filter by tag: All time, the largest tagged, and net worth set asi
   await expect(page.getByRole("region", { name: "Net worth" })).toBeVisible();
   const filter = page.getByRole("combobox", { name: "Filter by tag" });
   await filter.fill("kit");
+  // Enter takes the suggestion, once the book's tags have loaded.
+  await expect(page.getByRole("option", { name: "#kitchen" })).toBeVisible();
   await filter.press("Enter");
   await expect(page).toHaveURL(/tag=kitchen/);
   await expect(page.getByText("Only transactions tagged #kitchen.")).toBeVisible();

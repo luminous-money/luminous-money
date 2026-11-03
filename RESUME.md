@@ -4,45 +4,34 @@ Where We Left Off
 _Updated 2026-11-03._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Hand-off (2026-11-03): Funds B step 1 (shares in funds) is planned
+## Hand-off (2026-11-03): Funds B step 1 (shares in funds) is out
 
-**Read this first.** Everything built is released and live: **`v0.1.13`** (Funds A) and
-**`v0.1.14`** (receipts read in the background, plainer errors, account lists A–Z), and Emmer
-runs 0.1.14. Nothing is half built.
+**Read this first.** Everything is committed, released and live: **`v0.1.15`** (Funds B step 1,
+shares in funds), and Emmer runs 0.1.15. Nothing is half done.
 
 ### What was done (2026-11-03)
 
-- **Funds B is planned in steps** (Kael): [B's plan](docs/milestones/funds/B/PLAN.md) is new, and
-  holds only **step 1, shares in funds**, aimed at representing all of Kael's Fidelity accounts
-  in funds. The rest of B is "to be continued after we've shipped non-USD assets in funds". B's
-  old plan (the whole design before the split, "Picking up B" included) is now
-  [the design record](docs/milestones/funds/B/design-record.md); the scenarios and example book
-  point there.
-- **Step 1's model, in brief:** funds read a transaction **per commodity** (each commodity's
-  balance-sheet units get A's kind and cap), replacing A's single kind weighed in dollars. It's
-  the same for every USD-only transaction; a trade is one fund's two lines (`Emergency -3000.00
-  USD; Emergency +10 VTI`). Moves take shares (several at once), Unallocated is worked out per
-  commodity, and the Funds pages list holdings. Its plan has the ledger, server and PWA work,
-  the tests, 30 answers from Kael ("Decided with Kael") and 13 technical calls to review.
-- **Kael's first answers:** his Roth and traditional IRAs are wholly Retirement's; the
-  brokerage's unmarked events land in Unallocated for now; and Move money takes shares **or
-  dollars** (turned into shares at the price on the move's date).
-- **Then two directions from Kael:** a sale that says no fund (it takes shares the fund it
-  draws on doesn't have) is **flagged**: refused when typed by hand, and when it came in by
-  itself, queued in a new **Notifications** page behind a bell beside the camera (date-added
-  order; some notifications dismissable, this one gone only once the transaction is saved
-  fixed). And the IRAs' "belongs to" became **an account's default fund**, Kael's earlier idea:
-  each balance-sheet split counts for its account's default unless a line takes over its side,
-  which the plan checks against that idea's ten goals.
-- **Then rounds of questions, all answered** (the plan, "Decided with Kael", 6 to 30). A sale
-  is flagged only when it's short; Confirm waits for a fund (Select mode skips a flagged one),
-  and flagged sales come first in Review with the only fund that holds enough already chosen.
-  No fund goes below zero in a share by hand. Default funds are dated, set in the account editor
-  or while linking a bank account, with a preview first. A trade's choices read **From fund**
-  and **To fund** (To following From), in the Trade dialog too. The bell is always there, per
-  book, for writers, holds only flagged sales for now, and sends no email. A fund's page shows
-  value only, and its history lists every transaction its defaults gave it. Splits and divided
-  accounts wait for the rest of B. It ships as `v0.1.15`, and they stay "Funds".
+- **Funds B is planned in steps, and step 1 is built** (Kael): [B's
+  plan](docs/milestones/funds/B/PLAN.md) holds only step 1, now with "As built"; the rest of B is
+  "to be continued after we've shipped non-USD assets in funds". B's old plan is now [the design
+  record](docs/milestones/funds/B/design-record.md). design.md has "Funds B, step 1".
+- **Shares in funds:** funds read a transaction **per commodity** (A's kind and cap for each
+  commodity's balance-sheet units), so a trade is one fund's two lines (`Emergency -3000.00 USD;
+  Emergency +10 VTI`), the same as A for every USD-only transaction. Move money takes several
+  amounts, each in shares or dollars (turned into shares at the move's date's price). The Funds
+  page and a fund's page list holdings with prices and values; Unallocated is worked out per
+  commodity.
+- **Default funds** (Kael's earlier idea, checked against its ten goals): a dated `custom
+  "fund-default"` says what changes in an account with no line saying otherwise is a fund's; a
+  line takes over its side. Kael's Roth and traditional IRAs are to be Retirement's this way. Set
+  in an account's editor or beside a linked bank account, with a preview.
+- **No fund goes below zero in a share by hand** (Kael): the ledger refuses it; what `app` writes
+  by itself (`?staging=true`) is kept and, if it takes shares no fund has, listed as **short**:
+  marked and first in Review (the only fund that holds enough suggested, Confirm waiting for a
+  fund) and in the new **Notifications** page behind a bell beside the camera. A notification
+  that waits on a condition is read from it, so a fix anywhere clears it.
+- **The questions:** 30 answers from Kael are in the plan ("Decided with Kael"); 13 technical
+  calls, and 7 places the build departed from the plan, are there for Kael to look over.
 
 ### Done before (2026-11-02)
 
@@ -64,28 +53,30 @@ runs 0.1.14. Nothing is half built.
 
 ### What to do next
 
-1. **Kael looks over step 1's 13 technical calls** ([B's plan](docs/milestones/funds/B/PLAN.md),
-   "Decisions to review"), whenever suits; nothing waits on them.
-2. **Build Funds B step 1, shares in funds,** from that plan: the ledger first (per-commodity
-   shapes, moves of shares, holdings with values, Unallocated per commodity, default funds, the
-   short-sale flag), `pnpm generate`, then the app server (staging short sales, notifications)
-   and the PWA (including the bell and Notifications), the tests, and a look at every changed
-   screen. Release as `v0.1.15`. Kael's guiding case is his Fidelity brokerage,
-   whose four funds (Wedding, Emergency, Special Home Maintenance and Repair, and Special Home
-   Improvement) hold shares, beside two IRAs that are wholly Retirement's.
-3. **Kael reviews Funds A's decisions** (A's plan, "Decisions to review": 1 to 13 from planning,
-   14 to 23 made while building the screens), whenever suits.
-4. Then the rest of Funds B (the [design record](docs/milestones/funds/B/design-record.md), and
-   the 71 [scenarios](docs/milestones/funds/B/scenarios.md) with Kael), or M18 (suggested
+1. **Kael sets his Fidelity accounts up in funds on Emmer** (0.1.15 is installed there): both
+   IRAs' default fund Retirement, from their opening (the account editor, or beside each link on
+   Bank connections); the brokerage divided among Wedding, Emergency, Special Home Maintenance
+   and Repair, and Special Home Improvement with Move money from Unallocated; then whatever the
+   bell has. Watch the first bank sync after: a sale or transfer out of shares that every fund
+   holds should land in the bell, not fail.
+2. **Kael looks over step 1's calls** ([B's plan](docs/milestones/funds/B/PLAN.md), "Decisions to
+   review" and "Where the build departed from the plan"), and Funds A's (A's plan, "Decisions to
+   review"), whenever suits.
+3. Then the rest of Funds B (the [design record](docs/milestones/funds/B/design-record.md), and
+   the 71 [scenarios](docs/milestones/funds/B/scenarios.md) with Kael; splits and corporate
+   actions are waiting there, with how the bank feed books a split), or M18 (suggested
    recurring transactions and matching rules); see "Next steps" below.
 
 ### Working on it
 
 - **Funds' code:** the rules live twice, `services/ledger/src/ledger/fundlines.py` and
-  `services/app/src/shared/funds.ts` (same wording), so the PWA says what the ledger would; the
-  PWA's rows and the line that follows the transaction are `web/lib/funds.ts`; the screens are
-  `web/components/Funds.tsx`, `web/pages/Funds.tsx` and `web/pages/FundPage.tsx`. A's plan, "As
-  built", maps the rest.
+  `services/app/src/shared/funds.ts` (same wording: per commodity, with default funds), so the
+  PWA says what the ledger would; the PWA's rows and the line that follows the transaction are
+  `web/lib/funds.ts`; the screens are `web/components/Funds.tsx`, `DefaultFund.tsx`,
+  `NotificationsBell.tsx`, `web/pages/Funds.tsx`, `FundPage.tsx` and `Notifications.tsx`. A's
+  plan and B's, "As built", map the rest.
+- **Screenshots' results:** the `ui` container's `--rm` takes Playwright's `test-results` with
+  it; mount a host folder at `/repo/tests/ui/test-results` to keep a failure's page snapshot.
 - **Ledger tests without uv:** `cd services/ledger && docker run --rm -v "$PWD/src:/srv/src" -v
   "$PWD/tests:/srv/tests" -w /srv luminous-money/ledger:test pytest -q -p no:cacheprovider`.
   App units: `cd services/app && npx vitest run`; typechecks: `npx tsc -p tsconfig.web.json
@@ -165,7 +156,7 @@ repositories) is archived on GitHub and kept locally in `../.archive/system`. Ev
 GPL-2.0-or-later (Beancount is GPL-2.0-only). It wears the original app's look: its palette
 (light gray and blue; deep blue and cyan in dark mode) and its Lu logo (design.md, "Its look").
 
-**M1 through M17 and Funds A are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M17, Funds A and Funds B's step 1 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
 accounts), M11 (budgets), M12 (reports), M13 (sharing books), M14 (reconciliation), M15 (divided
@@ -197,10 +188,18 @@ from github.com's redirect, not the API, whose 60-an-hour limit for an address h
 **`v0.1.10`** (2026-10-27) brings the chart of accounts import and migrating from another
 system, **`v0.1.11`** what the AI costs, **`v0.1.12`** (2026-10-29) tags (M17) and the
 migration's clearer word on what's kept, **`v0.1.13`** (2026-11-02) Funds A, and **`v0.1.14`**
-(2026-11-02) receipts read in the background, plainer errors, and account lists A–Z. The history was rewritten once before
+(2026-11-02) receipts read in the background, plainer errors, and account lists A–Z, and
+**`v0.1.15`** (2026-11-03) Funds B's step 1: shares in funds, default funds and Notifications. The history was rewritten once before
 the first push (an email taken out of RESUME), so commit IDs from before then are gone.
 
 What a user can do now:
+- **Shares in funds (Funds B step 1):** a fund holds cash and shares: Move money takes several
+  amounts, each in shares or dollars; the Funds page and a fund's page list holdings with prices
+  and values; a trade's Funds section (its page, review, the Trade page) has From fund and To
+  fund. An asset or liability account can have a **default fund** from a day (its editor, or
+  beside a linked bank account): what changes there with no fund chosen is that fund's. Nothing
+  done by hand leaves a fund short of a share; a sale that came in by itself and takes shares no
+  fund has waits, marked, first in Review and in **Notifications** (the bell beside the camera).
 - **Funds (Funds A):** Menu → **Funds**: net worth, what's in funds, and Unallocated
   (everything that isn't in a fund, the house and retirement included); each fund's balance (red
   below zero), description and progress toward its target; **Move money** between funds
@@ -433,10 +432,10 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 228 tests, including the table lint
-    - auth: 24; app: 254; ai: 14; db: 10; csv-import: 22
+    - ledger: 246 tests, including the table lint
+    - auth: 24; app: 261; ai: 14; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 101 API tests and 121 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 103 API tests and 125 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Its `.env` (not committed: its keys) sets `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand`, so it never
@@ -456,8 +455,8 @@ How it's put together:
    categorizing it took about 76 seconds, hence background jobs), but none with a reference
    yet; watch the first suggestions' quality and `docker compose logs ai`. Not built from the
    proposal: a by-payee view in review (categorize a payee's group at once).
-3. **Funds B, step 1: shares in funds** ([its plan](docs/milestones/funds/B/PLAN.md); planned
-   2026-11-03 with Kael, ready to build). Then the rest of B or M18 (suggested recurring
+3. **Funds B's step 1 is out** (`v0.1.15`, [its plan](docs/milestones/funds/B/PLAN.md)); Kael
+   sets his Fidelity accounts up in funds. Then the rest of B or M18 (suggested recurring
    transactions and matching rules).
 4. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).

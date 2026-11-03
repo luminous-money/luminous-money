@@ -898,6 +898,7 @@ function remember(book: string, saved: Transaction) {
   void queryClient.invalidateQueries({ queryKey: ["book", book, "tree"] });
   void queryClient.invalidateQueries({ queryKey: ["book", book, "tags"] });
   void queryClient.invalidateQueries({ queryKey: ["book", book, "funds"] });
+  void queryClient.invalidateQueries({ queryKey: ["book", book, "notifications"] });
   void queryClient.invalidateQueries({ queryKey: ["book", book, "journal"] });
 }
 

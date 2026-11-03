@@ -3215,19 +3215,59 @@ select.fund-pick {
   margin-bottom: 0.25rem;
 }
 
-.move-amount .fund-line {
-  display: flex;
-  flex-wrap: wrap;
+.move-amount {
+  display: grid;
   gap: 0.4rem;
+  justify-items: start;
 }
 
-.move-amount .fund-line input {
-  flex: 1 1 7rem;
-  min-width: 6rem;
+.move-amount + .move-amount {
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--line);
+}
+
+/* An amount, what it's of and ×, on one line; Shares or Dollars under it. */
+.move-top {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  width: 100%;
+}
+
+.move-top input {
+  flex: 1 1 6rem;
+  min-width: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.move-top select {
+  flex: 0 1 8rem;
+  width: auto;
+  min-width: 0;
 }
 
 .move-amount p {
-  margin: 0.25rem 0 0;
+  margin: 0;
+}
+
+/* A trade's From fund and To fund on a review card. */
+.fund-trade label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.fund-trade select {
+  width: 0;
+  min-width: 0;
+  flex: 1 1 8rem;
+  max-width: 18rem;
+  font-size: 1rem;
+  color: var(--ink);
+  font-weight: 400;
 }
 
 .segmented button[aria-pressed="true"] {

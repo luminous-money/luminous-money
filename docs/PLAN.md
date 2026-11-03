@@ -174,8 +174,8 @@ milestone starts.
       home card.
 - [ ] **Funds B: Complex Fund Functionality** (next; Kael, 2026-11-02): everything else
       designed for funds, built in steps.
-  - [ ] **Step 1: shares in funds** (Kael, 2026-11-03; [planned](milestones/funds/B/PLAN.md)
-        with Kael, ready to build): a fund holds any commodity, so Kael's Fidelity accounts
+  - [x] **Step 1: shares in funds** (Kael, 2026-11-03; [built](milestones/funds/B/PLAN.md)
+        2026-11-03, `v0.1.15`): a fund holds any commodity, so Kael's Fidelity accounts
         can be represented in funds. Funds read a transaction per commodity, moves take shares
         (typed in shares or dollars), the Funds pages list holdings, and an account can have a
         default fund (an IRA's is Retirement). A sale that says no fund is flagged: refused when

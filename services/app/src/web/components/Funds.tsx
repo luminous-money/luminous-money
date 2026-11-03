@@ -895,13 +895,13 @@ function MoveAmount({
     !share || !price || !Number.isFinite(number) || !number
       ? null
       : row.inDollars
-        ? `${formatMoney(fixed(typed), operating)} is ${(number / Number(price.price.number)).toFixed(places)} ${row.currency} at ${formatMoney(price.price.number, operating)} (${shortDay(price.date)})`
+        ? `${formatMoney(fixed(typed), operating)} is ${(number / Number(price.price.number)).toFixed(places).replace(/\.?0+$/, "")} ${row.currency} at ${formatMoney(price.price.number, operating)} (${shortDay(price.date)})`
         : `about ${formatMoney((number * Number(price.price.number)).toFixed(2), operating)} at ${formatMoney(price.price.number, operating)} (${shortDay(price.date)})`;
   return (
     <div className="move-amount">
-      <div className="fund-line">
+      <div className="move-top">
         <input
-          aria-label={`Amount${commodities.length > 1 ? ` of ${row.currency}` : ""}`}
+          aria-label={`Amount${commodities.length > 1 ? ` of ${share ? row.currency : "Cash"}` : ""}`}
           inputMode="decimal"
           value={row.amount}
           placeholder={!share || row.inDollars ? "0.00" : "0"}
@@ -921,32 +921,32 @@ function MoveAmount({
             ))}
           </select>
         )}
-        {share && (
-          <span className="segmented" role="group" aria-label={`${row.currency} in`}>
-            <button
-              type="button"
-              aria-pressed={!row.inDollars}
-              onClick={() => onChange({ inDollars: false })}
-            >
-              Shares
-            </button>
-            <button
-              type="button"
-              aria-pressed={row.inDollars}
-              disabled={!price}
-              title={price ? undefined : `${row.currency} has no price on or before ${date}`}
-              onClick={() => onChange({ inDollars: true })}
-            >
-              Dollars
-            </button>
-          </span>
-        )}
         {removable && (
           <button type="button" className="icon" aria-label="Remove this amount" onClick={onRemove}>
             ×
           </button>
         )}
       </div>
+      {share && (
+        <span className="segmented" role="group" aria-label={`${row.currency} in`}>
+          <button
+            type="button"
+            aria-pressed={!row.inDollars}
+            onClick={() => onChange({ inDollars: false })}
+          >
+            Shares
+          </button>
+          <button
+            type="button"
+            aria-pressed={row.inDollars}
+            disabled={!price}
+            title={price ? undefined : `${row.currency} has no price on or before ${date}`}
+            onClick={() => onChange({ inDollars: true })}
+          >
+            Dollars
+          </button>
+        </span>
+      )}
       {hint && <p className="small muted">{hint}</p>}
     </div>
   );

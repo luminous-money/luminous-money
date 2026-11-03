@@ -1057,8 +1057,8 @@ same money in through another's, a day or so later. Both would sit in review, un
 
 Funds say what money is *for*, as a second ledger beside the accounts (where it is). Funds A is
 the version with no rules (Kael: "I've held an easy version of this milestone hostage to a hard
-version"); Funds B ([its plan](milestones/funds/B/PLAN.md)) adds the rest, asset-aware funds
-first. The whole design, with Kael's answers, is [A's plan](milestones/funds/A/PLAN.md).
+version"); Funds B ([its plan](milestones/funds/B/PLAN.md)) adds the rest, in steps: shares
+in funds first (below). The whole design, with Kael's answers, is [A's plan](milestones/funds/A/PLAN.md).
 
 - **Money reaches or leaves a fund only when you say so:** a transaction's lines ("for
   Emergency", "from Emergency"), or a move between funds. Unallocated is net worth less every
@@ -1106,6 +1106,60 @@ first. The whole design, with Kael's answers, is [A's plan](milestones/funds/A/P
 - **Archiving** moves what's left (to Unallocated, or another fund) on the archive date, no
   earlier than the fund's last entry, and takes it out of the pickers; lines already on it stay.
   Deleting is only for a fund with no history.
+
+### Funds B, step 1: shares in funds (2026-11-03)
+
+Funds hold any commodity, so Kael's Fidelity accounts are represented in funds: a brokerage whose
+funds hold cash and shares, and two IRAs that are wholly Retirement's. [B's
+plan](milestones/funds/B/PLAN.md) has the walkthrough and Kael's answers ("Decided with Kael").
+
+- **Funds read a transaction one commodity at a time.** Each commodity's change is its
+  balance-sheet splits' units, with Funds A's kind and cap per commodity. A buy is dollars out
+  and shares in, so one fund can make a whole trade (`Emergency -3000.00 USD; Emergency +10
+  VTI`), and a sale's gain needs no line: the fund that sold gets the proceeds. This replaced A's
+  single kind weighed in dollars, which couldn't say which shares a fund got; for every USD-only
+  transaction it's the same. Units need no booking, so a sale's empty cost (`{}`) reads too.
+- **A fund appears once per commodity,** and a line in a commodity the transaction doesn't move is
+  refused. Only commodities the book has can be moved, so a typo can't make a new one.
+- **Values follow prices; nothing else does.** A fund's holdings are valued at the day's prices,
+  each with its price and date; targets stay in dollars, judged by value. Funds hold shares, not
+  lots, so they don't use cost basis and show no gains.
+- **Unallocated per commodity** is what the accounts hold less what funds hold; its value is
+  still net worth less every fund's.
+- **No fund goes below zero in a share by hand** (Kael). A write by hand (a transaction, a move,
+  a default, a deletion) that would leave one there is refused; a transaction is checked only
+  when its share effects change or it's confirmed, as A's lines are checked only when they
+  change. What `app` writes by itself (imports, bank feeds and their position changes, receipts,
+  schedules, pairing: `?staging=true`) is kept, and if it takes a share a fund doesn't have it's
+  **short**: listed by `GET /funds/short`, marked and put first in review, with the only fund
+  that holds enough suggested, and Confirm waits for a fund. "Short" counts the whole book,
+  whatever the dates, as balances do. Dollars stay as in A: below zero is allowed, shown in red.
+- **Notifications** (Kael): a bell beside the camera (for writers, per book, always there, with a
+  count) opens a queue, oldest first. A notification that waits on a condition isn't stored:
+  it's read from the condition (here, the short transactions), so a fix made anywhere clears it,
+  and it can't outlive its problem. Dismissable kinds, when they come, will be stored in `app`.
+- **Default funds are Kael's earlier idea, made to fit lines on the transaction.** A dated
+  `custom "fund-default" <account> "<fund>"` says that from that day, what changes in the account
+  (and under it) with no line saying otherwise is the fund's. Each balance-sheet split counts for
+  its account's default (else Unallocated); a `+` line takes over from the splits that went up, a
+  `-` line from those that went down, and the rest stays with their defaults; with none
+  anywhere, that's A. It meets the old idea's goals: money entering lands in the default with
+  nothing marked, transfers included; defaults work both ways; a choice on the transaction
+  overrides; defaults win over conversions; defaults route money and don't pin balances (money
+  can be moved out of a default fund); Unallocated can be a default apart from none, for the
+  fill rules to come. A "belongs to" the plan first had pinned the fund to the account, with no
+  way to override or redistribute, so it was dropped. Defaults are dated so changing one never
+  rewrites history, and they're worked out on reading (the transactions touching a defaulted
+  account), not stored on transactions, so they can't go stale.
+- **Screens:** a trade's Funds section has From fund and To fund (Kael's words; To follows From
+  until it's changed; Split it for parts), the review card and the Trade page too; several
+  commodities get a group each. Move money takes several amounts, each in shares or in dollars
+  (turned into shares at the price on the move's date, rounded to the places the book writes
+  that commodity in, at least three). The Funds page and a fund's page list holdings; a fund's
+  history shows a transaction's lines together and includes what defaults gave it, so it adds up.
+  A default fund is set in an account's editor or beside a linked bank account, saying what it
+  will do before it's saved. They stay "Funds" though they hold mutual funds: holdings are always
+  named by ticker.
 
 ### Bank feeds: SimpleFIN (M9)
 

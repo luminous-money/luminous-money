@@ -523,8 +523,14 @@ function QueueItem({
             <button
               type="button"
               className="primary"
-              disabled={blocked}
-              title={blocked ? "Choose its accounts first" : undefined}
+              disabled={blocked || needsFund}
+              title={
+                blocked
+                  ? "Choose its accounts first"
+                  : needsFund
+                    ? "Say which fund's shares it sells first"
+                    : undefined
+              }
               onClick={() => void swipe.current?.commit("confirm")}
             >
               Confirm

@@ -52,10 +52,15 @@ def _check_target(ledger: Ledger, book_id: str, target: models.Amount | None) ->
     return number, currency
 
 
+def _plain(number: Decimal) -> Decimal:
+    """A share amount as plainly as it's held: 10.000 is 10, 20.4810 is 20.481."""
+    return number.quantize(Decimal(1)) if number == number.to_integral() else number.normalize()
+
+
 def _holding(number: Decimal, currency: str, target: str, known) -> models.FundHolding:
     found = investments.rate(currency, target, known)
     return models.FundHolding(
-        amount=_amount(number, currency),
+        amount=_amount(number if currency == target else _plain(number), currency),
         value=_amount((number * found[0]).quantize(Decimal("0.01")), target) if found else None,
         price=_amount(found[0], target) if found and currency != target else None,
         price_date=found[1] if found else None,
@@ -410,7 +415,7 @@ def _check_shares(ledger: Ledger, book_id: str, add: list[engine.FundMove], remo
             delta[(m.to_fund.casefold(), m.currency)] += sign * m.number
     if not any(v < 0 for v in delta.values()):
         return
-    held = fundlines.share_holdings(ledger.store, book_id, header)
+    held = fundlines.share_holdings(ledger.store, book_id, header, currencies={c for _, c in delta})
     for (fund, currency), d in delta.items():
         have = held.get((fund, currency), Decimal(0))
         if d < 0 and have + d < 0:
@@ -531,7 +536,9 @@ def _default_effect(
                 )
             )
     problem = None
-    held = fundlines.share_holdings(ledger.store, book_id, header, current)
+    held = fundlines.share_holdings(
+        ledger.store, book_id, header, current, {c for amounts in delta.values() for c in amounts}
+    )
     for fund, amounts in [*delta.items(), (UNALLOCATED, unallocated)]:
         for c, n in amounts.items():
             have = held.get((fund.casefold(), c), Decimal(0))
