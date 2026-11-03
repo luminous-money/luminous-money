@@ -152,7 +152,7 @@ def test_rows_carry_their_lines(ledger, book):
         (pay("10.00", [line("unallocated", "5.00")]), "Unallocated isn't a fund to choose: it's what isn't in one"),
         (pay("10.00", [line("Emergency", "5.00"), line("emergency", "1.00")]), "Emergency is in it twice"),
         (pay("10.00", [line("Emergency", "0.00")]), "Emergency's amount can't be 0"),
-        (pay("10.00", [models.FundLine(fund="Emergency", amount=models.Amount(number="5", currency="EUR"))]), "funds hold USD for now"),
+        (pay("10.00", [models.FundLine(fund="Emergency", amount=models.Amount(number="5", currency="EUR"))]), "it moves no EUR (Emergency)"),
     ],
 )
 def test_lines_that_dont_fit_are_refused(ledger, book, transaction, problem):
@@ -184,11 +184,11 @@ def test_a_fund_can_go_below_zero(ledger, book):
 def test_kinds_come_from_the_change_in_net_worth(ledger, book):
     # A refund is money in: it can go back to the fund that paid.
     refund = txn(D(2026, 2, 5), [("Assets:Bank:PNC", "40.00"), ("Expenses:Home", "-40.00")], [line("Special Home Maintenance", "40.00")])
-    # A trade is a transfer: for a fund.
+    # A trade is dollars out and shares in (Funds B): one fund can give the one and get the other.
     buy = models.TransactionIn(
         date=D(2026, 2, 6),
         flag="*",
-        funds=[line("Wedding", "3000.00")],
+        funds=[line("Wedding", "-3000.00"), models.FundLine(fund="Wedding", amount=models.Amount(number="10", currency="VTI"))],
         postings=[
             models.Posting(account="Assets:Brokerage:Cash", units=usd("-3000.00")),
             models.Posting(

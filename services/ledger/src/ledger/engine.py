@@ -65,6 +65,9 @@ MEMO_KEY = "memo"
 FUNDS_KEY = "funds"
 FUND_TYPE = "fund"
 FUND_MOVE_TYPE = "fund-move"
+# Funds B: an account's default fund, from a day: `custom "fund-default" <account> "<fund>"` ("" for
+# none of its own from then on).
+FUND_DEFAULT_TYPE = "fund-default"
 UNALLOCATED = "Unallocated"
 NOTE_KEY = "note"
 TARGET_KEY = "target"
@@ -553,8 +556,9 @@ def with_accounts(
             return None
         entry = entry._replace(account=rename(entry.account), source_account=rename(entry.source_account))
     elif isinstance(entry, data.Custom):
-        # A budget (M11) or a statement (M14) is the account's own: it doesn't move to a substitute.
-        if entry.type in ("budget", STATEMENT_TYPE) and entry.values and isinstance(entry.values[0].value, str):
+        # A budget (M11), a statement (M14) or a default fund (Funds B) is the account's own: it
+        # doesn't move to a substitute.
+        if entry.type in ("budget", STATEMENT_TYPE, FUND_DEFAULT_TYPE) and entry.values and isinstance(entry.values[0].value, str):
             if drop(entry.values[0].value):
                 return None
         entry = entry._replace(
@@ -1060,6 +1064,52 @@ def with_funds(text: str, lines: list[tuple[str, Decimal, str]]) -> Directive:
     if lines:
         meta[FUNDS_KEY] = funds_text(lines)
     return to_directive(entry._replace(meta=meta))
+
+
+def balance_sheet_units(text: str, roots: set[str]) -> list[tuple[str, Decimal, str]] | None:
+    """Each of a transaction's postings under `roots` (its asset and liability accounts): its
+    account and the units it changes (a lone blank amount filled in, as booking would). None when
+    one of them only full booking could say."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1 or not isinstance(entries[0], data.Transaction):
+        return None
+    entry = entries[0]
+    found = []
+    for p, amount in zip(entry.postings, _amounts(entry)):
+        if p.account.split(":", 1)[0] not in roots:
+            continue
+        if amount is None:
+            return None
+        found.append((p.account, amount[0], amount[1]))
+    return found
+
+
+@dataclass(frozen=True)
+class FundDefault:
+    """A `custom "fund-default"` directive's contents: from `date`, what changes in `account` (and
+    under it) with no line saying otherwise is `fund`'s. None: the account has none of its own."""
+
+    date: datetime.date
+    account: str
+    fund: str | None
+
+
+def default_directive(d: FundDefault, directive_id: str | None = None) -> Directive:
+    """`2019-04-01 custom "fund-default" Assets:Retirement:Roth-IRA "Retirement"`."""
+    return parse_one(
+        f"{d.date.isoformat()} custom {_string(FUND_DEFAULT_TYPE)} {d.account} {_string(d.fund or '')}\n", directive_id
+    )
+
+
+def default_of(text: str) -> FundDefault | None:
+    """A default fund directive's contents; None for any other directive."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1 or not isinstance(entries[0], data.Custom) or entries[0].type != FUND_DEFAULT_TYPE:
+        return None
+    values = entries[0].values
+    if len(values) != 2 or values[0].dtype != bc_account.TYPE or not isinstance(values[1].value, str):
+        return None
+    return FundDefault(date=entries[0].date, account=values[0].value, fund=values[1].value or None)
 
 
 def balance_sheet_weights(text: str, roots: set[str]) -> list[tuple[Decimal, str]] | None:

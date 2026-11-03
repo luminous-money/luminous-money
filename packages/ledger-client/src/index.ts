@@ -46,6 +46,16 @@ export type FundHistory = Schemas["FundHistory"];
 export type FundMove = Schemas["FundMove"];
 export type FundMoveIn = Schemas["FundMoveIn"];
 export type FundMovePatch = Schemas["FundMovePatch"];
+export type FundHolding = Schemas["FundHolding"];
+export type FundMovesIn = Schemas["FundMovesIn"];
+export type FundDefault = Schemas["FundDefault"];
+export type FundDefaultIn = Schemas["FundDefaultIn"];
+export type FundDefaultPatch = Schemas["FundDefaultPatch"];
+export type FundDefaultPreview = Schemas["FundDefaultPreview"];
+export type FundDefaultEffect = Schemas["FundDefaultEffect"];
+export type FundChange = Schemas["FundChange"];
+export type ShortTransaction = Schemas["ShortTransaction"];
+export type ShortTake = Schemas["ShortTake"];
 
 export function createLedgerClient(options: ClientOptions) {
   return createClient<paths>(options);

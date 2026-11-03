@@ -267,22 +267,55 @@ class Ledger:
         self.get(book_id, directive_id)
         return self._put(book_id, self._postable(book_id, engine.parse_one(text, directive_id)), expected)
 
-    def create_transaction(self, book_id: str, t: models.TransactionIn) -> engine.Directive:
-        t = fundlines.checked(self.store, book_id, self._header(book_id), _marked(t))
-        return self._insert(book_id, self._postable(book_id, engine.transaction_directive(t)))
+    def create_transaction(self, book_id: str, t: models.TransactionIn, *, staging: bool = False) -> engine.Directive:
+        header = self._header(book_id)
+        t = fundlines.checked(self.store, book_id, header, _marked(t))
+        directive = self._postable(book_id, engine.transaction_directive(t))
+        self._guard(book_id, header, [(None, directive.text)], staging=staging)
+        return self._insert(book_id, directive)
 
     def update_transaction(
-        self, book_id: str, directive_id: str, t: models.TransactionIn, *, expected: str | None = None
+        self,
+        book_id: str,
+        directive_id: str,
+        t: models.TransactionIn,
+        *,
+        expected: str | None = None,
+        staging: bool = False,
     ) -> engine.Directive:
-        if self.get(book_id, directive_id).kind != "transaction":
+        row = self.get(book_id, directive_id)
+        if row.kind != "transaction":
             raise ValueError(f"directive {directive_id} is not a transaction")
         current = self.transaction(book_id, directive_id)
-        t = fundlines.checked(self.store, book_id, self._header(book_id), _marked(t, current), current)
-        return self._put(book_id, self._postable(book_id, engine.transaction_directive(t, directive_id)), expected)
+        header = self._header(book_id)
+        t = fundlines.checked(self.store, book_id, header, _marked(t, current), current)
+        directive = self._postable(book_id, engine.transaction_directive(t, directive_id))
+        self._guard(book_id, header, [(row.text, directive.text)], [(row, directive)], staging=staging)
+        return self._put(book_id, directive, expected)
 
-    def patch_transaction(self, book_id: str, directive_id: str, patch: models.TransactionPatch) -> engine.Directive:
+    def patch_transaction(
+        self, book_id: str, directive_id: str, patch: models.TransactionPatch, *, staging: bool = False
+    ) -> engine.Directive:
         """Change only the fields given, against the version given."""
-        return self.update_transaction(book_id, directive_id, self._patched(book_id, directive_id, patch), expected=patch.updated_at)
+        return self.update_transaction(
+            book_id, directive_id, self._patched(book_id, directive_id, patch), expected=patch.updated_at, staging=staging
+        )
+
+    def _guard(
+        self,
+        book_id: str,
+        header: list[str],
+        changes: list[tuple[str | None, str | None]],
+        updates: list[tuple[Row, engine.Directive]] = (),
+        *,
+        staging: bool = False,
+    ) -> None:
+        """Refuse a write by hand that leaves a fund short of a share (Funds B); what `app` stages
+        by itself isn't refused, and is listed as short until it's fixed."""
+        if staging:
+            return
+        confirming = [d.text for row, d in updates if row.flag == "!" and d.flag == "*"]
+        fundlines.guard(self.store, book_id, header, changes, confirming)
 
     def _patched(self, book_id: str, directive_id: str, patch: models.TransactionPatch) -> models.TransactionIn:
         """The transaction with `patch`'s fields applied (not written)."""
@@ -296,8 +329,10 @@ class Ledger:
         """Confirm (`*`) or re-stage (`!`) a transaction."""
         return self._put(book_id, engine.with_flag(self.get(book_id, directive_id).text, flag), expected)
 
-    def delete(self, book_id: str, directive_id: str, *, expected: str | None = None) -> None:
-        self.get(book_id, directive_id)
+    def delete(self, book_id: str, directive_id: str, *, expected: str | None = None, staging: bool = False) -> None:
+        row = self.get(book_id, directive_id)
+        if row.kind == "transaction":
+            self._guard(book_id, self._header(book_id), [(row.text, None)], staging=staging)
         with self.store.transaction():
             if expected is not None:
                 self.store.check_version(book_id, directive_id, expected)
@@ -845,7 +880,9 @@ class Ledger:
             prev_cursor=(_ledger_cursor(key(page[0])) if page else _BEFORE_ALL) if more_newer else None,
         )
 
-    def create_transactions(self, book_id: str, batch: list[models.TransactionIn]) -> list[engine.Directive]:
+    def create_transactions(
+        self, book_id: str, batch: list[models.TransactionIn], *, staging: bool = False
+    ) -> list[engine.Directive]:
         """Create many transactions in one atomic write: all of them, or none."""
         header = self._header(book_id)
         kinds = self._kinds(book_id)
@@ -853,11 +890,14 @@ class Ledger:
             self._postable(book_id, engine.transaction_directive(fundlines.checked(self.store, book_id, header, _marked(t))), kinds)
             for t in batch
         ]
+        self._guard(book_id, header, [(None, d.text) for d in directives], staging=staging)
         with self.store.transaction():
             self._write(book_id, directives)
         return directives
 
-    def apply_changes(self, book_id: str, changes: models.TransactionChanges) -> list[engine.Directive]:
+    def apply_changes(
+        self, book_id: str, changes: models.TransactionChanges, *, staging: bool = False
+    ) -> list[engine.Directive]:
         """Create, change and delete transactions in one atomic write: all of it, or none. An
         update or deletion whose version has moved on refuses the whole write (StaleVersion).
         Returns the created transactions."""
@@ -874,10 +914,22 @@ class Ledger:
                     raise NotFound(d.id)
                 self.store.check_version(book_id, d.id, d.updated_at)
             updated = []
+            rows = []
             for u in changes.update:
                 current = self.transaction(book_id, u.id)
                 t = fundlines.checked(self.store, book_id, header, _marked(self._patched(book_id, u.id, u), current), current)
                 updated.append(self._postable(book_id, engine.transaction_directive(t, u.id), kinds))
+                rows.append(self.store.get(book_id, u.id))
+            deleted = [self.store.get(book_id, d.id) for d in changes.delete]
+            self._guard(
+                book_id,
+                header,
+                [(None, d.text) for d in created]
+                + [(r.text, d.text) for r, d in zip(rows, updated)]
+                + [(r.text, None) for r in deleted],
+                list(zip(rows, updated)),
+                staging=staging,
+            )
             self._write(book_id, created + updated)
             self.store.delete(book_id, [d.id for d in changes.delete])
         return created

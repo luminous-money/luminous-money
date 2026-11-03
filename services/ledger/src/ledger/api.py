@@ -37,6 +37,14 @@ ReconciledParam = Annotated[
 TagParam = Annotated[
     list[str] | None, Query(description="Only transactions with every tag given (M17); repeat it for several.")
 ]
+StagingParam = Annotated[
+    bool,
+    Query(
+        description="Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a "
+        "transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), "
+        "rather than refused."
+    ),
+]
 
 class Filters:
     """Query parameters shared by the list endpoints."""
@@ -492,8 +500,14 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     @api.post("/books/{book_id}/fund-moves", status_code=201, responses=FUND_ERRORS)
     def create_fund_move(book_id: MemberBook, m: models.FundMoveIn) -> models.FundMove:
-        """Move money from one fund to another (either can be Unallocated): no account changes."""
+        """Move money (or shares) from one fund to another (either can be Unallocated): no
+        account changes. A move can't leave a fund below zero in a share."""
         return funds.create_move(ledger, book_id, m)
+
+    @api.post("/books/{book_id}/fund-moves/batch", status_code=201, responses=FUND_ERRORS)
+    def create_fund_moves(book_id: MemberBook, batch: models.FundMovesIn) -> list[models.FundMove]:
+        """Several moves in one write (a move with several amounts): all of them, or none."""
+        return funds.create_moves(ledger, book_id, batch)
 
     @api.patch("/books/{book_id}/fund-moves/{move_id}", responses=FUND_ERRORS)
     def patch_fund_move(book_id: MemberBook, move_id: str, p: models.FundMovePatch) -> models.FundMove:
@@ -502,6 +516,36 @@ def create_app(ledger: Ledger) -> FastAPI:
     @api.delete("/books/{book_id}/fund-moves/{move_id}", status_code=204, responses=FUND_ERRORS)
     def delete_fund_move(book_id: MemberBook, move_id: str, updated_at: VersionParam) -> None:
         funds.delete_move(ledger, book_id, move_id, updated_at)
+
+    @api.post("/books/{book_id}/fund-defaults", status_code=201, responses=FUND_ERRORS)
+    def create_fund_default(book_id: MemberBook, d: models.FundDefaultIn, user: User) -> models.FundDefault:
+        """From a day, what changes in an account with no line saying otherwise is a fund's (a
+        manager). Refused if it would leave a fund below zero in a share."""
+        require(ledger, book_id, user, "manage")
+        return funds.create_default(ledger, book_id, d)
+
+    @api.post("/books/{book_id}/fund-defaults/preview", responses=FUND_ERRORS)
+    def preview_fund_default(book_id: MemberBook, p: models.FundDefaultPreview) -> models.FundDefaultEffect:
+        """What making, changing or deleting a default fund would do to each fund."""
+        return funds.preview_default(ledger, book_id, p)
+
+    @api.patch("/books/{book_id}/fund-defaults/{default_id}", responses=FUND_ERRORS)
+    def patch_fund_default(
+        book_id: MemberBook, default_id: str, p: models.FundDefaultPatch, user: User
+    ) -> models.FundDefault:
+        require(ledger, book_id, user, "manage")
+        return funds.patch_default(ledger, book_id, default_id, p)
+
+    @api.delete("/books/{book_id}/fund-defaults/{default_id}", status_code=204, responses=FUND_ERRORS)
+    def delete_fund_default(book_id: MemberBook, default_id: str, updated_at: VersionParam, user: User) -> None:
+        require(ledger, book_id, user, "manage")
+        funds.delete_default(ledger, book_id, default_id, updated_at)
+
+    @api.get("/books/{book_id}/funds/short")
+    def short_transactions(book_id: MemberBook) -> list[models.ShortTransaction]:
+        """Transactions that take a share a fund doesn't have (they came in by themselves),
+        oldest added first: what Notifications lists until each is given a fund."""
+        return funds.short(ledger, book_id)
 
     # Reconciliation (M14)
 
@@ -557,16 +601,20 @@ def create_app(ledger: Ledger) -> FastAPI:
     # Transactions, as JSON
 
     @api.post("/books/{book_id}/transactions/batch", status_code=201)
-    def create_transactions(book_id: MemberBook, batch: list[models.TransactionIn]) -> list[models.Transaction]:
+    def create_transactions(
+        book_id: MemberBook, batch: list[models.TransactionIn], staging: StagingParam = False
+    ) -> list[models.Transaction]:
         """Create many transactions in one atomic write: all of them, or none."""
-        created = ledger.create_transactions(book_id, batch)
+        created = ledger.create_transactions(book_id, batch, staging=staging)
         return [ledger.transaction(book_id, d.id) for d in created]
 
     @api.post("/books/{book_id}/transactions/changes", responses={409: {"description": "Stale version"}})
-    def apply_changes(book_id: MemberBook, changes: models.TransactionChanges) -> list[models.Transaction]:
+    def apply_changes(
+        book_id: MemberBook, changes: models.TransactionChanges, staging: StagingParam = False
+    ) -> list[models.Transaction]:
         """Create, change (versioned patches) and delete transactions in one atomic write: all of
         it, or none. Returns the created ones."""
-        created = ledger.apply_changes(book_id, changes)
+        created = ledger.apply_changes(book_id, changes, staging=staging)
         return [ledger.transaction(book_id, d.id) for d in created]
 
     @api.get("/books/{book_id}/transactions/compact")
@@ -587,8 +635,10 @@ def create_app(ledger: Ledger) -> FastAPI:
         return ledger.transactions(book_id, **filters.values)
 
     @api.post("/books/{book_id}/transactions", status_code=201)
-    def create_transaction(book_id: MemberBook, transaction: models.TransactionIn) -> models.Transaction:
-        return ledger.transaction(book_id, ledger.create_transaction(book_id, transaction).id)
+    def create_transaction(
+        book_id: MemberBook, transaction: models.TransactionIn, staging: StagingParam = False
+    ) -> models.Transaction:
+        return ledger.transaction(book_id, ledger.create_transaction(book_id, transaction, staging=staging).id)
 
     @api.get("/books/{book_id}/transactions/{directive_id}")
     def get_transaction(book_id: MemberBook, directive_id: str) -> models.Transaction:
@@ -596,15 +646,17 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     @api.put("/books/{book_id}/transactions/{directive_id}", responses={409: {"description": "Stale version"}})
     def replace_transaction(
-        book_id: MemberBook, directive_id: str, transaction: models.TransactionUpdate
+        book_id: MemberBook, directive_id: str, transaction: models.TransactionUpdate, staging: StagingParam = False
     ) -> models.Transaction:
         body = models.TransactionIn.model_validate(transaction.model_dump(exclude={"updated_at"}))
-        ledger.update_transaction(book_id, directive_id, body, expected=transaction.updated_at)
+        ledger.update_transaction(book_id, directive_id, body, expected=transaction.updated_at, staging=staging)
         return ledger.transaction(book_id, directive_id)
 
     @api.patch("/books/{book_id}/transactions/{directive_id}", responses={409: {"description": "Stale version"}})
-    def patch_transaction(book_id: MemberBook, directive_id: str, patch: models.TransactionPatch) -> models.Transaction:
-        ledger.patch_transaction(book_id, directive_id, patch)
+    def patch_transaction(
+        book_id: MemberBook, directive_id: str, patch: models.TransactionPatch, staging: StagingParam = False
+    ) -> models.Transaction:
+        ledger.patch_transaction(book_id, directive_id, patch, staging=staging)
         return ledger.transaction(book_id, directive_id)
 
     # Attachments (M16)
@@ -684,8 +736,10 @@ def create_app(ledger: Ledger) -> FastAPI:
         status_code=204,
         responses={409: {"description": "Stale version"}},
     )
-    def delete_directive(book_id: MemberBook, directive_id: str, updated_at: VersionParam) -> None:
-        ledger.delete(book_id, directive_id, expected=updated_at)
+    def delete_directive(
+        book_id: MemberBook, directive_id: str, updated_at: VersionParam, staging: StagingParam = False
+    ) -> None:
+        ledger.delete(book_id, directive_id, expected=updated_at, staging=staging)
 
     # The engine
 

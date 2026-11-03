@@ -24,6 +24,7 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from decimal import Decimal
 
 from .engine import Directive
 from .migrations import after, migrate, now
@@ -539,12 +540,77 @@ class Store:
             args,
         ).fetchall()
 
+    def balance_sheet_totals(self, book_id: str, roots: set[str], currencies: set[str] | None = None) -> dict[str, Decimal]:
+        """What the accounts under `roots` hold of each commodity (of `currencies`, or every one),
+        every live transaction counted, unconfirmed included (Funds B: Unallocated's shares)."""
+        if not roots or currencies is not None and not currencies:
+            return {}
+        under = " OR ".join("p.account = ? OR p.account LIKE ?" for _ in roots)
+        args: list[str] = [book_id]
+        only = ""
+        if currencies is not None:
+            only = f" AND p.amount_currency IN ({','.join('?' for _ in currencies)})"
+            args += sorted(currencies)
+        for root in sorted(roots):
+            args += [root, root + ":%"]
+        totals: dict[str, Decimal] = {c: Decimal(0) for c in currencies or ()}
+        for r in self._conn.execute(
+            "SELECT p.amount, p.amount_currency AS currency FROM posting p JOIN directive d ON d.id = p.directive_id"
+            " WHERE d.book_id = ? AND d.deleted = 0 AND d.kind = 'transaction' AND p.amount IS NOT NULL"
+            f"{only} AND ({under})",
+            args,
+        ):
+            totals[r["currency"]] = totals.get(r["currency"], Decimal(0)) + Decimal(r["amount"])
+        return totals
+
+    def transactions_touching(
+        self, book_id: str, *, accounts: set[str] = frozenset(), currencies: set[str] = frozenset()
+    ) -> list[dict]:
+        """The live transactions with a posting in (or under) any of `accounts`, or in any of
+        `currencies`, oldest first: each one's directive fields, postings (account, amount,
+        currency; amount None where only booking could say) and fund lines (Funds B)."""
+        where, args = [], [book_id]
+        for a in sorted(accounts):
+            where.append("p.account = ? OR p.account LIKE ?")
+            args += [a, a + ":%"]
+        if currencies:
+            where.append(f"p.amount_currency IN ({','.join('?' for _ in currencies)})")
+            args += sorted(currencies)
+        if not where:
+            return []
+        rows = self._conn.execute(
+            "SELECT d.id, d.date, d.ordinal, d.flag, d.payee, d.narration, d.text, d.created_at, d.updated_at"
+            " FROM directive d WHERE d.book_id = ? AND d.deleted = 0 AND d.kind = 'transaction' AND EXISTS"
+            f" (SELECT 1 FROM posting p WHERE p.directive_id = d.id AND ({' OR '.join(where)}))"
+            " ORDER BY d.date, d.ordinal",
+            args,
+        ).fetchall()
+        found = {r["id"]: {**dict(r), "postings": [], "lines": []} for r in rows}
+        ids = list(found)
+        for start in range(0, len(ids), 500):
+            chunk = ids[start : start + 500]
+            marks = ",".join("?" for _ in chunk)
+            for p in self._conn.execute(
+                f"SELECT directive_id, account, amount, amount_currency FROM posting WHERE directive_id IN ({marks})"
+                " ORDER BY directive_id, idx",
+                chunk,
+            ):
+                found[p["directive_id"]]["postings"].append(
+                    (p["account"], Decimal(p["amount"]) if p["amount"] is not None else None, p["amount_currency"])
+                )
+            for f in self._conn.execute(
+                f"SELECT directive_id, fund, amount, currency FROM fund_line WHERE directive_id IN ({marks}) ORDER BY directive_id, idx",
+                chunk,
+            ):
+                found[f["directive_id"]]["lines"].append((f["fund"], Decimal(f["amount"]), f["currency"]))
+        return list(found.values())
+
     def fund_entries(self, book_id: str, fund: str) -> list[sqlite3.Row]:
         """A fund's lines and move sides, oldest first: the directive's id, kind, date, flag, payee,
         narration, text (a move's other side and note are in it) and version, and the amount."""
         return self._conn.execute(
             """
-            SELECT d.id, d.kind, d.date, d.flag, d.payee, d.narration, d.text, d.updated_at, f.amount, f.currency
+            SELECT d.id, d.kind, d.date, d.ordinal, d.flag, d.payee, d.narration, d.text, d.updated_at, f.amount, f.currency
             FROM fund_line f JOIN directive d ON d.id = f.directive_id
             WHERE f.book_id = ? AND f.fund = ? AND d.deleted = 0
             ORDER BY d.date, d.ordinal, f.idx

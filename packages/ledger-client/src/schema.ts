@@ -652,6 +652,65 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/fund-defaults": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Create Fund Default
+     * @description From a day, what changes in an account with no line saying otherwise is a fund's (a
+     *     manager). Refused if it would leave a fund below zero in a share.
+     */
+    post: operations["create_fund_default_api_ledger_v1_books__book_id__fund_defaults_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/fund-defaults/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Preview Fund Default
+     * @description What making, changing or deleting a default fund would do to each fund.
+     */
+    post: operations["preview_fund_default_api_ledger_v1_books__book_id__fund_defaults_preview_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/fund-defaults/{default_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete Fund Default */
+    delete: operations["delete_fund_default_api_ledger_v1_books__book_id__fund_defaults__default_id__delete"];
+    options?: never;
+    head?: never;
+    /** Patch Fund Default */
+    patch: operations["patch_fund_default_api_ledger_v1_books__book_id__fund_defaults__default_id__patch"];
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/fund-moves": {
     parameters: {
       query?: never;
@@ -663,9 +722,30 @@ export interface paths {
     put?: never;
     /**
      * Create Fund Move
-     * @description Move money from one fund to another (either can be Unallocated): no account changes.
+     * @description Move money (or shares) from one fund to another (either can be Unallocated): no
+     *     account changes. A move can't leave a fund below zero in a share.
      */
     post: operations["create_fund_move_api_ledger_v1_books__book_id__fund_moves_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/fund-moves/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Create Fund Moves
+     * @description Several moves in one write (a move with several amounts): all of them, or none.
+     */
+    post: operations["create_fund_moves_api_ledger_v1_books__book_id__fund_moves_batch_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -708,6 +788,27 @@ export interface paths {
      * @description Make a fund (a manager).
      */
     post: operations["create_fund_api_ledger_v1_books__book_id__funds_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/funds/short": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Short Transactions
+     * @description Transactions that take a share a fund doesn't have (they came in by themselves),
+     *     oldest added first: what Notifications lists until each is given a fund.
+     */
+    get: operations["short_transactions_api_ledger_v1_books__book_id__funds_short_get"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1940,9 +2041,15 @@ export interface components {
     };
     /**
      * Fund
-     * @description A fund: money set aside for something. What it holds is its lines and moves, so far.
+     * @description A fund: money set aside for something. What it holds is its lines, its moves, and what
+     *     the accounts it's the default fund of give it.
      */
     Fund: {
+      /**
+       * Accounts
+       * @description The accounts it's the default fund of today.
+       */
+      accounts?: string[];
       /**
        * Archived
        * @description When it was archived: out of the pickers, history kept.
@@ -1962,19 +2069,24 @@ export interface components {
       entries: number;
       /**
        * Holdings
-       * @description What it holds, per commodity (only the operating currency, for now).
+       * @description What it holds, per commodity: the operating currency first.
        */
-      holdings: components["schemas"]["Amount"][];
+      holdings: components["schemas"]["FundHolding"][];
       /** Name */
       name: string;
       /** @description What it's working toward, shown as progress: nothing fills it. */
       target?: components["schemas"]["Amount"] | null;
       /**
+       * Unpriced
+       * @description Commodities it holds with no price.
+       */
+      unpriced?: string[];
+      /**
        * Updated At
        * @description Its directive's version; None for one only used.
        */
       updated_at?: string | null;
-      /** @description What it holds, in the operating currency. */
+      /** @description What it holds, in the operating currency (what has no price left out). */
       value: components["schemas"]["Amount"];
     };
     /** FundArchive */
@@ -1995,6 +2107,101 @@ export interface components {
        * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
        */
       updated_at: string;
+    };
+    /** FundChange */
+    FundChange: {
+      /**
+       * Amounts
+       * @description What it gains (positive) or loses, per commodity.
+       */
+      amounts: components["schemas"]["Amount"][];
+      /** Fund */
+      fund: string;
+      /** @description Those amounts at today's prices. */
+      value: components["schemas"]["Amount"];
+    };
+    /**
+     * FundDefault
+     * @description From `date`, what changes in `account` (and under it) with no line saying otherwise is
+     *     `fund`'s (Funds B). `fund` None: the account has none of its own from then on.
+     */
+    FundDefault: {
+      /** Account */
+      account: string;
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Fund */
+      fund: string | null;
+      /** Id */
+      id: string;
+      /** Updated At */
+      updated_at: string;
+    };
+    /**
+     * FundDefaultEffect
+     * @description What a default fund would do: each fund's change, and why it can't be saved, if it can't.
+     */
+    FundDefaultEffect: {
+      /** Changes */
+      changes: components["schemas"]["FundChange"][];
+      /** Problem */
+      problem?: string | null;
+    };
+    /** FundDefaultIn */
+    FundDefaultIn: {
+      /** Account */
+      account: string;
+      /**
+       * Date
+       * Format: date
+       * @description From when.
+       */
+      date: string;
+      /**
+       * Fund
+       * @description A fund, Unallocated, or null for none of its own.
+       */
+      fund: string | null;
+    };
+    /**
+     * FundDefaultPatch
+     * @description Change only the fields given.
+     */
+    FundDefaultPatch: {
+      /** Date */
+      date?: string | null;
+      /** Fund */
+      fund?: string | null;
+      /**
+       * Updated At
+       * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       */
+      updated_at: string;
+    };
+    /**
+     * FundDefaultPreview
+     * @description A default fund to be made (no `id`) or changed (`id`), or one to be deleted (`delete`).
+     */
+    FundDefaultPreview: {
+      /** Account */
+      account: string;
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /**
+       * Delete
+       * @default false
+       */
+      delete: boolean;
+      /** Fund */
+      fund?: string | null;
+      /** Id */
+      id?: string | null;
     };
     /**
      * FundEntry
@@ -2047,6 +2254,19 @@ export interface components {
        */
       entries: components["schemas"]["FundEntry"][];
       fund: components["schemas"]["Fund"];
+    };
+    /**
+     * FundHolding
+     * @description What a fund (or Unallocated) holds of one commodity, and what that's worth.
+     */
+    FundHolding: {
+      amount: components["schemas"]["Amount"];
+      /** @description Per unit, in the operating currency; None for that currency. */
+      price?: components["schemas"]["Amount"] | null;
+      /** Price Date */
+      price_date?: string | null;
+      /** @description In the operating currency; None when it has no price. */
+      value: components["schemas"]["Amount"] | null;
     };
     /** FundIn */
     FundIn: {
@@ -2129,6 +2349,14 @@ export interface components {
       updated_at: string;
     };
     /**
+     * FundMovesIn
+     * @description Several moves at once (a move with several amounts): all of them, or none.
+     */
+    FundMovesIn: {
+      /** Moves */
+      moves: components["schemas"]["FundMoveIn"][];
+    };
+    /**
      * FundPatch
      * @description Change only the fields given; null clears one.
      */
@@ -2171,6 +2399,11 @@ export interface components {
        */
       currency: string;
       /**
+       * Defaults
+       * @description Every account's default funds, by account and date.
+       */
+      defaults?: components["schemas"]["FundDefault"][];
+      /**
        * Funds
        * @description Active funds by name, then archived ones.
        */
@@ -2184,6 +2417,11 @@ export interface components {
       on: string;
       /** @description Net worth less every fund's value: what isn't in a fund. */
       unallocated: components["schemas"]["Amount"];
+      /**
+       * Unallocated Holdings
+       * @description What Unallocated holds, per commodity: what the accounts hold that no fund does.
+       */
+      unallocated_holdings?: components["schemas"]["FundHolding"][];
       /**
        * Unpriced
        * @description Commodities held with no price, left out of net worth.
@@ -2757,6 +2995,47 @@ export interface components {
       date: string;
       value: components["schemas"]["Amount"];
     };
+    /** ShortTake */
+    ShortTake: {
+      /** @description What the transaction takes from it. */
+      amount: components["schemas"]["Amount"];
+      /**
+       * Fund
+       * @description A fund, or Unallocated.
+       */
+      fund: string;
+      /** @description What the fund holds of it now: below zero. */
+      holding: components["schemas"]["Amount"];
+    };
+    /**
+     * ShortTransaction
+     * @description A transaction that takes a share a fund doesn't have (Funds B): it came in by itself, and
+     *     waits for a fund to be named.
+     */
+    ShortTransaction: {
+      /**
+       * Added
+       * @description When it was written (its created_at).
+       */
+      added: string;
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Flag */
+      flag: string | null;
+      /** Id */
+      id: string;
+      /** Narration */
+      narration?: string | null;
+      /** Payee */
+      payee?: string | null;
+      /** Takes */
+      takes: components["schemas"]["ShortTake"][];
+      /** Updated At */
+      updated_at: string;
+    };
     /**
      * TagUse
      * @description A tag the book's transactions have (M17): a tag exists while one does.
@@ -2806,6 +3085,11 @@ export interface components {
       date: string;
       /** Fees */
       fees?: string | null;
+      /**
+       * Funds
+       * @description The trade's fund lines (Funds B), checked as any transaction's are.
+       */
+      funds?: components["schemas"]["FundLine"][] | null;
       /**
        * Holding Account
        * @description Default: the account itself (a leaf), or <node>:<COMMODITY>.
@@ -4665,6 +4949,8 @@ export interface operations {
       query: {
         /** @description The `updated_at` this edit was based on. */
         updated_at: string;
+        /** @description Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused. */
+        staging?: boolean;
       };
       header?: never;
       path: {
@@ -4731,6 +5017,165 @@ export interface operations {
       };
     };
   };
+  create_fund_default_api_ledger_v1_books__book_id__fund_defaults_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FundDefaultIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FundDefault"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  preview_fund_default_api_ledger_v1_books__book_id__fund_defaults_preview_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FundDefaultPreview"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FundDefaultEffect"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  delete_fund_default_api_ledger_v1_books__book_id__fund_defaults__default_id__delete: {
+    parameters: {
+      query: {
+        /** @description The `updated_at` this edit was based on. */
+        updated_at: string;
+      };
+      header?: never;
+      path: {
+        default_id: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  patch_fund_default_api_ledger_v1_books__book_id__fund_defaults__default_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        default_id: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FundDefaultPatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FundDefault"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   create_fund_move_api_ledger_v1_books__book_id__fund_moves_post: {
     parameters: {
       query?: never;
@@ -4753,6 +5198,46 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["FundMove"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  create_fund_moves_api_ledger_v1_books__book_id__fund_moves_batch_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FundMovesIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FundMove"][];
         };
       };
       /** @description Stale version */
@@ -4921,6 +5406,37 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  short_transactions_api_ledger_v1_books__book_id__funds_short_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ShortTransaction"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
       };
     };
   };
@@ -5576,7 +6092,10 @@ export interface operations {
   };
   create_transaction_api_ledger_v1_books__book_id__transactions_post: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused. */
+        staging?: boolean;
+      };
       header?: never;
       path: {
         book_id: string;
@@ -5611,7 +6130,10 @@ export interface operations {
   };
   create_transactions_api_ledger_v1_books__book_id__transactions_batch_post: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused. */
+        staging?: boolean;
+      };
       header?: never;
       path: {
         book_id: string;
@@ -5646,7 +6168,10 @@ export interface operations {
   };
   apply_changes_api_ledger_v1_books__book_id__transactions_changes_post: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused. */
+        staging?: boolean;
+      };
       header?: never;
       path: {
         book_id: string;
@@ -5756,7 +6281,10 @@ export interface operations {
   };
   replace_transaction_api_ledger_v1_books__book_id__transactions__directive_id__put: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused. */
+        staging?: boolean;
+      };
       header?: never;
       path: {
         directive_id: string;
@@ -5799,7 +6327,10 @@ export interface operations {
   };
   patch_transaction_api_ledger_v1_books__book_id__transactions__directive_id__patch: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused. */
+        staging?: boolean;
+      };
       header?: never;
       path: {
         directive_id: string;

@@ -602,7 +602,7 @@ def plan_trade(ledger, book_id: str, account: str, t: models.TradeIn) -> models.
     if fees:
         postings.append(models.Posting(account=FEES, units=cash(fees)))
 
-    transaction = models.TransactionIn(date=t.date, flag="*", narration=narration, postings=postings)
+    transaction = models.TransactionIn(date=t.date, flag="*", narration=narration, postings=postings, funds=t.funds or None)
     opens = sorted({p.account for p in postings} - {a.name for a in tree.values() if not a.implicit})
     return models.TradePreview(transaction=transaction, lots=drawn, opens=opens)
 
@@ -630,7 +630,12 @@ def trade(ledger, book_id: str, account: str, t: models.TradeIn) -> engine.Direc
         for d in ledger._account_directives(book_id, name, "leaf", None, currencies=commodity):
             opened.setdefault(engine.opened(d.text), d)  # two gains accounts share a parent
     directives = list(opened.values())
-    directive = engine.transaction_directive(plan.transaction)
+    from . import fundlines  # fundlines reads prices from here
+
+    header = ledger._header(book_id)
+    transaction = fundlines.checked(ledger.store, book_id, header, plan.transaction)
+    directive = engine.transaction_directive(transaction)
+    ledger._guard(book_id, header, [(None, directive.text)])
     _, problems = SCOPED.entries(ledger, book_id, holding, [d.text for d in directives] + [directive.text])
     mine = [p.message for p in problems if p.directive_id == directive.id]
     if mine:

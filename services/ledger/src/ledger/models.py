@@ -343,6 +343,9 @@ class TradeIn(Strict):
     holding_account: str | None = Field(None, description="Default: the account itself (a leaf), or <node>:<COMMODITY>.")
     lots: list[LotRef] | None = Field(None, description="For an account that sells specific lots (STRICT).")
     narration: str | None = None
+    funds: list[FundLine] | None = Field(
+        None, description="The trade's fund lines (Funds B), checked as any transaction's are."
+    )
 
 
 class DrawnLot(Api):
@@ -820,16 +823,28 @@ class Backup(Api):
 FundName = Annotated[str, StringConstraints(min_length=1, max_length=60)]
 
 
+class FundHolding(Api):
+    """What a fund (or Unallocated) holds of one commodity, and what that's worth."""
+
+    amount: Amount
+    value: Amount | None = Field(description="In the operating currency; None when it has no price.")
+    price: Amount | None = Field(None, description="Per unit, in the operating currency; None for that currency.")
+    price_date: datetime.date | None = None
+
+
 class Fund(Api):
-    """A fund: money set aside for something. What it holds is its lines and moves, so far."""
+    """A fund: money set aside for something. What it holds is its lines, its moves, and what
+    the accounts it's the default fund of give it."""
 
     name: str
     description: str | None = None
     target: Amount | None = Field(None, description="What it's working toward, shown as progress: nothing fills it.")
     created: datetime.date | None = Field(None, description="When it was made; None for one only used (an imported book).")
     archived: datetime.date | None = Field(None, description="When it was archived: out of the pickers, history kept.")
-    holdings: list[Amount] = Field(description="What it holds, per commodity (only the operating currency, for now).")
-    value: Amount = Field(description="What it holds, in the operating currency.")
+    holdings: list[FundHolding] = Field(description="What it holds, per commodity: the operating currency first.")
+    value: Amount = Field(description="What it holds, in the operating currency (what has no price left out).")
+    unpriced: list[str] = Field(default_factory=list, description="Commodities it holds with no price.")
+    accounts: list[str] = Field(default_factory=list, description="The accounts it's the default fund of today.")
     entries: int = Field(description="How many transaction lines and moves it has: none, and it can be deleted.")
     updated_at: str | None = Field(None, description="Its directive's version; None for one only used.")
 
@@ -842,7 +857,12 @@ class Funds(Api):
     net_worth: Amount = Field(description="Every asset and liability, valued (what has no price left out).")
     unallocated: Amount = Field(description="Net worth less every fund's value: what isn't in a fund.")
     unpriced: list[str] = Field(default_factory=list, description="Commodities held with no price, left out of net worth.")
+    unallocated_holdings: list[FundHolding] = Field(
+        default_factory=list,
+        description="What Unallocated holds, per commodity: what the accounts hold that no fund does.",
+    )
     funds: list[Fund] = Field(description="Active funds by name, then archived ones.")
+    defaults: list[FundDefault] = Field(default_factory=list, description="Every account's default funds, by account and date.")
 
 
 class FundIn(Strict):
@@ -913,6 +933,80 @@ class FundMove(Api):
     updated_at: str
 
 
+class FundMovesIn(Strict):
+    """Several moves at once (a move with several amounts): all of them, or none."""
+
+    moves: list[FundMoveIn] = Field(min_length=1)
+
+
+class FundDefault(Api):
+    """From `date`, what changes in `account` (and under it) with no line saying otherwise is
+    `fund`'s (Funds B). `fund` None: the account has none of its own from then on."""
+
+    id: str
+    account: str
+    fund: str | None
+    date: datetime.date
+    updated_at: str
+
+
+class FundDefaultIn(Strict):
+    account: str
+    fund: str | None = Field(description="A fund, Unallocated, or null for none of its own.")
+    date: datetime.date = Field(description="From when.")
+
+
+class FundDefaultPatch(Strict):
+    """Change only the fields given."""
+
+    updated_at: Version
+    fund: str | None = None
+    date: datetime.date | None = None
+
+
+class FundDefaultPreview(Strict):
+    """A default fund to be made (no `id`) or changed (`id`), or one to be deleted (`delete`)."""
+
+    id: str | None = None
+    account: str
+    fund: str | None = None
+    date: datetime.date
+    delete: bool = False
+
+
+class FundChange(Api):
+    fund: str
+    amounts: list[Amount] = Field(description="What it gains (positive) or loses, per commodity.")
+    value: Amount = Field(description="Those amounts at today's prices.")
+
+
+class FundDefaultEffect(Api):
+    """What a default fund would do: each fund's change, and why it can't be saved, if it can't."""
+
+    changes: list[FundChange]
+    problem: str | None = None
+
+
+class ShortTake(Api):
+    fund: str = Field(description="A fund, or Unallocated.")
+    amount: Amount = Field(description="What the transaction takes from it.")
+    holding: Amount = Field(description="What the fund holds of it now: below zero.")
+
+
+class ShortTransaction(Api):
+    """A transaction that takes a share a fund doesn't have (Funds B): it came in by itself, and
+    waits for a fund to be named."""
+
+    id: str
+    date: datetime.date
+    flag: str | None
+    payee: str | None = None
+    narration: str | None = None
+    added: str = Field(description="When it was written (its created_at).")
+    updated_at: str
+    takes: list[ShortTake]
+
+
 class FundMovePatch(Strict):
     """Change only the fields given."""
 
@@ -922,3 +1016,6 @@ class FundMovePatch(Strict):
     to_fund: FundName | None = None
     amount: Amount | None = None
     note: str | None = Field(None, max_length=200)
+
+
+Funds.model_rebuild()

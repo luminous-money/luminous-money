@@ -1895,8 +1895,16 @@
         "type": "object"
       },
       "Fund": {
-        "description": "A fund: money set aside for something. What it holds is its lines and moves, so far.",
+        "description": "A fund: money set aside for something. What it holds is its lines, its moves, and what\nthe accounts it's the default fund of give it.",
         "properties": {
+          "accounts": {
+            "description": "The accounts it's the default fund of today.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Accounts",
+            "type": "array"
+          },
           "archived": {
             "anyOf": [
               {
@@ -1940,9 +1948,9 @@
             "type": "integer"
           },
           "holdings": {
-            "description": "What it holds, per commodity (only the operating currency, for now).",
+            "description": "What it holds, per commodity: the operating currency first.",
             "items": {
-              "$ref": "#/components/schemas/Amount"
+              "$ref": "#/components/schemas/FundHolding"
             },
             "title": "Holdings",
             "type": "array"
@@ -1962,6 +1970,14 @@
             ],
             "description": "What it's working toward, shown as progress: nothing fills it."
           },
+          "unpriced": {
+            "description": "Commodities it holds with no price.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Unpriced",
+            "type": "array"
+          },
           "updated_at": {
             "anyOf": [
               {
@@ -1976,7 +1992,7 @@
           },
           "value": {
             "$ref": "#/components/schemas/Amount",
-            "description": "What it holds, in the operating currency."
+            "description": "What it holds, in the operating currency (what has no price left out)."
           }
         },
         "required": [
@@ -2020,6 +2036,224 @@
           "updated_at"
         ],
         "title": "FundArchive",
+        "type": "object"
+      },
+      "FundChange": {
+        "properties": {
+          "amounts": {
+            "description": "What it gains (positive) or loses, per commodity.",
+            "items": {
+              "$ref": "#/components/schemas/Amount"
+            },
+            "title": "Amounts",
+            "type": "array"
+          },
+          "fund": {
+            "title": "Fund",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "Those amounts at today's prices."
+          }
+        },
+        "required": [
+          "fund",
+          "amounts",
+          "value"
+        ],
+        "title": "FundChange",
+        "type": "object"
+      },
+      "FundDefault": {
+        "description": "From `date`, what changes in `account` (and under it) with no line saying otherwise is\n`fund`'s (Funds B). `fund` None: the account has none of its own from then on.",
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "fund": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "account",
+          "fund",
+          "date",
+          "updated_at"
+        ],
+        "title": "FundDefault",
+        "type": "object"
+      },
+      "FundDefaultEffect": {
+        "description": "What a default fund would do: each fund's change, and why it can't be saved, if it can't.",
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/FundChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          }
+        },
+        "required": [
+          "changes"
+        ],
+        "title": "FundDefaultEffect",
+        "type": "object"
+      },
+      "FundDefaultIn": {
+        "additionalProperties": false,
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "date": {
+            "description": "From when.",
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "fund": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A fund, Unallocated, or null for none of its own.",
+            "title": "Fund"
+          }
+        },
+        "required": [
+          "account",
+          "fund",
+          "date"
+        ],
+        "title": "FundDefaultIn",
+        "type": "object"
+      },
+      "FundDefaultPatch": {
+        "additionalProperties": false,
+        "description": "Change only the fields given.",
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "fund": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund"
+          },
+          "updated_at": {
+            "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "updated_at"
+        ],
+        "title": "FundDefaultPatch",
+        "type": "object"
+      },
+      "FundDefaultPreview": {
+        "additionalProperties": false,
+        "description": "A default fund to be made (no `id`) or changed (`id`), or one to be deleted (`delete`).",
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "delete": {
+            "default": false,
+            "title": "Delete",
+            "type": "boolean"
+          },
+          "fund": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          }
+        },
+        "required": [
+          "account",
+          "date"
+        ],
+        "title": "FundDefaultPreview",
         "type": "object"
       },
       "FundEntry": {
@@ -2143,6 +2377,54 @@
           "entries"
         ],
         "title": "FundHistory",
+        "type": "object"
+      },
+      "FundHolding": {
+        "description": "What a fund (or Unallocated) holds of one commodity, and what that's worth.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Per unit, in the operating currency; None for that currency."
+          },
+          "price_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "In the operating currency; None when it has no price."
+          }
+        },
+        "required": [
+          "amount",
+          "value"
+        ],
+        "title": "FundHolding",
         "type": "object"
       },
       "FundIn": {
@@ -2378,6 +2660,25 @@
         "title": "FundMovePatch",
         "type": "object"
       },
+      "FundMovesIn": {
+        "additionalProperties": false,
+        "description": "Several moves at once (a move with several amounts): all of them, or none.",
+        "properties": {
+          "moves": {
+            "items": {
+              "$ref": "#/components/schemas/FundMoveIn"
+            },
+            "minItems": 1,
+            "title": "Moves",
+            "type": "array"
+          }
+        },
+        "required": [
+          "moves"
+        ],
+        "title": "FundMovesIn",
+        "type": "object"
+      },
       "FundPatch": {
         "additionalProperties": false,
         "description": "Change only the fields given; null clears one.",
@@ -2461,6 +2762,14 @@
             "title": "Currency",
             "type": "string"
           },
+          "defaults": {
+            "description": "Every account's default funds, by account and date.",
+            "items": {
+              "$ref": "#/components/schemas/FundDefault"
+            },
+            "title": "Defaults",
+            "type": "array"
+          },
           "funds": {
             "description": "Active funds by name, then archived ones.",
             "items": {
@@ -2481,6 +2790,14 @@
           "unallocated": {
             "$ref": "#/components/schemas/Amount",
             "description": "Net worth less every fund's value: what isn't in a fund."
+          },
+          "unallocated_holdings": {
+            "description": "What Unallocated holds, per commodity: what the accounts hold that no fund does.",
+            "items": {
+              "$ref": "#/components/schemas/FundHolding"
+            },
+            "title": "Unallocated Holdings",
+            "type": "array"
           },
           "unpriced": {
             "description": "Commodities held with no price, left out of net worth.",
@@ -3839,6 +4156,103 @@
         "title": "RevalueIn",
         "type": "object"
       },
+      "ShortTake": {
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "What the transaction takes from it."
+          },
+          "fund": {
+            "description": "A fund, or Unallocated.",
+            "title": "Fund",
+            "type": "string"
+          },
+          "holding": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "What the fund holds of it now: below zero."
+          }
+        },
+        "required": [
+          "fund",
+          "amount",
+          "holding"
+        ],
+        "title": "ShortTake",
+        "type": "object"
+      },
+      "ShortTransaction": {
+        "description": "A transaction that takes a share a fund doesn't have (Funds B): it came in by itself, and\nwaits for a fund to be named.",
+        "properties": {
+          "added": {
+            "description": "When it was written (its created_at).",
+            "title": "Added",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flag"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "narration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narration"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "takes": {
+            "items": {
+              "$ref": "#/components/schemas/ShortTake"
+            },
+            "title": "Takes",
+            "type": "array"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "flag",
+          "added",
+          "updated_at",
+          "takes"
+        ],
+        "title": "ShortTransaction",
+        "type": "object"
+      },
       "TagUse": {
         "description": "A tag the book's transactions have (M17): a tag exists while one does.",
         "properties": {
@@ -3923,6 +4337,21 @@
               }
             ],
             "title": "Fees"
+          },
+          "funds": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FundLine"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The trade's fund lines (Funds B), checked as any transaction's are.",
+            "title": "Funds"
           },
           "holding_account": {
             "anyOf": [
@@ -7189,6 +7618,18 @@
               "title": "Updated At",
               "type": "string"
             }
+          },
+          {
+            "description": "Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused.",
+            "in": "query",
+            "name": "staging",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused.",
+              "title": "Staging",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -7369,9 +7810,201 @@
         "summary": "Export"
       }
     },
+    "/api/ledger/v1/books/{book_id}/fund-defaults": {
+      "post": {
+        "description": "From a day, what changes in an account with no line saying otherwise is a fund's (a\nmanager). Refused if it would leave a fund below zero in a share.",
+        "operationId": "create_fund_default_api_ledger_v1_books__book_id__fund_defaults_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundDefaultIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundDefault"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Create Fund Default"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/fund-defaults/preview": {
+      "post": {
+        "description": "What making, changing or deleting a default fund would do to each fund.",
+        "operationId": "preview_fund_default_api_ledger_v1_books__book_id__fund_defaults_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundDefaultPreview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundDefaultEffect"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Preview Fund Default"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/fund-defaults/{default_id}": {
+      "delete": {
+        "operationId": "delete_fund_default_api_ledger_v1_books__book_id__fund_defaults__default_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "default_id",
+            "required": true,
+            "schema": {
+              "title": "Default Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `updated_at` this edit was based on.",
+            "in": "query",
+            "name": "updated_at",
+            "required": true,
+            "schema": {
+              "description": "The `updated_at` this edit was based on.",
+              "title": "Updated At",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Delete Fund Default"
+      },
+      "patch": {
+        "operationId": "patch_fund_default_api_ledger_v1_books__book_id__fund_defaults__default_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "default_id",
+            "required": true,
+            "schema": {
+              "title": "Default Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundDefaultPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundDefault"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Patch Fund Default"
+      }
+    },
     "/api/ledger/v1/books/{book_id}/fund-moves": {
       "post": {
-        "description": "Move money from one fund to another (either can be Unallocated): no account changes.",
+        "description": "Move money (or shares) from one fund to another (either can be Unallocated): no\naccount changes. A move can't leave a fund below zero in a share.",
         "operationId": "create_fund_move_api_ledger_v1_books__book_id__fund_moves_post",
         "parameters": [
           {
@@ -7413,6 +8046,56 @@
           }
         },
         "summary": "Create Fund Move"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/fund-moves/batch": {
+      "post": {
+        "description": "Several moves in one write (a move with several amounts): all of them, or none.",
+        "operationId": "create_fund_moves_api_ledger_v1_books__book_id__fund_moves_batch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundMovesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FundMove"
+                  },
+                  "title": "Response Create Fund Moves Api Ledger V1 Books  Book Id  Fund Moves Batch Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Create Fund Moves"
       }
     },
     "/api/ledger/v1/books/{book_id}/fund-moves/{move_id}": {
@@ -7616,6 +8299,50 @@
           }
         },
         "summary": "Create Fund"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/funds/short": {
+      "get": {
+        "description": "Transactions that take a share a fund doesn't have (they came in by themselves),\noldest added first: what Notifications lists until each is given a fund.",
+        "operationId": "short_transactions_api_ledger_v1_books__book_id__funds_short_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ShortTransaction"
+                  },
+                  "title": "Response Short Transactions Api Ledger V1 Books  Book Id  Funds Short Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Short Transactions"
       }
     },
     "/api/ledger/v1/books/{book_id}/funds/{name}": {
@@ -8685,6 +9412,18 @@
               "title": "Book Id",
               "type": "string"
             }
+          },
+          {
+            "description": "Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused.",
+            "in": "query",
+            "name": "staging",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused.",
+              "title": "Staging",
+              "type": "boolean"
+            }
           }
         ],
         "requestBody": {
@@ -8734,6 +9473,18 @@
             "schema": {
               "title": "Book Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused.",
+            "in": "query",
+            "name": "staging",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused.",
+              "title": "Staging",
+              "type": "boolean"
             }
           }
         ],
@@ -8792,6 +9543,18 @@
             "schema": {
               "title": "Book Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused.",
+            "in": "query",
+            "name": "staging",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused.",
+              "title": "Staging",
+              "type": "boolean"
             }
           }
         ],
@@ -8988,6 +9751,18 @@
               "title": "Book Id",
               "type": "string"
             }
+          },
+          {
+            "description": "Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused.",
+            "in": "query",
+            "name": "staging",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused.",
+              "title": "Staging",
+              "type": "boolean"
+            }
           }
         ],
         "requestBody": {
@@ -9046,6 +9821,18 @@
             "schema": {
               "title": "Book Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused.",
+            "in": "query",
+            "name": "staging",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Written by itself (an import, a bank feed, a receipt, a schedule), not by hand: a transaction that takes a share a fund doesn't have is kept, and listed as short (Funds B), rather than refused.",
+              "title": "Staging",
+              "type": "boolean"
             }
           }
         ],
