@@ -38,6 +38,16 @@ export type Reconciliations = Components["schemas"]["Reconciliations"];
 export type Reconciliation = Components["schemas"]["Reconciliation"];
 export type Attachment = Components["schemas"]["Attachment"];
 export type TagUse = Components["schemas"]["TagUse"];
+export type Funds = Components["schemas"]["Funds"];
+export type Fund = Components["schemas"]["Fund"];
+export type FundLine = Components["schemas"]["FundLine"];
+export type FundIn = Components["schemas"]["FundIn"];
+export type FundPatch = Components["schemas"]["FundPatch"];
+export type FundHistory = Components["schemas"]["FundHistory"];
+export type FundEntry = Components["schemas"]["FundEntry"];
+export type FundMove = Components["schemas"]["FundMove"];
+export type FundMoveIn = Components["schemas"]["FundMoveIn"];
+export type FundMovePatch = Components["schemas"]["FundMovePatch"];
 
 export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"], "updated_at">;
 export type AccountKind = components["schemas"]["AccountIn"]["kind"];
@@ -207,6 +217,85 @@ export const api = {
         },
       })
     ),
+
+  /** Every fund with what it holds, net worth, and Unallocated (Funds A). */
+  funds: (book_id: string): Promise<Funds> =>
+    unwrap(ledger.GET("/api/ledger/v1/books/{book_id}/funds", { params: { path: { book_id } } })),
+
+  /** A fund and its history, newest first, with a running balance. */
+  fundHistory: (book_id: string, name: string): Promise<FundHistory> =>
+    unwrap(
+      ledger.GET("/api/ledger/v1/books/{book_id}/funds/{name}/entries", {
+        params: { path: { book_id, name } },
+      })
+    ),
+
+  createFund: (book_id: string, body: FundIn): Promise<Fund> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/funds", { params: { path: { book_id } }, body })
+    ),
+
+  patchFund: (book_id: string, name: string, body: FundPatch): Promise<Fund> =>
+    unwrap(
+      ledger.PATCH("/api/ledger/v1/books/{book_id}/funds/{name}", {
+        params: { path: { book_id, name } },
+        body,
+      })
+    ),
+
+  archiveFund: (
+    book_id: string,
+    name: string,
+    body: { updated_at: string; date?: string | null; to: string }
+  ): Promise<Fund> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/funds/{name}/archive", {
+        params: { path: { book_id, name } },
+        body,
+      })
+    ),
+
+  unarchiveFund: (book_id: string, name: string, updated_at: string): Promise<Fund> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/funds/{name}/unarchive", {
+        params: { path: { book_id, name } },
+        body: { updated_at },
+      })
+    ),
+
+  async deleteFund(book_id: string, name: string, updated_at: string) {
+    const { response, error } = await ledger.DELETE("/api/ledger/v1/books/{book_id}/funds/{name}", {
+      params: { path: { book_id, name }, query: { updated_at } },
+    });
+    if (!response.ok) throw new ApiError(response.status, describe(error) ?? "couldn't delete it");
+  },
+
+  /** Move money from one fund to another (either can be Unallocated): no account changes. */
+  moveFunds: (book_id: string, body: FundMoveIn): Promise<FundMove> =>
+    unwrap(
+      ledger.POST("/api/ledger/v1/books/{book_id}/fund-moves", {
+        params: { path: { book_id } },
+        body,
+      })
+    ),
+
+  patchMove: (book_id: string, move_id: string, body: FundMovePatch): Promise<FundMove> =>
+    unwrap(
+      ledger.PATCH("/api/ledger/v1/books/{book_id}/fund-moves/{move_id}", {
+        params: { path: { book_id, move_id } },
+        body,
+      })
+    ),
+
+  async deleteMove(book_id: string, move_id: string, updated_at: string) {
+    const { response, error } = await ledger.DELETE(
+      "/api/ledger/v1/books/{book_id}/fund-moves/{move_id}",
+      {
+        params: { path: { book_id, move_id }, query: { updated_at } },
+      }
+    );
+    if (!response.ok) throw new ApiError(response.status, describe(error) ?? "couldn't delete it");
+  },
 
   /** The book's tags (M17), alphabetically, each with how many transactions have it. */
   tags: (book_id: string): Promise<TagUse[]> =>

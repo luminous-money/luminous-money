@@ -302,6 +302,7 @@ textarea {
 
 input:focus,
 textarea:focus,
+select:focus-visible,
 button:focus-visible,
 .button:focus-visible {
   outline: 2px solid var(--accent);
@@ -506,7 +507,8 @@ button:focus-visible,
   color: var(--muted);
 }
 
-.editor label input {
+.editor label input,
+.editor label select {
   color: var(--ink);
   font-weight: 400;
 }
@@ -1138,7 +1140,7 @@ a.primary-link {
 main
   a:not(.button):not(.card):not(.back):not(.menu-item):not(.chart-leaf):not(.budget-link):not(
     .largest-row
-  ) {
+  ):not(.fund-row) {
   color: var(--accent);
   font-weight: 600;
 }
@@ -1226,6 +1228,12 @@ main
 
 .warning {
   color: #9a6b00;
+}
+
+@media (prefers-color-scheme: dark) {
+  .warning {
+    color: #f2c35b;
+  }
 }
 
 .status-line {
@@ -2823,4 +2831,294 @@ details.divide summary {
 
 .filter-panel .tag-input {
   margin-bottom: 0.25rem;
+}
+
+/* Funds (Funds A): a transaction's Funds section, chips, the review card's choice, the Funds
+   page, a fund's page and home's card */
+
+.negative {
+  color: var(--bad);
+}
+
+.funds-lead {
+  margin: 0;
+}
+
+.fund-lines {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* A line: its verb, the fund, the amount, × */
+.fund-line {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr) 6.5rem auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+/* The row to choose a first fund in has no amount or × yet: the select takes the room. */
+.fund-line > select:last-child {
+  grid-column: 2 / -1;
+}
+
+.fund-verb {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.fund-line select {
+  font-size: 1rem;
+  text-overflow: ellipsis;
+}
+
+.fund-line input {
+  font-size: 1rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* On a phone, a line is two rows, as a split is: the fund, then its amount and ×. */
+@media (max-width: 30rem) {
+  .fund-lines {
+    gap: 0.75rem;
+  }
+
+  .fund-line > select {
+    grid-column: 2 / -1;
+  }
+
+  .fund-line > input {
+    grid-column: 2 / 4;
+  }
+}
+
+button.fund-add,
+button.fund-more {
+  justify-self: start;
+}
+
+.fund-take {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.fund-take p {
+  margin: 0;
+}
+
+.fund-read {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.fund-read li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.funds-summary {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.funds-field .warning {
+  margin: 0;
+}
+
+.fund-chip {
+  background: color-mix(in srgb, var(--good) 18%, transparent);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.fund-chip.out {
+  background: color-mix(in srgb, #d9a441 24%, transparent);
+}
+
+/* Long names are cut short; the chip's title has the whole line. */
+.fund-chip-name {
+  display: inline-block;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.fund-chips {
+  max-width: 100%;
+}
+
+.fund-choice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* Beside its label, as "Paid from" is, however long the funds' names. */
+.fund-choice select {
+  width: 0;
+  min-width: 0;
+  max-width: 18rem;
+  flex: 1 1 8rem;
+  font-size: 1rem;
+  color: var(--ink);
+  font-weight: 400;
+}
+
+.fund-choice .fund-chips {
+  margin-inline-start: 0;
+}
+
+select.fund-pick {
+  flex: 1 1 10rem;
+  width: 0;
+  min-width: 0;
+}
+
+/* The Funds page */
+
+.funds-empty h2 {
+  margin-bottom: 0.5rem;
+}
+
+.funds-empty p + p {
+  margin-top: 0.75rem;
+}
+
+.fund-totals {
+  margin-bottom: 0.75rem;
+}
+
+.fund-totals dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+}
+
+.fund-totals dt {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.fund-totals dd {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.fund-card h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fund-card .balance {
+  white-space: nowrap;
+}
+
+.fund-target {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.6rem;
+}
+
+.archived-funds summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.archived-funds ul {
+  margin-bottom: 0;
+}
+
+/* A fund's page */
+
+.fund-head .balance {
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.fund-history {
+  margin-top: 1.25rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.fund-history .ledger-row:disabled {
+  opacity: 1;
+}
+
+/* Home's card */
+
+.funds-home {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.funds-home .section-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.fund-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fund-list li + li {
+  border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.fund-row {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.55rem 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.fund-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.fund-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.fund-row.unallocated .fund-name {
+  color: var(--muted);
+}
+
+.fund-row .num {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.fund-all {
+  margin: 0.25rem 0 0;
+  text-align: right;
 }

@@ -25,7 +25,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
-from . import budgets, chart, engine, investments, models, reconcile
+from . import budgets, chart, engine, fundlines, funds, investments, models, reconcile
 from .service import Ledger, NameTaken, NotFound, TooLarge
 from .store import Row, StaleVersion, Store
 
@@ -129,6 +129,10 @@ def create_app(ledger: Ledger) -> FastAPI:
     @app.exception_handler(budgets.BudgetRefused)
     async def budget_refused(_, exc: budgets.BudgetRefused):
         return JSONResponse({"detail": str(exc)}, status_code=422)
+
+    @app.exception_handler(fundlines.FundRefused)
+    async def fund_refused(_, exc: fundlines.FundRefused):
+        return JSONResponse(status_code=422, content={"detail": str(exc)})
 
     @app.exception_handler(reconcile.ReconcileRefused)
     async def reconcile_refused(_, exc: reconcile.ReconcileRefused):
@@ -431,6 +435,73 @@ def create_app(ledger: Ledger) -> FastAPI:
         """The book's tags (M17), alphabetically: each with how many transactions have it, and
         the first and last of their dates. A tag exists while a transaction has it."""
         return ledger.tags(book_id)
+
+    # Funds (Funds A)
+
+    FUND_ERRORS = {409: {"description": "Stale version"}, 422: {"description": "Not allowed"}}
+
+    @api.get("/books/{book_id}/funds")
+    def list_funds(
+        book_id: MemberBook,
+        on: Annotated[datetime.date | None, Query(description="Value at this day's prices (default today).")] = None,
+    ) -> models.Funds:
+        """Every fund with what it holds, net worth, and Unallocated (net worth less every fund)."""
+        return funds.listing(ledger, book_id, on)
+
+    @api.post("/books/{book_id}/funds", status_code=201, responses=FUND_ERRORS)
+    def create_fund(book_id: MemberBook, f: models.FundIn, user: User) -> models.Fund:
+        """Make a fund (a manager)."""
+        require(ledger, book_id, user, "manage")
+        return funds.create(ledger, book_id, f)
+
+    @api.patch("/books/{book_id}/funds/{name}", responses=FUND_ERRORS)
+    def patch_fund(book_id: MemberBook, name: str, p: models.FundPatch, user: User) -> models.Fund:
+        """Change a fund's description or target (a manager)."""
+        require(ledger, book_id, user, "manage")
+        return funds.patch(ledger, book_id, name, p)
+
+    @api.post("/books/{book_id}/funds/{name}/rename", responses=FUND_ERRORS)
+    def rename_fund(book_id: MemberBook, name: str, r: models.FundRename, user: User) -> models.Fund:
+        """Rename a fund everywhere it's named, history included (a manager). Through `app`, so
+        its rules and schedules follow."""
+        require(ledger, book_id, user, "manage")
+        return funds.rename(ledger, book_id, name, r)
+
+    @api.post("/books/{book_id}/funds/{name}/archive", responses=FUND_ERRORS)
+    def archive_fund(book_id: MemberBook, name: str, a: models.FundArchive, user: User) -> models.Fund:
+        """Archive a fund (a manager): what's left moves to Unallocated or another fund that day."""
+        require(ledger, book_id, user, "manage")
+        return funds.archive(ledger, book_id, name, a)
+
+    @api.post("/books/{book_id}/funds/{name}/unarchive", responses=FUND_ERRORS)
+    def unarchive_fund(book_id: MemberBook, name: str, v: models.FundVersion, user: User) -> models.Fund:
+        require(ledger, book_id, user, "manage")
+        return funds.unarchive(ledger, book_id, name, v)
+
+    @api.delete("/books/{book_id}/funds/{name}", status_code=204, responses=FUND_ERRORS)
+    def delete_fund(book_id: MemberBook, name: str, updated_at: VersionParam, user: User) -> None:
+        """Delete a fund with no history (a manager)."""
+        require(ledger, book_id, user, "manage")
+        funds.delete(ledger, book_id, name, updated_at)
+
+    @api.get("/books/{book_id}/funds/{name}/entries")
+    def fund_history(book_id: MemberBook, name: str) -> models.FundHistory:
+        """A fund and its history (transaction lines and moves), newest first, with a running
+        balance."""
+        return funds.history(ledger, book_id, name)
+
+    @api.post("/books/{book_id}/fund-moves", status_code=201, responses=FUND_ERRORS)
+    def create_fund_move(book_id: MemberBook, m: models.FundMoveIn) -> models.FundMove:
+        """Move money from one fund to another (either can be Unallocated): no account changes."""
+        return funds.create_move(ledger, book_id, m)
+
+    @api.patch("/books/{book_id}/fund-moves/{move_id}", responses=FUND_ERRORS)
+    def patch_fund_move(book_id: MemberBook, move_id: str, p: models.FundMovePatch) -> models.FundMove:
+        return funds.patch_move(ledger, book_id, move_id, p)
+
+    @api.delete("/books/{book_id}/fund-moves/{move_id}", status_code=204, responses=FUND_ERRORS)
+    def delete_fund_move(book_id: MemberBook, move_id: str, updated_at: VersionParam) -> None:
+        funds.delete_move(ledger, book_id, move_id, updated_at)
 
     # Reconciliation (M14)
 

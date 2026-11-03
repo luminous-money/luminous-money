@@ -15,6 +15,7 @@ import {
   type Unit,
   type Weekend,
 } from "../../shared/schedule.js";
+import { FundsFieldset, fundsShown, useFundRows } from "../components/Funds.js";
 import { SplitsFieldset, useSplits } from "../components/Splits.js";
 import { postable } from "../lib/accounts.js";
 import { today } from "../lib/format.js";
@@ -24,6 +25,7 @@ import {
   useAccountCreation,
   useAccounts,
   useDeleteSchedule,
+  useFunds,
   useSaveSchedule,
   useSchedule,
   useTransaction,
@@ -68,6 +70,7 @@ function fromTransaction(t: Transaction): {
       links: rest.links ?? [],
       meta: rest.meta ?? {},
       postings: rest.postings as TransactionTemplate["postings"],
+      ...(rest.funds?.length ? { funds: rest.funds } : {}),
     },
   };
 }
@@ -152,6 +155,14 @@ function Form({
   const currency = postings.find((p) => p.units)?.units?.currency ?? "USD";
   const splits = useSplits(postings, currency);
   const names = accounts.data ? postable(accounts.data, today()) : [];
+  // Funds (Funds A): every occurrence carries the template's lines.
+  const listing = useFunds(book);
+  const funds = useFundRows(
+    initial.template.funds,
+    postings,
+    splits.balance.state === "invalid" ? null : splits.postings,
+    listing.data?.currency
+  );
 
   const parsedDays = unit === "month" ? parseDays(days) : [];
   const rule: Rule = {
@@ -172,15 +183,18 @@ function Form({
     !ruleProblem &&
     splits.balance.state !== "invalid" &&
     !splits.unresolved &&
-    splits.postings.every((p) => p.account);
+    splits.postings.every((p) => p.account) &&
+    !(funds.changed && funds.problem);
 
   const submit = async () => {
     setError(null);
+    const { funds: _, ...rest } = initial.template;
     const template: TransactionTemplate = {
-      ...initial.template,
+      ...rest,
       payee: payee.trim() || null,
       narration,
       postings: splits.postings as TransactionTemplate["postings"],
+      ...(funds.lines.length ? { funds: funds.lines } : {}),
     };
     try {
       await save.mutateAsync(
@@ -282,6 +296,9 @@ function Form({
         match, the bank&apos;s amount replaces the split&apos;s, and the blank split absorbs the
         difference.
       </p>
+      {funds.ready && fundsShown(listing.data, initial.template.funds) && (
+        <FundsFieldset book={book} funds={funds} balanced={splits.balance.state !== "invalid"} />
+      )}
 
       <label className="check">
         <input

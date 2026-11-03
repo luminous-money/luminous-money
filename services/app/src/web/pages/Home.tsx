@@ -2,6 +2,7 @@ import type { Book } from "@luminous-money/ledger-client";
 import { Link } from "wouter";
 
 import { AccountValueNote, headline } from "../components/AccountValue.js";
+import { FundsCard } from "../components/Funds.js";
 import { JournalList } from "../components/JournalList.js";
 import { PartsLine } from "../components/Parts.js";
 import { SpendingThisMonth } from "../components/SpendingThisMonth.js";
@@ -17,9 +18,9 @@ import {
 } from "../lib/queries.js";
 import { ReportedLine } from "../components/BankStatus.js";
 
-/** This month's spending against the budget, recent transactions, and the user's starred
+/** This month's spending against the budget, recent transactions, the user's starred
  * accounts, with their balances (as shown: a card's is what's owed) and when each was last
- * updated by an import. */
+ * updated by an import, and the book's funds (when it has one). */
 export function Home({ book }: { book: Book }) {
   const accounts = useStarredAccounts(book.id);
   const imports = useLastImports(book.id);
@@ -84,6 +85,8 @@ export function Home({ book }: { book: Book }) {
           <Link href={`${bookHome(book.id)}/accounts/new`}>+ Add an account</Link>
         </p>
       )}
+
+      <FundsCard book={book.id} />
     </main>
   );
 }

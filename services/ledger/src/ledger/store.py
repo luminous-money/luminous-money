@@ -49,6 +49,25 @@ def split_tags(text: str | None) -> list[str]:
     return sorted(text.split(" ")) if text else []
 
 
+# A transaction's fund lines, "fund number currency" joined by ';' in order (fund names hold no ';'),
+# for a query's select list; `%` the directive table's alias (Funds A)
+FUNDS = (
+    "SELECT GROUP_CONCAT(line, ';') FROM (SELECT f.fund || ' ' || f.amount || ' ' || f.currency AS line"
+    " FROM fund_line f WHERE f.directive_id = %s.id ORDER BY f.idx)"
+)
+
+
+def split_funds(text: str | None) -> list[tuple[str, str, str]]:
+    """`FUNDS`' column as (fund, number, currency) lines, in order."""
+    lines = []
+    for part in (text or "").split(";"):
+        if part:
+            rest, _, currency = part.rpartition(" ")
+            fund, _, number = rest.rpartition(" ")
+            lines.append((fund, number, currency))
+    return lines
+
+
 class StaleVersion(Exception):
     """A write named a version that's no longer current."""
 
@@ -298,6 +317,12 @@ class Store:
                 "INSERT INTO transaction_tag (directive_id, book_id, tag, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
                 [(d.id, book_id, tag, stamp, stamp) for tag in d.tags],
             )
+            self._conn.execute("DELETE FROM fund_line WHERE directive_id = ?", (d.id,))
+            self._conn.executemany(
+                "INSERT INTO fund_line (directive_id, idx, book_id, fund, amount, currency, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [(d.id, i, book_id, fund, str(number), currency, stamp, stamp) for i, (fund, number, currency) in enumerate(d.funds)],
+            )
             self._conn.execute("DELETE FROM price WHERE directive_id = ?", (d.id,))
             if d.price is not None:
                 commodity, number, currency = d.price
@@ -324,6 +349,7 @@ class Store:
             )
             self._conn.execute("DELETE FROM posting WHERE directive_id = ?", (directive_id,))
             self._conn.execute("DELETE FROM transaction_tag WHERE directive_id = ?", (directive_id,))
+            self._conn.execute("DELETE FROM fund_line WHERE directive_id = ?", (directive_id,))
             self._conn.execute("DELETE FROM price WHERE directive_id = ?", (directive_id,))
             for attachment in self.attachments_of(book_id, [directive_id]):
                 self.delete_attachment(book_id, attachment["id"])
@@ -440,7 +466,7 @@ class Store:
                      AND r.reconciled IS NULL) AS unreconciled,
                    (SELECT MAX(r.reconciled) FROM posting r WHERE r.directive_id = d.id
                      AND {mine % ("r", "r")}) AS reconciled,
-                   ({TAGS % "d"}) AS tags
+                   ({TAGS % "d"}) AS tags, ({FUNDS % "d"}) AS funds
             FROM directive d
             WHERE d.book_id = :book AND d.deleted = 0 AND d.kind = 'transaction'
               AND d.id IN (SELECT directive_id FROM posting p WHERE {mine % ("p", "p")})
@@ -477,7 +503,8 @@ class Store:
             args += more
         return self._conn.execute(
             f"""
-            SELECT d.id, d.date, d.flag, d.payee, d.narration, d.budgeted, ({TAGS % "d"}) AS tags, p.idx,
+            SELECT d.id, d.date, d.flag, d.payee, d.narration, d.budgeted, ({TAGS % "d"}) AS tags,
+                   ({FUNDS % "d"}) AS funds, p.idx,
                    p.account, p.amount, p.amount_currency, p.reconciled, p.flag AS posting_flag, p.memo
             FROM directive d JOIN posting p ON p.directive_id = d.id
             WHERE {" AND ".join(where)}
@@ -498,6 +525,41 @@ class Store:
             """,
             (book_id,),
         ).fetchall()
+
+    def fund_lines(self, book_id: str, on: str | None = None) -> list[sqlite3.Row]:
+        """Every live fund line and move side dated `on` or earlier (or every one): fund, amount,
+        currency (Funds A)."""
+        where, args = ["f.book_id = ?", "d.deleted = 0"], [book_id]
+        if on is not None:
+            where.append("d.date <= ?")
+            args.append(on)
+        return self._conn.execute(
+            f"SELECT f.fund, f.amount, f.currency FROM fund_line f JOIN directive d ON d.id = f.directive_id"
+            f" WHERE {' AND '.join(where)}",
+            args,
+        ).fetchall()
+
+    def fund_entries(self, book_id: str, fund: str) -> list[sqlite3.Row]:
+        """A fund's lines and move sides, oldest first: the directive's id, kind, date, flag, payee,
+        narration, text (a move's other side and note are in it) and version, and the amount."""
+        return self._conn.execute(
+            """
+            SELECT d.id, d.kind, d.date, d.flag, d.payee, d.narration, d.text, d.updated_at, f.amount, f.currency
+            FROM fund_line f JOIN directive d ON d.id = f.directive_id
+            WHERE f.book_id = ? AND f.fund = ? AND d.deleted = 0
+            ORDER BY d.date, d.ordinal, f.idx
+            """,
+            (book_id, fund),
+        ).fetchall()
+
+    def fund_users(self, book_id: str, fund: str) -> list[Row]:
+        """The live directives with a line for (or a move naming) `fund`."""
+        rows = self._conn.execute(
+            "SELECT DISTINCT d.* FROM directive d JOIN fund_line f ON f.directive_id = d.id"
+            " WHERE f.book_id = ? AND f.fund = ? AND d.deleted = 0 ORDER BY d.date, d.ordinal",
+            (book_id, fund),
+        ).fetchall()
+        return [_row(r) for r in rows]
 
     def latest_prices(self, book_id: str, on: str) -> list[sqlite3.Row]:
         """For each commodity and quote currency, its latest price dated `on` or earlier: commodity,
@@ -575,7 +637,8 @@ class Store:
             args.append(through)
         order = "ASC" if newer_than is not None else "DESC"
         return self._conn.execute(
-            f"SELECT id, date, ordinal, flag, payee, narration, budgeted, updated_at, ({TAGS % 'directive'}) AS tags"
+            f"SELECT id, date, ordinal, flag, payee, narration, budgeted, updated_at, ({TAGS % 'directive'}) AS tags,"
+            f" ({FUNDS % 'directive'}) AS funds"
             " FROM directive"
             f" WHERE {' AND '.join(where)} ORDER BY date {order}, ordinal {order} LIMIT ?",
             (*args, limit),

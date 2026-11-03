@@ -59,6 +59,16 @@ CARDS_KEY = "cards"
 CARD_BRANDS = ("visa", "mastercard", "amex", "discover", "other")
 # On a posting: what it is, in words ("Eggs Hppy 18", a receipt's line) (M16).
 MEMO_KEY = "memo"
+# Funds (Funds A): on a transaction, its fund lines, one string: "Emergency +500.00 USD; Wedding
+# -20.00 USD" (`+` into the fund, `-` out of it). A fund is a `custom "fund"` directive; a move
+# between funds a `custom "fund-move"`. Unallocated is what isn't in a fund: never a line.
+FUNDS_KEY = "funds"
+FUND_TYPE = "fund"
+FUND_MOVE_TYPE = "fund-move"
+UNALLOCATED = "Unallocated"
+NOTE_KEY = "note"
+TARGET_KEY = "target"
+ARCHIVED_KEY = "archived"
 NODE = "node"
 ROOT_OPTIONS = (
     ("name_assets", "asset"),
@@ -110,6 +120,9 @@ class Directive:
     price: tuple[str, Decimal, str] | None = None  # price directives only: commodity, number, currency
     budgeted: bool = True  # transactions only: False with `budget: FALSE`, kept out of budgets (M11)
     tags: tuple[str, ...] = ()  # transactions only, sorted (M17)
+    # A transaction's fund lines, or a fund move's two sides (Unallocated's left out): (fund,
+    # signed number, commodity), `+` into the fund (Funds A).
+    funds: tuple[tuple[str, Decimal, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -221,6 +234,7 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
         price=(entry.currency, entry.amount.number, entry.amount.currency) if isinstance(entry, data.Price) else None,
         budgeted=not (isinstance(entry, data.Transaction) and entry.meta.get(BUDGET_KEY) is False),
         tags=tuple(sorted(entry.tags or ())) if isinstance(entry, data.Transaction) else (),
+        funds=_fund_lines_of(entry),
     )
 
 
@@ -331,8 +345,11 @@ def transaction_directive(t: models.TransactionIn, directive_id: str | None = No
     (account names, currencies, flags, metadata keys) and guarantees the stored text is exactly
     what parsing it would produce.
     """
+    meta = {k: v for k, v in _meta_in(t.meta).items() if k != FUNDS_KEY}
+    if t.funds:
+        meta[FUNDS_KEY] = funds_text([(f.fund, Decimal(f.amount.number), f.amount.currency) for f in t.funds])
     entry = data.Transaction(
-        meta=_meta_in(t.meta),
+        meta=meta,
         date=t.date,
         flag=t.flag,
         payee=t.payee,
@@ -634,7 +651,8 @@ def _transaction_model(entry: data.Transaction) -> models.TransactionIn:
         narration=entry.narration or "",
         tags=sorted(entry.tags or ()),
         links=sorted(entry.links or ()),
-        meta=_meta_out(entry.meta),
+        funds=[fund_line(line) for line in _fund_lines_of(entry)] or None,
+        meta=_meta_out({k: v for k, v in entry.meta.items() if k != FUNDS_KEY}),
         postings=[
             models.Posting(
                 account=p.account,
@@ -891,3 +909,175 @@ def _is_tombstone(entry: data.Directive) -> bool:
 
 def _dedupe(lines: list[str]) -> list[str]:
     return list(dict.fromkeys(lines))
+
+
+# Funds (Funds A)
+
+_FUND_LINE = re.compile(r"^(?P<fund>.+?) (?P<number>[+-]\d+(?:\.\d+)?) (?P<currency>[A-Z][A-Z0-9'._-]*)$")
+
+
+def funds_text(lines: list[tuple[str, Decimal, str]]) -> str:
+    """A transaction's `funds:` value: "Emergency +500.00 USD; Wedding -20.00 USD"."""
+    return "; ".join(f"{fund} {'+' if number > 0 else '-'}{decimal_text(abs(number))} {currency}" for fund, number, currency in lines)
+
+
+def parse_funds(value: str) -> list[tuple[str, Decimal, str]]:
+    """A `funds:` value as (fund, signed number, commodity) lines, read from the right of each, so
+    a fund's name can hold spaces and digits. Refused (ParseFailure) if any line can't be read."""
+    lines = []
+    for part in value.split(";"):
+        found = _FUND_LINE.match(part.strip())
+        if not found:
+            raise ParseFailure([f"can't read the fund line {part.strip()!r} (it's \"<fund> <+ or -><amount> <commodity>\")"])
+        lines.append((found["fund"], Decimal(found["number"]), found["currency"]))
+    return lines
+
+
+def fund_line(line: tuple[str, Decimal, str]) -> models.FundLine:
+    fund, number, currency = line
+    return models.FundLine(fund=fund, amount=models.Amount(number=decimal_text(number), currency=currency))
+
+
+def _fund_lines_of(entry: data.Directive) -> tuple[tuple[str, Decimal, str], ...]:
+    """A transaction's fund lines, or a move's two sides (Unallocated's left out)."""
+    if isinstance(entry, data.Transaction):
+        value = entry.meta.get(FUNDS_KEY)
+        if value is None:
+            return ()
+        if not isinstance(value, str):
+            raise ParseFailure([f"{FUNDS_KEY}: must be a string"])
+        return tuple(parse_funds(value))
+    move = _move_of_entry(entry)
+    if move is None:
+        return ()
+    sides = [(move.from_fund, -move.number, move.currency), (move.to_fund, move.number, move.currency)]
+    return tuple(side for side in sides if side[0] != UNALLOCATED)
+
+
+def _string(text: str) -> str:
+    """A Beancount string literal."""
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+@dataclass(frozen=True)
+class FundDeclaration:
+    """A `custom "fund"` directive's contents."""
+
+    name: str
+    date: datetime.date
+    description: str | None = None
+    target: tuple[Decimal, str] | None = None
+    archived: datetime.date | None = None
+
+
+def fund_directive(f: FundDeclaration, directive_id: str | None = None) -> Directive:
+    """`2026-11-02 custom "fund" "Emergency"`, with `description`, `target` and `archived` as its
+    metadata."""
+    text = f"{f.date.isoformat()} custom {_string(FUND_TYPE)} {_string(f.name)}\n"
+    if f.description:
+        text += f"  {DESCRIPTION_KEY}: {_string(one_line(f.description))}\n"
+    if f.target:
+        text += f"  {TARGET_KEY}: {decimal_text(f.target[0])} {f.target[1]}\n"
+    if f.archived:
+        text += f"  {ARCHIVED_KEY}: {f.archived.isoformat()}\n"
+    return parse_one(text, directive_id)
+
+
+def fund_of(text: str) -> FundDeclaration | None:
+    """A fund directive's contents; None for any other directive."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1 or not isinstance(entries[0], data.Custom) or entries[0].type != FUND_TYPE:
+        return None
+    entry = entries[0]
+    if len(entry.values) != 1 or not isinstance(entry.values[0].value, str):
+        return None
+    description, target, archived = (entry.meta.get(k) for k in (DESCRIPTION_KEY, TARGET_KEY, ARCHIVED_KEY))
+    return FundDeclaration(
+        name=entry.values[0].value,
+        date=entry.date,
+        description=description if isinstance(description, str) and description else None,
+        target=(target.number, target.currency) if isinstance(target, bc_amount.Amount) else None,
+        archived=archived if isinstance(archived, datetime.date) else None,
+    )
+
+
+@dataclass(frozen=True)
+class FundMove:
+    """A `custom "fund-move"` directive's contents: an amount from one fund to another (either can
+    be Unallocated)."""
+
+    date: datetime.date
+    from_fund: str
+    to_fund: str
+    number: Decimal
+    currency: str
+    note: str | None = None
+
+
+def move_directive(m: FundMove, directive_id: str | None = None) -> Directive:
+    """`2026-11-02 custom "fund-move" "Unallocated" "Wedding" 2500.00 USD`, with a `note`."""
+    text = (
+        f"{m.date.isoformat()} custom {_string(FUND_MOVE_TYPE)} {_string(m.from_fund)} {_string(m.to_fund)} "
+        f"{decimal_text(m.number)} {m.currency}\n"
+    )
+    if m.note:
+        text += f"  {NOTE_KEY}: {_string(one_line(m.note))}\n"
+    return parse_one(text, directive_id)
+
+
+def _move_of_entry(entry: data.Directive) -> FundMove | None:
+    if not isinstance(entry, data.Custom) or entry.type != FUND_MOVE_TYPE:
+        return None
+    values = [v.value for v in entry.values]
+    if len(values) != 3 or not isinstance(values[0], str) or not isinstance(values[1], str) or not isinstance(values[2], bc_amount.Amount):
+        raise ParseFailure(['a fund move is "<from>" "<to>" <amount> <commodity>'])
+    note = entry.meta.get(NOTE_KEY)
+    return FundMove(
+        date=entry.date,
+        from_fund=values[0],
+        to_fund=values[1],
+        number=values[2].number,
+        currency=values[2].currency,
+        note=note if isinstance(note, str) and note else None,
+    )
+
+
+def move_of(text: str) -> FundMove | None:
+    """A fund move's contents; None for any other directive."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1:
+        return None
+    return _move_of_entry(entries[0])
+
+
+def with_funds(text: str, lines: list[tuple[str, Decimal, str]]) -> Directive:
+    """A transaction with its fund lines replaced (none: the key goes); everything else as it was."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1 or not isinstance(entries[0], data.Transaction):
+        raise ParseFailure(["not a transaction"])
+    entry = entries[0]
+    meta = {k: v for k, v in entry.meta.items() if k != FUNDS_KEY}
+    if lines:
+        meta[FUNDS_KEY] = funds_text(lines)
+    return to_directive(entry._replace(meta=meta))
+
+
+def balance_sheet_weights(text: str, roots: set[str]) -> list[tuple[Decimal, str]] | None:
+    """What each of a transaction's postings under `roots` (its asset and liability accounts)
+    weighs, as booking would (units, or units times a cost or price; a blank amount as booking
+    fills it). None when only full booking could say."""
+    entries, errors, _ = parser.parse_string(text)
+    if errors or len(entries) != 1 or not isinstance(entries[0], data.Transaction):
+        return None
+    entry = entries[0]
+    filled = _amounts(entry)
+    weights = []
+    for p, amount in zip(entry.postings, filled):
+        if p.account.split(":", 1)[0] not in roots:
+            continue
+        explicit = not (p.units is MISSING or p.units.number is MISSING or p.units.currency is MISSING)
+        weight = _weight(p) if explicit else (amount if p.cost is None and p.price is None else None)
+        if weight is None:
+            return None
+        weights.append(weight)
+    return weights

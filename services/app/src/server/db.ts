@@ -343,6 +343,9 @@ export const MIGRATIONS: Migration[] = [
     ]),
     "CREATE INDEX reference_transaction_book ON reference_transaction (book_id, date)",
   ],
+  // 19: funds (Funds A). A rule may name a fund what it categorizes is taken from (or put
+  // toward), all of it.
+  ["ALTER TABLE category_rule ADD COLUMN fund TEXT"],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -1121,6 +1124,30 @@ export class AppDb {
   }
 
   /**
+   * Follow a fund renamed in the ledger (Funds A): the rules that name it, and schedules'
+   * templates' fund lines. One transaction.
+   */
+  renameFund(book: string, old: string, renamed: string): void {
+    transaction(this.db, () => {
+      const stamp = now();
+      this.db
+        .prepare("UPDATE category_rule SET fund = ?, updated_at = ? WHERE book_id = ? AND fund = ?")
+        .run(renamed, stamp, book, old);
+      const rows = this.db
+        .prepare("SELECT id, template FROM schedule WHERE book_id = ?")
+        .all(book) as { id: string; template: string }[];
+      for (const r of rows) {
+        const template = JSON.parse(r.template) as TransactionTemplate;
+        if (!template.funds?.some((l) => l.fund === old)) continue;
+        template.funds = template.funds.map((l) => (l.fund === old ? { ...l, fund: renamed } : l));
+        this.db
+          .prepare("UPDATE schedule SET template = ?, updated_at = ? WHERE id = ?")
+          .run(JSON.stringify(template), stamp, r.id);
+      }
+    });
+  }
+
+  /**
    * Follow accounts deleted in the ledger, their splits moved to `substitute`: what referred to
    * them now refers to the substitute (import batches, so duplicates are still caught; CSV
    * profiles, if the substitute has none; schedules, rules, proposals), and what was about
@@ -1534,8 +1561,8 @@ export class AppDb {
     const stamp = now();
     this.db
       .prepare(
-        `INSERT INTO category_rule (id, book_id, name, conditions, account, payee, part, auto_confirm, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO category_rule (id, book_id, name, conditions, account, payee, part, fund, auto_confirm, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -1545,6 +1572,7 @@ export class AppDb {
         rule.account,
         rule.payee,
         rule.part ?? null,
+        rule.fund ?? null,
         rule.auto_confirm ? 1 : 0,
         stamp,
         stamp
@@ -1562,7 +1590,7 @@ export class AppDb {
       this.db
         .prepare(
           `UPDATE category_rule SET name = ?, conditions = ?, account = ?, payee = ?, part = ?,
-             auto_confirm = ?, updated_at = ? WHERE id = ?`
+             fund = ?, auto_confirm = ?, updated_at = ? WHERE id = ?`
         )
         .run(
           rule.name,
@@ -1570,6 +1598,7 @@ export class AppDb {
           rule.account,
           rule.payee,
           rule.part ?? null,
+          rule.fund ?? null,
           rule.auto_confirm ? 1 : 0,
           after(current.updated_at),
           id

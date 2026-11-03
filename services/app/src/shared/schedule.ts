@@ -13,6 +13,7 @@
  * handling: a Saturday or Sunday stays, moves to the Friday before, or to the Monday after.
  * Dates are ISO strings (YYYY-MM-DD), computed in UTC so no time zone shifts them.
  */
+import type { FundLine } from "./funds.js";
 
 /** How far ahead "upcoming" looks: the Schedules page, and the grayed rows in ledgers. */
 export const UPCOMING_DAYS = 16;
@@ -191,6 +192,8 @@ export type TransactionTemplate = {
   narration: string;
   tags: string[];
   links: string[];
+  /** Fund lines every occurrence carries (Funds A). */
+  funds?: FundLine[];
   meta: Record<string, unknown>;
   postings: {
     account: string;

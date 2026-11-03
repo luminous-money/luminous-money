@@ -12,8 +12,8 @@ import threading
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from . import engine, investments, models
-from .store import Row, Store, split_tags
+from . import engine, fundlines, investments, models
+from .store import Row, Store, split_funds, split_tags
 
 # New books: dollars, and sales draw on the oldest lots first (US tax reporting's default).
 DEFAULT_HEADER = ['option "operating_currency" "USD"', 'option "booking_method" "FIFO"']
@@ -268,14 +268,16 @@ class Ledger:
         return self._put(book_id, self._postable(book_id, engine.parse_one(text, directive_id)), expected)
 
     def create_transaction(self, book_id: str, t: models.TransactionIn) -> engine.Directive:
-        return self._insert(book_id, self._postable(book_id, engine.transaction_directive(_marked(t))))
+        t = fundlines.checked(self.store, book_id, self._header(book_id), _marked(t))
+        return self._insert(book_id, self._postable(book_id, engine.transaction_directive(t)))
 
     def update_transaction(
         self, book_id: str, directive_id: str, t: models.TransactionIn, *, expected: str | None = None
     ) -> engine.Directive:
         if self.get(book_id, directive_id).kind != "transaction":
             raise ValueError(f"directive {directive_id} is not a transaction")
-        t = _marked(t, self.transaction(book_id, directive_id))
+        current = self.transaction(book_id, directive_id)
+        t = fundlines.checked(self.store, book_id, self._header(book_id), _marked(t, current), current)
         return self._put(book_id, self._postable(book_id, engine.transaction_directive(t, directive_id)), expected)
 
     def patch_transaction(self, book_id: str, directive_id: str, patch: models.TransactionPatch) -> engine.Directive:
@@ -615,6 +617,7 @@ class Ledger:
                         narration=r["narration"],
                         budgeted=bool(r["budgeted"]),
                         tags=split_tags(r["tags"]),
+                        funds=_funds(r["funds"]),
                         postings=[],
                     )
                 )
@@ -735,6 +738,7 @@ class Ledger:
                         counterpart=others[0] if entry["splits"] == 2 and len(others) == 1 else None,
                         splits=entry["splits"],
                         tags=split_tags(entry["tags"]),
+                        funds=_funds(entry["funds"]),
                         reconciled=entry["reconciled"] if not entry["unreconciled"] else None,
                         parts=_parts(entry["parts"]) if is_node else [],
                         updated_at=entry["updated_at"],
@@ -830,6 +834,7 @@ class Ledger:
                     narration=r["narration"],
                     budgeted=bool(r["budgeted"]),
                     tags=split_tags(r["tags"]),
+                    funds=_funds(r["funds"]),
                     postings=postings.get(r["id"], []),
                     reconciled=is_reconciled(postings.get(r["id"], [])),
                     updated_at=r["updated_at"],
@@ -842,9 +847,12 @@ class Ledger:
 
     def create_transactions(self, book_id: str, batch: list[models.TransactionIn]) -> list[engine.Directive]:
         """Create many transactions in one atomic write: all of them, or none."""
-        self._header(book_id)
+        header = self._header(book_id)
         kinds = self._kinds(book_id)
-        directives = [self._postable(book_id, engine.transaction_directive(_marked(t)), kinds) for t in batch]
+        directives = [
+            self._postable(book_id, engine.transaction_directive(fundlines.checked(self.store, book_id, header, _marked(t))), kinds)
+            for t in batch
+        ]
         with self.store.transaction():
             self._write(book_id, directives)
         return directives
@@ -853,25 +861,23 @@ class Ledger:
         """Create, change and delete transactions in one atomic write: all of it, or none. An
         update or deletion whose version has moved on refuses the whole write (StaleVersion).
         Returns the created transactions."""
-        self._header(book_id)
+        header = self._header(book_id)
         kinds = self._kinds(book_id)
-        created = [self._postable(book_id, engine.transaction_directive(_marked(t)), kinds) for t in changes.create]
+        created = [
+            self._postable(book_id, engine.transaction_directive(fundlines.checked(self.store, book_id, header, _marked(t))), kinds)
+            for t in changes.create
+        ]
         with self.store.transaction():
             for d in [*changes.update, *changes.delete]:
                 row = self.store.get(book_id, d.id)
                 if row is None or row.deleted or row.kind != "transaction":
                     raise NotFound(d.id)
                 self.store.check_version(book_id, d.id, d.updated_at)
-            updated = [
-                self._postable(
-                    book_id,
-                    engine.transaction_directive(
-                        _marked(self._patched(book_id, u.id, u), self.transaction(book_id, u.id)), u.id
-                    ),
-                    kinds,
-                )
-                for u in changes.update
-            ]
+            updated = []
+            for u in changes.update:
+                current = self.transaction(book_id, u.id)
+                t = fundlines.checked(self.store, book_id, header, _marked(self._patched(book_id, u.id, u), current), current)
+                updated.append(self._postable(book_id, engine.transaction_directive(t, u.id), kinds))
             self._write(book_id, created + updated)
             self.store.delete(book_id, [d.id for d in changes.delete])
         return created
@@ -983,6 +989,11 @@ def _marked(t: models.TransactionIn, current: models.TransactionIn | None = None
             meta[engine.RECONCILED_KEY] = mark
         postings.append(p.model_copy(update={"meta": meta}))
     return t.model_copy(update={"postings": postings})
+
+
+def _funds(text: str | None) -> list[models.FundLine]:
+    """A row's fund lines, from the store's `FUNDS` column."""
+    return [models.FundLine(fund=f, amount=models.Amount(number=n, currency=c)) for f, n, c in split_funds(text)]
 
 
 def _amount(value: tuple[Decimal, str] | None) -> models.Amount | None:

@@ -19,6 +19,7 @@
 import type { Transaction, TransactionIn } from "@luminous-money/ledger-client";
 
 import { negate } from "../shared/decimal.js";
+import { mergedLines } from "../shared/funds.js";
 import type { PairedTransfer } from "../shared/transfers.js";
 import type { AppDb, HeldRow, PairedOriginal, TransferPair } from "./db.js";
 import { UNCATEGORIZED } from "./imports.js";
@@ -34,8 +35,18 @@ const shortName = (account: string) => account.split(":").slice(-2).join(":");
 
 /** The writable part of a transaction, to restore it as it was. */
 function asInput(t: Transaction): TransactionIn {
-  const { date, flag, payee, narration, tags, links, meta, postings } = t;
-  return { date, flag, payee, narration, tags, links, meta, postings };
+  const { date, flag, payee, narration, tags, links, funds, meta, postings } = t;
+  return {
+    date,
+    flag,
+    payee,
+    narration,
+    tags,
+    links,
+    ...(funds?.length ? { funds } : {}),
+    meta,
+    postings,
+  };
 }
 
 type Side = {
@@ -59,6 +70,12 @@ function sideOf(t: Transaction, rows: HeldRow[], types: Map<string, string | nul
   return { transaction: t, account: anchor.account, amount: anchor.units, rows };
 }
 
+/** Both sides' fund lines, summed per fund, for the transfer they make. */
+function fundsOf(a: Transaction, b: Transaction): Pick<TransactionIn, "funds"> {
+  const funds = mergedLines(a.funds, b.funds);
+  return funds.length ? { funds } : {};
+}
+
 /** The transfer two sides make: out of one, into the other, on the earlier date. */
 function transferOf(out: Side, into: Side): TransactionIn {
   const [first, second] = [out, into].sort((a, b) =>
@@ -71,6 +88,8 @@ function transferOf(out: Side, into: Side): TransactionIn {
     narration: `Transfer from ${shortName(out.account)} to ${shortName(into.account)}`,
     tags: [],
     links: [],
+    // Either side's fund lines, kept (Funds A): what one said it was for still holds.
+    ...fundsOf(out.transaction, into.transaction),
     meta:
       second!.transaction.meta?.budget === false || first!.transaction.meta?.budget === false
         ? { budget: false }

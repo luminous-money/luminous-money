@@ -30,8 +30,10 @@ import {
   type SchedulePatch,
   type UpcomingOccurrence,
 } from "../shared/schedule.js";
+import { linesProblem, shapeOf } from "../shared/funds.js";
 import { StaleVersion, type AppDb, type StoredSchedule } from "./db.js";
 import type { DailyJob } from "./daily.js";
+import { fundChoices, type FundChoices } from "./funds.js";
 import type { LedgerPort } from "./ledger.js";
 
 export const SCHEDULE_KEY = "schedule";
@@ -48,9 +50,14 @@ export const bookToday = (db: AppDb, book: string) => todayIn(db.timeZone(book))
 const DECIMAL = /^-?\d+(\.\d+)?$/;
 const AMOUNT = /^\d+(\.\d+)?$/;
 
-/** Why a schedule can't be saved, or null if it can. The ledger checks the transaction again
- * when an occurrence is staged. */
-export function scheduleProblem(s: ScheduleIn, accounts: Account[]): string | null {
+/** Why a schedule can't be saved, or null if it can. With `funds` (the book's active funds), its
+ * fund lines must name them and fit its splits. The ledger checks the transaction again when an
+ * occurrence is staged. */
+export function scheduleProblem(
+  s: ScheduleIn,
+  accounts: Account[],
+  funds?: FundChoices
+): string | null {
   if (!s.name?.trim()) return "Name the schedule";
   const rule = problem(s.rule);
   if (rule) return rule;
@@ -70,8 +77,19 @@ export function scheduleProblem(s: ScheduleIn, accounts: Account[]): string | nu
     if (!account || account.kind !== "leaf" || account.implicit || account.close)
       return `${p.account || "An account"} isn't an open account that holds transactions`;
   }
+  const lines = s.template?.funds ?? [];
+  if (lines.length && funds) {
+    const unknown = lines.find((l) => !funds.active.has(l.fund));
+    if (unknown) return `${unknown.fund} isn't an active fund`;
+    const problem = linesProblem(shapeOf(postings, funds.currency), lines);
+    if (problem) return problem[0]!.toUpperCase() + problem.slice(1);
+  }
   return null;
 }
+
+/** The funds a schedule's lines may name, if it has any (Funds A). */
+const fundsFor = (ledger: LedgerPort, book: string, s: ScheduleIn | null) =>
+  fundChoices(ledger, book, s?.template?.funds?.map((l) => l.fund) ?? []);
 
 /** Something the caller has to fix: 404 (no such book or schedule) or 422 (not a valid one). */
 export class ScheduleProblem extends Error {
@@ -102,7 +120,9 @@ export async function createSchedule({
 }: Services & { input: ScheduleIn | null; on?: string }): Promise<Schedule> {
   const ledger = ledgerFor(user);
   if (!(await ledger.book(book))) throw new ScheduleProblem(404, "not found");
-  const problem = input ? scheduleProblem(input, await ledger.accounts(book)) : "send a schedule";
+  const problem = input
+    ? scheduleProblem(input, await ledger.accounts(book), await fundsFor(ledger, book, input))
+    : "send a schedule";
   if (!input || problem) throw new ScheduleProblem(422, problem!);
   const id = db.addSchedule({
     user_id: user,
@@ -139,7 +159,11 @@ export async function editSchedule({
   if (!patch?.updated_at) throw new ScheduleProblem(422, "send the updated_at you read");
   const { updated_at, ...changes } = patch;
   const merged = { ...current, ...changes };
-  const problem = scheduleProblem(merged, await ledger.accounts(book));
+  const problem = scheduleProblem(
+    merged,
+    await ledger.accounts(book),
+    await fundsFor(ledger, book, merged)
+  );
   if (problem) throw new ScheduleProblem(422, problem);
   if (current.updated_at !== updated_at)
     throw new StaleVersion("the schedule changed since it was read");
@@ -187,6 +211,7 @@ export function occurrenceTransaction(
     narration: template.narration,
     tags: template.tags,
     links: template.links,
+    ...(template.funds?.length ? { funds: template.funds } : {}),
     meta: { ...template.meta, [SCHEDULE_KEY]: s.id, [SCHEDULE_DATE_KEY]: occurrence.nominal },
     postings: template.postings.map(
       ({ tolerance: _tolerance, ...p }) => p

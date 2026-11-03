@@ -1036,7 +1036,61 @@ same money in through another's, a day or so later. Both would sit in review, un
   month's spending. Net worth (balances) isn't filtered and is set aside, saying so; home's
   "Spent this month" and an account's "Typically" aren't filtered.
 - **Not funds:** a tag overlaps others and adds up to nothing, while setting money aside needs
-  something exclusive and conserved. That's the Funds milestone's (milestones/funds/PLAN.md).
+  something exclusive and conserved. That's what funds are for (Funds A, below).
+
+### Funds A (2026-11-02)
+
+Funds say what money is *for*, as a second ledger beside the accounts (where it is). Funds A is
+the version with no rules (Kael: "I've held an easy version of this milestone hostage to a hard
+version"); Funds B ([its plan](milestones/funds/B/PLAN.md)) adds the rest, asset-aware funds
+first. The whole design, with Kael's answers, is [A's plan](milestones/funds/A/PLAN.md).
+
+- **Money reaches or leaves a fund only when you say so:** a transaction's lines ("for
+  Emergency", "from Emergency"), or a move between funds. Unallocated is net worth less every
+  fund, the house and retirement included, worked out and never written, so nothing has to be
+  kept in step with the accounts. Drawing a fund below zero is allowed, shown in red.
+- **In the books, as text:** a fund is `custom "fund"` (description, target, archived), a
+  transaction's lines are one `funds:` metadata string on the transaction (`Emergency +500.00
+  USD; Wedding -20.00 USD`, read from the right so names can hold spaces and digits), and a move
+  is `custom "fund-move"`. Exports, backups and restores carry funds with no new work. Lines are
+  on the transaction, not its splits: putting them on splits would mean cutting the bank's
+  split in two, which breaks review cards, matching and reconciliation. A derived `fund_line`
+  table (ledger migration 13) is read with SQL, as `posting` and `transaction_tag` are.
+- **What a transaction is to funds comes from its change in net worth** (its asset and
+  liability splits, weighed in the operating currency): money in goes *to* funds, money out
+  comes *from* them, a transfer (between your accounts, paying a card, a trade) puts money
+  *toward* them, and with More options takes from them too. So a refund is money in (it can go
+  back to the fund that paid), and an opening balance can start a fund. Lines add up to no more
+  than the transaction, each way: to shift more, move money between funds.
+- **The ledger checks lines only when they change** (`fundlines.checked`), so recategorizing in
+  review, pairing a transfer or matching an import can never fail because of a fund. A page
+  whose saved lines no longer fit says so, and saving its other changes keeps them; Save waits
+  only on lines you've changed. `shared/funds.ts` is the same rules in TypeScript, so the PWA
+  says what's wrong before the ledger would.
+- **Funds hold dollars** (the operating currency) in A, but every stored amount keeps its
+  commodity and a fund reports `holdings` and `value`, so asset-aware funds (B's first step) lift
+  one check rather than rework the model.
+- **The Funds section** (a transaction's page, New transaction, a schedule's template) reads the
+  splits as they're edited: one sentence ("$1,000.00 coming in. Without a fund, it's
+  Unallocated."), a line per fund (To / From / For, a native select with each fund's balance, an
+  amount), and always what it does to each fund, Unallocated included. **The first line
+  follows**: it holds what the transaction has left on its side until an amount is typed, so
+  choosing a fund puts all of it there, and typing $300 into a second line leaves $700 in the
+  first. On a phone a line is two rows, as a split is. The section shows when the book has a
+  fund to choose, or the transaction has lines, so books that don't use funds don't see it.
+- **Elsewhere:** review cards have one compact select (the whole amount, or Unallocated), and
+  show split or partial lines as chips with Edit…; Select mode's **Fund…** gives each selected
+  transaction a fund for all of it, by its own kind; rows, review cards and schedules show
+  chips in words ("to Emergency", "from Wedding"); a rule's **Fund** puts what it imports
+  toward, or takes it from, that fund (an archived one is left off rather than failing the
+  import); the Funds page, a fund's page (history with a running balance), Move money, and a
+  home card.
+- **Roles:** managers set funds up (create, rename, describe, target, archive, delete); writers
+  choose funds on transactions and move money. Renaming goes through `app`, as accounts do, so
+  rules and schedule templates that name the fund follow.
+- **Archiving** moves what's left (to Unallocated, or another fund) on the archive date, no
+  earlier than the fund's last entry, and takes it out of the pickers; lines already on it stay.
+  Deleting is only for a fund with no history.
 
 ### Bank feeds: SimpleFIN (M9)
 

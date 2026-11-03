@@ -6,6 +6,7 @@ import { accountsLabel, movement } from "../lib/journal.js";
 import type { JournalRow } from "../lib/ledger.js";
 import { withBack } from "../lib/navigation.js";
 import type { Selection } from "../lib/selection.js";
+import { FundChips } from "./Funds.js";
 import { TagChips } from "./Tags.js";
 
 /**
@@ -56,6 +57,7 @@ export function JournalList({
                 <span className="ledger-payee">
                   {row.payee ?? row.narration ?? "(no description)"}
                   <TagChips tags={row.tags} />
+                  <FundChips lines={row.funds} />
                 </span>
                 <span className="ledger-account muted">
                   {row.reconciled && (

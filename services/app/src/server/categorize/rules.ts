@@ -56,6 +56,7 @@ export function rules(load: (book: string) => CategoryRule[]): Categorizer {
               auto_confirm: rule.auto_confirm,
               rule_id: rule.id,
               ...(rule.part ? { part: rule.part } : {}),
+              ...(rule.fund ? { fund: rule.fund } : {}),
             },
           ];
         }),
@@ -66,8 +67,13 @@ export function rules(load: (book: string) => CategoryRule[]): Categorizer {
 
 const DECIMAL = /^-?\d+(\.\d+)?$/;
 
-/** Why a rule can't be saved, or null if it can. */
-export function ruleProblem(rule: CategoryRuleIn | null, accounts: Account[]): string | null {
+/** Why a rule can't be saved, or null if it can. With `funds` (the book's active funds), its
+ * fund must be one of them. */
+export function ruleProblem(
+  rule: CategoryRuleIn | null,
+  accounts: Account[],
+  funds?: string[]
+): string | null {
   if (!rule?.name?.trim()) return "Name the rule";
   const c = rule.conditions;
   if (!c || specificity(c) === 0) return "Give the rule at least one condition";
@@ -86,5 +92,6 @@ export function ruleProblem(rule: CategoryRuleIn | null, accounts: Account[]): s
     if (!leaves.has(rule.part) || !rule.part.startsWith(`${c.account}:`))
       return `${rule.part} isn't one of ${c.account}'s parts`;
   }
+  if (rule.fund && funds && !funds.includes(rule.fund)) return `${rule.fund} isn't an active fund`;
   return null;
 }

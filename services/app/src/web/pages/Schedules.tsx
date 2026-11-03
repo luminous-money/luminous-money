@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 
 import { describe, UPCOMING_DAYS, type TransactionTemplate } from "../../shared/schedule.js";
+import { FundChips } from "../components/Funds.js";
 import { formatMoney } from "../lib/decimal.js";
 import { explain, useSchedules, useUpcoming } from "../lib/queries.js";
 
@@ -52,6 +53,7 @@ export function Schedules({ book }: { book: string }) {
             <p className="muted small">
               {describe(s.rule)}
               {s.paused ? " · Paused" : s.next ? ` · Next: ${s.next.date}` : " · Ended"}
+              <FundChips lines={s.template.funds} />
             </p>
             {s.last_error && <p className="error small">Couldn't stage: {s.last_error}</p>}
           </Link>

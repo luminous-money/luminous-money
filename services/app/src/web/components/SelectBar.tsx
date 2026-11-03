@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { UNALLOCATED } from "../../shared/funds.js";
 import { usePopover } from "../lib/popover.js";
 import { AccountPicker, type AccountCreation } from "./AccountPicker.js";
 import { TagInput, type TagChoice } from "./Tags.js";
@@ -10,26 +11,36 @@ export type BulkAction = {
   /** Why it can't be done now, if it can't. */
   disabled?: string | false;
 } & (
-  | { run: () => void; pick?: undefined; pickTag?: undefined }
+  | { run: () => void; pick?: undefined; pickTag?: undefined; pickFund?: undefined }
   /** One that needs an account first ("Categorize as…"): the bar shows a picker. */
   | {
       pick: { accounts: string[]; create?: AccountCreation; prefer?: string[] };
       pickTag?: undefined;
+      pickFund?: undefined;
       run: (account: string) => void;
     }
   /** One that needs a tag first ("Add tag…", M17): the bar shows a tag picker. */
   | {
       pickTag: { choices: TagChoice[]; allowNew: boolean };
       pick?: undefined;
+      pickFund?: undefined;
       run: (tag: string) => void;
+    }
+  /** One that needs a fund first ("Fund…", Funds A): the bar shows a select of Unallocated and
+   * the funds. Unallocated is run as UNALLOCATED. */
+  | {
+      pickFund: { funds: { name: string; label: string }[] };
+      pick?: undefined;
+      pickTag?: undefined;
+      run: (fund: string) => void;
     }
 );
 
 /**
  * Select mode's bar, sticky across the top of review and ledgers: how many are selected,
  * "Select all" (what's shown: a filtered list's rows, loaded so far), the **Actions** menu (what
- * the page can do in bulk: confirm, categorize, tag, suggest categories…), and "Done". An action
- * that needs an account or a tag opens a picker in the bar.
+ * the page can do in bulk: confirm, categorize, tag, fund, suggest categories…), and "Done". An
+ * action that needs an account, a tag or a fund opens a picker in the bar.
  */
 export function SelectBar({
   count,
@@ -82,7 +93,7 @@ export function SelectBar({
                   title={action.disabled || undefined}
                   onClick={() => {
                     menu.setOpen(false);
-                    if (action.pick || action.pickTag) setPicking(action);
+                    if (action.pick || action.pickTag || action.pickFund) setPicking(action);
                     else action.run();
                   }}
                 >
@@ -110,6 +121,33 @@ export function SelectBar({
               if (tag) picking.run(tag);
             }}
           />
+          <button type="button" className="plain" onClick={() => setPicking(null)}>
+            Cancel
+          </button>
+        </div>
+      )}
+      {picking?.pickFund && (
+        <div className="select-bar-row">
+          <select
+            aria-label="Fund"
+            className="fund-pick"
+            value=""
+            autoFocus
+            onChange={(e) => {
+              setPicking(null);
+              picking.run(e.target.value);
+            }}
+          >
+            <option value="" disabled>
+              Choose a fund…
+            </option>
+            <option value={UNALLOCATED}>Unallocated (no fund)</option>
+            {picking.pickFund.funds.map((f) => (
+              <option key={f.name} value={f.name}>
+                {f.label}
+              </option>
+            ))}
+          </select>
           <button type="button" className="plain" onClick={() => setPicking(null)}>
             Cancel
           </button>

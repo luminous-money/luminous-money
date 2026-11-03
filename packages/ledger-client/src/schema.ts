@@ -652,6 +652,171 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/fund-moves": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Create Fund Move
+     * @description Move money from one fund to another (either can be Unallocated): no account changes.
+     */
+    post: operations["create_fund_move_api_ledger_v1_books__book_id__fund_moves_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/fund-moves/{move_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete Fund Move */
+    delete: operations["delete_fund_move_api_ledger_v1_books__book_id__fund_moves__move_id__delete"];
+    options?: never;
+    head?: never;
+    /** Patch Fund Move */
+    patch: operations["patch_fund_move_api_ledger_v1_books__book_id__fund_moves__move_id__patch"];
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/funds": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Funds
+     * @description Every fund with what it holds, net worth, and Unallocated (net worth less every fund).
+     */
+    get: operations["list_funds_api_ledger_v1_books__book_id__funds_get"];
+    put?: never;
+    /**
+     * Create Fund
+     * @description Make a fund (a manager).
+     */
+    post: operations["create_fund_api_ledger_v1_books__book_id__funds_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/funds/{name}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete Fund
+     * @description Delete a fund with no history (a manager).
+     */
+    delete: operations["delete_fund_api_ledger_v1_books__book_id__funds__name__delete"];
+    options?: never;
+    head?: never;
+    /**
+     * Patch Fund
+     * @description Change a fund's description or target (a manager).
+     */
+    patch: operations["patch_fund_api_ledger_v1_books__book_id__funds__name__patch"];
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/funds/{name}/archive": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Archive Fund
+     * @description Archive a fund (a manager): what's left moves to Unallocated or another fund that day.
+     */
+    post: operations["archive_fund_api_ledger_v1_books__book_id__funds__name__archive_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/funds/{name}/entries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Fund History
+     * @description A fund and its history (transaction lines and moves), newest first, with a running
+     *     balance.
+     */
+    get: operations["fund_history_api_ledger_v1_books__book_id__funds__name__entries_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/funds/{name}/rename": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Rename Fund
+     * @description Rename a fund everywhere it's named, history included (a manager). Through `app`, so
+     *     its rules and schedules follow.
+     */
+    post: operations["rename_fund_api_ledger_v1_books__book_id__funds__name__rename_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/ledger/v1/books/{book_id}/funds/{name}/unarchive": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Unarchive Fund */
+    post: operations["unarchive_fund_api_ledger_v1_books__book_id__funds__name__unarchive_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/import": {
     parameters: {
       query?: never;
@@ -1595,6 +1760,11 @@ export interface components {
       date: string;
       /** Flag */
       flag: string;
+      /**
+       * Funds
+       * @description Its fund lines (Funds A).
+       */
+      funds?: components["schemas"]["FundLine"][];
       /** Id */
       id: string;
       /** Narration */
@@ -1768,6 +1938,258 @@ export interface components {
        */
       fetched: components["schemas"]["PriceOut"][];
     };
+    /**
+     * Fund
+     * @description A fund: money set aside for something. What it holds is its lines and moves, so far.
+     */
+    Fund: {
+      /**
+       * Archived
+       * @description When it was archived: out of the pickers, history kept.
+       */
+      archived?: string | null;
+      /**
+       * Created
+       * @description When it was made; None for one only used (an imported book).
+       */
+      created?: string | null;
+      /** Description */
+      description?: string | null;
+      /**
+       * Entries
+       * @description How many transaction lines and moves it has: none, and it can be deleted.
+       */
+      entries: number;
+      /**
+       * Holdings
+       * @description What it holds, per commodity (only the operating currency, for now).
+       */
+      holdings: components["schemas"]["Amount"][];
+      /** Name */
+      name: string;
+      /** @description What it's working toward, shown as progress: nothing fills it. */
+      target?: components["schemas"]["Amount"] | null;
+      /**
+       * Updated At
+       * @description Its directive's version; None for one only used.
+       */
+      updated_at?: string | null;
+      /** @description What it holds, in the operating currency. */
+      value: components["schemas"]["Amount"];
+    };
+    /** FundArchive */
+    FundArchive: {
+      /**
+       * Date
+       * @description When; default today. What's left moves then.
+       */
+      date?: string | null;
+      /**
+       * To
+       * @description Where what's left goes: Unallocated, or an active fund.
+       * @default Unallocated
+       */
+      to: string;
+      /**
+       * Updated At
+       * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       */
+      updated_at: string;
+    };
+    /**
+     * FundEntry
+     * @description One change to a fund: a transaction's line, or a move.
+     */
+    FundEntry: {
+      /** @description Signed: positive into the fund. */
+      amount: components["schemas"]["Amount"];
+      /** @description The fund's balance after it, in its commodity. */
+      balance: components["schemas"]["Amount"];
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /**
+       * Flag
+       * @description A transaction's flag: `!` unconfirmed.
+       */
+      flag?: string | null;
+      /**
+       * Id
+       * @description The transaction's or the move's ID.
+       */
+      id: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "transaction" | "move";
+      /** Narration */
+      narration?: string | null;
+      /** Note */
+      note?: string | null;
+      /**
+       * Other
+       * @description A move's other side: where it came from, or went.
+       */
+      other?: string | null;
+      /** Payee */
+      payee?: string | null;
+      /** Updated At */
+      updated_at: string;
+    };
+    /** FundHistory */
+    FundHistory: {
+      /**
+       * Entries
+       * @description Newest first.
+       */
+      entries: components["schemas"]["FundEntry"][];
+      fund: components["schemas"]["Fund"];
+    };
+    /** FundIn */
+    FundIn: {
+      /** Description */
+      description?: string | null;
+      /** Name */
+      name: string;
+      target?: components["schemas"]["Amount"] | null;
+    };
+    /**
+     * FundLine
+     * @description What a transaction does to one fund (Funds A): `+` puts money into it, `-` takes it out.
+     *     Unallocated is never a line: it's what isn't in a fund.
+     */
+    FundLine: {
+      /** @description Signed: positive into the fund, negative out of it. */
+      amount: components["schemas"]["Amount"];
+      /** Fund */
+      fund: string;
+    };
+    /** FundMove */
+    FundMove: {
+      amount: components["schemas"]["Amount"];
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** From Fund */
+      from_fund: string;
+      /** Id */
+      id: string;
+      /** Note */
+      note?: string | null;
+      /** To Fund */
+      to_fund: string;
+      /** Updated At */
+      updated_at: string;
+    };
+    /** FundMoveIn */
+    FundMoveIn: {
+      /** @description How much moves: positive. */
+      amount: components["schemas"]["Amount"];
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /**
+       * From Fund
+       * @description A fund, or Unallocated.
+       */
+      from_fund: string;
+      /** Note */
+      note?: string | null;
+      /**
+       * To Fund
+       * @description A fund, or Unallocated.
+       */
+      to_fund: string;
+    };
+    /**
+     * FundMovePatch
+     * @description Change only the fields given.
+     */
+    FundMovePatch: {
+      amount?: components["schemas"]["Amount"] | null;
+      /** Date */
+      date?: string | null;
+      /** From Fund */
+      from_fund?: string | null;
+      /** Note */
+      note?: string | null;
+      /** To Fund */
+      to_fund?: string | null;
+      /**
+       * Updated At
+       * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       */
+      updated_at: string;
+    };
+    /**
+     * FundPatch
+     * @description Change only the fields given; null clears one.
+     */
+    FundPatch: {
+      /** Description */
+      description?: string | null;
+      target?: components["schemas"]["Amount"] | null;
+      /**
+       * Updated At
+       * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       */
+      updated_at: string;
+    };
+    /** FundRename */
+    FundRename: {
+      /** To */
+      to: string;
+      /**
+       * Updated At
+       * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       */
+      updated_at: string;
+    };
+    /** FundVersion */
+    FundVersion: {
+      /**
+       * Updated At
+       * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
+       */
+      updated_at: string;
+    };
+    /**
+     * Funds
+     * @description Every fund, and what's left: Unallocated is net worth less every fund.
+     */
+    Funds: {
+      /**
+       * Currency
+       * @description The book's operating currency, what values are in.
+       */
+      currency: string;
+      /**
+       * Funds
+       * @description Active funds by name, then archived ones.
+       */
+      funds: components["schemas"]["Fund"][];
+      /** @description Every asset and liability, valued (what has no price left out). */
+      net_worth: components["schemas"]["Amount"];
+      /**
+       * On
+       * Format: date
+       */
+      on: string;
+      /** @description Net worth less every fund's value: what isn't in a fund. */
+      unallocated: components["schemas"]["Amount"];
+      /**
+       * Unpriced
+       * @description Commodities held with no price, left out of net worth.
+       */
+      unpriced?: string[];
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -1850,6 +2272,11 @@ export interface components {
       date: string;
       /** Flag */
       flag: string;
+      /**
+       * Funds
+       * @description Its fund lines (Funds A).
+       */
+      funds?: components["schemas"]["FundLine"][];
       /** Id */
       id: string;
       /** Narration */
@@ -1920,6 +2347,11 @@ export interface components {
       date: string;
       /** Flag */
       flag: string;
+      /**
+       * Funds
+       * @description Its fund lines (Funds A).
+       */
+      funds?: components["schemas"]["FundLine"][];
       /** Id */
       id: string;
       /** Narration */
@@ -2434,6 +2866,11 @@ export interface components {
        * @default !
        */
       flag: string;
+      /**
+       * Funds
+       * @description Its fund lines (Funds A). Money in goes to funds (`+`), money out comes from them (`-`), and a transfer puts money toward them (`+`, and with More options `-` too); together they're no more than the transaction. Checked only when they change.
+       */
+      funds?: components["schemas"]["FundLine"][] | null;
       /** Id */
       id: string;
       /** Links */
@@ -2491,6 +2928,11 @@ export interface components {
       date?: string | null;
       /** Flag */
       flag?: string | null;
+      /**
+       * Funds
+       * @description Replaces all its fund lines (Funds A); [] or null clears them.
+       */
+      funds?: components["schemas"]["FundLine"][] | null;
       /** Id */
       id: string;
       /** Links */
@@ -2531,6 +2973,11 @@ export interface components {
        * @default !
        */
       flag: string;
+      /**
+       * Funds
+       * @description Its fund lines (Funds A). Money in goes to funds (`+`), money out comes from them (`-`), and a transfer puts money toward them (`+`, and with More options `-` too); together they're no more than the transaction. Checked only when they change.
+       */
+      funds?: components["schemas"]["FundLine"][] | null;
       /** Links */
       links?: string[];
       /** Meta */
@@ -2563,6 +3010,11 @@ export interface components {
       date?: string | null;
       /** Flag */
       flag?: string | null;
+      /**
+       * Funds
+       * @description Replaces all its fund lines (Funds A); [] or null clears them.
+       */
+      funds?: components["schemas"]["FundLine"][] | null;
       /** Links */
       links?: string[] | null;
       /** Meta */
@@ -2604,6 +3056,11 @@ export interface components {
        * @default !
        */
       flag: string;
+      /**
+       * Funds
+       * @description Its fund lines (Funds A). Money in goes to funds (`+`), money out comes from them (`-`), and a transfer puts money toward them (`+`, and with More options `-` too); together they're no more than the transaction. Checked only when they change.
+       */
+      funds?: components["schemas"]["FundLine"][] | null;
       /** Links */
       links?: string[];
       /** Meta */
@@ -4271,6 +4728,433 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
+    };
+  };
+  create_fund_move_api_ledger_v1_books__book_id__fund_moves_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FundMoveIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FundMove"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  delete_fund_move_api_ledger_v1_books__book_id__fund_moves__move_id__delete: {
+    parameters: {
+      query: {
+        /** @description The `updated_at` this edit was based on. */
+        updated_at: string;
+      };
+      header?: never;
+      path: {
+        move_id: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  patch_fund_move_api_ledger_v1_books__book_id__fund_moves__move_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        move_id: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FundMovePatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FundMove"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  list_funds_api_ledger_v1_books__book_id__funds_get: {
+    parameters: {
+      query?: {
+        /** @description Value at this day's prices (default today). */
+        on?: string | null;
+      };
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Funds"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_fund_api_ledger_v1_books__book_id__funds_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FundIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Fund"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  delete_fund_api_ledger_v1_books__book_id__funds__name__delete: {
+    parameters: {
+      query: {
+        /** @description The `updated_at` this edit was based on. */
+        updated_at: string;
+      };
+      header?: never;
+      path: {
+        name: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  patch_fund_api_ledger_v1_books__book_id__funds__name__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FundPatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Fund"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  archive_fund_api_ledger_v1_books__book_id__funds__name__archive_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FundArchive"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Fund"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  fund_history_api_ledger_v1_books__book_id__funds__name__entries_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FundHistory"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  rename_fund_api_ledger_v1_books__book_id__funds__name__rename_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FundRename"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Fund"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  unarchive_fund_api_ledger_v1_books__book_id__funds__name__unarchive_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FundVersion"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Fund"];
+        };
+      };
+      /** @description Stale version */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not allowed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

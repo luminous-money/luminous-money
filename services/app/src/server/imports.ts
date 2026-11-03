@@ -39,6 +39,7 @@ import { categorize, stagedPostings } from "./categorize/chain.js";
 import { buildRequest } from "./categorize/context.js";
 import { proposalRecord } from "./categorize/service.js";
 import type { Categorizer, Decision } from "./categorize/types.js";
+import { decidedLines, fundChoices, type FundChoices } from "./funds.js";
 import type { AppDb } from "./db.js";
 import type { LedgerPort } from "./ledger.js";
 import { assign } from "./pipeline/assign.js";
@@ -77,10 +78,13 @@ export function stagedTransaction(
   batchId: string,
   row: Stageable,
   decision: Decision = {},
-  source: ImportSource = "csv"
+  source: ImportSource = "csv",
+  funds?: FundChoices
 ): TransactionIn {
   const amount = { number: row.amount, currency };
   const fallback = row.amount.startsWith("-") ? UNCATEGORIZED.out : UNCATEGORIZED.in;
+  const postings = stagedPostings(account, amount, decision, fallback) as TransactionIn["postings"];
+  const lines = decidedLines(decision, postings, funds);
   return {
     date: row.date,
     flag: decision.category?.auto_confirm ? "*" : "!",
@@ -88,8 +92,9 @@ export function stagedTransaction(
     narration: row.description,
     tags: [],
     links: [],
+    ...(lines ? { funds: lines } : {}),
     meta: { source, "import-batch": batchId, "import-id": row.fingerprint },
-    postings: stagedPostings(account, amount, decision, fallback) as TransactionIn["postings"],
+    postings,
   };
 }
 
@@ -167,8 +172,13 @@ export async function prepareStage({
     rows.filter((_, i) => !decided[i]!.category),
     accounts
   );
+  const funds = await fundChoices(
+    ledger,
+    book.id,
+    decided.map((d) => d.category?.fund)
+  );
   const transactions = rows.map((row, i) =>
-    stagedTransaction(account, currency, batchId, row, decided[i], source)
+    stagedTransaction(account, currency, batchId, row, decided[i], source, funds)
   );
   const record = (ids: string[]) => {
     const uses = new Map<string, number>();

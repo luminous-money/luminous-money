@@ -8,6 +8,7 @@ import { ReceiptNote } from "../components/ReceiptNote.js";
 import { TagChips } from "../components/Tags.js";
 import { useBulkActions } from "../lib/bulk.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
+import { FundChoice } from "../components/Funds.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
 import { BaseChoice } from "../components/BaseChoice.js";
 import { PartChoice } from "../components/PartChoice.js";
@@ -417,6 +418,14 @@ function QueueItem({
             postings={t.postings}
             disabled={busy}
             onChange={(postings) => void save({ postings })}
+          />
+
+          <FundChoice
+            book={book}
+            transaction={t}
+            here={`/books/${book}/review`}
+            disabled={busy}
+            onChange={(funds) => void save({ funds })}
           />
 
           <ExcludeFromBudget

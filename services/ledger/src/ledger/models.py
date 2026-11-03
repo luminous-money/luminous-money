@@ -79,6 +79,21 @@ class Posting(Strict):
 Tag = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9\-_/.]+$")]
 
 
+class FundLine(Strict):
+    """What a transaction does to one fund (Funds A): `+` puts money into it, `-` takes it out.
+    Unallocated is never a line: it's what isn't in a fund."""
+
+    fund: str = Field(min_length=1, max_length=60)
+    amount: Amount = Field(description="Signed: positive into the fund, negative out of it.")
+
+
+FUNDS_DESCRIPTION = (
+    "Its fund lines (Funds A). Money in goes to funds (`+`), money out comes from them (`-`), and a "
+    "transfer puts money toward them (`+`, and with More options `-` too); together they're no more "
+    "than the transaction. Checked only when they change."
+)
+
+
 class TransactionIn(Strict):
     date: datetime.date
     flag: Flag = Field("!", description="`!` is staged for review; `*` is confirmed.")
@@ -86,6 +101,7 @@ class TransactionIn(Strict):
     narration: str = ""
     tags: list[Tag] = Field(default_factory=list)
     links: list[str] = Field(default_factory=list)
+    funds: list[FundLine] | None = Field(None, description=FUNDS_DESCRIPTION)
     meta: Meta = Field(default_factory=dict)
     postings: list[Posting] = Field(min_length=1)
 
@@ -130,6 +146,7 @@ class TransactionPatch(Strict):
     narration: str | None = None
     tags: list[Tag] | None = None
     links: list[str] | None = None
+    funds: list[FundLine] | None = Field(None, description="Replaces all its fund lines (Funds A); [] or null clears them.")
     meta: Meta | None = None
     postings: list[Posting] | None = Field(None, min_length=1)
 
@@ -446,6 +463,7 @@ class CompactTransaction(Api):
     narration: str | None
     budgeted: bool = Field(True, description="False with `budget: FALSE`: kept out of budgets (M11).")
     tags: list[str] = Field(default_factory=list, description="Its tags, sorted (M17).")
+    funds: list[FundLine] = Field(default_factory=list, description="Its fund lines (Funds A).")
     postings: list[CompactPosting]
 
 
@@ -473,6 +491,7 @@ class LedgerRow(Api):
     counterpart: str | None = Field(description="The other split's account, for a two-split transaction; None for more.")
     splits: int
     tags: list[str] = Field(default_factory=list, description="Its tags, sorted (M17).")
+    funds: list[FundLine] = Field(default_factory=list, description="Its fund lines (Funds A).")
     reconciled: datetime.date | None = Field(
         None, description="Once all its postings in the account are reconciled: the (latest) statement's date."
     )
@@ -573,6 +592,7 @@ class JournalRow(Api):
     narration: str | None
     budgeted: bool
     tags: list[str] = Field(default_factory=list, description="Its tags, sorted (M17).")
+    funds: list[FundLine] = Field(default_factory=list, description="Its fund lines (Funds A).")
     postings: list[CompactPosting]
     reconciled: bool | None = Field(
         None, description="Whether its asset and liability postings are all reconciled; None when it has none."
@@ -793,3 +813,112 @@ class Backup(Api):
         default_factory=list,
         description="Books deleted since the cursor. Their chunks hold every directive's tombstone.",
     )
+
+
+# Funds (Funds A)
+
+FundName = Annotated[str, StringConstraints(min_length=1, max_length=60)]
+
+
+class Fund(Api):
+    """A fund: money set aside for something. What it holds is its lines and moves, so far."""
+
+    name: str
+    description: str | None = None
+    target: Amount | None = Field(None, description="What it's working toward, shown as progress: nothing fills it.")
+    created: datetime.date | None = Field(None, description="When it was made; None for one only used (an imported book).")
+    archived: datetime.date | None = Field(None, description="When it was archived: out of the pickers, history kept.")
+    holdings: list[Amount] = Field(description="What it holds, per commodity (only the operating currency, for now).")
+    value: Amount = Field(description="What it holds, in the operating currency.")
+    entries: int = Field(description="How many transaction lines and moves it has: none, and it can be deleted.")
+    updated_at: str | None = Field(None, description="Its directive's version; None for one only used.")
+
+
+class Funds(Api):
+    """Every fund, and what's left: Unallocated is net worth less every fund."""
+
+    on: datetime.date
+    currency: str = Field(description="The book's operating currency, what values are in.")
+    net_worth: Amount = Field(description="Every asset and liability, valued (what has no price left out).")
+    unallocated: Amount = Field(description="Net worth less every fund's value: what isn't in a fund.")
+    unpriced: list[str] = Field(default_factory=list, description="Commodities held with no price, left out of net worth.")
+    funds: list[Fund] = Field(description="Active funds by name, then archived ones.")
+
+
+class FundIn(Strict):
+    name: FundName
+    description: str | None = Field(None, max_length=200)
+    target: Amount | None = None
+
+
+class FundPatch(Strict):
+    """Change only the fields given; null clears one."""
+
+    updated_at: Version
+    description: str | None = Field(None, max_length=200)
+    target: Amount | None = None
+
+
+class FundRename(Strict):
+    to: FundName
+    updated_at: Version
+
+
+class FundArchive(Strict):
+    updated_at: Version
+    date: datetime.date | None = Field(None, description="When; default today. What's left moves then.")
+    to: str = Field("Unallocated", description="Where what's left goes: Unallocated, or an active fund.")
+
+
+class FundVersion(Strict):
+    updated_at: Version
+
+
+class FundEntry(Api):
+    """One change to a fund: a transaction's line, or a move."""
+
+    id: str = Field(description="The transaction's or the move's ID.")
+    kind: Literal["transaction", "move"]
+    date: datetime.date
+    flag: str | None = Field(None, description="A transaction's flag: `!` unconfirmed.")
+    payee: str | None = None
+    narration: str | None = None
+    amount: Amount = Field(description="Signed: positive into the fund.")
+    balance: Amount = Field(description="The fund's balance after it, in its commodity.")
+    other: str | None = Field(None, description="A move's other side: where it came from, or went.")
+    note: str | None = None
+    updated_at: str
+
+
+class FundHistory(Api):
+    fund: Fund
+    entries: list[FundEntry] = Field(description="Newest first.")
+
+
+class FundMoveIn(Strict):
+    date: datetime.date
+    from_fund: FundName = Field(description="A fund, or Unallocated.")
+    to_fund: FundName = Field(description="A fund, or Unallocated.")
+    amount: Amount = Field(description="How much moves: positive.")
+    note: str | None = Field(None, max_length=200)
+
+
+class FundMove(Api):
+    id: str
+    date: datetime.date
+    from_fund: str
+    to_fund: str
+    amount: Amount
+    note: str | None = None
+    updated_at: str
+
+
+class FundMovePatch(Strict):
+    """Change only the fields given."""
+
+    updated_at: Version
+    date: datetime.date | None = None
+    from_fund: FundName | None = None
+    to_fund: FundName | None = None
+    amount: Amount | None = None
+    note: str | None = Field(None, max_length=200)

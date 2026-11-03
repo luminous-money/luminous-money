@@ -35,6 +35,8 @@ export type Member = components["schemas"]["Member"];
 export type Role = NonNullable<Book["role"]>;
 export type ReconcileState = components["schemas"]["ReconcileState"];
 export type ReconcileIn = components["schemas"]["ReconcileIn"];
+export type Funds = components["schemas"]["Funds"];
+export type Fund = components["schemas"]["Fund"];
 export type Reconciled = components["schemas"]["Reconciled"];
 export type Reconciliations = components["schemas"]["Reconciliations"];
 export type DayBalances = components["schemas"]["DayBalances"];
@@ -104,9 +106,15 @@ export interface LedgerPort {
   patch(
     book: string,
     id: string,
-    changes: Partial<Pick<TransactionIn, "postings" | "payee" | "narration" | "flag" | "meta">>,
+    changes: Partial<
+      Pick<TransactionIn, "postings" | "payee" | "narration" | "flag" | "meta" | "funds">
+    >,
     updated_at: string
   ): Promise<Transaction>;
+  /** Every fund, with what it holds; net worth, and Unallocated (Funds A). */
+  funds(book: string): Promise<Funds>;
+  /** Rename a fund everywhere it's named in the books, history included (a manager). */
+  renameFund(book: string, fund: string, to: string, updated_at: string): Promise<Fund>;
   /** The book's unconfirmed (`!`) transactions. */
   unconfirmed(book: string): Promise<Transaction[]>;
   /** Who has the book: its owner, then its members (M13). */
@@ -349,6 +357,17 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
             path: { book_id: book },
             query: { from, tag: tags?.length ? tags : undefined },
           },
+        })
+      ),
+    funds: (book) =>
+      unwrap(
+        client.GET("/api/ledger/v1/books/{book_id}/funds", { params: { path: { book_id: book } } })
+      ),
+    renameFund: (book, fund, to, updated_at) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/funds/{name}/rename", {
+          params: { path: { book_id: book, name: fund } },
+          body: { to, updated_at },
         })
       ),
     patch: (book, id, changes, updated_at) =>

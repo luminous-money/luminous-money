@@ -223,6 +223,15 @@ export const bankFeeds = {
 const accountPath = (book: string, account: string) =>
   `${base(book)}/accounts/${encodeURIComponent(account)}`;
 
+/** Renaming a fund (Funds A): through the app, so rules and schedules that name it follow. */
+export const renameFund = async (book: string, fund: string, to: string, updatedAt: string) =>
+  json<import("./ledger.js").Fund>(
+    await apiFetch(
+      `${base(book)}/funds/${encodeURIComponent(fund)}/rename`,
+      post({ to, updated_at: updatedAt })
+    )
+  );
+
 /** Renaming, archiving and deleting accounts: through the app, so what it keeps by account name
  * follows. */
 export const accountChanges = {

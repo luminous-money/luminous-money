@@ -19,6 +19,8 @@ import {
   type Book,
   type BudgetStatus,
   type DayBalances,
+  type Fund,
+  type Funds,
   type ReconcileIn,
   type ReconcileState,
   type Reconciled,
@@ -339,12 +341,44 @@ export class FakeLedger implements LedgerPort {
   async patch(
     book: string,
     id: string,
-    changes: Partial<Pick<TransactionIn, "postings" | "payee" | "narration" | "flag" | "meta">>,
+    changes: Partial<
+      Pick<TransactionIn, "postings" | "payee" | "narration" | "flag" | "meta" | "funds">
+    >,
     _updated_at: string
   ) {
     const found = await this.transaction(book, id);
     Object.assign(found, changes);
     return confirmed(found);
+  }
+
+  /** Funds (Funds A): names and whether each is archived; balances aren't modeled. */
+  fundList: { name: string; archived?: string | null }[] = [];
+
+  async funds(_book: string): Promise<Funds> {
+    const zero = { number: "0.00", currency: "USD" };
+    return {
+      on: "2026-01-01",
+      currency: "USD",
+      net_worth: zero,
+      unallocated: zero,
+      unpriced: [],
+      funds: this.fundList.map((f) => ({
+        name: f.name,
+        archived: f.archived ?? null,
+        holdings: [],
+        value: zero,
+        entries: 0,
+        updated_at: "v1",
+      })),
+    };
+  }
+
+  async renameFund(_book: string, fund: string, to: string): Promise<Fund> {
+    const found = this.fundList.find((f) => f.name === fund)!;
+    found.name = to;
+    for (const t of this.transactions)
+      t.funds = t.funds?.map((l) => (l.fund === fund ? { ...l, fund: to } : l)) ?? t.funds;
+    return (await this.funds(_book)).funds.find((f) => f.name === to)!;
   }
 
   fetched = 0;

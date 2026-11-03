@@ -21,6 +21,7 @@ import { categorize, placed, representative } from "./chain.js";
 import { buildRequest } from "./context.js";
 import { matches } from "./rules.js";
 import type { Categorizer, Chosen, Decision, Incoming } from "./types.js";
+import { decidedLines, fundChoices, type FundChoices } from "../funds.js";
 
 /** The unconfirmed transaction as a categorizer sees it, if it's open to categorizing. */
 export function openToCategorizing(t: Transaction): Incoming | undefined {
@@ -80,12 +81,15 @@ async function apply(
   t: Transaction,
   incoming: Incoming,
   decision: Decision,
-  requestId: string
+  requestId: string,
+  funds?: FundChoices
 ) {
   const { payee } = decision;
   const postings = placed(t.postings, incoming, decision);
   const lead = representative(decision, postings, incoming);
   if (!lead && !payee) return false;
+  // A rule's fund, on a transaction with no fund lines yet (Funds A).
+  const lines = t.funds?.length ? undefined : decidedLines(decision, postings, funds);
   await ledger.patch(
     book.id,
     t.id,
@@ -93,6 +97,7 @@ async function apply(
       postings: postings as Transaction["postings"],
       ...(payee?.payee ? { payee: payee.payee } : {}),
       ...(lead?.auto_confirm && mayAutoConfirm(t) ? { flag: "*" } : {}),
+      ...(lines ? { funds: lines } : {}),
     },
     t.updated_at
   );
@@ -129,6 +134,11 @@ export async function suggestUnconfirmed(
     open.map((o) => o.incoming)
   );
   const decisions = await categorize(categorizers, request);
+  const funds = await fundChoices(
+    ledger,
+    book.id,
+    [...decisions.values()].map((d) => d.category?.fund)
+  );
   const known = new Set(request.context.accounts.map((a) => a.name));
   const uses = new Map<string, number>();
   let n = 0;
@@ -142,7 +152,7 @@ export async function suggestUnconfirmed(
         await ledger.createAccount(book.id, name);
         known.add(name);
       }
-    if (await apply(services, t, incoming, decision, request.request_id)) n++;
+    if (await apply(services, t, incoming, decision, request.request_id, funds)) n++;
     const rule = decision.category?.rule_id;
     if (rule) uses.set(rule, (uses.get(rule) ?? 0) + 1);
   }
@@ -161,6 +171,7 @@ const ruleProposal = (rule: CategoryRule, t: Transaction): Chosen => ({
   rule_id: rule.id,
   categorizer: "rules",
   ...(rule.part ? { part: rule.part } : {}),
+  ...(rule.fund ? { fund: rule.fund } : {}),
 });
 
 /** The unconfirmed transactions a rule covers that are open to categorizing, and that it would
@@ -174,7 +185,8 @@ export async function coveredBy(services: Services, rule: CategoryRule) {
     const unchanged =
       after.length === t.postings.length &&
       after.every((p, i) => p.account === t.postings[i]!.account) &&
-      (!rule.payee || t.payee === rule.payee);
+      (!rule.payee || t.payee === rule.payee) &&
+      (!rule.fund || !!t.funds?.length);
     return unchanged ? [] : [{ t, incoming }];
   });
 }
@@ -182,6 +194,7 @@ export async function coveredBy(services: Services, rule: CategoryRule) {
 /** Re-apply a rule to the unconfirmed transactions it covers that the user hasn't decided. */
 export async function applyRule(services: Services, rule: CategoryRule): Promise<number> {
   const covered = await coveredBy(services, rule);
+  const funds = await fundChoices(services.ledger, services.book.id, [rule.fund]);
   for (const { t, incoming } of covered) {
     const proposal = ruleProposal(rule, t);
     await apply(
@@ -189,7 +202,8 @@ export async function applyRule(services: Services, rule: CategoryRule): Promise
       t,
       incoming,
       { category: proposal, ...(rule.payee ? { payee: proposal } : {}) },
-      "rule"
+      "rule",
+      funds
     );
   }
   services.db.countRuleUses(new Map([[rule.id, covered.length]]));

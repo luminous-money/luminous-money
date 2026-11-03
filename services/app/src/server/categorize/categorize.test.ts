@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { CategorizeRequest, HistoryTransaction } from "../../shared/categorizer-api.js";
 import type { RuleConditions } from "../../shared/rules.js";
 import { AppDb } from "../db.js";
+import { decidedLines } from "../funds.js";
 import { importFile } from "../imports.js";
 import { FakeLedger } from "../testing.js";
 import { categorize, placed, SETTLE } from "./chain.js";
@@ -436,6 +437,31 @@ describe("importing with categorization", () => {
     expect(staged.postings.some((p) => p.flag)).toBe(false); // confirmed: its splits too
     expect(db.rule("b", id)!.applied).toBe(1);
   });
+
+  it("a rule's fund goes on what it stages, all of it (Funds A)", async () => {
+    db.addRule("b", {
+      name: "Mystery",
+      conditions: { account: null, key: null, contains: "mystery", min: null, max: null },
+      account: "Expenses:Food:Coffee",
+      payee: null,
+      fund: "Emergency",
+      auto_confirm: false,
+    });
+    ledger.fundList = [{ name: "Emergency" }];
+
+    const result = await run();
+
+    const staged = ledger.transactions.find((t) => t.id === result.rows[1]!.transaction_id)!;
+    expect(staged.funds).toEqual([{ fund: "Emergency", amount: usd("-9.00") }]);
+    // An archived fund (or one that's gone) is left off rather than failing the import.
+    const decision = {
+      category: { id: "", confidence: 1, categorizer: "rules", fund: "Emergency" },
+    };
+    const postings = staged.postings;
+    expect(
+      decidedLines(decision, postings, { active: new Set(), currency: "USD" })
+    ).toBeUndefined();
+  });
 });
 
 describe("unconfirmed transactions", () => {
@@ -545,6 +571,26 @@ describe("unconfirmed transactions", () => {
       "Expenses:Food:Coffee",
     ]);
     expect(db.rule("b", id)!.applied).toBe(1);
+  });
+
+  it("a rule re-applied with a fund puts it on what has no fund lines yet (Funds A)", async () => {
+    const open = unconfirmed("TEA HOUSE");
+    const tagged = unconfirmed("TEA HOUSE AGAIN");
+    tagged.funds = [{ fund: "Treats", amount: usd("-4.50") }];
+    ledger.fundList = [{ name: "Treats" }, { name: "Household" }];
+    const id = db.addRule("b", {
+      name: "Tea",
+      conditions: { account: null, key: null, contains: "tea", min: null, max: null },
+      account: "Expenses:Food:Coffee",
+      payee: null,
+      fund: "Household",
+      auto_confirm: false,
+    });
+
+    await applyRule({ db, ledger, book }, db.rule("b", id)!);
+
+    expect(open.funds).toEqual([{ fund: "Household", amount: usd("-4.50") }]);
+    expect(tagged.funds).toEqual([{ fund: "Treats", amount: usd("-4.50") }]); // yours stays
   });
 
   it("settling records whether the proposal was kept, and gives feedback", async () => {

@@ -12,6 +12,7 @@ import { TypicalPeriods } from "../components/TypicalPeriods.js";
 import { HoldingsPanel } from "../components/Holdings.js";
 import { JumpToDate, MoreBelow, NewerRow, usePaging } from "../components/Paged.js";
 import { filteredLabel, LedgerFilter, useLedgerView } from "../components/LedgerFilter.js";
+import { FundChips } from "../components/Funds.js";
 import { TagChips } from "../components/Tags.js";
 import { ReconcileStatus } from "../components/ReconcileStatus.js";
 import { partOf, reconciledItself } from "../../shared/divided.js";
@@ -347,6 +348,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
                   )}
                   {row.payee ?? row.narration ?? "(no description)"}
                   <TagChips tags={row.tags} />
+                  <FundChips lines={row.funds} />
                 </span>
                 <span className="ledger-account muted">
                   {row.reconciled && (

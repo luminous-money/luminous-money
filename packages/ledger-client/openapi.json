@@ -1498,6 +1498,14 @@
             "title": "Flag",
             "type": "string"
           },
+          "funds": {
+            "description": "Its fund lines (Funds A).",
+            "items": {
+              "$ref": "#/components/schemas/FundLine"
+            },
+            "title": "Funds",
+            "type": "array"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -1886,6 +1894,613 @@
         "title": "FetchResult",
         "type": "object"
       },
+      "Fund": {
+        "description": "A fund: money set aside for something. What it holds is its lines and moves, so far.",
+        "properties": {
+          "archived": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was archived: out of the pickers, history kept.",
+            "title": "Archived"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was made; None for one only used (an imported book).",
+            "title": "Created"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "entries": {
+            "description": "How many transaction lines and moves it has: none, and it can be deleted.",
+            "title": "Entries",
+            "type": "integer"
+          },
+          "holdings": {
+            "description": "What it holds, per commodity (only the operating currency, for now).",
+            "items": {
+              "$ref": "#/components/schemas/Amount"
+            },
+            "title": "Holdings",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What it's working toward, shown as progress: nothing fills it."
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its directive's version; None for one only used.",
+            "title": "Updated At"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "What it holds, in the operating currency."
+          }
+        },
+        "required": [
+          "name",
+          "holdings",
+          "value",
+          "entries"
+        ],
+        "title": "Fund",
+        "type": "object"
+      },
+      "FundArchive": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When; default today. What's left moves then.",
+            "title": "Date"
+          },
+          "to": {
+            "default": "Unallocated",
+            "description": "Where what's left goes: Unallocated, or an active fund.",
+            "title": "To",
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "updated_at"
+        ],
+        "title": "FundArchive",
+        "type": "object"
+      },
+      "FundEntry": {
+        "description": "One change to a fund: a transaction's line, or a move.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "Signed: positive into the fund."
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "The fund's balance after it, in its commodity."
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A transaction's flag: `!` unconfirmed.",
+            "title": "Flag"
+          },
+          "id": {
+            "description": "The transaction's or the move's ID.",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "transaction",
+              "move"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "narration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narration"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "other": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A move's other side: where it came from, or went.",
+            "title": "Other"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "date",
+          "amount",
+          "balance",
+          "updated_at"
+        ],
+        "title": "FundEntry",
+        "type": "object"
+      },
+      "FundHistory": {
+        "properties": {
+          "entries": {
+            "description": "Newest first.",
+            "items": {
+              "$ref": "#/components/schemas/FundEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "fund": {
+            "$ref": "#/components/schemas/Fund"
+          }
+        },
+        "required": [
+          "fund",
+          "entries"
+        ],
+        "title": "FundHistory",
+        "type": "object"
+      },
+      "FundIn": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "FundIn",
+        "type": "object"
+      },
+      "FundLine": {
+        "additionalProperties": false,
+        "description": "What a transaction does to one fund (Funds A): `+` puts money into it, `-` takes it out.\nUnallocated is never a line: it's what isn't in a fund.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "Signed: positive into the fund, negative out of it."
+          },
+          "fund": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Fund",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fund",
+          "amount"
+        ],
+        "title": "FundLine",
+        "type": "object"
+      },
+      "FundMove": {
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "from_fund": {
+            "title": "From Fund",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "to_fund": {
+            "title": "To Fund",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "from_fund",
+          "to_fund",
+          "amount",
+          "updated_at"
+        ],
+        "title": "FundMove",
+        "type": "object"
+      },
+      "FundMoveIn": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "How much moves: positive."
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "from_fund": {
+            "description": "A fund, or Unallocated.",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "From Fund",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "to_fund": {
+            "description": "A fund, or Unallocated.",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "To Fund",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "from_fund",
+          "to_fund",
+          "amount"
+        ],
+        "title": "FundMoveIn",
+        "type": "object"
+      },
+      "FundMovePatch": {
+        "additionalProperties": false,
+        "description": "Change only the fields given.",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "from_fund": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Fund"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "to_fund": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Fund"
+          },
+          "updated_at": {
+            "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "updated_at"
+        ],
+        "title": "FundMovePatch",
+        "type": "object"
+      },
+      "FundPatch": {
+        "additionalProperties": false,
+        "description": "Change only the fields given; null clears one.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "updated_at"
+        ],
+        "title": "FundPatch",
+        "type": "object"
+      },
+      "FundRename": {
+        "additionalProperties": false,
+        "properties": {
+          "to": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "To",
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to",
+          "updated_at"
+        ],
+        "title": "FundRename",
+        "type": "object"
+      },
+      "FundVersion": {
+        "additionalProperties": false,
+        "properties": {
+          "updated_at": {
+            "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "updated_at"
+        ],
+        "title": "FundVersion",
+        "type": "object"
+      },
+      "Funds": {
+        "description": "Every fund, and what's left: Unallocated is net worth less every fund.",
+        "properties": {
+          "currency": {
+            "description": "The book's operating currency, what values are in.",
+            "title": "Currency",
+            "type": "string"
+          },
+          "funds": {
+            "description": "Active funds by name, then archived ones.",
+            "items": {
+              "$ref": "#/components/schemas/Fund"
+            },
+            "title": "Funds",
+            "type": "array"
+          },
+          "net_worth": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "Every asset and liability, valued (what has no price left out)."
+          },
+          "on": {
+            "format": "date",
+            "title": "On",
+            "type": "string"
+          },
+          "unallocated": {
+            "$ref": "#/components/schemas/Amount",
+            "description": "Net worth less every fund's value: what isn't in a fund."
+          },
+          "unpriced": {
+            "description": "Commodities held with no price, left out of net worth.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Unpriced",
+            "type": "array"
+          }
+        },
+        "required": [
+          "on",
+          "currency",
+          "net_worth",
+          "unallocated",
+          "funds"
+        ],
+        "title": "Funds",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2128,6 +2743,14 @@
             "title": "Flag",
             "type": "string"
           },
+          "funds": {
+            "description": "Its fund lines (Funds A).",
+            "items": {
+              "$ref": "#/components/schemas/FundLine"
+            },
+            "title": "Funds",
+            "type": "array"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -2303,6 +2926,14 @@
           "flag": {
             "title": "Flag",
             "type": "string"
+          },
+          "funds": {
+            "description": "Its fund lines (Funds A).",
+            "items": {
+              "$ref": "#/components/schemas/FundLine"
+            },
+            "title": "Funds",
+            "type": "array"
           },
           "id": {
             "title": "Id",
@@ -3430,6 +4061,21 @@
             "title": "Flag",
             "type": "string"
           },
+          "funds": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FundLine"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its fund lines (Funds A). Money in goes to funds (`+`), money out comes from them (`-`), and a transfer puts money toward them (`+`, and with More options `-` too); together they're no more than the transaction. Checked only when they change.",
+            "title": "Funds"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -3572,6 +4218,21 @@
             ],
             "title": "Flag"
           },
+          "funds": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FundLine"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Replaces all its fund lines (Funds A); [] or null clears them.",
+            "title": "Funds"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -3701,6 +4362,21 @@
             "title": "Flag",
             "type": "string"
           },
+          "funds": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FundLine"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its fund lines (Funds A). Money in goes to funds (`+`), money out comes from them (`-`), and a transfer puts money toward them (`+`, and with More options `-` too); together they're no more than the transaction. Checked only when they change.",
+            "title": "Funds"
+          },
           "links": {
             "items": {
               "type": "string"
@@ -3799,6 +4475,21 @@
               }
             ],
             "title": "Flag"
+          },
+          "funds": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FundLine"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Replaces all its fund lines (Funds A); [] or null clears them.",
+            "title": "Funds"
           },
           "links": {
             "anyOf": [
@@ -3924,6 +4615,21 @@
             "minLength": 1,
             "title": "Flag",
             "type": "string"
+          },
+          "funds": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FundLine"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its fund lines (Funds A). Money in goes to funds (`+`), money out comes from them (`-`), and a transfer puts money toward them (`+`, and with More options `-` too); together they're no more than the transaction. Checked only when they change.",
+            "title": "Funds"
           },
           "links": {
             "items": {
@@ -6661,6 +7367,570 @@
           }
         },
         "summary": "Export"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/fund-moves": {
+      "post": {
+        "description": "Move money from one fund to another (either can be Unallocated): no account changes.",
+        "operationId": "create_fund_move_api_ledger_v1_books__book_id__fund_moves_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundMoveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundMove"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Create Fund Move"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/fund-moves/{move_id}": {
+      "delete": {
+        "operationId": "delete_fund_move_api_ledger_v1_books__book_id__fund_moves__move_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "move_id",
+            "required": true,
+            "schema": {
+              "title": "Move Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `updated_at` this edit was based on.",
+            "in": "query",
+            "name": "updated_at",
+            "required": true,
+            "schema": {
+              "description": "The `updated_at` this edit was based on.",
+              "title": "Updated At",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Delete Fund Move"
+      },
+      "patch": {
+        "operationId": "patch_fund_move_api_ledger_v1_books__book_id__fund_moves__move_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "move_id",
+            "required": true,
+            "schema": {
+              "title": "Move Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundMovePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundMove"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Patch Fund Move"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/funds": {
+      "get": {
+        "description": "Every fund with what it holds, net worth, and Unallocated (net worth less every fund).",
+        "operationId": "list_funds_api_ledger_v1_books__book_id__funds_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Value at this day's prices (default today).",
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Value at this day's prices (default today).",
+              "title": "On"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Funds"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Funds"
+      },
+      "post": {
+        "description": "Make a fund (a manager).",
+        "operationId": "create_fund_api_ledger_v1_books__book_id__funds_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Fund"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Create Fund"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/funds/{name}": {
+      "delete": {
+        "description": "Delete a fund with no history (a manager).",
+        "operationId": "delete_fund_api_ledger_v1_books__book_id__funds__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `updated_at` this edit was based on.",
+            "in": "query",
+            "name": "updated_at",
+            "required": true,
+            "schema": {
+              "description": "The `updated_at` this edit was based on.",
+              "title": "Updated At",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Delete Fund"
+      },
+      "patch": {
+        "description": "Change a fund's description or target (a manager).",
+        "operationId": "patch_fund_api_ledger_v1_books__book_id__funds__name__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Fund"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Patch Fund"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/funds/{name}/archive": {
+      "post": {
+        "description": "Archive a fund (a manager): what's left moves to Unallocated or another fund that day.",
+        "operationId": "archive_fund_api_ledger_v1_books__book_id__funds__name__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundArchive"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Fund"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Archive Fund"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/funds/{name}/entries": {
+      "get": {
+        "description": "A fund and its history (transaction lines and moves), newest first, with a running\nbalance.",
+        "operationId": "fund_history_api_ledger_v1_books__book_id__funds__name__entries_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundHistory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fund History"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/funds/{name}/rename": {
+      "post": {
+        "description": "Rename a fund everywhere it's named, history included (a manager). Through `app`, so\nits rules and schedules follow.",
+        "operationId": "rename_fund_api_ledger_v1_books__book_id__funds__name__rename_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundRename"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Fund"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Rename Fund"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/funds/{name}/unarchive": {
+      "post": {
+        "operationId": "unarchive_fund_api_ledger_v1_books__book_id__funds__name__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Fund"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Stale version"
+          },
+          "422": {
+            "description": "Not allowed"
+          }
+        },
+        "summary": "Unarchive Fund"
       }
     },
     "/api/ledger/v1/books/{book_id}/import": {

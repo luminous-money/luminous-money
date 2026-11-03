@@ -36,6 +36,16 @@ export type TradePreview = Schemas["TradePreview"];
 export type AccountPatch = Schemas["AccountPatch"];
 export type OpeningHolding = Schemas["OpeningHolding"];
 export type Backup = Schemas["Backup"];
+export type FundLine = Schemas["FundLine"];
+export type Fund = Schemas["Fund"];
+export type Funds = Schemas["Funds"];
+export type FundIn = Schemas["FundIn"];
+export type FundPatch = Schemas["FundPatch"];
+export type FundEntry = Schemas["FundEntry"];
+export type FundHistory = Schemas["FundHistory"];
+export type FundMove = Schemas["FundMove"];
+export type FundMoveIn = Schemas["FundMoveIn"];
+export type FundMovePatch = Schemas["FundMovePatch"];
 
 export function createLedgerClient(options: ClientOptions) {
   return createClient<paths>(options);

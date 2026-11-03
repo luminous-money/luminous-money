@@ -569,6 +569,15 @@ export function createApi({
     return found && { id: found.id, name: found.name };
   };
 
+  /** A rule's fund named as the fund is, and the book's active funds to check it against (none
+   * when the rule names no fund). */
+  const ruleFund = async (ledger: LedgerPort, book: string, fund: string | null | undefined) => {
+    if (!fund?.trim()) return { fund: null, funds: undefined };
+    const funds = (await ledger.funds(book)).funds.filter((f) => !f.archived).map((f) => f.name);
+    const wanted = fund.trim().toLowerCase();
+    return { fund: funds.find((f) => f.toLowerCase() === wanted) ?? fund.trim(), funds };
+  };
+
   api.get("/books/:book/rules", async (c) => {
     const { book } = c.req.param();
     if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
@@ -582,13 +591,15 @@ export function createApi({
     if (!info) return c.json({ detail: "not found" }, 404);
     const ledger = ledgerFor(c.get("user"));
     const input = (await c.req.json().catch(() => null)) as CategoryRuleIn | null;
-    const problem = ruleProblem(input, await ledger.accounts(book));
+    const { fund, funds } = await ruleFund(ledger, book, input?.fund);
+    const problem = ruleProblem(input && { ...input, fund }, await ledger.accounts(book), funds);
     if (problem) return c.json({ detail: problem }, 422);
     const id = db.addRule(book, {
       ...input!,
       name: input!.name.trim(),
       payee: input!.payee || null,
       part: input!.part || null,
+      fund,
     });
     const rule = db.rule(book, id)!;
     const covers = (await coveredBy({ db, ledger, book: info }, rule)).length;
@@ -615,7 +626,14 @@ export function createApi({
     if (!patch?.updated_at) return c.json({ detail: "send the updated_at you read" }, 422);
     const { updated_at, ...changes } = patch;
     const merged = { ...current, ...changes };
-    const problem = ruleProblem(merged, await ledger.accounts(book));
+    // A fund it named already may have been archived since: that's kept, not refused.
+    const kept = "fund" in changes ? undefined : current.fund;
+    const { fund, funds } = await ruleFund(ledger, book, merged.fund);
+    const problem = ruleProblem(
+      { ...merged, fund },
+      await ledger.accounts(book),
+      kept ? undefined : funds
+    );
     if (problem) return c.json({ detail: problem }, 422);
     try {
       db.updateRule(book, id, updated_at, {
@@ -624,6 +642,7 @@ export function createApi({
         account: merged.account,
         payee: merged.payee || null,
         part: merged.part || null,
+        fund,
         auto_confirm: merged.auto_confirm,
       });
     } catch (error) {
@@ -819,6 +838,30 @@ export function createApi({
       return c.json(renamed);
     })
   );
+
+  // Funds (Funds A): the PWA reads and changes them at the ledger, but for renaming, which goes
+  // through here so rules and schedules follow (the ledger first, then `app`, as accounts do).
+  api.post("/books/:book/funds/:fund/rename", async (c) => {
+    const { book, fund } = c.req.param();
+    const { to, updated_at } = (await c.req.json().catch(() => ({}))) as {
+      to?: unknown;
+      updated_at?: unknown;
+    };
+    if (typeof to !== "string" || typeof updated_at !== "string")
+      return c.json({ detail: "send the new name as `to`, and the updated_at you read" }, 422);
+    try {
+      const ledger = ledgerFor(c.get("user"));
+      const wanted = fund.toLowerCase();
+      const old = (await ledger.funds(book)).funds.find(
+        (f) => f.name.toLowerCase() === wanted
+      )?.name;
+      const renamed = await ledger.renameFund(book, fund, to, updated_at);
+      db.renameFund(book, old ?? fund, renamed.name);
+      return c.json(renamed);
+    } catch (error) {
+      return c.json(...ledgerStatus(error));
+    }
+  });
 
   api.post("/books/:book/accounts/:account/archive", (c) =>
     accountChange(c, async (ledger, book, account) => {

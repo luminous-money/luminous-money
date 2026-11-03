@@ -37,6 +37,7 @@ import {
   bankFeeds,
   receipts,
   reconciling,
+  renameFund,
   systemApi,
   type LinkRequest,
   type BookInfo,
@@ -59,6 +60,10 @@ import {
   ApiError,
   type BudgetBasis,
   type BudgetIn,
+  type FundIn,
+  type FundMoveIn,
+  type FundMovePatch,
+  type FundPatch,
   type LedgerPageAt,
   type TransactionChanges,
 } from "./ledger.js";
@@ -410,6 +415,64 @@ export const useJournal = (
  * refreshes it. */
 export const useTags = (book: string) =>
   useQuery({ queryKey: [...keys.book(book), "tags"], queryFn: () => api.tags(book) });
+
+/** The book's funds (Funds A): balances, net worth and Unallocated. Under the book's key, so
+ * every edit refreshes it. */
+export const useFunds = (book: string, enabled = true) =>
+  useQuery({ queryKey: [...keys.book(book), "funds"], queryFn: () => api.funds(book), enabled });
+
+/** A fund and its history. */
+export const useFundHistory = (book: string, name: string) =>
+  useQuery({
+    queryKey: [...keys.book(book), "funds", "history", name],
+    queryFn: () => api.fundHistory(book, name),
+  });
+
+/** A change to funds: everything about the book is refreshed after it. */
+function useFundChange<A, R>(book: string, fn: (args: A) => Promise<R>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => void client.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
+export const useCreateFund = (book: string) =>
+  useFundChange(book, (f: FundIn) => api.createFund(book, f));
+export const usePatchFund = (book: string) =>
+  useFundChange(book, ({ name, patch }: { name: string; patch: FundPatch }) =>
+    api.patchFund(book, name, patch)
+  );
+export const useRenameFund = (book: string) =>
+  useFundChange(
+    book,
+    ({ name, to, updated_at }: { name: string; to: string; updated_at: string }) =>
+      renameFund(book, name, to, updated_at)
+  );
+export const useArchiveFund = (book: string) =>
+  useFundChange(
+    book,
+    ({ name, ...body }: { name: string; updated_at: string; date?: string; to: string }) =>
+      api.archiveFund(book, name, body)
+  );
+export const useUnarchiveFund = (book: string) =>
+  useFundChange(book, ({ name, updated_at }: { name: string; updated_at: string }) =>
+    api.unarchiveFund(book, name, updated_at)
+  );
+export const useDeleteFund = (book: string) =>
+  useFundChange(book, ({ name, updated_at }: { name: string; updated_at: string }) =>
+    api.deleteFund(book, name, updated_at)
+  );
+export const useMoveFunds = (book: string) =>
+  useFundChange(book, (m: FundMoveIn) => api.moveFunds(book, m));
+export const usePatchMove = (book: string) =>
+  useFundChange(book, ({ id, patch }: { id: string; patch: FundMovePatch }) =>
+    api.patchMove(book, id, patch)
+  );
+export const useDeleteMove = (book: string) =>
+  useFundChange(book, ({ id, updated_at }: { id: string; updated_at: string }) =>
+    api.deleteMove(book, id, updated_at)
+  );
 
 /** Keyset pages loading either way: older below (`fetchNextPage`), newer above
  * (`fetchPreviousPage`), from the newest or from `date` back. */
@@ -791,6 +854,8 @@ function remember(book: string, saved: Transaction) {
   void queryClient.invalidateQueries({ queryKey: ["book", book, "ledger"] });
   void queryClient.invalidateQueries({ queryKey: ["book", book, "tree"] });
   void queryClient.invalidateQueries({ queryKey: ["book", book, "tags"] });
+  void queryClient.invalidateQueries({ queryKey: ["book", book, "funds"] });
+  void queryClient.invalidateQueries({ queryKey: ["book", book, "journal"] });
 }
 
 export function useEditTransaction(book: string, id: string) {
@@ -965,6 +1030,13 @@ export function useRole(book: string): Role | undefined {
 export const useCanWrite = (book: string) => {
   const role = useRole(book);
   return role === undefined || role !== "read";
+};
+
+/** Whether the caller manages the book (sets funds up, say). Unknown yet counts as no: managing
+ * is the exception. */
+export const useCanManage = (book: string) => {
+  const role = useRole(book);
+  return role === "owner" || role === "manage";
 };
 
 export function useMembers(book: string) {

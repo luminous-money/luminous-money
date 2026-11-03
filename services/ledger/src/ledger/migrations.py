@@ -118,6 +118,26 @@ def _backfill_tags(conn: sqlite3.Connection) -> None:
         )
 
 
+def _backfill_funds(conn: sqlite3.Connection) -> None:
+    """Fill in migration 13's table from the transactions and fund moves written before it."""
+    from . import engine
+
+    rows = conn.execute(
+        "SELECT id, book_id, text FROM directive WHERE deleted = 0"
+        " AND ((kind = 'transaction' AND text LIKE '%funds:%') OR (kind = 'custom' AND text LIKE '%fund-move%'))"
+    ).fetchall()
+    for row in rows:
+        stamp = now()
+        conn.executemany(
+            "INSERT INTO fund_line (directive_id, idx, book_id, fund, amount, currency, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (row[0], i, row[1], fund, str(number), currency, stamp, stamp)
+                for i, (fund, number, currency) in enumerate(engine.parse_one(row[2], row[0]).funds)
+            ],
+        )
+
+
 def _backfill_prices(conn: sqlite3.Connection) -> None:
     """Fill in migration 4's price table from the price directives written before it."""
     from . import engine
@@ -271,6 +291,24 @@ MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
         ),
         "CREATE INDEX transaction_tag_book ON transaction_tag(book_id, tag)",
         _backfill_tags,
+    ],
+    # 13: funds (Funds A). Each transaction's fund lines and each fund move's sides, so balances and
+    # a fund's history are read with SQL; the text still holds them.
+    [
+        create_table(
+            "fund_line",
+            [
+                "directive_id TEXT NOT NULL REFERENCES directive(id) ON DELETE CASCADE",
+                "idx INTEGER NOT NULL",
+                "book_id TEXT NOT NULL",
+                "fund TEXT NOT NULL",
+                "amount TEXT NOT NULL",
+                "currency TEXT NOT NULL",
+            ],
+            ["PRIMARY KEY (directive_id, idx)"],
+        ),
+        "CREATE INDEX fund_line_book ON fund_line(book_id, fund)",
+        _backfill_funds,
     ],
 ]
 

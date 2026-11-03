@@ -164,12 +164,29 @@ milestone starts.
       [Built](milestones/m17-transaction-tagging/PLAN.md) 2026-10-29: Beancount's `#tag`s, a
       Tags field on a transaction's page, Add tag… and Remove tag… in Select mode, tags on rows,
       a tag filter on ledgers, Transactions and Reports (whose breakdown gains All time).
-- [ ] **Funds** (next, after M17; Kael, 2026-10-29): what money is *for*, as a ledger of its own
-      beside the accounts (where it is). Every dollar of net worth (every asset, the house and
-      retirement included) is in exactly one fund, Unallocated holding the rest; splits say
-      which, by choice or by rules (defaults per account, a spend order, autofill to targets).
-      It replaces divided accounts as the way to set money aside. **Being designed** with Kael:
-      [its plan](milestones/funds/PLAN.md) holds the decisions so far and the open questions.
+- [x] **Funds A: Basic Funds** (Kael, 2026-11-02): what money is *for*, as a ledger of its
+      own beside the accounts (where it is), with no rules: a fund fills or drains only when a
+      transaction says so ("for Emergency", "from Emergency"), or by a move between funds.
+      Funds hold dollars; Unallocated is net worth less every fund.
+      [Built](milestones/funds/A/PLAN.md) 2026-11-02 (`v0.1.13`): a Funds section on a
+      transaction's page, New transaction and schedules, a fund on review cards, Select mode's
+      Fund…, a rule's fund, chips on rows, the Funds page, each fund's page, Move money and a
+      home card.
+- [ ] **Funds B: Complex Fund Functionality** (next; Kael, 2026-11-02): everything else
+      designed for funds, **asset-aware funds first** (a brokerage whose funds hold shares, Kael's
+      guiding case), then spend and fill rules, account defaults, groups (a house and its
+      mortgage), budget funds for *why* money is spent, and loans in funds.
+      [Its plan](milestones/funds/B/PLAN.md) holds the design so far, with an
+      [example book](milestones/funds/B/example-book.md) and
+      [71 scenarios](milestones/funds/B/scenarios.md) still to gut-check.
+- [ ] **Loans** (Kael, 2026-10-30; not planned, its place in the order not decided): big loans as
+      a special case, apart from funds and within them. An amortization schedule loaded easily
+      (read from a PDF or image by the AI, a CSV, or typed in) guides a scheduled payment, from
+      any point in the loan (say which payment is next). The payments can be seen as monthly
+      expenses, though the books already recorded what they paid for (the principal paid down
+      the liability). [loans-and-taxes.md](loans-and-taxes.md) ("Budgets and the principal")
+      already sketches both: counting a liability's payments as spending, and amortization in
+      schedules. In funds, a loan is grouped (Funds B's open question 4).
 - [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules
       that add tags, a Tags field on schedules (their templates carry tags already, unseen) and
       on Capture receipt, the AI and history proposing the book's own tags, and transfers

@@ -62,6 +62,8 @@ export type InternalProposal = Proposal & {
   splits?: { index: number; account: string }[];
   /** Accounts it would open, used in its proposal: the AI, with the book's account creation on. */
   opens?: string[];
+  /** The fund it's taken from or put toward, all of it (Funds A): a user's own rule. */
+  fund?: string;
 };
 
 export interface Categorizer {

@@ -11,10 +11,14 @@ import { useState } from "react";
 import type { Transaction } from "@luminous-money/ledger-client";
 
 import type { AccountCreation } from "../components/AccountPicker.js";
+import { shapeFor } from "../components/Funds.js";
 import type { BulkAction } from "../components/SelectBar.js";
+import { UNALLOCATED, wholeLine } from "../../shared/funds.js";
 import { appApi } from "./appApi.js";
+import { formatMoney } from "./decimal.js";
+import { sameLines } from "./funds.js";
 import type { TransactionChanges } from "./ledger.js";
-import { explain, useBulkEdit, useTags } from "./queries.js";
+import { explain, useBulkEdit, useFunds, useTags } from "./queries.js";
 import { tagList } from "../components/Tags.js";
 import { aiCostSentence } from "./ai.js";
 
@@ -70,6 +74,49 @@ export function useBulkActions({
         },
       },
       { onSuccess: () => setNote(said(changed)), onError: (e) => setNote(explain(e)) }
+    );
+  };
+  const listing = useFunds(book).data;
+  const activeFunds = listing?.funds.filter((f) => !f.archived) ?? [];
+  /** Give each selected transaction `fund` for all of it (the way it goes), or clear its funds
+   * (Unallocated). One whose amounts funds can't read (not all in the book's currency) is left. */
+  const setFund = (fund: string) => {
+    const currency = listing?.currency ?? "USD";
+    let changed = 0;
+    let had = 0;
+    let unread = 0;
+    setNote(null);
+    bulk.mutate(
+      {
+        transactions: chosen,
+        change: (t) => {
+          const line =
+            fund === UNALLOCATED ? null : wholeLine(shapeFor(t.postings, currency), fund);
+          const funds = fund === UNALLOCATED ? [] : line && [line];
+          if (!funds) {
+            unread++;
+            return null;
+          }
+          if (sameLines(t.funds, funds)) {
+            had++;
+            return null;
+          }
+          changed++;
+          return { funds };
+        },
+      },
+      {
+        onSuccess: () =>
+          setNote(
+            (fund === UNALLOCATED
+              ? `Cleared the funds of ${plural(changed, "transaction")}` +
+                (had ? `; ${had} had none` : "")
+              : `Set the fund of ${plural(changed, "transaction")} to ${fund}` +
+                (had ? `; ${had} had it already` : "")) +
+              (unread ? `; skipped ${unread} not all in ${currency}.` : ".")
+          ),
+        onError: (e) => setNote(explain(e)),
+      }
     );
   };
   const suggest = useMutation({
@@ -165,6 +212,20 @@ export function useBulkActions({
           (changed) => `Removed ${tagList([tag])} from ${plural(changed, "transaction")}.`
         ),
     } satisfies BulkAction,
+    ...(activeFunds.length
+      ? [
+          {
+            label: "Fund…",
+            pickFund: {
+              funds: activeFunds.map((f) => ({
+                name: f.name,
+                label: `${f.name} · ${formatMoney(f.value.number, f.value.currency)}`,
+              })),
+            },
+            run: setFund,
+          } satisfies BulkAction,
+        ]
+      : []),
     {
       label: "Suggest categories",
       disabled: !unconfirmed.length && "only unconfirmed ones are categorized",

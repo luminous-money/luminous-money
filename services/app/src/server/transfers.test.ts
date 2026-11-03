@@ -86,6 +86,22 @@ describe("pairing transfers", () => {
     ]);
   });
 
+  it("keeps either side's fund lines (Funds A)", async () => {
+    await bring(FIDELITY, [row(1, "2026-10-10", "-500.00", "TRANSFER TO PNC")]);
+    await bring(PNC, [row(1, "2026-10-11", "500.00", "TRANSFER FROM FIDELITY")]);
+    const [out, into] = ledger.transactions;
+    out!.funds = [{ fund: "Emergency", amount: { number: "-500.00", currency: "USD" } }];
+    into!.funds = [{ fund: "Wedding", amount: { number: "500.00", currency: "USD" } }];
+
+    await pair();
+
+    const transfer = (await ledger.unconfirmed()).find((t) => t.narration.startsWith("Transfer"))!;
+    expect(transfer.funds).toEqual([
+      { fund: "Emergency", amount: { number: "-500.00", currency: "USD" } },
+      { fund: "Wedding", amount: { number: "500.00", currency: "USD" } },
+    ]);
+  });
+
   it("pairs a card payment, but not what's too far apart, categorized, or in one account", async () => {
     await bring(PNC, [
       row(1, "2026-10-01", "-500.00", "CHASE PAYMENT"),

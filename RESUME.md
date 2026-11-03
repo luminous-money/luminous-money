@@ -1,20 +1,40 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-10-29._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-02._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Hand-off (2026-10-29): M17 released; Funds is next, and being designed
+## Latest (2026-11-02): Funds A built, released as `v0.1.13`
 
-**Read this first.**
+**Funds A** ([its plan](docs/milestones/funds/A/PLAN.md); design.md, "Funds A") is built: a
+second ledger of funds beside the accounts, with no rules. A fund fills or drains only when a
+transaction says so (`funds:` lines: `+` into a fund, `-` out), or by a move between funds.
+Unallocated is net worth less every fund, never written. Funds hold dollars, kept with their
+commodity so shares can follow. It was built over two sessions (the ledger and app server first,
+then the PWA, its tests and a look at every screen on a phone and a desktop, light and dark).
 
-- **Funds, the next milestone, is being designed with Kael** and isn't started:
-  [docs/milestones/funds/PLAN.md](docs/milestones/funds/PLAN.md) holds the problem, how we got
-  there, what's decided and the open questions, and stands on its own. Kael means to answer
-  Claude's latest reply; the whole conversation is verbatim in
-  `docs/milestones/funds/discussion.private.md`: kept out of git (`.gitignore`:
-  `docs/**/*.private.md`) because it uses real figures, so only Kael's machines have it. Don't
-  build until Kael has answered; continue the design conversation from there.
+- **For Kael to review:** A's plan, "Decisions to review" (1 to 13 from planning, 14 to 23 made
+  while building the screens: when the Funds section shows, the first line holding what's left,
+  saved lines that no longer fit not stopping Save, "No fund" on transfers, and so on).
+- **Next: Funds B**, starting with **asset-aware funds** (Kael's guiding case: a Fidelity
+  brokerage whose four funds, Wedding, Emergency, Special Home Maintenance and Repair, and
+  Special Home Improvement, hold shares). Its material is in
+  [docs/milestones/funds/B/](docs/milestones/funds/B/PLAN.md): its plan (headed with what A
+  settled and where B starts), the example book and the 71 scenarios to gut-check with Kael. A
+  is shaped for it: every stored amount keeps its commodity, a fund reports `holdings` and
+  `value`, and A refuses other commodities in one check (`fundlines.py`, `funds._checked`).
+- **Working on funds:** the rules live twice, `services/ledger/src/ledger/fundlines.py` and
+  `services/app/src/shared/funds.ts` (same wording), so the PWA says what the ledger would; the
+  PWA's rows and the line that follows the transaction are `web/lib/funds.ts`; the screens are
+  `web/components/Funds.tsx`, `web/pages/Funds.tsx` and `web/pages/FundPage.tsx`. Ledger tests
+  without uv: `cd services/ledger && docker run --rm -v "$PWD/src:/srv/src" -v
+  "$PWD/tests:/srv/tests" -w /srv luminous-money/ledger:test pytest -q -p no:cacheprovider`.
+
+### Also
+
+- **Loans** are noted in [docs/PLAN.md](docs/PLAN.md) (Kael, 2026-10-30; not planned): amortization
+  schedules loaded from a PDF, image, CSV or by hand, guiding scheduled payments from any point in
+  the loan, and payments seen as monthly expenses.
 - **M17 (tagging) is built and released as `v0.1.12`** (2026-10-29; see "Releases" below for
   its Release run): its [plan](docs/milestones/m17-transaction-tagging/PLAN.md) has the calls
   made without asking, design.md has "Tags (M17)". It needed ledger-graphs **0.1.2**
@@ -25,7 +45,7 @@ _Updated 2026-10-29._ Keep this current: every finalized change set updates it (
   system's) and `luminous.kaelshipman.me` redirect to it, and an app installed from the old
   address gets a service worker that removes itself, so it follows. The original system's
   other names were removed. ~/Setup has it all (`docs/emmer.md`, section 6). Upgrading Emmer to
-  0.1.12 is Kael's: `/srv/luminous-money/luminous-money upgrade` (it backs up first).
+  0.1.13 is Kael's: `/srv/luminous-money/luminous-money upgrade` (it backs up first).
 - **A bug found on the live server, not fixed:** a linked brokerage opened with its lots at a
   $0.00 cost basis, so its gains (and any sale's capital gains) are wrong. The likely cause:
   `openingHoldings` (`services/app/src/server/simplefin/holdings.ts`) takes a reported
@@ -60,7 +80,7 @@ repositories) is archived on GitHub and kept locally in `../.archive/system`. Ev
 GPL-2.0-or-later (Beancount is GPL-2.0-only). It wears the original app's look: its palette
 (light gray and blue; deep blue and cyan in dark mode) and its Lu logo (design.md, "Its look").
 
-**M1 through M17 are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M17 and Funds A are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
 accounts), M11 (budgets), M12 (reports), M13 (sharing books), M14 (reconciliation), M15 (divided
@@ -68,8 +88,8 @@ accounts), M16 (receipt capture) and M17 (tagging) are described in their plans,
 accounts import** and **migrating from another system**, slipped in before M17 (2026-10-26).
 **M19 (AI categorization) was built within M16** and is live; its PLAN.md entry was found
 unchecked and corrected on 2026-10-26 (what's left is a question: whether imports and bank feeds
-ask the AI by themselves). The milestones ahead (**Funds**, being designed, then M18, M20 and
-Polish) are in [docs/PLAN.md](docs/PLAN.md).
+ask the AI by themselves). The milestones ahead (**Funds B** next, then M18, M20 and Polish;
+**Loans** noted, not placed) are in [docs/PLAN.md](docs/PLAN.md).
 
 What an operator can do now (production readiness, phase 1; [docs/deploying.md](docs/deploying.md)):
 `luminous-money install` sets a deployment up (a laptop, or a public server with built-in HTTPS),
@@ -90,11 +110,26 @@ from github.com's redirect, not the API, whose 60-an-hour limit for an address h
 **`v0.1.3`** adds private instances (`LUMINOUS_MONEY_SERVICE_MODE`, `LUMINOUS_MONEY_ALLOWED_EMAILS`), and **`v0.1.4`**
 `LUMINOUS_MONEY_SIMPLEFIN_MODE`; **`v0.1.5`** names them all `LUMINOUS_MONEY_*` (they were `LM_*`);
 **`v0.1.10`** (2026-10-27) brings the chart of accounts import and migrating from another
-system, **`v0.1.11`** what the AI costs, and **`v0.1.12`** (2026-10-29) tags (M17) and the
-migration's clearer word on what's kept. The history was rewritten once before
+system, **`v0.1.11`** what the AI costs, **`v0.1.12`** (2026-10-29) tags (M17) and the
+migration's clearer word on what's kept, and **`v0.1.13`** (2026-11-02) Funds A. The history was rewritten once before
 the first push (an email taken out of RESUME), so commit IDs from before then are gone.
 
 What a user can do now:
+- **Funds (Funds A):** Menu → **Funds**: net worth, what's in funds, and Unallocated
+  (everything that isn't in a fund, the house and retirement included); each fund's balance (red
+  below zero), description and progress toward its target; **Move money** between funds
+  (either can be Unallocated) and, for managers, **New fund**; archived funds folded below. A
+  fund's page has its history (newest first, with a running balance; a move opens to change or
+  delete it), Move money, and for managers Settings (name, description, target), Archive… (what's
+  left goes to Unallocated or another fund, on a day) or Unarchive, and Delete (with no
+  history). A transaction's page (and New transaction, and a schedule) has a **Funds** section:
+  what it is ("$1,000.00 coming in"), a line per fund (To on money in, From on spending, For on
+  a transfer, whose **More options** takes from funds too), "+ Another fund", and what it does
+  to each fund, Unallocated included; more than the transaction is refused, and a fund taken
+  below zero is noted. Review cards have a fund select (the whole amount), Select mode has
+  **Fund…**, a rule's **Fund** puts what it imports toward (or takes it from) a fund, rows show
+  chips ("to Emergency"), and home has a Funds card. Writers choose funds and move money;
+  managers set funds up.
 - **Tags (M17):** a transaction's page has **Tags** (type to add: suggestions from the book's
   tags, or a new one, made lowercase and dashed: "Trip to Italy" is `#trip-to-italy`; × removes
   one). Select mode (review, ledgers, Transactions) adds a tag to the selection (**Add tag…**) or
@@ -276,6 +311,9 @@ How it's put together:
     value, gain) and account ledgers computed with SQL; subtrees for brokerages.
   - Investments (`investments.py`): prices, valuation, account-scoped booking for cost basis,
     holdings, trades, revaluation, beanprice fetching.
+  - Funds (`funds.py`, `fundlines.py`, Funds A): the funds list with net worth and
+    Unallocated, setup, renames, archiving, history, moves, and the checks on a transaction's
+    lines (only when they change).
   - Versioned PATCH edits, batch writes, atomic create-and-delete (`/transactions/changes`),
     migrations, backups and export.
 - **`services/app`** (TypeScript): the PWA, plus stars, CSV profiles, imports, the pipeline
@@ -303,10 +341,10 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 198 tests, including the table lint
-    - auth: 24; app: 222; ai: 14; db: 10; csv-import: 22
+    - ledger: 228 tests, including the table lint
+    - auth: 24; app: 248; ai: 14; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 94 API tests and 108 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 100 API tests and 121 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Its `.env` (not committed: its keys) sets `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand`, so it never
@@ -325,8 +363,9 @@ How it's put together:
    two exports. Real Claude calls with a reference haven't been seen yet (no key in the repo);
    watch the first suggestions' quality and `docker compose logs ai`. Not built from the
    proposal: a by-payee view in review (categorize a payee's group at once).
-3. **Funds** (next): being designed with Kael; see [its plan](docs/milestones/funds/PLAN.md) and
-   the hand-off above. Then M18 (suggested recurring transactions and matching rules).
+3. **Funds B**, starting with asset-aware funds ([its plan](docs/milestones/funds/B/PLAN.md)),
+   once Kael has looked over Funds A's decisions to review. Then M18 (suggested recurring
+   transactions and matching rules).
 4. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
    ownership transfer, the rest of M8's auth questions).
 
@@ -348,7 +387,15 @@ How it's put together:
   @luminous-money/ledger-client build`): the services read its built `dist` types, so they see
   the old API until then. (`pnpm test` builds it in Docker.)
 - **Tags live in the transaction's text; `transaction_tag` is derived** (written by
-  `store.put`, like `posting`). Change tags through the transaction, never the table.
+  `store.put`, like `posting`). Change tags through the transaction, never the table. Fund
+  lines are the same: `funds:` in the text, `fund_line` derived.
+- **A fund's lines are checked only when they change** (`fundlines.checked` compares with the
+  stored ones), so recategorizing, pairing or matching can't fail on a fund; the transaction
+  page says when saved lines no longer fit, and saves the rest. Fund names match ignoring case,
+  are kept as their fund is named, can't hold `; " \ /`, and are never Unallocated.
+- **Links are accent-colored by one rule** (`main a:not(.button):not(.card)…` in `styles.css`):
+  a link styled as a row (budget rows, the largest, home's fund rows) has to be added to its
+  `:not()` list, or it comes out blue whatever its own rule says.
 
 - **Behind a TLS proxy, session cookies are `__Host-lm_access` / `__Secure-lm_refresh`;** on
   plain HTTP, `lm_access` / `lm_refresh`. auth reads either (prefixed first), because a request

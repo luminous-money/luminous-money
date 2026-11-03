@@ -20,6 +20,8 @@ import { ReceiptButton } from "./components/ReceiptButton.js";
 import { AddAccount } from "./pages/AddAccount.js";
 import { Books } from "./pages/Books.js";
 import { Budgets } from "./pages/Budgets.js";
+import { FundPage } from "./pages/FundPage.js";
+import { FundsPage } from "./pages/Funds.js";
 import { Reports } from "./pages/Reports.js";
 import { InvitationPage } from "./pages/Invitation.js";
 import { Sharing } from "./pages/Sharing.js";
@@ -144,6 +146,14 @@ function Gate() {
           </Route>
           <Route path="/books/:book/budgets">
             {({ book: id }) => <Budgets key={id} book={id} />}
+          </Route>
+          <Route path="/books/:book/funds">
+            {({ book: id }) => <FundsPage key={id} book={id} />}
+          </Route>
+          <Route path="/books/:book/funds/:fund">
+            {({ book: id, fund }) => (
+              <FundPage key={fund} book={id} name={decodeURIComponent(fund)} />
+            )}
           </Route>
           <Route path="/books/:book/transactions">
             {({ book: id }) => <Transactions key={id} book={id} />}

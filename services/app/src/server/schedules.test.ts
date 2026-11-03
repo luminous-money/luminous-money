@@ -122,6 +122,39 @@ describe("saving schedules", () => {
     });
   });
 
+  it("carries its fund lines onto every occurrence, and refuses lines that don't fit (Funds A)", async () => {
+    ledger.fundList = [{ name: "Housing" }];
+    const withFunds = (number: string): ScheduleIn => ({
+      ...rent(),
+      template: {
+        ...rent().template,
+        funds: [{ fund: "Housing", amount: { number, currency: "USD" } }],
+      },
+    });
+    await expect(create(withFunds("-1600.00"), "2024-01-01")).rejects.toThrow(
+      "Its funds give 1,600.00 USD, more than the 1,500.00 USD that went out"
+    );
+    await expect(
+      create(
+        {
+          ...withFunds("-100.00"),
+          template: {
+            ...withFunds("-100.00").template,
+            funds: [{ fund: "Nope", amount: { number: "-1.00", currency: "USD" } }],
+          },
+        },
+        "2024-01-01"
+      )
+    ).rejects.toThrow("Nope isn't an active fund");
+
+    await create(withFunds("-1500.00"), "2024-02-01");
+
+    expect(ledger.transactions.map((t) => t.funds)).toEqual([
+      [{ fund: "Housing", amount: { number: "-1500.00", currency: "USD" } }],
+      [{ fund: "Housing", amount: { number: "-1500.00", currency: "USD" } }],
+    ]);
+  });
+
   it("edits are versioned", async () => {
     const s = await create(rent({ start: "2025-01-01" }), "2024-03-10");
     const edit = (updated_at: string) =>

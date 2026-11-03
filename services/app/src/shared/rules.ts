@@ -30,6 +30,9 @@ export type CategoryRule = {
   part: string | null;
   /** Stage matching transactions confirmed, skipping review. */
   auto_confirm: boolean;
+  /** A fund they're taken from (money out) or put toward (money in, a transfer), all of it
+   * (Funds A). */
+  fund: string | null;
   /** How many transactions it has categorized. */
   applied: number;
   created_at: string;
@@ -39,7 +42,7 @@ export type CategoryRule = {
 export type CategoryRuleIn = Pick<
   CategoryRule,
   "name" | "conditions" | "account" | "payee" | "auto_confirm"
-> & { part?: string | null };
+> & { part?: string | null; fund?: string | null };
 
 export type CategoryRulePatch = Partial<CategoryRuleIn> & { updated_at: string };
 

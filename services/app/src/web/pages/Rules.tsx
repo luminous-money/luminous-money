@@ -51,7 +51,16 @@ export function Rules({ book }: { book: string }) {
           <Link key={r.id} href={`/books/${book}/rules/${r.id}`} className="card link account-card">
             <div className="account-card-top">
               <h2>{r.name}</h2>
-              <span className="muted small">{shortName(r.account)}</span>
+              <span className="muted small">
+                {shortName(r.account)}
+                {r.fund && (
+                  <span className="tags">
+                    <span className="tag fund-chip" title={`All of it, to or from ${r.fund}`}>
+                      <span className="fund-chip-name">{r.fund}</span>
+                    </span>
+                  </span>
+                )}
+              </span>
             </div>
             <p className="muted small">
               {conditionsInWords(r)}

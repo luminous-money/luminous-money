@@ -2,12 +2,14 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 import { partOf } from "../../shared/divided.js";
+import { shapeOf } from "../../shared/funds.js";
 import { payeeKey } from "../../shared/payees.js";
 import { AccountPicker } from "../components/AccountPicker.js";
 import { displayName, postable, shortName } from "../lib/accounts.js";
 import type { CategoryRule, CategoryRuleIn } from "../lib/appApi.js";
 import { isDecimal } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
+import { wholeFund } from "../lib/funds.js";
 import { useBack, useParam } from "../lib/navigation.js";
 import {
   explain,
@@ -15,6 +17,7 @@ import {
   useAccounts,
   useApplyRule,
   useDeleteRule,
+  useFunds,
   useRule,
   useSaveRule,
   useTransaction,
@@ -27,6 +30,7 @@ const BLANK: CategoryRuleIn = {
   account: "",
   payee: null,
   part: null,
+  fund: null,
   auto_confirm: false,
 };
 
@@ -54,6 +58,10 @@ export function RuleEditor({ book, id }: { book: string; id?: string }) {
       account: view.counterpart.account,
       payee: t.payee ?? null,
       part: whole && view.anchor.account !== main ? view.anchor.account : null,
+      // A fund it was all for (Funds A): a rule's fund is always the whole amount.
+      fund:
+        (t.funds?.[0] && wholeFund(t.funds, shapeOf(t.postings, t.funds[0].amount.currency))) ||
+        null,
       auto_confirm: false,
     };
   }
@@ -107,6 +115,11 @@ function Form({
   const [category, setCategory] = useState(initial.account);
   const [payee, setPayee] = useState(initial.payee ?? "");
   const [part, setPart] = useState(initial.part ?? "");
+  const [fund, setFund] = useState(initial.fund ?? "");
+  const listing = useFunds(book).data;
+  const activeFunds = listing?.funds.filter((f) => !f.archived).map((f) => f.name) ?? [];
+  // A fund it names that's been archived since (or isn't there): imports leave it off.
+  const fundGone = !!fund && !!listing && !activeFunds.includes(fund);
   const [autoConfirm, setAutoConfirm] = useState(initial.auto_confirm);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<{ id: string; covers: number } | null>(null);
@@ -152,6 +165,9 @@ function Form({
       account: category,
       payee: payee.trim() || null,
       part: (whole && part) || null,
+      // Unchanged, it's left out: a fund archived since stays on the rule rather than refusing
+      // the rest of the edit.
+      ...(rule && fund === (rule.fund ?? "") ? {} : { fund: fund || null }),
       auto_confirm: autoConfirm,
     };
     try {
@@ -295,6 +311,32 @@ function Form({
             placeholder="e.g. Corner Cafe"
           />
         </label>
+        {(activeFunds.length > 0 || fund) && (
+          <label>
+            <span>
+              Fund <span className="muted">(optional)</span>
+            </span>
+            <select value={fund} onChange={(e) => setFund(e.target.value)}>
+              <option value="">None</option>
+              {activeFunds.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+              {fundGone && <option value={fund}>{fund} (archived)</option>}
+            </select>
+            <span className="small muted">
+              What it matches is taken from this fund (spending), or put toward it (money in, a
+              transfer): all of it.
+            </span>
+          </label>
+        )}
+        {fundGone && (
+          <p className="small warning">
+            {fund} is archived: what this rule matches is left in Unallocated until you choose
+            another fund, or unarchive it.
+          </p>
+        )}
         <label className="check">
           <input
             type="checkbox"

@@ -5,6 +5,7 @@ import { Link, useLocation } from "wouter";
 import { Attachments, type Pending } from "../components/Attachments.js";
 import { ReceiptNote } from "../components/ReceiptNote.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
+import { FundsFieldset, fundsShown, useFundRows } from "../components/Funds.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
 import { PartChoice } from "../components/PartChoice.js";
 import { SplitsFieldset, useSplits } from "../components/Splits.js";
@@ -19,6 +20,7 @@ import {
   useCanWrite,
   useCreateTransaction,
   useEditTransaction,
+  useFunds,
   useTags,
   useTransaction,
 } from "../lib/queries.js";
@@ -137,6 +139,17 @@ function Editor({
   const fallbackCurrency = useMemo(() => currencyOf(t), [t]);
   const splits = useSplits(t.postings, fallbackCurrency);
   const { postings, balance, unresolved } = splits;
+  // Funds (Funds A): read from the splits as they're being edited.
+  const listing = useFunds(book);
+  const funds = useFundRows(
+    t.funds,
+    t.postings,
+    balance.state === "invalid" ? null : postings,
+    listing.data?.currency
+  );
+  // Lines are checked only when they change (as the ledger does): ones that no longer fit are
+  // said, not a reason the rest can't be saved.
+  const fundsBlocked = funds.changed && !!funds.problem;
   const busy = edit.isPending || add.isPending;
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
   const names = accounts.data ? postable(accounts.data, date) : [];
@@ -155,7 +168,16 @@ function Editor({
     if (changesReconciled && !confirming) return setConfirming(true);
     setConfirming(false);
     try {
-      const changes = { date, flag, payee: payee.trim() || null, narration, tags, postings, meta };
+      const changes = {
+        date,
+        flag,
+        payee: payee.trim() || null,
+        narration,
+        tags,
+        postings,
+        meta,
+        ...(funds.changed ? { funds: funds.lines } : {}),
+      };
       if (isNew) {
         const created = await add.mutateAsync({ ...changes, links: [] });
         for (const file of pending) await attachments.add(book, created.id, file.blob, file.name);
@@ -230,6 +252,14 @@ function Editor({
 
       <PartChoice book={book} postings={splits.rows} onChange={(rows) => splits.setRows(rows)} />
       <SplitsFieldset splits={splits} accounts={names} create={create} />
+      {funds.ready && fundsShown(listing.data, t.funds) && (
+        <FundsFieldset
+          book={book}
+          funds={funds}
+          balanced={balance.state !== "invalid"}
+          readOnly={!canWrite}
+        />
+      )}
       <ExcludeFromBudget meta={meta} onChange={setMeta} />
 
       <ReceiptNote meta={t.meta} />
@@ -263,15 +293,25 @@ function Editor({
         <Link href={back} className="button">
           Back
         </Link>
-        <button type="submit" disabled={busy || balance.state === "invalid"}>
+        <button
+          type="submit"
+          disabled={busy || balance.state === "invalid" || fundsBlocked}
+          title={fundsBlocked ? (funds.problem ?? undefined) : undefined}
+        >
           Save
         </button>
         {staged && (
           <button
             type="button"
             className="primary"
-            disabled={busy || balance.state === "invalid" || unresolved}
-            title={unresolved ? "Choose an account for every split first" : undefined}
+            disabled={busy || balance.state === "invalid" || unresolved || fundsBlocked}
+            title={
+              unresolved
+                ? "Choose an account for every split first"
+                : fundsBlocked
+                  ? (funds.problem ?? undefined)
+                  : undefined
+            }
             onClick={() => void submit("*", back)}
           >
             Confirm
