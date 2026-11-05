@@ -12,6 +12,8 @@ import {
   type CategorizeOut,
   type Eagerness,
   type ExtractIn,
+  type LoanTableFacts,
+  type LoanTableIn,
   type ProviderName,
   type ReceiptFacts,
 } from "@luminous-money/ai-api";
@@ -34,6 +36,8 @@ export interface Provider {
     credential: string | null,
     meter?: Meter
   ): Promise<CategorizeOut>;
+  /** Read a loan's amortization schedule into rows. */
+  loanTable(input: LoanTableIn, credential: string | null, meter?: Meter): Promise<LoanTableFacts>;
 }
 
 /** The provider couldn't answer (declined, failed, or answered nonsense): `app` carries on
@@ -214,5 +218,79 @@ export const PROPOSALS_JSON_SCHEMA = {
       },
     },
     new_accounts: { type: "array", items: { type: "string" } },
+  },
+} as const;
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** What a schedule's facts must look like. Rows that don't read are dropped (the app checks
+ * what's left adds up); with none left, it wasn't read. */
+const LoanTableSchema = z.object({
+  lender: nullable(z.string()),
+  amount: nullable(decimal),
+  rate: nullable(decimal),
+  payments: nullable(z.number().int().positive()),
+  first: nullable(z.string().regex(DATE)),
+  rows: z
+    .array(z.unknown())
+    .catch([])
+    .transform((rows) =>
+      rows.flatMap((r) => {
+        const row = z
+          .object({
+            number: nullable(z.number().int()),
+            date: nullable(z.string().regex(DATE)),
+            principal: decimal,
+            interest: decimal,
+            escrow: nullable(decimal),
+            balance: decimal,
+          })
+          .safeParse(r);
+        return row.success ? [row.data] : [];
+      })
+    ),
+  note: nullable(z.string()),
+});
+
+export function checkedLoanTable(answer: unknown): LoanTableFacts {
+  const parsed = LoanTableSchema.safeParse(answer);
+  if (!parsed.success || !parsed.data.rows.length)
+    throw new ReadFailed("the answer wasn't an amortization schedule's payments");
+  return parsed.data;
+}
+
+const count = (description: string) => ({
+  anyOf: [{ type: "integer" }, { type: "null" }],
+  description,
+});
+
+/** A schedule's JSON Schema, for providers that constrain their output to one. */
+export const LOAN_TABLE_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["lender", "amount", "rate", "payments", "first", "rows", "note"],
+  properties: {
+    lender: text("Who the loan is with, as a person would name them."),
+    amount: text("What was borrowed, as a decimal."),
+    rate: text("The yearly interest rate, as a percent: 3.75 for 3.75%."),
+    payments: count("How many payments the loan has, in all."),
+    first: text("The first payment's due date, YYYY-MM-DD."),
+    rows: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["number", "date", "principal", "interest", "escrow", "balance"],
+        properties: {
+          number: count("The payment's number, as printed."),
+          date: text("Its due date, YYYY-MM-DD."),
+          principal: { type: "string", description: "Principal paid, as a decimal." },
+          interest: { type: "string", description: "Interest paid, as a decimal." },
+          escrow: text("Escrow (or other amounts paid with it), if the schedule shows them."),
+          balance: { type: "string", description: "What's owed after it, as a decimal." },
+        },
+      },
+    },
+    note: text("Anything a person should know about reading it, in one short sentence."),
   },
 } as const;

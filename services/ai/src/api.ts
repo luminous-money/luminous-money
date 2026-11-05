@@ -17,6 +17,7 @@ import {
   type AiSettingsPatch,
   type CategorizeIn,
   type ExtractIn,
+  type LoanTableIn,
   type ProviderName,
 } from "@luminous-money/ai-api";
 
@@ -210,6 +211,18 @@ export function createApi({
     if (input.file.data.length > MAX_BASE64)
       return c.json({ detail: "a receipt is at most 5 MB" }, 413);
     return answer(c, "extract", (meter) => use.provider.extract(input, use.credential, meter));
+  });
+
+  /** What a loan's amortization schedule says: its rows, and its terms where it prints them. */
+  api.post("/books/:book/loans/extract", async (c) => {
+    const use = await ready(c);
+    if (use.refused) return use.refused;
+    const input = (await c.req.json().catch(() => null)) as LoanTableIn | null;
+    if (!input?.file?.data || !input.file.media_type || !input.currency)
+      return c.json({ detail: "send the schedule and the currency" }, 422);
+    if (input.file.data.length > MAX_BASE64)
+      return c.json({ detail: "a schedule is at most 5 MB" }, 413);
+    return answer(c, "loan-table", (meter) => use.provider.loanTable(input, use.credential, meter));
   });
 
   /** Where transactions' unconfirmed splits belong, with the book's guidance (and its

@@ -1161,6 +1161,47 @@ plan](milestones/funds/B/PLAN.md) has the walkthrough and Kael's answers ("Decid
   will do before it's saved. They stay "Funds" though they hold mutual funds: holdings are always
   named by ticker.
 
+### Loans, step 1 (2026-11-05)
+
+A loan is managed from an amortization table, and its payments are staged with principal,
+interest and anything paid with them (escrow, PMI) apart. [The loans plan](milestones/loans/PLAN.md)
+has the walkthrough, Kael's answers and the calls made without asking.
+
+- **A loan is accounts, tables, others and extras.** Its accounts: what's owed (a liability),
+  what pays it, where interest goes, and optionally what it bought. Its first **table** is where
+  it starts, worked out from terms or imported (a CSV with its columns guessed, or a PDF or image
+  read by the book's AI); a later table takes over from its date (the lender's new schedule, an
+  adjustable rate's reset). **Others** are each a name, an account and an amount from a date, so
+  "escrow becomes $482.17 from January" is a new version of Escrow. **Extras** are extra
+  principal with every payment from a date.
+- **The books win; the table is where they start** (Kael). A payment is its table's row while
+  what the books say is owed before it is what the row says was owed, to the cent, so an imported
+  table is honored as the lender wrote it, rounding included. Otherwise (after an extra payment,
+  a re-base) it's worked out from the books: interest is a month's rate on what's owed the day
+  before it's due, principal is the rest of the table's payment, which stays the same, so the
+  loan ends sooner. Only a new table changes the payment. That's how an amortized loan works:
+  an extra payment invalidates the rest of the original table.
+- **The payment is an M3 schedule the loan keeps,** its occurrences worked out by the loan
+  (`server/loan-payments.ts`), so review, matching the bank's row (the paying split carries the
+  tolerance; principal takes up the difference), auto-confirm and upcoming rows are schedules'.
+  Its schedule can't be edited or deleted on its own. A payment already in the paying account
+  (the bank's) is filled in rather than staged twice.
+- **History, when a loan is declared already under way:** *from the start* (the borrowing, then
+  every payment due, confirmed or not; those due before the paying account's books begin come
+  from Opening Balances and are principal and interest only, so that account's balance isn't
+  changed by money that left before its history); *from today* (one transaction saying what's
+  owed, against Opening Balances or, for an asset not in the books, the asset; Kael); or
+  *already in the books*. Payments from the next one.
+- **Changing it:** a dated change fills in again the unconfirmed payments from its date
+  (confirmed ones stay). **Extra payment** writes its own transaction toward principal. **The
+  lender's statement** (what was owed on a day) writes the difference as an adjustment (against
+  interest by default), so the books agree with the lender.
+- **Escrow is an account the lender holds** (`Assets:Escrow:…`): the payment fills it, and the
+  tax bill and insurance are ordinary schedules paid out of it, which the loan's page lists and
+  links to, with "+ A payment from escrow". Its balance follows what the lender does.
+- **Kept in `app`** (migration 20), beside the schedule it drives: a book's export doesn't carry
+  loans, as it doesn't carry schedules; whole-system backups do.
+
 ### Bank feeds: SimpleFIN (M9)
 
 [SimpleFIN](https://www.simplefin.org/protocol.html), usually through the SimpleFIN Bridge, is the

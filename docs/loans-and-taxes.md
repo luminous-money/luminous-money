@@ -40,8 +40,9 @@ car. Revaluing the car records its depreciation.
 
 In double-entry, principal isn't spending: it's debt paid down. So budgets (M11) count only the
 interest, taxes and insurance ($1,400 above), not the $2,500 that left checking. Thinking of the
-whole payment as the month's housing cost is natural, though. Two ways to close that gap, neither
-built yet:
+whole payment as the month's housing cost is natural, though. Two ways to close that gap, which
+[Loans](milestones/loans/PLAN.md) builds (2026-11-05): a loan's payments from its table (step 1),
+and outflows (step 2), counting what's paid into a liability or escrow as spending:
 
 1. **"Count payments as spending"** on a liability account: budgets and "Spent this month" would
    include its paydown, while the books stay correct.

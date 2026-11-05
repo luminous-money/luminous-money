@@ -40,6 +40,9 @@ import {
   upcomingOccurrences,
   view,
 } from "./schedules.js";
+import { createLoan, editLoan, extraPayment, LoanProblem, loanView, rebaseLoan } from "./loans.js";
+import { readLoanTable } from "./loan-read.js";
+import type { LoanIn, LoanPatch, LoanRebaseIn } from "../shared/loans.js";
 import type { Categorizer } from "./categorize/types.js";
 import { ruleProblem } from "./categorize/rules.js";
 import { aiCategorizer } from "./categorize/ai.js";
@@ -324,7 +327,7 @@ export function createApi({
   // after it. Without, the request waits, as it always did (scripts, the API suite).
   const jobs = new Jobs();
   const failureOf = (error: unknown): Failure =>
-    error instanceof ReceiptProblem || error instanceof LedgerError
+    error instanceof ReceiptProblem || error instanceof LedgerError || error instanceof LoanProblem
       ? { status: error.status, detail: error.message }
       : {
           status: 500,
@@ -346,6 +349,7 @@ export function createApi({
       return c.json(await work(() => {}), status);
     } catch (error) {
       if (error instanceof ReceiptProblem) return c.json({ detail: error.message }, error.status);
+      if (error instanceof LoanProblem) return c.json({ detail: error.message }, error.status);
       return c.json(...ledgerStatus(error));
     }
   };
@@ -1398,8 +1402,124 @@ export function createApi({
     const { book, id } = c.req.param();
     if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
     if (!db.schedule(book, id)) return c.json({ detail: "not found" }, 404);
+    if (db.loanOf(id))
+      return c.json({ detail: "this schedule follows a loan: delete the loan instead" }, 422);
     try {
       db.deleteSchedule(book, id, c.req.query("updated_at") ?? "");
+    } catch (error) {
+      if (error instanceof StaleVersion) return c.json({ detail: error.message }, 409);
+      throw error;
+    }
+    return c.body(null, 204);
+  });
+
+  // Loans: a loan's payments are a schedule's, worked out by the loan.
+  const loanError = (error: unknown): readonly [{ detail: string }, 404 | 409 | 422] => {
+    if (error instanceof LoanProblem) return [{ detail: error.message }, error.status];
+    if (error instanceof StaleVersion) return [{ detail: error.message }, 409];
+    if (error instanceof LedgerError && [404, 409, 422].includes(error.status))
+      return [{ detail: error.message }, error.status as 404 | 409 | 422];
+    throw error;
+  };
+
+  /** Read a lender's amortization schedule (multipart `file`: a PDF or an image) with the
+   * book's AI, into rows to check and save. With `Prefer: respond-async`, as a job. */
+  api.post("/books/:book/loans/read", async (c) => {
+    const { book } = c.req.param();
+    const form = await c.req.parseBody();
+    const file = form["file"];
+    if (!(file instanceof File)) return c.json({ detail: "send the schedule as `file`" }, 422);
+    // Images are made smaller before they're read; a PDF goes as it is, and the AI takes 5 MB.
+    if (file.size > (file.type === "application/pdf" ? 5 * 1024 * 1024 : UPLOAD_LIMIT))
+      return c.json({ detail: "a PDF schedule is at most 5 MB" }, 413);
+    const user = c.get("user");
+    const currency = (await ledgerFor(user).book(book))?.currency ?? "USD";
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    return readNowOrLater(c, book, 200, () =>
+      readLoanTable({
+        ai: aiFor?.(user),
+        book,
+        file: { name: file.name, type: file.type, bytes },
+        currency,
+      })
+    );
+  });
+
+  /** The book's loans, each with what's owed and its next payment. */
+  api.get("/books/:book/loans", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    const ledger = ledgerFor(c.get("user"));
+    return c.json(
+      await Promise.all(db.loans(book).map((l) => loanView(db, ledger, l, { brief: true })))
+    );
+  });
+
+  /** Declare a loan, with how its history comes into the books, and stage what's due. */
+  api.post("/books/:book/loans", async (c) => {
+    const { book } = c.req.param();
+    const input = (await c.req.json().catch(() => null)) as LoanIn | null;
+    try {
+      return c.json(await createLoan({ db, ledgerFor, user: c.get("user"), book, input }), 201);
+    } catch (error) {
+      return c.json(...loanError(error));
+    }
+  });
+
+  api.get("/books/:book/loans/:id", async (c) => {
+    const { book, id } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    const found = db.loan(book, id);
+    return found
+      ? c.json(await loanView(db, ledgerFor(c.get("user")), found))
+      : c.json({ detail: "not found" }, 404);
+  });
+
+  /** Change a loan (only the fields sent), against `updated_at`: its unconfirmed payments from
+   * the earliest date a change touches are filled in again. */
+  api.patch("/books/:book/loans/:id", async (c) => {
+    const { book, id } = c.req.param();
+    const patch = (await c.req.json().catch(() => null)) as LoanPatch | null;
+    try {
+      return c.json(await editLoan({ db, ledgerFor, user: c.get("user"), book, id, patch }));
+    } catch (error) {
+      return c.json(...loanError(error));
+    }
+  });
+
+  /** What the lender says was owed on a date: the difference is written as an adjustment. */
+  api.post("/books/:book/loans/:id/rebase", async (c) => {
+    const { book, id } = c.req.param();
+    const input = (await c.req.json().catch(() => null)) as LoanRebaseIn | null;
+    try {
+      return c.json(await rebaseLoan({ db, ledgerFor, user: c.get("user"), book, id, input }));
+    } catch (error) {
+      return c.json(...loanError(error));
+    }
+  });
+
+  /** An extra payment toward principal, on a date. */
+  api.post("/books/:book/loans/:id/extra", async (c) => {
+    const { book, id } = c.req.param();
+    const input = (await c.req.json().catch(() => null)) as {
+      date: string;
+      amount: string;
+      from?: string | null;
+    } | null;
+    try {
+      return c.json(await extraPayment({ db, ledgerFor, user: c.get("user"), book, id, input }));
+    } catch (error) {
+      return c.json(...loanError(error));
+    }
+  });
+
+  /** Delete a loan and its schedule, against `?updated_at=`. What they staged stays. */
+  api.delete("/books/:book/loans/:id", async (c) => {
+    const { book, id } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    if (!db.loan(book, id)) return c.json({ detail: "not found" }, 404);
+    try {
+      db.deleteLoan(book, id, c.req.query("updated_at") ?? "");
     } catch (error) {
       if (error instanceof StaleVersion) return c.json({ detail: error.message }, 409);
       throw error;

@@ -35,6 +35,7 @@ import { StaleVersion, type AppDb, type StoredSchedule } from "./db.js";
 import type { DailyJob } from "./daily.js";
 import { fundChoices, type FundChoices } from "./funds.js";
 import { STAGING, type LedgerPort } from "./ledger.js";
+import { stageLoanPayments } from "./loan-payments.js";
 
 export const SCHEDULE_KEY = "schedule";
 export const SCHEDULE_DATE_KEY = "schedule-date";
@@ -157,6 +158,8 @@ export async function editSchedule({
   const current = db.schedule(book, id);
   if (!current) throw new ScheduleProblem(404, "not found");
   if (!patch?.updated_at) throw new ScheduleProblem(422, "send the updated_at you read");
+  if (db.loanOf(id))
+    throw new ScheduleProblem(422, "this schedule follows a loan: change the loan");
   const { updated_at, ...changes } = patch;
   const merged = { ...current, ...changes };
   const problem = scheduleProblem(
@@ -264,10 +267,17 @@ export function upcomingOccurrences(
     .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
 }
 
+/** What every occurrence carries: its schedule and nominal date. */
+export const occurrenceMeta = (id: string) => (o: Occurrence) => ({
+  [SCHEDULE_KEY]: id,
+  [SCHEDULE_DATE_KEY]: o.nominal,
+});
+
 /**
  * Stage every due occurrence of the active schedules (all of them, or one book's, or one
  * schedule), each due by today in its book's time zone (or `on`). Each schedule's occurrences
- * are one atomic ledger write. Returns how many were staged.
+ * are one atomic ledger write; a loan's are worked out by the loan (loan-payments.ts), and
+ * `flag` overrides how they're staged. Returns how many were staged.
  */
 export async function runSchedules({
   db,
@@ -275,19 +285,34 @@ export async function runSchedules({
   on,
   book,
   id,
+  flag,
 }: {
   db: AppDb;
   ledgerFor: (userId: string) => LedgerPort;
   on?: string;
   book?: string;
   id?: string;
+  flag?: "*" | "!";
 }): Promise<number> {
   let staged = 0;
   for (const s of db.activeSchedules()) {
     if ((book && s.book_id !== book) || (id && s.id !== id)) continue;
     const occurrences = due(s.rule, s.last_applied, on ?? bookToday(db, s.book_id));
     if (!occurrences.length) continue;
+    const loan = db.loanOf(s.id);
     try {
+      if (loan) {
+        staged += await stageLoanPayments({
+          db,
+          ledger: ledgerFor(s.user_id),
+          loan,
+          schedule: s,
+          occurrences,
+          meta: occurrenceMeta(s.id),
+          ...(flag ? { flag } : {}),
+        });
+        continue;
+      }
       const created = await ledgerFor(s.user_id).createTransactions(
         s.book_id,
         occurrences.map((o) => occurrenceTransaction(s, o)),

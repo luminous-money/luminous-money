@@ -3339,3 +3339,95 @@ select.fund-pick {
   cursor: pointer;
   color: var(--muted);
 }
+
+/* Loans: the payments tables, the CSV's columns, the parts paid with a payment, escrow. */
+
+/* A phone scrolls a wide table rather than the page. */
+.loan-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* A fieldset or grid item is as wide as its widest content unless told otherwise. */
+.loan-page > *,
+.loan-editor fieldset {
+  min-width: 0;
+}
+
+.loan-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+.loan-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 0.25rem 0;
+}
+
+.loan-table td {
+  padding: 0.3rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.loan-table .num {
+  text-align: right;
+  padding-left: 0.6rem;
+}
+
+.loan-table .due {
+  white-space: nowrap;
+}
+
+.loan-preview,
+.loan-summary {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.loan-preview p,
+.loan-summary p {
+  margin: 0;
+}
+
+.loan-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.6rem;
+}
+
+.loan-other {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.loan-history {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.loan-changes {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.1rem;
+}
+
+.loan-escrow {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.loan-escrow .button {
+  justify-self: start;
+}
+
+@media (max-width: 480px) {
+  .loan-table {
+    font-size: 0.8rem;
+  }
+}

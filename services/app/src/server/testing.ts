@@ -473,8 +473,17 @@ export class FakeLedger implements LedgerPort {
   }
   private sum(account: string, keep: (t: Transaction) => boolean) {
     return this.transactions
-      .filter((t) => keep(t) && this.posting(t, account)?.units)
-      .reduce((total, t) => add(total, this.posting(t, account)!.units!.number), "0");
+      .filter((t) => keep(t) && this.posting(t, account))
+      .reduce((total, t) => add(total, this.units(t, account) ?? "0"), "0");
+  }
+
+  /** A posting's amount, a lone blank worked out from the others (as booking would). */
+  private units(t: Transaction, account: string): string | null {
+    const p = this.posting(t, account)!;
+    if (p.units) return p.units.number;
+    const others = t.postings.filter((o) => o !== p);
+    if (others.some((o) => !o.units)) return null;
+    return negate(others.reduce((total, o) => add(total, o.units!.number), "0"));
   }
 
   attachments: { transaction: string; name: string; type: string; size: number }[] = [];

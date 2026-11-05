@@ -33,6 +33,7 @@ import { statusMessage } from "./format.js";
 import { ApiError, type Attachment } from "./ledger.js";
 import type { PairedTransfer } from "../../shared/transfers.js";
 import type { SystemInfo } from "../../shared/system.js";
+import type { LoanIn, LoanPatch, LoanRead, LoanRebaseIn, LoanView } from "../../shared/loans.js";
 import type { ReconcileDraft, ReconcileView, Reconciled } from "../../shared/reconcile.js";
 import type {
   Breakdown,
@@ -331,12 +332,13 @@ const WAIT_FOR = 10 * 60_000;
 async function awaited<T>(
   book: string,
   started: Response,
-  onStep?: (step: ReceiptStep) => void
+  onStep?: (step: ReceiptStep) => void,
+  waitFor = WAIT_FOR
 ): Promise<T> {
   if (started.status === 504) throw new OutcomeUnknown(504, statusMessage(504, started.statusText));
   if (started.status !== 202) return json<T>(started);
   const { id } = (await started.json()) as { id: string };
-  const until = Date.now() + WAIT_FOR;
+  const until = Date.now() + waitFor;
   let blipsSince: number | null = null;
   let lastBlip = "";
   while (Date.now() < until) {
@@ -369,7 +371,7 @@ async function awaited<T>(
   }
   throw new OutcomeUnknown(
     0,
-    "It's still being worked on after 10 minutes. It may yet finish: look before trying again."
+    `It's still being worked on after ${Math.round(waitFor / 60_000)} minutes. It may yet finish: look before trying again.`
   );
 }
 
@@ -731,6 +733,74 @@ export const appApi = {
 
   upcoming: async (book: string, days = UPCOMING_DAYS): Promise<UpcomingOccurrence[]> =>
     json(await apiFetch(`${base(book)}/schedules/upcoming?days=${days}`)),
+
+  // Loans
+
+  loans: async (book: string): Promise<LoanView[]> => json(await apiFetch(`${base(book)}/loans`)),
+
+  loan: async (book: string, id: string): Promise<LoanView> =>
+    json(await apiFetch(`${base(book)}/loans/${id}`)),
+
+  createLoan: async (book: string, loan: LoanIn): Promise<LoanView> =>
+    json(
+      await apiFetch(`${base(book)}/loans`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(loan),
+      })
+    ),
+
+  editLoan: async (book: string, id: string, patch: LoanPatch): Promise<LoanView> =>
+    json(
+      await apiFetch(`${base(book)}/loans/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(patch),
+      })
+    ),
+
+  rebaseLoan: async (book: string, id: string, rebase: LoanRebaseIn): Promise<LoanView> =>
+    json(
+      await apiFetch(`${base(book)}/loans/${id}/rebase`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(rebase),
+      })
+    ),
+
+  extraPayment: async (
+    book: string,
+    id: string,
+    payment: { date: string; amount: string; from?: string | null }
+  ): Promise<LoanView> =>
+    json(
+      await apiFetch(`${base(book)}/loans/${id}/extra`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payment),
+      })
+    ),
+
+  async deleteLoan(book: string, loan: LoanView): Promise<void> {
+    const response = await apiFetch(
+      `${base(book)}/loans/${loan.id}?updated_at=${encodeURIComponent(loan.updated_at)}`,
+      { method: "DELETE" }
+    );
+    if (!response.ok) await json(response);
+  },
+
+  /** Read a lender's schedule (a PDF or an image) with the book's AI, in the background: a
+   * long one can take several minutes. */
+  readLoanTable: async (book: string, file: Blob, filename: string): Promise<LoanRead> => {
+    const form = new FormData();
+    form.set("file", file, filename);
+    return awaited(
+      book,
+      await apiFetch(`${base(book)}/loans/read`, { method: "POST", body: form, ...inBackground }),
+      undefined,
+      20 * 60_000
+    );
+  },
 
   /** Transaction ID to schedule ID, for every transaction a schedule staged. */
   scheduled: async (book: string): Promise<Record<string, string>> =>

@@ -10,6 +10,8 @@ import type {
   CategorizeOut,
   ExtractIn,
   ExtractOut,
+  LoanTableIn,
+  LoanTableOut,
 } from "@luminous-money/ai-api";
 
 /** An answer (with what it cost, in it), or why there isn't one (and what trying cost, if the
@@ -23,20 +25,22 @@ export interface AiPort {
   extract(book: string, input: ExtractIn): Promise<Answer<ExtractOut>>;
   /** Where transactions' unconfirmed splits belong. */
   categorize(book: string, input: CategorizeIn): Promise<Answer<CategorizeOut>>;
+  /** What a loan's amortization schedule says. */
+  loanTable(book: string, input: LoanTableIn): Promise<Answer<LoanTableOut>>;
   /** Forget a deleted book. */
   forgetBook(book: string): Promise<void>;
 }
 
 export function httpAi(baseUrl: string, userId: string): AiPort {
-  const call = (path: string, init: RequestInit = {}) =>
+  const call = (path: string, init: RequestInit = {}, timeout = 180_000) =>
     fetch(`${baseUrl}/api/ai/v1${path}`, {
       ...init,
       headers: { "X-User-Id": userId, "content-type": "application/json", ...init.headers },
-      signal: AbortSignal.timeout(180_000),
+      signal: AbortSignal.timeout(timeout),
     });
-  const post = async <T>(path: string, body: unknown): Promise<Answer<T>> => {
+  const post = async <T>(path: string, body: unknown, timeout?: number): Promise<Answer<T>> => {
     try {
-      const response = await call(path, { method: "POST", body: JSON.stringify(body) });
+      const response = await call(path, { method: "POST", body: JSON.stringify(body) }, timeout);
       if (response.ok) return { ok: (await response.json()) as T };
       const answer = (await response.json().catch(() => ({}))) as {
         detail?: string;
@@ -62,6 +66,8 @@ export function httpAi(baseUrl: string, userId: string): AiPort {
     },
     extract: (book, input) => post(`${books(book)}/receipts/extract`, input),
     categorize: (book, input) => post(`${books(book)}/categorize`, input),
+    // A 30-year schedule is 360 rows to write out: it can take several minutes.
+    loanTable: (book, input) => post(`${books(book)}/loans/extract`, input, 900_000),
     async forgetBook(book) {
       await call(books(book), { method: "DELETE" }).catch(() => undefined);
     },

@@ -72,6 +72,7 @@ export function AiSettingsPanel({ book }: { book: string }) {
 const OPERATIONS = {
   extract: ["receipt read", "receipts read"],
   categorize: ["categorizing request", "categorizing requests"],
+  "loan-table": ["loan schedule read", "loan schedules read"],
 } as const;
 
 /** What the book's AI has cost this month (UTC), estimated from what each call reported. */

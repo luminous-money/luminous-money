@@ -26,6 +26,7 @@ import {
   useAccounts,
   useDeleteSchedule,
   useFunds,
+  useLoans,
   useSaveSchedule,
   useSchedule,
   useTransaction,
@@ -84,9 +85,25 @@ function parseDays(text: string): number[] | null {
 
 const showDays = (days: number[]) => days.map((d) => (d === -1 ? "last" : String(d))).join(", ");
 
-/** A new schedule (blank, or from `?from=<transaction>` for "Repeat…"), or an existing one. */
+/** A payment out of an account (escrow's, from a loan's page): yearly, from today. */
+const outOf = (account: string): { name: string; rule: Rule; template: TransactionTemplate } => ({
+  name: "",
+  rule: { ...monthly(today()), unit: "year" },
+  template: {
+    ...BLANK,
+    postings: [
+      { account: "", units: null },
+      { account, units: null },
+    ],
+  },
+});
+
+/** A new schedule (blank, from `?from=<transaction>` for "Repeat…", or paid out of
+ * `?account=`), or an existing one. A loan's payments are its loan's to change. */
 export function ScheduleEditor({ book, id }: { book: string; id?: string }) {
   const from = useParam("from");
+  const account = useParam("account");
+  const loan = useLoans(book).data?.find((l) => l.schedule_id === id);
   const existing = useSchedule(book, id);
   const source = useTransaction(book, from ?? "");
   const back = useBack(`/books/${book}/schedules`);
@@ -102,7 +119,13 @@ export function ScheduleEditor({ book, id }: { book: string; id?: string }) {
       </header>
       {loading && <p className="muted">Loading…</p>}
       {existing.error && <p className="card error">{explain(existing.error)}</p>}
-      {!loading && (
+      {loan && (
+        <p className="card">
+          These are the payments of the loan {loan.name}: change them on{" "}
+          <Link href={`/books/${book}/loans/${loan.id}`}>its page</Link>.
+        </p>
+      )}
+      {!loading && !loan && (
         <Form
           key={existing.data?.updated_at ?? source.data?.id ?? "new"}
           book={book}
@@ -111,7 +134,9 @@ export function ScheduleEditor({ book, id }: { book: string; id?: string }) {
             existing.data ??
             (source.data
               ? fromTransaction(source.data)
-              : { name: "", rule: monthly(today()), template: BLANK })
+              : account
+                ? outOf(account)
+                : { name: "", rule: monthly(today()), template: BLANK })
           }
           back={back}
         />

@@ -55,6 +55,7 @@ import {
 } from "./appApi.js";
 import { today } from "./format.js";
 import type { Migration } from "../../shared/migration.js";
+import type { LoanIn, LoanPatch, LoanRebaseIn, LoanView } from "../../shared/loans.js";
 import type { CategoryRulePatch } from "../../shared/rules.js";
 import {
   api,
@@ -114,6 +115,8 @@ export const keys = {
   rules: (book: string) => ["book", book, "rules"] as const,
   schedules: (book: string) => ["book", book, "schedules"] as const,
   schedule: (book: string, id: string) => ["book", book, "schedules", id] as const,
+  loans: (book: string) => ["book", book, "loans"] as const,
+  loan: (book: string, id: string) => ["book", book, "loans", id] as const,
   transaction: (book: string, id: string) => ["book", book, "transaction", id] as const,
 };
 
@@ -846,6 +849,57 @@ export function useSaveSchedule(book: string) {
 export function useDeleteSchedule(book: string) {
   return useMutation({
     mutationFn: (schedule: Schedule) => appApi.deleteSchedule(book, schedule),
+    onSuccess: () => schedulesChanged(book),
+  });
+}
+
+// Loans
+
+export function useLoans(book: string) {
+  return useQuery({ queryKey: keys.loans(book), queryFn: () => appApi.loans(book) });
+}
+
+export function useLoan(book: string, id: string | undefined) {
+  return useQuery({
+    queryKey: keys.loan(book, id ?? ""),
+    queryFn: () => appApi.loan(book, id!),
+    enabled: !!id,
+  });
+}
+
+/** A loan's changes write and stage transactions: refresh everything in the book. */
+export function useSaveLoan(book: string) {
+  return useMutation({
+    mutationFn: ({ id, loan }: { id?: string; loan: LoanIn | LoanPatch }) =>
+      id ? appApi.editLoan(book, id, loan as LoanPatch) : appApi.createLoan(book, loan as LoanIn),
+    onSuccess: () => schedulesChanged(book),
+  });
+}
+
+export function useRebaseLoan(book: string) {
+  return useMutation({
+    mutationFn: ({ id, rebase }: { id: string; rebase: LoanRebaseIn }) =>
+      appApi.rebaseLoan(book, id, rebase),
+    onSuccess: () => schedulesChanged(book),
+  });
+}
+
+export function useExtraPayment(book: string) {
+  return useMutation({
+    mutationFn: ({
+      id,
+      payment,
+    }: {
+      id: string;
+      payment: { date: string; amount: string; from?: string | null };
+    }) => appApi.extraPayment(book, id, payment),
+    onSuccess: () => schedulesChanged(book),
+  });
+}
+
+export function useDeleteLoan(book: string) {
+  return useMutation({
+    mutationFn: (loan: LoanView) => appApi.deleteLoan(book, loan),
     onSuccess: () => schedulesChanged(book),
   });
 }

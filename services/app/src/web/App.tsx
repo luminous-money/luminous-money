@@ -38,6 +38,9 @@ import { Review } from "./pages/Review.js";
 import { TradePage } from "./pages/TradePage.js";
 import { RuleEditor } from "./pages/RuleEditor.js";
 import { Rules } from "./pages/Rules.js";
+import { LoanEditor } from "./pages/LoanEditor.js";
+import { LoanPage } from "./pages/LoanPage.js";
+import { Loans } from "./pages/Loans.js";
 import { ScheduleEditor } from "./pages/ScheduleEditor.js";
 import { Schedules } from "./pages/Schedules.js";
 import { Setup } from "./pages/Setup.js";
@@ -222,6 +225,13 @@ function Gate() {
             {({ book: id, id: schedule }) => (
               <ScheduleEditor key={schedule} book={id} id={schedule} />
             )}
+          </Route>
+          <Route path="/books/:book/loans">{({ book: id }) => <Loans key={id} book={id} />}</Route>
+          <Route path="/books/:book/loans/new">
+            {({ book: id }) => <LoanEditor key="new" book={id} />}
+          </Route>
+          <Route path="/books/:book/loans/:id">
+            {({ book: id, id: loan }) => <LoanPage key={loan} book={id} id={loan} />}
           </Route>
           <Route path="/books/:book/connections">
             {({ book: id }) => <BankConnections key={id} book={id} />}

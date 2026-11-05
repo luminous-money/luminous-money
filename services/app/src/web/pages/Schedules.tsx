@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { describe, UPCOMING_DAYS, type TransactionTemplate } from "../../shared/schedule.js";
 import { FundChips } from "../components/Funds.js";
 import { formatMoney } from "../lib/decimal.js";
-import { explain, useSchedules, useUpcoming } from "../lib/queries.js";
+import { explain, useLoans, useSchedules, useUpcoming } from "../lib/queries.js";
 
 /** A template's headline amount: its first split with one. */
 function amount(template: TransactionTemplate): string {
@@ -18,6 +18,8 @@ function amount(template: TransactionTemplate): string {
 export function Schedules({ book }: { book: string }) {
   const schedules = useSchedules(book);
   const upcoming = useUpcoming(book);
+  // A loan's payments are a schedule the loan keeps: it opens the loan.
+  const loans = new Map((useLoans(book).data ?? []).map((l) => [l.schedule_id, l]));
 
   return (
     <main>
@@ -43,7 +45,11 @@ export function Schedules({ book }: { book: string }) {
         {schedules.data?.map((s) => (
           <Link
             key={s.id}
-            href={`/books/${book}/schedules/${s.id}`}
+            href={
+              loans.has(s.id)
+                ? `/books/${book}/loans/${loans.get(s.id)!.id}`
+                : `/books/${book}/schedules/${s.id}`
+            }
             className="card link account-card"
           >
             <div className="account-card-top">
@@ -51,6 +57,7 @@ export function Schedules({ book }: { book: string }) {
               <span className="balance">{amount(s.template)}</span>
             </div>
             <p className="muted small">
+              {loans.has(s.id) && "A loan's payments · "}
               {describe(s.rule)}
               {s.paused ? " · Paused" : s.next ? ` · Next: ${s.next.date}` : " · Ended"}
               <FundChips lines={s.template.funds} />

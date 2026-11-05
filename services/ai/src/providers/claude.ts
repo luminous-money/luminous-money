@@ -9,6 +9,10 @@
  * - **Categorize** (`claude-opus-5` unless `AI_CLAUDE_CATEGORIZE_MODEL` says otherwise): text
  *   only, the chart of accounts at the end of the system prompt, where it's cached between
  *   calls; with the server-side fallback on a refusal, on the models that have one.
+ * - **A loan's table** (the extract model): a lender's amortization schedule, a PDF or an
+ *   image, transcribed row by row. A 30-year schedule is 360 rows, so the answer is long: it
+ *   streams with room for 64,000 tokens, at medium effort, since `app` checks that the rows add
+ *   up rather than trusting them.
  *
  * A refusal or any failure is ReadFailed: `app` carries on without it. Beyond the total, the
  * prompts are first drafts: evals and tuning are later work.
@@ -19,6 +23,8 @@ import { callsOf, type Usage } from "../pricing.js";
 import type {
   CategorizeOut,
   ExtractIn,
+  LoanTableFacts,
+  LoanTableIn,
   PayeeReference,
   ReceiptFacts,
   ReceiptFile,
@@ -26,8 +32,10 @@ import type {
 
 import {
   checkedFacts,
+  checkedLoanTable,
   checkedProposals,
   FACTS_JSON_SCHEMA,
+  LOAN_TABLE_JSON_SCHEMA,
   PROPOSALS_JSON_SCHEMA,
   ReadFailed,
   sumOf,
@@ -92,6 +100,14 @@ Before you answer, add the lines up: they must equal the total. If they don't, l
 - payment: how it was paid. method is card, cash or other; for a card, its brand (visa, mastercard, amex, discover, or other) and its last four digits as printed ("••9499", "XXXXXXXXXXXX9499", "ending in 9499"). Null where the receipt doesn't show it.
 - note: anything a person should know (a handwritten tip, a split tender, a faded or torn total), in one short sentence; otherwise null.`;
 
+export const LOAN_TABLE_SYSTEM = `You read lenders' amortization schedules (a mortgage's, a car loan's, a student loan's) for a personal accounting app, and transcribe them. Answer with the JSON the schema describes.
+
+- rows: every payment in the schedule, in order, one row each, with nothing skipped or summarized: a 30-year mortgage has 360. For each, its number and due date (YYYY-MM-DD) as printed, the principal and the interest it pays, escrow if the schedule has a column for it (taxes and insurance held by the lender, or a combined "escrow" or "other" column; null otherwise), and the balance: what's still owed after it.
+- Leave out rows that aren't payments: headers repeated on each page, yearly subtotals, totals, the loan's starting balance on a row of its own.
+- Give amounts as printed, as decimals without currency symbols or thousands separators ("1389.35"). A row's balance is the one before it less its principal; if what you read doesn't agree, look again at the digits.
+- The terms, when the schedule prints them: lender, amount borrowed, the yearly rate as a percent ("3.75"), how many payments, and the first payment's due date. Null for any it doesn't show; never work them out yourself.
+- note: anything a person should know about reading it (pages missing, a column that's unclear, payments that don't add up as printed), in one short sentence; otherwise null.`;
+
 const EAGERNESS = {
   reluctant: "Open a new account only when nothing in the chart could reasonably hold a split.",
   average: "Open a new account when the chart has nothing that fits a split well.",
@@ -155,7 +171,7 @@ function receiptBlock({ data, media_type }: ReceiptFile): Anthropic.Beta.BetaCon
     return { type: "document", source: { type: "base64", media_type: "application/pdf", data } };
   if (IMAGES.includes(media_type as ImageType))
     return { type: "image", source: { type: "base64", media_type: media_type as ImageType, data } };
-  throw new ReadFailed(`a receipt is an image or a PDF, not ${media_type}`);
+  throw new ReadFailed(`it has to be an image or a PDF, not ${media_type}`);
 }
 
 /** What went wrong calling Claude, for the person who'll read it in review or on the AI page:
@@ -309,6 +325,41 @@ export function claude({ extractModel, categorizeModel, client }: ClaudeOptions)
         meter
       );
       return checkedProposals(answer);
+    },
+
+    async loanTable(
+      input: LoanTableIn,
+      credential: string | null,
+      meter?: Meter
+    ): Promise<LoanTableFacts> {
+      const api = connect(credential);
+      const { answer } = await ask(
+        api,
+        {
+          model: extractModel,
+          max_tokens: 64000,
+          thinking: { type: "adaptive" },
+          system: [{ type: "text", text: LOAN_TABLE_SYSTEM, cache_control: { type: "ephemeral" } }],
+          output_config: {
+            effort: "medium",
+            format: { type: "json_schema", schema: LOAN_TABLE_JSON_SCHEMA },
+          },
+          messages: [
+            {
+              role: "user",
+              content: [
+                receiptBlock(input.file),
+                {
+                  type: "text",
+                  text: `The book's currency is ${input.currency}. Transcribe this amortization schedule: every payment.`,
+                },
+              ],
+            },
+          ],
+        } as Params,
+        meter
+      );
+      return checkedLoanTable(answer);
     },
   };
 }

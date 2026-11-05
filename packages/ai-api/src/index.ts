@@ -191,6 +191,38 @@ export type CategorizeOut = {
  * cost. */
 export type ExtractOut = ReceiptFacts & { cost?: AiCost };
 
+/** `POST /api/ai/v1/books/:book/loans/extract`: a lender's amortization schedule (a PDF or an
+ * image), to read into rows. */
+export type LoanTableIn = { file: ReceiptFile; currency: string };
+
+/** One payment, as the schedule prints it: amounts as decimals, the date YYYY-MM-DD. */
+export type LoanTableRow = {
+  number: number | null;
+  date: string | null;
+  principal: string;
+  interest: string;
+  /** Escrow, or anything else paid with it, if the schedule has a column for it. */
+  escrow: string | null;
+  /** What's owed after it. */
+  balance: string;
+};
+
+/** What a schedule says: its terms where it prints them, and every payment's row. */
+export type LoanTableFacts = {
+  lender: string | null;
+  /** What was borrowed. */
+  amount: string | null;
+  /** The yearly rate, as a percent. */
+  rate: string | null;
+  payments: number | null;
+  /** The first payment's due date. */
+  first: string | null;
+  rows: LoanTableRow[];
+  note: string | null;
+};
+
+export type LoanTableOut = LoanTableFacts & { cost?: AiCost };
+
 /** One call to a model, and what it cost, estimated from the usage it reported at the model's
  * list prices (USD). `usd` is null for a model whose prices aren't known. */
 export type AiCall = {
@@ -248,5 +280,9 @@ export type AiUsage = {
   month: string;
   usd: number | null;
   calls: number;
-  operations: { operation: "extract" | "categorize"; count: number; usd: number | null }[];
+  operations: {
+    operation: "extract" | "categorize" | "loan-table";
+    count: number;
+    usd: number | null;
+  }[];
 };

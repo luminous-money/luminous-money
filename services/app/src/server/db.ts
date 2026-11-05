@@ -24,6 +24,7 @@ import type { FetchResult, TransactionIn } from "@luminous-money/ledger-client";
 import type { CategoryRule, CategoryRuleIn, RuleConditions } from "../shared/rules.js";
 import type { ReconcileDraft } from "../shared/reconcile.js";
 import type { Occurrence, Rule, TransactionTemplate } from "../shared/schedule.js";
+import type { Loan, LoanAccounts } from "../shared/loans.js";
 
 export type { ReconcileDraft };
 
@@ -346,6 +347,24 @@ export const MIGRATIONS: Migration[] = [
   // 19: funds (Funds A). A rule may name a fund what it categorizes is taken from (or put
   // toward), all of it.
   ["ALTER TABLE category_rule ADD COLUMN fund TEXT"],
+  // 20: loans. A loan's accounts, its tables, others, extras and re-bases (JSON), and the
+  // schedule that stages its payments (its pause and auto-confirm are the schedule's).
+  [
+    createTable("loan", [
+      "id TEXT PRIMARY KEY",
+      "user_id TEXT NOT NULL",
+      "book_id TEXT NOT NULL",
+      "name TEXT NOT NULL",
+      "payee TEXT",
+      "currency TEXT NOT NULL",
+      "accounts TEXT NOT NULL", // JSON: LoanAccounts
+      "spec TEXT NOT NULL", // JSON: LoanSpec
+      "tolerance TEXT NOT NULL",
+      "schedule_id TEXT NOT NULL",
+    ]),
+    "CREATE INDEX loan_book ON loan(book_id)",
+    "CREATE UNIQUE INDEX loan_schedule ON loan(schedule_id)",
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -365,6 +384,32 @@ export type StoredSchedule = {
   created_at: string;
   updated_at: string;
 };
+
+/** What a loan keeps as JSON beside its accounts. */
+export type LoanSpec = Pick<Loan, "tables" | "others" | "extras" | "rebases" | "history">;
+
+/** A loan as stored, with its owner. Its pause and auto-confirm are its schedule's. */
+export type StoredLoan = Omit<Loan, "auto_confirm" | "paused"> & { user_id: string };
+
+type LoanRecord = Omit<StoredLoan, "accounts" | keyof LoanSpec> & {
+  accounts: string;
+  spec: string;
+};
+
+const toLoan = ({ accounts, spec, ...r }: LoanRecord): StoredLoan => ({
+  ...r,
+  accounts: JSON.parse(accounts) as LoanAccounts,
+  ...(JSON.parse(spec) as LoanSpec),
+});
+
+const specOf = (l: LoanSpec): string =>
+  JSON.stringify({
+    tables: l.tables,
+    others: l.others,
+    extras: l.extras,
+    rebases: l.rebases,
+    history: l.history,
+  });
 
 /** The proposal a staged transaction got, as stored. */
 export type StoredProposal = {
@@ -1100,6 +1145,123 @@ export class AppDb {
       .run(book, account);
   }
 
+  /** Keep a loan's schedule in step with the loan: its name, rule and template (the next
+   * payment). Bookkeeping, not an edit: the version doesn't change. */
+  setScheduleTemplate(id: string, s: Pick<StoredSchedule, "name" | "rule" | "template">): void {
+    this.db
+      .prepare("UPDATE schedule SET name = ?, rule = ?, template = ? WHERE id = ?")
+      .run(s.name, JSON.stringify(s.rule), JSON.stringify(s.template), id);
+  }
+
+  /** Move a schedule past nominal dates it staged nothing for (a loan paid off). */
+  setLastApplied(id: string, nominal: string): void {
+    this.db
+      .prepare("UPDATE schedule SET last_applied = ?, last_error = NULL WHERE id = ?")
+      .run(nominal, id);
+  }
+
+  // Loans
+
+  loans(book: string): StoredLoan[] {
+    const rows = this.db
+      .prepare("SELECT * FROM loan WHERE book_id = ? ORDER BY name, created_at")
+      .all(book) as LoanRecord[];
+    return rows.map(toLoan);
+  }
+
+  loan(book: string, id: string): StoredLoan | undefined {
+    const r = this.db.prepare("SELECT * FROM loan WHERE book_id = ? AND id = ?").get(book, id) as
+      LoanRecord | undefined;
+    return r && toLoan(r);
+  }
+
+  /** The loan whose payments a schedule stages, if any. */
+  loanOf(scheduleId: string): StoredLoan | undefined {
+    const r = this.db.prepare("SELECT * FROM loan WHERE schedule_id = ?").get(scheduleId) as
+      LoanRecord | undefined;
+    return r && toLoan(r);
+  }
+
+  addLoan(
+    l: Pick<
+      StoredLoan,
+      | "user_id"
+      | "book_id"
+      | "name"
+      | "payee"
+      | "currency"
+      | "accounts"
+      | "tolerance"
+      | "schedule_id"
+    > &
+      LoanSpec
+  ): string {
+    const id = randomUUID().replace(/-/g, "");
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO loan (id, user_id, book_id, name, payee, currency, accounts, spec, tolerance, schedule_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        id,
+        l.user_id,
+        l.book_id,
+        l.name,
+        l.payee,
+        l.currency,
+        JSON.stringify(l.accounts),
+        specOf(l),
+        l.tolerance,
+        l.schedule_id,
+        stamp,
+        stamp
+      );
+    return id;
+  }
+
+  /** Change a loan against the version read. */
+  updateLoan(
+    book: string,
+    id: string,
+    expected: string,
+    changes: Partial<Pick<StoredLoan, "name" | "payee" | "accounts" | "tolerance"> & LoanSpec>
+  ): void {
+    transaction(this.db, () => {
+      const current = this.loan(book, id);
+      if (!current) throw new Error(`no loan ${id}`);
+      if (current.updated_at !== expected)
+        throw new StaleVersion("the loan changed since it was read");
+      const next = { ...current, ...changes };
+      this.db
+        .prepare(
+          `UPDATE loan SET name = ?, payee = ?, accounts = ?, spec = ?, tolerance = ?, updated_at = ?
+           WHERE id = ?`
+        )
+        .run(
+          next.name,
+          next.payee,
+          JSON.stringify(next.accounts),
+          specOf(next),
+          next.tolerance,
+          after(current.updated_at),
+          id
+        );
+    });
+  }
+
+  /** Delete a loan and its schedule (what they staged stays in the books). */
+  deleteLoan(book: string, id: string, expected: string): void {
+    transaction(this.db, () => {
+      const current = this.loan(book, id);
+      if (!current) throw new Error(`no loan ${id}`);
+      if (current.updated_at !== expected)
+        throw new StaleVersion("the loan changed since it was read");
+      this.db.prepare("DELETE FROM loan WHERE id = ?").run(id);
+      this.db.prepare("DELETE FROM schedule WHERE id = ?").run(current.schedule_id);
+    });
+  }
+
   /** For each of `transactions` a schedule staged, the schedule. */
   schedulesOf(transactions: string[]): Map<string, StoredSchedule> {
     if (!transactions.length) return new Map();
@@ -1268,7 +1430,21 @@ export class AppDb {
       ["category_rule", "id", ["conditions"]],
       ["proposal", "transaction_id", ["postings", "proposal"]],
       ["reference_transaction", "id", ["postings"]],
+      ["loan", "id", ["spec"]],
     ]);
+    // A loan's own accounts are named by role, not `account`.
+    for (const r of this.db
+      .prepare("SELECT id, accounts FROM loan WHERE book_id = ?")
+      .all(book) as { id: string; accounts: string }[]) {
+      const accounts = JSON.parse(r.accounts) as Record<string, string | null>;
+      const mapped = Object.fromEntries(
+        Object.entries(accounts).map(([k, v]) => [k, v === null ? v : to(v)])
+      );
+      if (JSON.stringify(mapped) !== r.accounts)
+        this.db
+          .prepare("UPDATE loan SET accounts = ?, updated_at = ? WHERE id = ?")
+          .run(JSON.stringify(mapped), stamp, r.id);
+    }
   }
 
   /**
@@ -1335,6 +1511,7 @@ export class AppDb {
         "DELETE FROM star WHERE book_id = ?",
         "DELETE FROM schedule_occurrence WHERE schedule_id IN (SELECT id FROM schedule WHERE book_id = ?)",
         "DELETE FROM schedule WHERE book_id = ?",
+        "DELETE FROM loan WHERE book_id = ?",
         "DELETE FROM category_rule WHERE book_id = ?",
         "DELETE FROM proposal WHERE book_id = ?",
         "DELETE FROM price_fetch WHERE book_id = ?",

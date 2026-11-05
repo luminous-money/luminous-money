@@ -1,15 +1,32 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-03._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-05._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Hand-off (2026-11-03): Funds B step 1 (shares in funds) is out
+## Hand-off (2026-11-05): Loans, step 1 is out; step 2 (outflows) is next
 
-**Read this first.** Everything is committed, released and live: **`v0.1.15`** (Funds B step 1,
-shares in funds), and Emmer runs 0.1.15. Nothing is half done.
+**Read this first.** Loans step 1 is committed and released as **`v0.1.16`** (the tag on its
+commit); Emmer still runs 0.1.15 until Kael upgrades it (`upgrade 0.1.16`). **Step 2, outflows,
+is planned with Kael and not started:** [the loans plan](docs/milestones/loans/PLAN.md), "Step 2".
 
-### What was done (2026-11-03)
+### What was done (2026-11-05)
+
+- **Loans planned with Kael** ([the plan](docs/milestones/loans/PLAN.md): his brief, the model,
+  "Decided with Kael"). Four answers: the books win and the table is where they start; the
+  opening is against Opening Balances with the asset offered; step 1's dated changes are others'
+  amounts, extra principal, the lender's statement and a new table; outflows are built now, as
+  step 2.
+- **Step 1, loans, built:** Menu → **Loans** → New loan: the accounts (what's owed, paid from,
+  interest, optionally what it bought), the table (worked out from terms, a lender's CSV with its
+  columns guessed, or a PDF or image read by the book's AI), what's paid with it (escrow, PMI,
+  other), and its history (from the start, backfilled; from today; already in the books). A
+  loan's page: what's owed and the next payment's parts, Pay extra, the lender's statement,
+  dated changes, Escrow (its balance and the schedules paid from it, "+ A payment from escrow"),
+  the payments ahead, Settings. The payment is an M3 schedule the loan keeps.
+- **16 calls made without asking** are in the plan's "Decisions to review", for Kael to look over.
+
+### Done before (2026-11-03): Funds B step 1 (shares in funds), `v0.1.15`
 
 - **Funds B is planned in steps, and step 1 is built** (Kael): [B's
   plan](docs/milestones/funds/B/PLAN.md) holds only step 1, now with "As built"; the rest of B is
@@ -33,7 +50,7 @@ shares in funds), and Emmer runs 0.1.15. Nothing is half done.
 - **The questions:** 30 answers from Kael are in the plan ("Decided with Kael"); 13 technical
   calls, and 7 places the build departed from the plan, are there for Kael to look over.
 
-### Done before (2026-11-02)
+### Done before that (2026-11-02)
 
 - **Funds A** ([its plan](docs/milestones/funds/A/PLAN.md), which now describes what was built;
   design.md, "Funds A"): a second ledger of funds beside the accounts, with no rules. A fund fills
@@ -53,22 +70,38 @@ shares in funds), and Emmer runs 0.1.15. Nothing is half done.
 
 ### What to do next
 
-1. **Kael sets his Fidelity accounts up in funds on Emmer** (0.1.15 is installed there): both
+1. **Build Loans step 2, outflows** ([the plan](docs/milestones/loans/PLAN.md), "Step 2"):
+   an asset or liability that counts as spending (what's paid into it, as an expense account),
+   the expenses paid out of it masked; budgets, home and Reports on outflows, and a switch on
+   Reports to Expenses. Settled with Kael; only technical calls are left.
+2. **Kael upgrades Emmer to 0.1.16** and declares his mortgage (Menu → Loans): most likely "from
+   today" with the lender's balance, or "from the start" for the interest history (payments
+   before checking's books began come from Opening Balances). Escrow's tax and insurance
+   payments become schedules paid from escrow (the loan's page links them). Reading a PDF
+   schedule is a real Claude call (Sonnet 5): watch `luminous-money logs ai` the first time.
+3. **Kael looks over Loans step 1's calls** (the plan's "Decisions to review").
+4. **Kael sets his Fidelity accounts up in funds on Emmer** (0.1.15 is installed there): both
    IRAs' default fund Retirement, from their opening (the account editor, or beside each link on
    Bank connections); the brokerage divided among Wedding, Emergency, Special Home Maintenance
    and Repair, and Special Home Improvement with Move money from Unallocated; then whatever the
    bell has. Watch the first bank sync after: a sale or transfer out of shares that every fund
    holds should land in the bell, not fail.
-2. **Kael looks over step 1's calls** ([B's plan](docs/milestones/funds/B/PLAN.md), "Decisions to
-   review" and "Where the build departed from the plan"), and Funds A's (A's plan, "Decisions to
-   review"), whenever suits.
-3. Then the rest of Funds B (the [design record](docs/milestones/funds/B/design-record.md), and
+5. **Kael looks over Funds B step 1's calls** ([B's plan](docs/milestones/funds/B/PLAN.md),
+   "Decisions to review" and "Where the build departed from the plan"), and Funds A's (A's plan,
+   "Decisions to review"), whenever suits.
+6. Then the rest of Funds B (the [design record](docs/milestones/funds/B/design-record.md), and
    the 71 [scenarios](docs/milestones/funds/B/scenarios.md) with Kael; splits and corporate
    actions are waiting there, with how the bank feed books a split), or M18 (suggested
    recurring transactions and matching rules); see "Next steps" below.
 
 ### Working on it
 
+- **Loans' code:** the engine is `services/app/src/shared/loans.ts` (shared with the PWA, so the
+  form previews what the server stages); staging a loan's payments is
+  `server/loan-payments.ts`, which `server/schedules.ts` hands a loan's occurrences to; the rest
+  is `server/loans.ts` and `server/loan-read.ts`. The loans plan's "Step 1: as built" maps the
+  screens and the API. A terms table sent without rows gets them worked out, which keeps API
+  tests short.
 - **Funds' code:** the rules live twice, `services/ledger/src/ledger/fundlines.py` and
   `services/app/src/shared/funds.ts` (same wording: per commodity, with default funds), so the
   PWA says what the ledger would; the PWA's rows and the line that follows the transaction are
@@ -105,9 +138,6 @@ shares in funds), and Emmer runs 0.1.15. Nothing is half done.
 
 ### Also
 
-- **Loans** are noted in [docs/PLAN.md](docs/PLAN.md) (Kael, 2026-10-30; not planned): amortization
-  schedules loaded from a PDF, image, CSV or by hand, guiding scheduled payments from any point in
-  the loan, and payments seen as monthly expenses.
 - **M17 (tagging) is built and released as `v0.1.12`** (2026-10-29; see "Releases" below for
   its Release run): its [plan](docs/milestones/m17-transaction-tagging/PLAN.md) has the calls
   made without asking, design.md has "Tags (M17)". It needed ledger-graphs **0.1.2**
@@ -156,7 +186,7 @@ repositories) is archived on GitHub and kept locally in `../.archive/system`. Ev
 GPL-2.0-or-later (Beancount is GPL-2.0-only). It wears the original app's look: its palette
 (light gray and blue; deep blue and cyan in dark mode) and its Lu logo (design.md, "Its look").
 
-**M1 through M17, Funds A and Funds B's step 1 are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M17, Funds A, Funds B's step 1 and Loans' step 1 are built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
 accounts), M11 (budgets), M12 (reports), M13 (sharing books), M14 (reconciliation), M15 (divided
@@ -164,8 +194,8 @@ accounts), M16 (receipt capture) and M17 (tagging) are described in their plans,
 accounts import** and **migrating from another system**, slipped in before M17 (2026-10-26).
 **M19 (AI categorization) was built within M16** and is live; its PLAN.md entry was found
 unchecked and corrected on 2026-10-26 (what's left is a question: whether imports and bank feeds
-ask the AI by themselves). The milestones ahead (**Funds B** next, then M18, M20 and Polish;
-**Loans** noted, not placed) are in [docs/PLAN.md](docs/PLAN.md).
+ask the AI by themselves). The milestones ahead (**Loans** step 2, outflows, next; then the rest of
+Funds B, M18, M20 and Polish) are in [docs/PLAN.md](docs/PLAN.md).
 
 What an operator can do now (production readiness, phase 1; [docs/deploying.md](docs/deploying.md)):
 `luminous-money install` sets a deployment up (a laptop, or a public server with built-in HTTPS),
@@ -189,10 +219,26 @@ from github.com's redirect, not the API, whose 60-an-hour limit for an address h
 system, **`v0.1.11`** what the AI costs, **`v0.1.12`** (2026-10-29) tags (M17) and the
 migration's clearer word on what's kept, **`v0.1.13`** (2026-11-02) Funds A, and **`v0.1.14`**
 (2026-11-02) receipts read in the background, plainer errors, and account lists A–Z, and
-**`v0.1.15`** (2026-11-03) Funds B's step 1: shares in funds, default funds and Notifications. The history was rewritten once before
+**`v0.1.15`** (2026-11-03) Funds B's step 1: shares in funds, default funds and Notifications, and
+**`v0.1.16`** (2026-11-05) Loans' step 1. The history was rewritten once before
 the first push (an email taken out of RESUME), so commit IDs from before then are gone.
 
 What a user can do now:
+- **Loans (step 1):** Menu → **Loans** → **New loan**: name and lender; what's owed, what pays
+  it, where interest goes, what it bought; the amortization table (**Work it out** from what was
+  borrowed, the rate, the number of payments and the first payment's date; **Import a CSV**, its
+  columns guessed and changeable; **Read a PDF or image** with the book's AI), previewed with
+  any row that doesn't add up named; **Paid with it** (+ Escrow, + PMI, + Other: an amount to an
+  account); and **Its history** when payments were due already: from the start (borrowed, then
+  every payment, confirmed or not), from today (what's owed now), or already in the books. Its
+  payments are staged as they come due (a schedule the loan keeps: review, matching the bank,
+  auto-confirm), each the table's row while the books agree with it, else worked out from what
+  the books say is owed. A loan's page: owed today, the next payment and its parts, when it's
+  paid off and the interest still to pay; **Pay extra…** (toward principal); **Lender's
+  statement** (what was owed on a day: the difference written so the books agree); **Changes**
+  (an amount paid with it from a date, extra principal with each payment, a new table);
+  **Escrow** (its balance, the schedules paid from it, + A payment from escrow); the payments
+  ahead; **Settings** (accounts, tolerance, auto-confirm, pause, delete).
 - **Shares in funds (Funds B step 1):** a fund holds cash and shares: Move money takes several
   amounts, each in shares or dollars; the Funds page and a fund's page list holdings with prices
   and values; a trade's Funds section (its page, review, the Trade page) has From fund and To
@@ -408,13 +454,15 @@ How it's put together:
   (`src/server/pipeline`: matcher, then assignment), match review (`src/server/matches.ts`) and
   schedules (`src/shared/schedule.ts` for rules, `src/server/schedules.ts` for the generator), and
   categorization (`src/server/categorize`: the chain, context, `rules`, `history`, external
-  providers; the external API's types in `src/shared/categorizer-api.ts`), and funds (the rules in
-  `src/shared/funds.ts`, a rule's fund on what it stages in `src/server/funds.ts`), in
+  providers; the external API's types in `src/shared/categorizer-api.ts`), funds (the rules in
+  `src/shared/funds.ts`, a rule's fund on what it stages in `src/server/funds.ts`), and loans
+  (the engine in `src/shared/loans.ts`, `src/server/loans.ts` and `loan-payments.ts`), in
   `app.sqlite`.
 - **`services/ai`** (TypeScript, M16): each book's AI settings and sealed credential
   (`ai.sqlite`), the providers (`src/providers`: `claude`, and `fake` for test stacks, chosen
-  by `AI_PROVIDERS`), and two operations: `receipts/extract` (a receipt's facts; Claude Sonnet
-  5) and `categorize` (where splits belong; Claude Opus 5). It answers; `app` composes and stages
+  by `AI_PROVIDERS`), and three operations: `receipts/extract` (a receipt's facts; Claude Sonnet
+  5), `categorize` (where splits belong; Claude Opus 5) and `loans/extract` (a lender's
+  amortization schedule's rows; the extract model, Loans). It answers; `app` composes and stages
   (`src/server/receipts.ts`, the chain in `src/server/categorize`, its AI step `ai.ts`; reading
   runs as a background job when asked, `src/server/jobs.ts`), and the ledger keeps the files
   (attachments, migration 10). Their shared types are `packages/ai-api`.
@@ -433,9 +481,9 @@ How it's put together:
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 246 tests, including the table lint
-    - auth: 24; app: 261; ai: 14; db: 10; csv-import: 22
+    - auth: 24; app: 290; ai: 15; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 103 API tests and 125 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 107 API tests and 127 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Its `.env` (not committed: its keys) sets `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand`, so it never

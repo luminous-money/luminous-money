@@ -72,6 +72,7 @@ const ai: AiPort = {
       },
     };
   },
+  loanTable: async () => ({ failed: "not in these tests" }),
   forgetBook: async () => {},
 };
 

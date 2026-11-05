@@ -70,6 +70,7 @@ function ai(
     settings: async () => ({ ready: true, create_accounts: false, ...settings }) as AiSettings,
     extract: async () => extract(),
     categorize: async (_book, input) => (asked.push(input), { ok: categorize(input) }),
+    loanTable: async () => ({ failed: "not in these tests" }),
     forgetBook: async () => undefined,
   };
   return { port, asked };

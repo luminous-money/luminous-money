@@ -9,10 +9,17 @@
  *   that account as the fallback. A transaction whose payee or narration contains a reference
  *   entry's payee (ignoring case) goes to that entry's most usual account instead, with "From
  *   the reference" as its reason.
+ * - **A loan's table:** twelve payments of a made-up $12,000 loan at 6%, first due on the 1st
+ *   of next January, with $100.00 of escrow each.
  * - **Cost:** each operation is one made-up call, `FAKE_CALL` ($0.0042), so costs can be shown
  *   and summed in tests.
  */
-import type { CategorizeOut, ExtractIn, ReceiptFacts } from "@luminous-money/ai-api";
+import type {
+  CategorizeOut,
+  ExtractIn,
+  LoanTableFacts,
+  ReceiptFacts,
+} from "@luminous-money/ai-api";
 
 import type { CategorizeInput, Meter, Provider } from "./types.js";
 
@@ -92,6 +99,36 @@ export const fake: Provider = {
         };
       }),
       new_accounts: created ? [created] : [],
+    };
+  },
+  async loanTable(_input, _credential, meter?: Meter): Promise<LoanTableFacts> {
+    meter?.(FAKE_CALL);
+    const year = new Date().getUTCFullYear() + 1;
+    const rows: LoanTableFacts["rows"] = [];
+    let owed = 1200000; // cents
+    const payment = 103279; // $12,000 at 6% over 12 months
+    for (let n = 1; n <= 12; n++) {
+      const interest = Math.round(owed * 0.005);
+      const principal = n === 12 ? owed : payment - interest;
+      owed -= principal;
+      const money = (c: number) => `${Math.floor(c / 100)}.${String(c % 100).padStart(2, "0")}`;
+      rows.push({
+        number: n,
+        date: `${year}-${String(n).padStart(2, "0")}-01`,
+        principal: money(principal),
+        interest: money(interest),
+        escrow: "100.00",
+        balance: money(owed),
+      });
+    }
+    return {
+      lender: "Fake Lender",
+      amount: "12000.00",
+      rate: "6",
+      payments: 12,
+      first: `${year}-01-01`,
+      rows,
+      note: "Read by the fake provider",
     };
   },
 };

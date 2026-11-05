@@ -11,6 +11,7 @@ import type {
   AiUsage,
   CategorizeIn,
   CategorizeOut,
+  LoanTableOut,
   ReceiptFacts,
 } from "@luminous-money/ai-api";
 
@@ -142,6 +143,20 @@ describe("the two operations", () => {
     await useFake();
     expect((await call("reader", "/books/b/receipts/extract", "POST", EXTRACT)).status).toBe(403);
     expect((await call("reader", "/books/b/categorize", "POST", CATEGORIZE)).status).toBe(403);
+  });
+
+  it("read a loan's amortization schedule into rows", async () => {
+    await useFake();
+    const response = await call("writer", "/books/b/loans/extract", "POST", {
+      file: EXTRACT.file,
+      currency: "USD",
+    });
+    expect(response.status).toBe(200);
+    const table = (await response.json()) as LoanTableOut;
+    expect(table).toMatchObject({ amount: "12000.00", rate: "6", payments: 12 });
+    expect(table.rows).toHaveLength(12);
+    expect(table.rows.at(-1)!.balance).toBe("0.00");
+    expect(table.cost).toMatchObject({ calls: 1, usd: 0.0042 });
   });
 
   it("extract a receipt's facts, and categorize splits", async () => {

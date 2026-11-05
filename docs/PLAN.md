@@ -186,14 +186,21 @@ milestone starts.
         [The design record](milestones/funds/B/design-record.md) holds the design so far, with
         an [example book](milestones/funds/B/example-book.md) and
         [71 scenarios](milestones/funds/B/scenarios.md) still to gut-check.
-- [ ] **Loans** (Kael, 2026-10-30; not planned, its place in the order not decided): big loans as
-      a special case, apart from funds and within them. An amortization schedule loaded easily
-      (read from a PDF or image by the AI, a CSV, or typed in) guides a scheduled payment, from
-      any point in the loan (say which payment is next). The payments can be seen as monthly
-      expenses, though the books already recorded what they paid for (the principal paid down
-      the liability). [loans-and-taxes.md](loans-and-taxes.md) ("Budgets and the principal")
-      already sketches both: counting a liability's payments as spending, and amortization in
-      schedules. In funds, a loan is grouped (Funds B's open question 4).
+- [ ] **Loans** (Kael, 2026-10-30; planned with Kael 2026-11-05: [its plan](milestones/loans/PLAN.md)):
+      big loans managed from an amortization table (worked out, a CSV, or a PDF read by the AI),
+      with dated changes, history when one's already under way, and escrow dovetailing with
+      schedules; and their payments seen as monthly spending. In funds, a loan is grouped (Funds
+      B's open question 4), which is the rest of Funds B.
+  - [x] **Step 1: loans** ([built](milestones/loans/PLAN.md#step-1-as-built-2026-11-05)
+        2026-11-05): principal, interest and others (escrow, PMI) from dated versions; the books
+        win and the table is where they start; the payment an M3 schedule the loan keeps; from
+        the start (backfilled, Opening Balances before the paying account's books), from today,
+        or already in the books; extra payments, the lender's statement, a new table; escrow's
+        schedules linked from the loan.
+  - [ ] **Step 2: outflows** (Kael, 2026-11-05): an asset or liability can count as spending
+        (what's paid into it, as an expense account), with the expenses paid out of it masked;
+        budgets, home and Reports count outflows, and Reports switches to Expenses, the
+        traditional P&L view.
 - [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules
       that add tags, a Tags field on schedules (their templates carry tags already, unseen) and
       on Capture receipt, the AI and history proposing the book's own tags, and transfers
