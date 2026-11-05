@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { AccountPicker } from "../components/AccountPicker.js";
 import { AccountSettings } from "../components/AccountSettings.js";
 import { BudgetForm, BudgetGlance } from "../components/Budget.js";
+import { OutflowCard } from "../components/Outflow.js";
 import { DefaultFundCard } from "../components/DefaultFund.js";
 import { NewAccountField } from "../components/NewAccountField.js";
 import { partOf } from "../../shared/divided.js";
@@ -108,6 +109,12 @@ export function AccountEditor({ book, account }: { book: string; account: string
       {!isRoot && !found.close && (found.type === "asset" || found.type === "liability") && (
         <DefaultFundCard book={book} account={found.name} opened={found.open} />
       )}
+      {!isRoot &&
+        !found.close &&
+        !found.implicit &&
+        (found.type === "asset" || found.type === "liability") && (
+          <OutflowCard key={found.updated_at} book={book} account={found} />
+        )}
       {found.close && <Unarchive book={book} account={found} />}
       {!isRoot && (!found.close || !found.protected) && (
         <div className="card disclosures">

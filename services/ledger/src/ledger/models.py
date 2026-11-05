@@ -209,6 +209,11 @@ class Account(Api):
     cards: list[Card] = Field(
         default_factory=list, description="An asset or liability account's payment cards (M16): a receipt's card names it."
     )
+    outflow: str | None = Field(
+        None,
+        description="An asset or liability that counts as spending (Loans): the expense account what's paid into it "
+        "counts as; expenses paid out of it don't count again. Its subtree too.",
+    )
     updated_at: str | None = Field(None, description="Its `open` directive's version; send it back to change settings.")
 
 
@@ -402,6 +407,11 @@ class AccountPatch(Strict):
         description="An asset or liability account's payment cards (a divided account's on the whole); "
         "each card is one account's.",
     )
+    outflow: str | None = Field(
+        None,
+        description="An asset or liability: count what's paid into it as spending, as this expense account (an open "
+        "leaf), and mask the expenses paid out of it (Loans). None or \"\": it doesn't count.",
+    )
 
 
 class PurgeAffected(Api):
@@ -454,6 +464,11 @@ class CompactPosting(Api):
     reconciled: datetime.date | None = Field(None, description="The statement it was reconciled with (M14).")
     flag: str | None = Field(None, description="`!`: a split still to confirm (M16).")
     memo: str | None = Field(None, description="What the split is, in words (a receipt's line) (M16).")
+    outflow_of: str | None = Field(
+        None,
+        description="In the outflows lens, a split that isn't in the books: spending paid into this account, which "
+        "counts as spending (Loans).",
+    )
 
 
 class CompactTransaction(Api):

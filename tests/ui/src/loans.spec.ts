@@ -137,3 +137,54 @@ test("a lender's CSV schedule, its columns guessed", async ({ page }) => {
   await page.getByRole("combobox", { name: "Owed after" }).selectOption("Payment");
   await expect(page.getByText(/doesn't add up/)).toBeVisible();
 });
+
+test("outflows: a new loan's payments count as spending, and Reports switch to expenses", async ({
+  page,
+}) => {
+  const { book } = await loanBook(page);
+  await page.goto(`/ui/books/${book}/loans/new`);
+  await page.getByLabel("Name").fill("Mortgage");
+  await pick(page, "What's owed", "mortgage", MORTGAGE);
+  await pick(page, "Paid from", "checking", CHECKING);
+  await pick(page, "Interest goes to", "interest", INTEREST);
+  await page.getByLabel("Borrowed").fill("300000");
+  await page.getByLabel("Rate (% a year)").fill("3.75");
+  await page.getByLabel("First payment").fill(monthFrom(-1));
+  await page.getByRole("button", { name: "+ Escrow" }).click();
+  await page.getByLabel("Amount", { exact: true }).fill("450.00");
+  await page.getByRole("radio", { name: /From the start/ }).check();
+  await expect(page.getByLabel("Count the whole payment as monthly spending")).toBeChecked();
+  await expect(
+    page.getByText("Principal counts as Expenses:Housing:Mortgage-Principal")
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page).toHaveURL(/\/loans\/[0-9a-f]+$/);
+  const spending = page.getByRole("region", { name: "As spending" });
+  await expect(spending).toContainText(
+    `${MORTGAGE}: counts as Expenses:Housing:Mortgage-Principal`
+  );
+  await expect(spending).toContainText(
+    "Assets:Escrow:Mortgage: counts as Expenses:Housing:Mortgage-Escrow"
+  );
+
+  // The account editor says so too.
+  await page.goto(`/ui/books/${book}/accounts/${MORTGAGE}/edit`);
+  await expect(
+    page.getByRole("region", { name: "Counts as spending" }).getByRole("button", {
+      name: "Counts as: Expenses:Housing:Mortgage-Principal",
+    })
+  ).toBeVisible();
+
+  // Reports: outflows by default, expenses on the switch (kept in the address).
+  await page.goto(`/ui/books/${book}/reports`);
+  const lens = page.getByRole("radiogroup", { name: "Spending as" });
+  await expect(lens.getByRole("radio", { name: "Outflows" })).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
+  await expect(page.getByText("Spending as it leaves your hands")).toBeVisible();
+  await lens.getByRole("radio", { name: "Expenses" }).click();
+  await expect(page).toHaveURL(/lens=expenses/);
+  await expect(page.getByText("Spending as the books have it")).toBeVisible();
+});

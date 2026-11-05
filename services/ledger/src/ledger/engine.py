@@ -52,6 +52,8 @@ SOURCE_KEY = "source"
 # part what comes in from the bank or a file lands in (M15).
 DIVIDED_KEY = "divided"
 MAIN_PART_KEY = "main-part"
+# An asset or liability that counts as spending (Loans step 2): the expense account it counts as.
+OUTFLOW_KEY = "outflow"
 # On an asset or liability account's open: the payment cards it's paid with (M16), so a
 # receipt's card names its account: "visa 9499, 0417" (the brand optional). One value, since
 # Beancount metadata has no lists.
@@ -419,6 +421,7 @@ def accounts(header: list[str], texts: list[str], versions: dict[str, str] | Non
                 divided=entry.meta.get(DIVIDED_KEY) is True,
                 main_part=entry.meta[MAIN_PART_KEY] if isinstance(entry.meta.get(MAIN_PART_KEY), str) else None,
                 cards=cards_of(entry.meta),
+                outflow=entry.meta[OUTFLOW_KEY] if isinstance(entry.meta.get(OUTFLOW_KEY), str) else None,
             )
     for entry in entries:
         if isinstance(entry, data.Close) and entry.account in found:
@@ -494,10 +497,11 @@ def reopened(
     divided: object = _KEEP,
     main_part: object = _KEEP,
     cards: object = _KEEP,
+    outflow: object = _KEEP,
 ) -> Directive:
     """An `open` directive with its booking method and `revalue-every` set (None: removed), and
-    its `display-name` and `description` (None or "": removed), `divided` (False: removed), main part and cards
-    (none: removed) set if given, kept if not."""
+    its `display-name` and `description` (None or "": removed), `divided` (False: removed), main part, cards
+    and outflow (none: removed) set if given, kept if not."""
     entries, errors, _ = parser.parse_string(text)
     if errors or len(entries) != 1 or not isinstance(entries[0], data.Open):
         raise ParseFailure(["not an open directive"])
@@ -525,6 +529,10 @@ def reopened(
         meta.pop(CARDS_KEY, None)
         if cards:
             meta[CARDS_KEY] = cards_text(cards)  # type: ignore[arg-type]
+    if outflow is not _KEEP:
+        meta.pop(OUTFLOW_KEY, None)
+        if outflow:
+            meta[OUTFLOW_KEY] = str(outflow)
     return to_directive(entry._replace(meta=meta, booking=data.Booking[booking] if booking else None))
 
 
@@ -551,6 +559,8 @@ def with_accounts(
         entry = entry._replace(account=rename(entry.account))
         if isinstance(entry, data.Open) and isinstance(entry.meta.get(MAIN_PART_KEY), str):
             entry = entry._replace(meta={**entry.meta, MAIN_PART_KEY: rename(entry.meta[MAIN_PART_KEY])})
+        if isinstance(entry, data.Open) and isinstance(entry.meta.get(OUTFLOW_KEY), str):
+            entry = entry._replace(meta={**entry.meta, OUTFLOW_KEY: rename(entry.meta[OUTFLOW_KEY])})
     elif isinstance(entry, data.Pad):
         if drop(entry.account):
             return None

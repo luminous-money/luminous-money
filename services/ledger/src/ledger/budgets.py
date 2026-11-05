@@ -30,7 +30,7 @@ from typing import Literal
 from beancount.core import data
 from beancount.parser import parser
 
-from . import engine, investments, models
+from . import engine, investments, models, outflows
 from .service import Ledger, NotFound
 
 TYPE = "budget"
@@ -240,6 +240,25 @@ def status(ledger: Ledger, book_id: str, on: datetime.date, basis: Literal["peri
     }
 
     flows: dict[tuple[str, datetime.date, datetime.date], tuple[Decimal, Decimal, dict[str, Decimal]]] = {}
+    # With accounts that count as spending (Loans step 2), flows are read through the outflows
+    # lens: from every transaction since the earliest period, read once.
+    counted = bool(outflows.targets(list(accounts.values())))
+    lensed: list[models.CompactTransaction] | None = None
+
+    def rows(name: str, span: tuple[datetime.date, datetime.date]):
+        nonlocal lensed
+        if not counted:
+            yield from ledger.store.flow(book_id, name, span[0].isoformat(), span[1].isoformat())
+            return
+        if lensed is None:
+            earliest = min([span_of(v)[0] for v in current.values()] + [_month(on)[0]])
+            lensed = ledger.compact(book_id, earliest, lens="outflows")
+        for t in lensed:
+            if not (t.budgeted and span[0] <= t.date < span[1]):
+                continue
+            for p in t.postings:
+                if p.amount and (p.account == name or p.account.startswith(name + ":")):
+                    yield {"flag": t.flag, "currency": p.amount.currency, "amount": p.amount.number}
 
     def flow(name: str, span: tuple[datetime.date, datetime.date]) -> tuple[Decimal, Decimal, dict[str, Decimal]]:
         """The account's flow over [start, end), as it reads: (all of it, the unconfirmed part,
@@ -248,7 +267,7 @@ def status(ledger: Ledger, book_id: str, on: datetime.date, basis: Literal["peri
         if key not in flows:
             sign = _SIGN.get(accounts[name].type or "", 1)
             total, unconfirmed, others = Decimal(0), Decimal(0), {}
-            for row in ledger.store.flow(book_id, name, span[0].isoformat(), span[1].isoformat()):
+            for row in rows(name, span):
                 if row["amount"] is None:
                     continue
                 number = Decimal(row["amount"]) * sign

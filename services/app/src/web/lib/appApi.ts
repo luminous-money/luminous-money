@@ -118,11 +118,16 @@ export type BreakdownOptions = {
   of?: string;
   /** Only the transactions with every one (M17). */
   tags?: string[];
+  lens?: Lens;
 };
 
-/** `&tag=…` for each tag (M17). */
-const tagQuery = (tags: string[] = []) =>
-  tags.map((tag) => `&tag=${encodeURIComponent(tag)}`).join("");
+/** How Reports read spending (Loans step 2): as outflows (the default), or as booked. */
+export type Lens = "outflows" | "expenses";
+
+/** `&tag=…` for each tag (M17), and `&lens=expenses` for the books as booked. */
+const tagQuery = (tags: string[] = [], lens: Lens = "outflows") =>
+  tags.map((tag) => `&tag=${encodeURIComponent(tag)}`).join("") +
+  (lens === "expenses" ? "&lens=expenses" : "");
 
 export type BookSettings = {
   time_zone: string | null;
@@ -644,8 +649,13 @@ export const appApi = {
   reports: {
     spending: async (book: string, on: string): Promise<SpendingThisMonth> =>
       json(await apiFetch(`${base(book)}/reports/spending?on=${on}`)),
-    cashFlow: async (book: string, on: string, tags: string[] = []): Promise<CashFlow> =>
-      json(await apiFetch(`${base(book)}/reports/cash-flow?on=${on}${tagQuery(tags)}`)),
+    cashFlow: async (
+      book: string,
+      on: string,
+      tags: string[] = [],
+      lens: Lens = "outflows"
+    ): Promise<CashFlow> =>
+      json(await apiFetch(`${base(book)}/reports/cash-flow?on=${on}${tagQuery(tags, lens)}`)),
     breakdown: async (book: string, on: string, options: BreakdownOptions): Promise<Breakdown> =>
       json(
         await apiFetch(
@@ -655,11 +665,16 @@ export const appApi = {
             depth: String(options.depth),
             window: options.window,
             ...(options.of ? { of: options.of } : {}),
-          })}${tagQuery(options.tags)}`
+          })}${tagQuery(options.tags, options.lens)}`
         )
       ),
-    largest: async (book: string, on: string, tags: string[] = []): Promise<LargestTransactions> =>
-      json(await apiFetch(`${base(book)}/reports/largest?on=${on}${tagQuery(tags)}`)),
+    largest: async (
+      book: string,
+      on: string,
+      tags: string[] = [],
+      lens: Lens = "outflows"
+    ): Promise<LargestTransactions> =>
+      json(await apiFetch(`${base(book)}/reports/largest?on=${on}${tagQuery(tags, lens)}`)),
     netWorth: async (book: string, on: string): Promise<NetWorth> =>
       json(await apiFetch(`${base(book)}/reports/net-worth?on=${on}`)),
     typical: async (book: string, on: string, account: string): Promise<TypicalPeriods> =>

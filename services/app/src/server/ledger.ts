@@ -106,7 +106,12 @@ export interface LedgerPort {
   transaction(book: string, id: string): Promise<Transaction>;
   /** Every transaction from `from` on (or every one), oldest first, compactly: categorizers'
    * context and reports' stream. With `tags`, only those with every one (M17). */
-  compact(book: string, from?: string, tags?: string[]): Promise<CompactTransaction[]>;
+  compact(
+    book: string,
+    from?: string,
+    tags?: string[],
+    lens?: "outflows"
+  ): Promise<CompactTransaction[]>;
   /** Change a transaction's fields (only those given), against the version read. */
   patch(
     book: string,
@@ -371,12 +376,12 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
           params: { path: { book_id: book }, query: { on, basis } },
         })
       ),
-    compact: (book, from, tags) =>
+    compact: (book, from, tags, lens) =>
       unwrap(
         client.GET("/api/ledger/v1/books/{book_id}/transactions/compact", {
           params: {
             path: { book_id: book },
-            query: { from, tag: tags?.length ? tags : undefined },
+            query: { from, tag: tags?.length ? tags : undefined, ...(lens ? { lens } : {}) },
           },
         })
       ),

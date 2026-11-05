@@ -116,6 +116,18 @@
             ],
             "title": "Open"
           },
+          "outflow": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An asset or liability that counts as spending (Loans): the expense account what's paid into it counts as; expenses paid out of it don't count again. Its subtree too.",
+            "title": "Outflow"
+          },
           "revalue_every": {
             "anyOf": [
               {
@@ -414,6 +426,18 @@
             "description": "A divided account's main part: one of its parts, where what comes in lands.",
             "title": "Main Part"
           },
+          "outflow": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An asset or liability: count what's paid into it as spending, as this expense account (an open leaf), and mask the expenses paid out of it (Loans). None or \"\": it doesn't count.",
+            "title": "Outflow"
+          },
           "revalue_every": {
             "anyOf": [
               {
@@ -613,6 +637,18 @@
               }
             ],
             "title": "Open"
+          },
+          "outflow": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An asset or liability that counts as spending (Loans): the expense account what's paid into it counts as; expenses paid out of it don't count again. Its subtree too.",
+            "title": "Outflow"
           },
           "revalue_every": {
             "anyOf": [
@@ -1458,6 +1494,18 @@
             ],
             "description": "What the split is, in words (a receipt's line) (M16).",
             "title": "Memo"
+          },
+          "outflow_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "In the outflows lens, a split that isn't in the books: spending paid into this account, which counts as spending (Loans).",
+            "title": "Outflow Of"
           },
           "reconciled": {
             "anyOf": [
@@ -5259,6 +5307,18 @@
               }
             ],
             "title": "Open"
+          },
+          "outflow": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An asset or liability that counts as spending (Loans): the expense account what's paid into it counts as; expenses paid out of it don't count again. Its subtree too.",
+            "title": "Outflow"
           },
           "protected": {
             "default": false,
@@ -9652,6 +9712,25 @@
               ],
               "description": "Only transactions with every tag given (M17); repeat it for several.",
               "title": "Tag"
+            }
+          },
+          {
+            "description": "`outflows`: as outflows read them (Loans): what's paid into an asset or liability that counts as spending is added as spending (`outflow_of`), and the expenses paid out of one are masked.",
+            "in": "query",
+            "name": "lens",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "outflows",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`outflows`: as outflows read them (Loans): what's paid into an asset or liability that counts as spending is added as spending (`outflow_of`), and the expenses paid out of one are masked.",
+              "title": "Lens"
             }
           }
         ],

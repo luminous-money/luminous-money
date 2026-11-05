@@ -19,6 +19,7 @@ import {
   usd,
 } from "../components/Loans.js";
 import { LoanTableSource } from "../components/LoanTableSource.js";
+import { LoanSpending } from "../components/Outflow.js";
 import { formatDay, today } from "../lib/format.js";
 import { useBack, withBack } from "../lib/navigation.js";
 import {
@@ -103,6 +104,7 @@ function Loan({ book, loan, here }: { book: string; loan: LoanView; here: string
       <Rebase book={book} loan={loan} />
       <Changes book={book} loan={loan} />
       <Escrow book={book} loan={loan} here={here} />
+      <LoanSpending book={book} loan={loan} />
 
       {status.ahead.length > 0 && (
         <section className="card" aria-label="Payments ahead">

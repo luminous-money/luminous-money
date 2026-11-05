@@ -78,6 +78,15 @@ describe("reports", () => {
     expect(flow.totals.expenses).toBe(0); // the trip was more than 6 months ago
   });
 
+  it("read spending as outflows unless asked for the expenses as booked; net worth as it is", async () => {
+    ledger.lenses = [];
+    await cashFlowReport(ledger, "b", "2026-10-15");
+    await cashFlowReport(ledger, "b", "2026-10-15", 6, [], "expenses");
+    await spendingReport(ledger, "b", "2026-10-15");
+    await netWorthReport(ledger, "b", "2026-10-15");
+    expect(ledger.lenses).toEqual(["outflows", undefined, "outflows", undefined]);
+  });
+
   it("measure spending under the highest-level expense budgets, against them", async () => {
     spend("2026-09-03", "Expenses:Food", "100.00");
     spend("2026-10-03", "Expenses:Food", "40.00");

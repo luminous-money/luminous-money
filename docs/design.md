@@ -739,7 +739,9 @@ bring in (a **goal**, for income, assets such as savings, and liabilities being 
 - **What counts:** the account's flow over the period, its subtree included, read as the
   account reads (spent, earned, put in, paid down). Refunds take spending back; transfers inside
   the subtree cancel out. **Unconfirmed transactions count**, shown apart. Only the operating
-  currency counts; other currencies are listed.
+  currency counts; other currencies are listed. Since Loans' step 2, read as **outflows** when
+  any account counts as spending ("Outflows" below): a loan's principal and escrow count under
+  the expense accounts they count as, and what escrow pays isn't counted again.
 - **Excluded transactions:** `budget: FALSE` on a transaction (a roof, once in twenty years)
   keeps it out of budgets while it's categorized and counts everywhere else, reports included.
   The ledger derives a `budgeted` column from it, so budget sums stay one indexed query.
@@ -1201,6 +1203,27 @@ has the walkthrough, Kael's answers and the calls made without asking.
   links to, with "+ A payment from escrow". Its balance follows what the lender does.
 - **Kept in `app`** (migration 20), beside the schedule it drives: a book's export doesn't carry
   loans, as it doesn't carry schedules; whole-system backups do.
+
+### Outflows: Loans, step 2 (2026-11-05)
+
+Spending as it's felt, beside spending as it's booked (Kael): a loan's payment pays down a debt
+for something bought long ago, and escrow fills an account the lender holds, yet both are the
+month's spending in daily life.
+
+- **An asset or liability can count as spending:** `outflow:` on its `open` names an expense
+  account. What's paid into it (or its subtree) is spending, as that account; what's paid out of
+  it for expenses isn't counted again (the tax bill paid from escrow was spent as escrow filled).
+  Money out of one masks the transaction's expenses first, then what it pays into another that
+  counts, in proportion; borrowing and refunds are never spending.
+- **A lens, not a second set of books:** the ledger rewrites the posting stream as it's read
+  (`transactions/compact?lens=outflows`, `outflows.py`): splits scaled and splits added (marked
+  `outflow_of`), unbalanced on purpose. Nothing is written; balances, reconciliation and funds
+  never see it. Budget status reads through it when any account counts, so budgets, home's
+  "Spent this month" and Reports' spending all count outflows from one implementation.
+- **The traditional view stays:** Reports switches to **Expenses** (`?lens=expenses`), the
+  expense accounts as booked; net worth and an account's Typically always read the books.
+- **Set** in an account's editor (Counts as spending), on a loan's page (As spending), or by New
+  loan (checked by default).
 
 ### Bank feeds: SimpleFIN (M9)
 

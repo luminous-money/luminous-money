@@ -1,8 +1,8 @@
 Loans: plan
 ==================================================================================================
 
-> **Status (2026-11-05): planned with Kael, being built.** Kael's brief is below, then the
-> model. Kael's answers are under [Decided with Kael](#decided-with-kael); the calls made without asking go
+> **Status (2026-11-05): both steps built; step 1 released as `v0.1.16`, step 2 as `v0.1.17`.**
+> Kael's brief is below, then the model. Kael's answers are under [Decided with Kael](#decided-with-kael); the calls made without asking go
 > under [Decisions to review](#decisions-to-review). Loans come in two steps: **step 1 is
 > loans** (the amortization table, dated changes, the payment schedule, history, escrow), and
 > **step 2 is outflows** (a loan's payments counted as spending in budgets and charts).
@@ -154,6 +154,27 @@ Built as planned, with the departures noted under [Decisions to review](#decisio
   breakdown, the largest). Reports gets a switch: **Outflows** (the default) or **Expenses**,
   the traditional P&L view, against the expense accounts directly.
 
+### Step 2: as built (2026-11-05)
+
+- **In the books:** `outflow: "Expenses:…"` on an asset or liability's `open` (and so its
+  subtree), set with `PATCH /accounts/{account}` (`outflow`; `""` clears it), shown on
+  `Account.outflow`; a rename of the expense account follows. Exports carry it.
+- **The lens is the ledger's** (`services/ledger/src/ledger/outflows.py`):
+  `GET /transactions/compact?lens=outflows` adds a split for what's paid into a counting account
+  (as its expense account, marked `outflow_of`) and masks expenses paid out of one; budget
+  status reads flows through it whenever any account counts. One implementation for budgets and
+  reports.
+- **`app`'s reports** (`server/reports.ts`) read spending as outflows unless `?lens=expenses`;
+  home's "Spent this month" always as outflows; net worth and an account's Typically as booked.
+- **The PWA:** Reports' **Outflows | Expenses** switch (`?lens=expenses` in the address), the
+  account editor's **Counts as spending** card (`components/Outflow.tsx`), the loan page's
+  **As spending** card ("Count the payments as spending"), and New loan's **Count the whole
+  payment as monthly spending** (checked), which opens `<interest's parent>:<Loan>-Principal`
+  and `-Escrow` and counts the liability and escrow as them.
+- **Tests:** the ledger (8, `tests/test_outflows.py`), `app`'s reports asking for the right lens,
+  an API test (the cash flow and a budget, booked and as outflows) and a browser test (New loan
+  through Reports' switch).
+
 ## Decided with Kael
 
 Asked and answered on 2026-11-05:
@@ -222,3 +243,20 @@ Made without asking; each is easy to change.
     schedule paid out of it, yearly.
 16. **The schedule's template is the next payment,** refreshed when the loan changes and after
     payments are staged, so the Schedules page and upcoming rows show it.
+
+Step 2's:
+
+17. **Counting as spending is a setting on the account's `open`** (the ledger's), so budgets
+    (which the ledger works out) read it, exports carry it, and a renamed expense account is
+    followed. It covers the account's subtree.
+18. **What it counts as must be an open expense leaf.** New loan offers it checked, opening
+    `<interest's parent>:<Loan>-Principal` and `-<the other's name>` (`Mortgage-Escrow`).
+19. **What comes out of a counting account masks the transaction's expenses first,** then what it
+    pays into another counting account (escrow's surplus applied to principal), each in
+    proportion, in cents. Borrowing, a refund out of it to the bank, and anything else aren't
+    spending, and don't reduce it either.
+20. **Budgets always count outflows** when any account counts as spending, with no switch of
+    their own; home's "Spent this month" too. Only the operating currency is counted.
+21. **Reports' switch is in the address** (`?lens=expenses`), so it survives a reload and a
+    tag filter; net worth and an account's Typically read the books as booked. The cash flow's
+    total keeps its "Expenses" label, as the chart's legend does.

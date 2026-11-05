@@ -327,7 +327,16 @@ export class FakeLedger implements LedgerPort {
     return found;
   }
 
-  async compact(_book: string, from?: string, tags: string[] = []): Promise<CompactTransaction[]> {
+  /** The lenses each compact read asked for (the fake doesn't apply them). */
+  lenses: (string | undefined)[] = [];
+
+  async compact(
+    _book: string,
+    from?: string,
+    tags: string[] = [],
+    lens?: "outflows"
+  ): Promise<CompactTransaction[]> {
+    this.lenses.push(lens);
     return this.transactions
       .filter((t) => (!from || t.date >= from) && hasTags(t.tags, tags))
       .sort((a, b) => a.date.localeCompare(b.date))

@@ -11,6 +11,10 @@
  * - **By tag** (M17): cash flow, breakdowns and the largest can count only the transactions
  *   with every one of some tags (the ledger filters the stream). Then the largest covers all
  *   time, as a tag usually marks a trip or project rather than this month's spending.
+ * - **Outflows** (Loans step 2): spending is read as outflows by default (the ledger's lens:
+ *   what's paid into an asset or liability that counts as spending is spending, and the expenses
+ *   it pays for are masked); `lens: "expenses"` reads the expense accounts as booked, the
+ *   traditional P&L view. Net worth and an account's typical periods read the books as they are.
  */
 import {
   breakdown,
@@ -60,15 +64,26 @@ async function context(ledger: LedgerPort, book: string) {
   return { currency: info.currency, accounts, roots };
 }
 
+/** How spending is read: as outflows (the default), or as the expense accounts are booked. */
+export type Lens = "outflows" | "expenses";
+
 /** The posting stream from `from` (or all of it), only the transactions with every one of `tags`
- * when there are any. */
+ * when there are any, through the outflows lens unless `lens` says otherwise. */
 const stream = async (
   ledger: LedgerPort,
   book: string,
   from: string | undefined,
-  tags: string[] = []
+  tags: string[] = [],
+  lens: Lens | null = null
 ): Promise<Posting[]> =>
-  fromTransactions(await ledger.compact(book, from, tags.length ? tags : undefined));
+  fromTransactions(
+    await ledger.compact(
+      book,
+      from,
+      tags.length ? tags : undefined,
+      lens === "outflows" ? "outflows" : undefined
+    )
+  );
 
 /** The highest-level expense budgets: the accounts home's budget figure covers. */
 export function topExpenseBudgets(status: BudgetStatus): string[] {
@@ -80,7 +95,7 @@ export async function spendingReport(ledger: LedgerPort, book: string, on: strin
   const [{ currency, roots }, status, postings] = await Promise.all([
     context(ledger, book),
     ledger.budgetStatus(book, on, "month"),
-    stream(ledger, book, monthsBefore(on, 12)),
+    stream(ledger, book, monthsBefore(on, 12), [], "outflows"),
   ]);
   return spendingThisMonth({
     postings,
@@ -97,11 +112,12 @@ export async function cashFlowReport(
   book: string,
   on: string,
   months = 6,
-  tags: string[] = []
+  tags: string[] = [],
+  lens: Lens = "outflows"
 ) {
   const [{ currency, roots }, postings] = await Promise.all([
     context(ledger, book),
-    stream(ledger, book, monthsBefore(on, months - 1), tags),
+    stream(ledger, book, monthsBefore(on, months - 1), tags, lens),
   ]);
   return cashFlow({ postings, today: on, currency, months, roots });
 }
@@ -118,14 +134,15 @@ export async function breakdownReport(
     /** "total": everything to date, summed (for a tag's trip or project). */
     window?: "average" | "month" | "total";
     tags?: string[];
+    lens?: Lens;
   }
 ) {
-  const { tags = [], ...rest } = options;
+  const { tags = [], lens = "outflows", ...rest } = options;
   const window = rest.window ?? "average";
   const from = window === "total" ? undefined : monthsBefore(on, window === "average" ? 6 : 0);
   const [{ currency, roots }, postings] = await Promise.all([
     context(ledger, book),
-    stream(ledger, book, from, tags),
+    stream(ledger, book, from, tags, lens),
   ]);
   const root = roots[rest.side];
   if (rest.of && !(rest.of === root || rest.of.startsWith(`${root}:`)))
@@ -139,12 +156,13 @@ export async function largestReport(
   book: string,
   on: string,
   limit = 8,
-  tags: string[] = []
+  tags: string[] = [],
+  lens: Lens = "outflows"
 ) {
   const tagged = tags.length > 0;
   const [{ currency, roots }, postings] = await Promise.all([
     context(ledger, book),
-    stream(ledger, book, tagged ? undefined : monthsBefore(on, 0), tags),
+    stream(ledger, book, tagged ? undefined : monthsBefore(on, 0), tags, lens),
   ]);
   const from = tagged ? (postings[0]?.date ?? on) : undefined;
   return largestTransactions({ postings, today: on, currency, roots, limit, from });

@@ -19,6 +19,8 @@ import {
   usd,
 } from "../components/Loans.js";
 import { LoanTableSource, type TableExtras } from "../components/LoanTableSource.js";
+import { spendingAccount, useCountLoan } from "../components/Outflow.js";
+import { api } from "../lib/ledger.js";
 import { formatDay, today } from "../lib/format.js";
 import { useBack } from "../lib/navigation.js";
 import {
@@ -83,6 +85,8 @@ function Form({ book, back }: { book: string; back: string }) {
   const [owedOn, setOwedOn] = useState(now);
   const [tolerance, setTolerance] = useState("");
   const [autoConfirm, setAutoConfirm] = useState(false);
+  const [asSpending, setAsSpending] = useState(true);
+  const counting = useCountLoan(book);
   const [error, setError] = useState<string | null>(null);
 
   const start = table?.rows[0]?.date ?? "";
@@ -156,6 +160,7 @@ function Form({ book, back }: { book: string; back: string }) {
         history,
       };
       const made = await save.mutateAsync({ loan: input });
+      if (asSpending) await counting.run(made, await api.accounts(book));
       navigate(`/books/${book}/loans/${made.id}`);
     } catch (e) {
       setError(explain(e));
@@ -357,6 +362,23 @@ function Form({ book, back }: { book: string; back: string }) {
           />
           Confirm payments automatically (no review needed)
         </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={asSpending}
+            onChange={(e) => setAsSpending(e.target.checked)}
+          />
+          Count the whole payment as monthly spending
+        </label>
+        {asSpending && interest && (
+          <p className="small muted">
+            Principal counts as {spendingAccount(name || "Loan", interest, "Principal")}
+            {others.some((o) => o.account.startsWith("Assets:"))
+              ? `, and escrow as ${spendingAccount(name || "Loan", interest, "Escrow")}, whose tax and insurance bills then aren't counted again`
+              : ""}
+            : in budgets, home and Reports&apos; outflows.
+          </p>
+        )}
         {table && (
           <p className="small muted">
             Payments are staged as they come due, monthly on the{" "}

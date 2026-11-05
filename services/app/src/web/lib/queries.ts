@@ -43,6 +43,7 @@ import {
   type BookInfo,
   type BookInvite,
   type BreakdownOptions,
+  type Lens,
   type Role,
   type CsvProfile,
   type CategoryRule,
@@ -723,6 +724,23 @@ export const useSetAccount = (book: string, account: string) =>
     )
   );
 
+/** Count accounts as spending, or stop (Loans step 2): each with the version read. Budgets and
+ * reports change with it, so everything in the book is refreshed. */
+export function useCountAsSpending(book: string) {
+  return useMutation({
+    mutationFn: async (
+      changes: { account: string; updated_at: string; outflow: string | null }[]
+    ) => {
+      for (const c of changes)
+        await api.setAccount(book, c.account, {
+          updated_at: c.updated_at,
+          outflow: c.outflow ?? "",
+        } as Parameters<typeof api.setAccount>[2]);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.book(book) }),
+  });
+}
+
 export const useTrade = (book: string, account: string) =>
   useMutation(investmentMutation(book, (t: TradeIn) => api.trade(book, account, t)));
 
@@ -1196,10 +1214,10 @@ export const useSpendingReport = (book: string) =>
     queryFn: () => appApi.reports.spending(book, today()),
   });
 
-export const useCashFlowReport = (book: string, tags: string[] = []) =>
+export const useCashFlowReport = (book: string, tags: string[] = [], lens: Lens = "outflows") =>
   useQuery({
-    queryKey: reportKey(book, "cash-flow", tags),
-    queryFn: () => appApi.reports.cashFlow(book, today(), tags),
+    queryKey: reportKey(book, "cash-flow", tags, lens),
+    queryFn: () => appApi.reports.cashFlow(book, today(), tags, lens),
   });
 
 export const useBreakdownReport = (book: string, options: BreakdownOptions) =>
@@ -1209,10 +1227,10 @@ export const useBreakdownReport = (book: string, options: BreakdownOptions) =>
     placeholderData: (previous) => previous, // keep the donut while the next level loads
   });
 
-export const useLargestReport = (book: string, tags: string[] = []) =>
+export const useLargestReport = (book: string, tags: string[] = [], lens: Lens = "outflows") =>
   useQuery({
-    queryKey: reportKey(book, "largest", tags),
-    queryFn: () => appApi.reports.largest(book, today(), tags),
+    queryKey: reportKey(book, "largest", tags, lens),
+    queryFn: () => appApi.reports.largest(book, today(), tags, lens),
   });
 
 export const useNetWorthReport = (book: string) =>

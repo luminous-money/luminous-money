@@ -5,10 +5,10 @@ import { Link, useLocation } from "wouter";
 import { BreakdownChart, CashFlowChart, NetWorthChart } from "../components/Charts.js";
 import { tagList, TagInput } from "../components/Tags.js";
 import { shortName } from "../lib/accounts.js";
-import type { BreakdownOptions } from "../lib/appApi.js";
+import type { BreakdownOptions, Lens } from "../lib/appApi.js";
 import { useChartTheme } from "../lib/chartTheme.js";
 import { formatAmount } from "../lib/format.js";
-import { useParams, withBack } from "../lib/navigation.js";
+import { useParam, useParams, withBack } from "../lib/navigation.js";
 import {
   explain,
   useBreakdownReport,
@@ -39,14 +39,26 @@ const PALETTE = [
  * the transactions with every one; the breakdown starts on All time and the largest covers all
  * time (a tag is usually a trip or a project, not this month's); net worth, which is balances,
  * is set aside.
+ *
+ * Spending is read as outflows (Loans step 2: what's paid into a loan or escrow that counts as
+ * spending is spending, and what escrow pays for isn't counted again), or as the expense accounts
+ * are booked (`?lens=expenses`), the traditional P&L view.
  */
 export function Reports({ book }: { book: string }) {
   const [, navigate] = useLocation();
   const tags = useParams("tag").filter(Boolean);
+  const lens: Lens = useParam("lens") === "expenses" ? "expenses" : "outflows";
   const bookTags = useTags(book);
   const base = `/books/${book}/reports`;
-  const query = (chosen: string[]) =>
-    chosen.map((tag) => `tag=${encodeURIComponent(tag)}`).join("&");
+  const query = (chosen: string[], as: Lens = lens) =>
+    [
+      ...chosen.map((tag) => `tag=${encodeURIComponent(tag)}`),
+      ...(as === "expenses" ? ["lens=expenses"] : []),
+    ].join("&");
+  const go = (chosen: string[], as: Lens = lens) => {
+    const q = query(chosen, as);
+    navigate(q ? `${base}?${q}` : base, { replace: true });
+  };
   return (
     <main>
       <header className="page-head">
@@ -54,6 +66,32 @@ export function Reports({ book }: { book: string }) {
         <p className="muted">Unconfirmed transactions count.</p>
       </header>
       <div className="stack">
+        <section className="card report-lens" aria-label="Spending as">
+          <div className="segmented" role="radiogroup" aria-label="Spending as">
+            {(
+              [
+                ["outflows", "Outflows"],
+                ["expenses", "Expenses"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={lens === value}
+                className={lens === value ? "on" : ""}
+                onClick={() => go(tags, value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="small muted">
+            {lens === "outflows"
+              ? "Spending as it leaves your hands: a loan's whole payment and escrow count each month (for accounts that count as spending), and what escrow pays isn't counted again."
+              : "Spending as the books have it: only expense accounts, so a loan's principal and escrow aren't spending, and the tax bill is, when it's paid."}
+          </p>
+        </section>
         <section className="card report-filter" aria-label="Filter by tag">
           <TagInput
             label="Filter by tag"
@@ -61,16 +99,14 @@ export function Reports({ book }: { book: string }) {
             choices={bookTags.data ?? []}
             allowNew={false}
             placeholder={bookTags.data?.length ? "Filter by tag" : "No tags yet"}
-            onChange={(chosen) =>
-              navigate(chosen.length ? `${base}?${query(chosen)}` : base, { replace: true })
-            }
+            onChange={(chosen) => go(chosen)}
           />
           {tags.length > 0 && (
             <p className="small muted">
               Only transactions tagged {tagList(tags)}.{" "}
               <Link
                 href={withBack(
-                  `/books/${book}/transactions?${query(tags)}`,
+                  `/books/${book}/transactions?${query(tags, "outflows")}`,
                   `${base}?${query(tags)}`
                 )}
               >
@@ -79,9 +115,9 @@ export function Reports({ book }: { book: string }) {
             </p>
           )}
         </section>
-        <CashFlowCard book={book} tags={tags} />
-        <BreakdownCard key={tags.join(" ")} book={book} tags={tags} />
-        <LargestCard book={book} tags={tags} />
+        <CashFlowCard book={book} tags={tags} lens={lens} />
+        <BreakdownCard key={tags.join(" ")} book={book} tags={tags} lens={lens} />
+        <LargestCard book={book} tags={tags} lens={lens} />
         {tags.length ? (
           <p className="card small muted">Net worth isn't filtered by tag: it's balances.</p>
         ) : (
@@ -100,8 +136,8 @@ function Pending({ error, height }: { error: unknown; height: number }) {
   );
 }
 
-function CashFlowCard({ book, tags }: { book: string; tags: string[] }) {
-  const report = useCashFlowReport(book, tags);
+function CashFlowCard({ book, tags, lens }: { book: string; tags: string[]; lens: Lens }) {
+  const report = useCashFlowReport(book, tags, lens);
   const theme = useChartTheme();
   const d = report.data;
   const money = (n: number) => formatAmount(n, d!.currency);
@@ -145,7 +181,7 @@ const WINDOWS = {
   total: { caption: "in all", nothing: "with these tags" },
 } as const;
 
-function BreakdownCard({ book, tags }: { book: string; tags: string[] }) {
+function BreakdownCard({ book, tags, lens }: { book: string; tags: string[]; lens: Lens }) {
   const [side, setSide] = useState<BreakdownOptions["side"]>("expenses");
   const [depth, setDepth] = useState(1);
   const [window, setWindow] = useState<BreakdownOptions["window"]>(
@@ -153,7 +189,7 @@ function BreakdownCard({ book, tags }: { book: string; tags: string[] }) {
   );
   // Drilled into: each level's account, outermost first.
   const [path, setPath] = useState<string[]>([]);
-  const report = useBreakdownReport(book, { side, depth, window, of: path.at(-1), tags });
+  const report = useBreakdownReport(book, { side, depth, window, of: path.at(-1), tags, lens });
   const theme = useChartTheme();
   const d = report.data;
   const drill = (account: string) => setPath((p) => [...p, account]);
@@ -295,8 +331,8 @@ function BreakdownList({
   );
 }
 
-function LargestCard({ book, tags }: { book: string; tags: string[] }) {
-  const report = useLargestReport(book, tags);
+function LargestCard({ book, tags, lens }: { book: string; tags: string[]; lens: Lens }) {
+  const report = useLargestReport(book, tags, lens);
   const here = `/books/${book}/reports`;
   return (
     <section className="card report" aria-label="Largest transactions">

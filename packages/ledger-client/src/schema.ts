@@ -1287,6 +1287,11 @@ export interface components {
       /** Open */
       open?: string | null;
       /**
+       * Outflow
+       * @description An asset or liability that counts as spending (Loans): the expense account what's paid into it counts as; expenses paid out of it don't count again. Its subtree too.
+       */
+      outflow?: string | null;
+      /**
        * Revalue Every
        * @description A revalued asset (a house, a car): how many days its value stays current.
        */
@@ -1396,6 +1401,11 @@ export interface components {
        */
       main_part?: string | null;
       /**
+       * Outflow
+       * @description An asset or liability: count what's paid into it as spending, as this expense account (an open leaf), and mask the expenses paid out of it (Loans). None or "": it doesn't count.
+       */
+      outflow?: string | null;
+      /**
        * Revalue Every
        * @description A revalued asset: days its value stays current; None: not one.
        */
@@ -1487,6 +1497,11 @@ export interface components {
       name: string;
       /** Open */
       open?: string | null;
+      /**
+       * Outflow
+       * @description An asset or liability that counts as spending (Loans): the expense account what's paid into it counts as; expenses paid out of it don't count again. Its subtree too.
+       */
+      outflow?: string | null;
       /**
        * Revalue Every
        * @description A revalued asset (a house, a car): how many days its value stays current.
@@ -1837,6 +1852,11 @@ export interface components {
        * @description What the split is, in words (a receipt's line) (M16).
        */
       memo?: string | null;
+      /**
+       * Outflow Of
+       * @description In the outflows lens, a split that isn't in the books: spending paid into this account, which counts as spending (Loans).
+       */
+      outflow_of?: string | null;
       /**
        * Reconciled
        * @description The statement it was reconciled with (M14).
@@ -3437,6 +3457,11 @@ export interface components {
       name: string;
       /** Open */
       open?: string | null;
+      /**
+       * Outflow
+       * @description An asset or liability that counts as spending (Loans): the expense account what's paid into it counts as; expenses paid out of it don't count again. Its subtree too.
+       */
+      outflow?: string | null;
       /**
        * Protected
        * @description A top-level, system or brokerage-part account: it can't be renamed or deleted.
@@ -6218,6 +6243,8 @@ export interface operations {
         from?: string | null;
         /** @description Only transactions with every tag given (M17); repeat it for several. */
         tag?: string[] | null;
+        /** @description `outflows`: as outflows read them (Loans): what's paid into an asset or liability that counts as spending is added as spending (`outflow_of`), and the expenses paid out of one are masked. */
+        lens?: "outflows" | null;
       };
       header?: never;
       path: {

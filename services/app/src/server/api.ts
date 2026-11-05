@@ -20,6 +20,7 @@ import {
   ReportProblem,
   spendingReport,
   typicalReport,
+  type Lens,
 } from "./reports.js";
 import { finish, ReconcileProblem, reconcileView, saveDraft } from "./reconcile.js";
 import type { AiPort } from "./ai.js";
@@ -442,6 +443,9 @@ export function createApi({
   // Cash flow, breakdowns and the largest take `tag` (repeated): only the transactions with
   // every one (M17).
   const tagsOf = (c: Context) => c.req.queries("tag") ?? [];
+  // Spending as outflows (Loans step 2), unless `lens=expenses` asks for the books as booked.
+  const lensOf = (c: Context): Lens =>
+    c.req.query("lens") === "expenses" ? "expenses" : "outflows";
   /** Income and expenses for each of the last `months` (6) months. */
   api.get(
     "/books/:book/reports/cash-flow",
@@ -451,7 +455,8 @@ export function createApi({
         book,
         reportOn(c, book),
         count(c.req.query("months"), 1, 24, 6),
-        tagsOf(c)
+        tagsOf(c),
+        lensOf(c)
       )
     )
   );
@@ -468,6 +473,7 @@ export function createApi({
         slices: count(c.req.query("slices"), 2, 12, 6),
         window: window === "month" || window === "total" ? window : "average",
         tags: tagsOf(c),
+        lens: lensOf(c),
       });
     })
   );
@@ -480,7 +486,8 @@ export function createApi({
         book,
         reportOn(c, book),
         count(c.req.query("limit"), 1, 50, 8),
-        tagsOf(c)
+        tagsOf(c),
+        lensOf(c)
       )
     )
   );

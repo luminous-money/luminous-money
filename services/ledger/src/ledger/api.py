@@ -624,11 +624,18 @@ def create_app(ledger: Ledger) -> FastAPI:
             datetime.date | None, Query(alias="from", description="The first date included; every one without it.")
         ] = None,
         tag: TagParam = None,
+        lens: Annotated[
+            Literal["outflows"] | None,
+            Query(
+                description="`outflows`: as outflows read them (Loans): what's paid into an asset or liability that "
+                "counts as spending is added as spending (`outflow_of`), and the expenses paid out of one are masked."
+            ),
+        ] = None,
     ) -> list[models.CompactTransaction]:
         """Every transaction from a date on, oldest first, with only payee, narration, whether it
         counts against budgets, its tags, and each posting's account and amount: the context
         categorizers work from, and reports' posting stream. Not paged."""
-        return ledger.compact(book_id, date_from, tag)
+        return ledger.compact(book_id, date_from, tag, lens)
 
     @api.get("/books/{book_id}/transactions")
     def list_transactions(book_id: MemberBook, filters: Annotated[Filters, Depends()]) -> list[models.Transaction]:

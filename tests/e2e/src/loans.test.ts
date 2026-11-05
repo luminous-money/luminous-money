@@ -273,4 +273,81 @@ describe("Loans", () => {
     assert.equal(read.escrow, "100.00");
     assert.equal(read.lender, "Fake Lender");
   });
+
+  it("outflows: a loan's principal and escrow count as spending, escrow's tax bill doesn't count again", async () => {
+    const { app, ledger } = await setUp();
+    const first = monthFrom(-2);
+    const made = await app(
+      "/loans",
+      "POST",
+      loanIn(first, { kind: "today", on: monthFrom(-3), owed: "300000.00", against: OPENING })
+    );
+    assert.equal(made.status, 201, await made.clone().text());
+    // This month's tax bill, paid from escrow.
+    const tax = await ledger("/accounts", "POST", {
+      name: "Expenses:Housing:Property-Tax",
+      kind: "leaf",
+    });
+    assert.equal(tax.status, 201, await tax.clone().text());
+    const bill = await ledger("/transactions", "POST", {
+      date: monthFrom(0),
+      flag: "*",
+      narration: "County tax bill",
+      postings: [
+        { account: ESCROW, units: usd("-600.00") },
+        { account: "Expenses:Housing:Property-Tax", units: usd("600.00") },
+      ],
+    });
+    assert.equal(bill.status, 201, await bill.clone().text());
+
+    const spending = async (lens: string) => {
+      const report = (await (
+        await app(`/reports/cash-flow?on=${monthFrom(0)}&months=1${lens}`)
+      ).json()) as { totals: { expenses: number } };
+      return report.totals.expenses;
+    };
+    // As booked: this month's interest and the tax bill.
+    const booked = await spending("");
+    assert.equal(booked, await spending("&lens=expenses"));
+
+    for (const [account, as_] of [
+      [MORTGAGE, "Expenses:Housing:Mortgage-Principal"],
+      [ESCROW, "Expenses:Housing:Mortgage-Escrow"],
+    ] as const) {
+      assert.equal((await ledger("/accounts", "POST", { name: as_, kind: "leaf" })).status, 201);
+      const found = (await (await ledger("/accounts")).json()) as {
+        name: string;
+        updated_at: string;
+      }[];
+      const patched = await ledger(`/accounts/${account}`, "PATCH", {
+        updated_at: found.find((a) => a.name === account)!.updated_at,
+        outflow: as_,
+      });
+      assert.equal(patched.status, 200, await patched.clone().text());
+    }
+    // As outflows: the whole payment (principal, interest and escrow), and the tax bill masked.
+    const outflows = await spending("");
+    const expenses = await spending("&lens=expenses");
+    assert.equal(expenses, booked);
+    // This month's only spending is the payment: all of it, and the tax bill isn't counted again.
+    assert.ok(Math.abs(outflows - 1839.35) < 0.01, `${outflows} vs ${booked}`);
+    assert.ok(booked > 600 && booked < 1600, `${booked}`); // interest and the tax bill
+
+    // Budgets count outflows too.
+    const budget = await ledger("/budgets/Expenses:Housing", "PUT", {
+      start: monthFrom(0),
+      amount: "2500",
+      unit: "month",
+      every: 1,
+      updated_at: null,
+    });
+    assert.equal(budget.status, 200, await budget.clone().text());
+    const status = (await (await ledger(`/budgets/status?on=${monthFrom(0)}`)).json()) as {
+      lines: { account: string; spent: { number: string } }[];
+    };
+    assert.equal(
+      status.lines.find((l) => l.account === "Expenses:Housing")?.spent.number,
+      "1839.35"
+    );
+  });
 });

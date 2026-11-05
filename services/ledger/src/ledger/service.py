@@ -12,7 +12,7 @@ import threading
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from . import engine, fundlines, investments, models
+from . import engine, fundlines, investments, models, outflows
 from .store import Row, Store, split_funds, split_tags
 
 # New books: dollars, and sales draw on the oldest lots first (US tax reporting's default).
@@ -450,6 +450,8 @@ class Ledger:
         if "cards" in changes:
             changes["cards"] = patch.cards or []
             self._check_cards(accounts, name, changes["cards"], divided)
+        if changes.get("outflow"):
+            self._check_outflow(accounts, account, changes["outflow"])
         row = next(r for r in self.store.find(book_id, kind="open", limit=None) if engine.opened(r.text) == name)
         directive = engine.reopened(
             row.text,
@@ -464,6 +466,7 @@ class Ledger:
             ),
             **({"main_part": changes["main_part"]} if "main_part" in changes else {}),
             **({"cards": changes["cards"]} if "cards" in changes else {}),
+            **({"outflow": changes["outflow"]} if "outflow" in changes else {}),
         )
         self._put(book_id, engine.parse_one(directive.text, row.id), None if opened_now else patch.updated_at)
         return self._account(book_id, name)
@@ -474,6 +477,15 @@ class Ledger:
     def reconciling_roots(self, header: list[str]) -> list[str]:
         """The top-level accounts whose accounts are reconciled: assets and liabilities."""
         return [root for root, type_ in engine.root_types(header).items() if type_ in self.RECONCILED_TYPES]
+
+    def _check_outflow(self, accounts: dict[str, models.Account], account: models.Account, target: str) -> None:
+        """Counting as spending (Loans step 2) is for an asset or liability, as an expense account
+        that's an open leaf."""
+        if account.type not in ("asset", "liability"):
+            raise engine.ParseFailure([f"only an asset or liability counts as spending, not {account.name}"])
+        found = accounts.get(target)
+        if found is None or found.type != "expense" or found.kind != "leaf" or found.implicit or found.close:
+            raise engine.ParseFailure([f"{target} isn't an open expense account that holds transactions"])
 
     def _check_cards(self, accounts: dict[str, models.Account], name: str, cards: list[models.Card], divided: bool) -> None:
         """Cards go on an asset or liability account that's a real account (a leaf, or a divided
@@ -634,11 +646,40 @@ class Ledger:
     OPENING_BALANCES = "Equity:Opening-Balances"
 
     def compact(
-        self, book_id: str, date_from: datetime.date | None, tags: list[str] | None = None
+        self,
+        book_id: str,
+        date_from: datetime.date | None,
+        tags: list[str] | None = None,
+        lens: str | None = None,
     ) -> list[models.CompactTransaction]:
         """Every transaction dated `date_from` or later (or every one), oldest first, in compact
         form: the context categorizers work from, and reports' posting stream, read with plain SQL
-        so a long window stays fast. With `tags`, only those with all of them (M17)."""
+        so a long window stays fast. With `tags`, only those with all of them (M17). With `lens`
+        "outflows", as outflows read them (outflows.py, Loans step 2)."""
+        out = self._compact(book_id, date_from, tags)
+        return self.outflows(book_id, out) if lens == "outflows" else out
+
+    def outflows(
+        self, book_id: str, transactions: list[models.CompactTransaction]
+    ) -> list[models.CompactTransaction]:
+        """Compact transactions as outflows read them: what's paid into an account that counts as
+        spending is spending, and the expenses paid out of one are masked."""
+        accounts = self.accounts(book_id)
+        found = outflows.targets(accounts)
+        if not found:
+            return transactions
+        header = self._header(book_id)
+        types = engine.root_types(header)
+        currency = investments.operating_currency(header)
+
+        def is_expense(name: str) -> bool:
+            return types.get(name.split(":")[0]) == "expense"
+
+        return [outflows.lensed(t, found, is_expense, currency) for t in transactions]
+
+    def _compact(
+        self, book_id: str, date_from: datetime.date | None, tags: list[str] | None = None
+    ) -> list[models.CompactTransaction]:
         self._header(book_id)
         out: list[models.CompactTransaction] = []
         for r in self.store.compact(book_id, date_from.isoformat() if date_from else None, tags):
