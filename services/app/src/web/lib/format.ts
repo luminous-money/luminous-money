@@ -8,6 +8,26 @@ export function formatWhen(stamp: string): string {
   );
 }
 
+/** An ISO date as its month: "Sep 2024". Read in UTC, as it's written, so the 1st isn't the
+ * last day of the month before west of Greenwich. */
+export function formatMonth(iso: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${iso}T00:00:00Z`));
+}
+
+/** An ISO date with its year, always: "Sep 1, 2024" (a table's rows, years apart). */
+export function formatFullDay(iso: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${iso}T00:00:00Z`));
+}
+
 /** An ISO date as a short day: "Sep 30", with the year if it isn't this one. */
 export function formatDay(iso: string, now = new Date()): string {
   const [year, month, day] = iso.split("-").map(Number) as [number, number, number];

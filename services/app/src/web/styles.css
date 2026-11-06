@@ -3431,3 +3431,170 @@ select.fund-pick {
     font-size: 0.8rem;
   }
 }
+
+/* New loan's questionnaire: a step a screen, a progress bar, the confirmation page's flows. */
+
+.loan-setup fieldset {
+  min-width: 0;
+}
+
+.setup-progress {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.setup-progress span {
+  flex: 1;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.setup-progress span.reached {
+  background: var(--accent);
+}
+
+.setup-step {
+  margin: -0.4rem 0 0;
+}
+
+.setup-question {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.setup-answer {
+  font-size: 1.15rem;
+}
+
+.setup-extra {
+  display: grid;
+  gap: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 0.75rem;
+  margin: 0;
+  background: var(--card);
+}
+
+.setup-extra legend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0 0.25rem;
+}
+
+.setup-bill {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.setup-options {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.editor label.setup-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.editor label.setup-option.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 25%, var(--card));
+}
+
+.setup-option input {
+  flex: none;
+  width: 1.1rem;
+  min-height: auto;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.setup-option > span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.setup-card {
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.setup-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.setup-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.setup-flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.setup-flow li {
+  display: grid;
+  gap: 0.3rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.setup-part {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.setup-amount {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.setup-slot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.setup-slot > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.setup-slot .pill {
+  flex: none;
+}
+
+.setup-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}

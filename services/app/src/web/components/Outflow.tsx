@@ -10,7 +10,7 @@ import {
   useCountAsSpending,
   useCreateAccount,
 } from "../lib/queries.js";
-import { leavesUnder, PickerField } from "./Loans.js";
+import { inChart, leavesUnder, PickerField, planned } from "./Loans.js";
 
 /**
  * Counting an asset or liability as spending (Loans step 2, outflows): what's paid into it counts
@@ -62,11 +62,10 @@ export function OutflowCard({ book, account }: { book: string; account: Account 
   );
 }
 
-/** Where a loan's payments count as spending, beside its interest: `Expenses:Housing:Mortgage-
- * Principal`, `Expenses:Housing:Mortgage-Escrow`. */
-export function spendingAccount(loan: string, interest: string, part: string): string {
-  const parent = interest.split(":").slice(0, -1).join(":") || "Expenses";
-  return `${parent}:${toSegment(`${loan} ${part}`)}`;
+/** What a loan's account suggests counting as, as spending: `Expenses:Financing:<part>:<its
+ * last part>` (`Expenses:Financing:Principal:123-Main-St`), as New loan names them. */
+export function spendingAccount(account: string, part: string): string {
+  return `Expenses:Financing:${toSegment(part) || "Other"}:${account.split(":").at(-1)}`;
 }
 
 /** The accounts a loan's payments go into that aren't expenses: what's owed, and each other's
@@ -78,71 +77,81 @@ export function loanSpendingAccounts(loan: LoanView): { account: string; part: s
   return [{ account: loan.accounts.liability, part: "Principal" }, ...others];
 }
 
-/** Count what a loan's payments put into its liability and escrow as spending, opening the
- * expense accounts they count as. */
-export function useCountLoan(book: string) {
+/**
+ * A loan's card: whether what its payments put into its liability and escrow counts as spending,
+ * and, for what doesn't yet, what to count it as (suggested; opened when it's counted).
+ */
+export function LoanSpending({ book, loan }: { book: string; loan: LoanView }) {
   const chart = useAccounts(book);
   const createAccount = useCreateAccount(book);
   const count = useCountAsSpending(book);
-  return {
-    pending: count.isPending || createAccount.isPending,
-    error: count.error ?? createAccount.error,
-    run: async (loan: LoanView, accounts: Account[]) => {
-      const known = new Set((chart.data ?? accounts).map((a) => a.name));
-      const changes = [];
-      for (const { account, part } of loanSpendingAccounts(loan)) {
-        const found = accounts.find((a) => a.name === account);
-        if (!found?.updated_at || found.outflow) continue;
-        const target = spendingAccount(loan.name, loan.accounts.interest, part);
-        if (!known.has(target)) await createAccount.mutateAsync({ name: target, kind: "leaf" });
-        changes.push({ account, updated_at: found.updated_at, outflow: target });
-      }
-      if (changes.length) await count.mutateAsync(changes);
-    },
-  };
-}
-
-/** A loan's card: whether its payments count as spending, and one press to make them. */
-export function LoanSpending({ book, loan }: { book: string; loan: LoanView }) {
-  const chart = useAccounts(book);
-  const counting = useCountLoan(book);
+  const [chosen, setChosen] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const accounts = chart.data ?? [];
   const rows = loanSpendingAccounts(loan).map((r) => ({
     ...r,
     outflow: accounts.find((a) => a.name === r.account)?.outflow ?? null,
+    as: chosen[r.account] ?? spendingAccount(r.account, r.part),
   }));
   const missing = rows.filter((r) => !r.outflow);
+  const run = async () => {
+    setError(null);
+    try {
+      const changes = [];
+      for (const r of missing) {
+        const found = accounts.find((a) => a.name === r.account);
+        if (!found?.updated_at) continue;
+        if (!inChart(accounts, r.as)) await createAccount.mutateAsync({ name: r.as, kind: "leaf" });
+        changes.push({ account: r.account, updated_at: found.updated_at, outflow: r.as });
+      }
+      if (changes.length) await count.mutateAsync(changes);
+    } catch (e) {
+      setError(explain(e));
+    }
+  };
   return (
-    <section className="card" aria-label="As spending">
+    <section className="card editor" aria-label="As spending">
       <h2 className="section-title">As spending</h2>
       <p className="small muted">
         {missing.length
-          ? "Its principal (and escrow) aren't expenses in the books. Counted as spending, the whole payment shows in budgets, home and Reports each month, and what escrow pays isn't counted again."
+          ? "Principal (and escrow) aren't expenses in the books. Counted as spending, the whole payment shows in budgets, home and Reports each month, and what escrow pays isn't counted again."
           : "The whole payment counts as spending in budgets, home and Reports' outflows."}
       </p>
       <ul className="loan-changes">
-        {rows.map((r) => (
-          <li key={r.account}>
-            {r.account}: {r.outflow ? `counts as ${r.outflow}` : "not counted"}
-          </li>
-        ))}
+        {rows
+          .filter((r) => r.outflow)
+          .map((r) => (
+            <li key={r.account}>
+              {r.account} counts as {r.outflow}
+            </li>
+          ))}
       </ul>
+      {missing.map((r) => (
+        <PickerField
+          key={r.account}
+          label={`${r.part} counts as`}
+          accounts={
+            inChart(accounts, r.as)
+              ? leavesUnder(accounts, ["Expenses"])
+              : [...leavesUnder(accounts, ["Expenses"]), r.as]
+          }
+          value={r.as}
+          onChange={(as) => setChosen((c) => ({ ...c, [r.account]: as }))}
+          prefer={["Expenses"]}
+          create={planned(accounts)}
+          {...(!inChart(accounts, r.as) ? { suggest: r.as } : {})}
+        />
+      ))}
       {missing.length > 0 && (
-        <button
-          type="button"
-          disabled={counting.pending || !chart.data}
-          onClick={async () => {
-            setError(null);
-            try {
-              await counting.run(loan, accounts);
-            } catch (e) {
-              setError(explain(e));
-            }
-          }}
-        >
-          Count the payments as spending
-        </button>
+        <div>
+          <button
+            type="button"
+            disabled={count.isPending || createAccount.isPending || !chart.data}
+            onClick={() => void run()}
+          >
+            Count the payments as spending
+          </button>
+        </div>
       )}
       {error && <p className="error small">{error}</p>}
     </section>

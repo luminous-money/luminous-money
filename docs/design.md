@@ -1180,7 +1180,7 @@ has the walkthrough, Kael's answers and the calls made without asking.
 - **A loan is accounts, tables, others and extras.** Its accounts: what's owed (a liability),
   what pays it, where interest goes, and optionally what it bought. Its first **table** is where
   it starts, worked out from terms or imported (a CSV with its columns guessed, or a PDF or image
-  read by the book's AI); a later table takes over from its date (the lender's new schedule, an
+  read by the book's AI; since step 3, the UI only works it out); a later table takes over from its date (the lender's new schedule, an
   adjustable rate's reset). **Others** are each a name, an account and an amount from a date, so
   "escrow becomes $482.17 from January" is a new version of Escrow. **Extras** are extra
   principal with every payment from a date.
@@ -1202,7 +1202,8 @@ has the walkthrough, Kael's answers and the calls made without asking.
   from Opening Balances and are principal and interest only, so that account's balance isn't
   changed by money that left before its history); *from today* (one transaction saying what's
   owed, against Opening Balances or, for an asset not in the books, the asset; Kael); or
-  *already in the books*. Payments from the next one.
+  *already in the books*. Payments from the next one. Since step 3, New loan offers the first
+  two (against Opening Balances) and notices the third.
 - **Changing it:** a dated change fills in again the unconfirmed payments from its date
   (confirmed ones stay). **Extra payment** writes its own transaction toward principal. **The
   lender's statement** (what was owed on a day) writes the difference as an adjustment (against
@@ -1212,6 +1213,43 @@ has the walkthrough, Kael's answers and the calls made without asking.
   links to, with "+ A payment from escrow". Its balance follows what the lender does.
 - **Kept in `app`** (migration 20), beside the schedule it drives: a book's export doesn't carry
   loans, as it doesn't carry schedules; whole-system backups do.
+
+### New loan as a questionnaire: Loans, step 3 (2026-11-06)
+
+New loan asked for its accounts up front, before saying what each was for, and opened each one
+as it was named. Kael found it hard to follow, so it became a questionnaire that only gathers
+answers ([the plan's step 3](milestones/loans/PLAN.md#step-3-setting-a-loan-up-a-questionnaire)
+has his answers and the calls made without asking).
+
+- **One step a screen,** each a question: what it's for (a home, a car or something else, and
+  "123 Main St"), its terms (and the table they make, to check against the paperwork), what's
+  paid with it, its payments so far (only when some are due), how it's paid, then a page to
+  check it all over. Back and Next, a progress bar; the answers are kept in the browser's
+  session (`web/lib/loan-setup.ts`, which holds all of it but the screens).
+- **Accounts are named from what it's for,** so nothing has to be chosen before it means
+  anything: `Liabilities:Loans:Mortgages:123-Main-St`, `Expenses:Financing:Interest:123-Main-St`,
+  `Assets:Property:123-Main-St`, `Assets:Escrow:123-Main-St` and the like. They're shown, each
+  changeable, on the last page, beside the money that goes to them, marked new or already in
+  the books. Paid from defaults to a bank-linked account (a starred one first), else one under
+  `Assets:Bank` (Kael).
+- **Nothing is made until Confirm,** which is one request: `POST loans` with a `setup` (accounts
+  to open, what it bought at what it cost, escrow's balance, the bills paid from escrow, what
+  counts as spending), all checked before anything is written; the accounts open first, in one
+  all-or-none write. Its pickers' "Create account" only names an account.
+- **History is two choices** (Kael): record each payment, or start from what's owed now, always
+  against Opening Balances. A loan account that already says what's owed is noticed, and
+  nothing is written for it: "already in the books" is no longer a choice, but still the server's
+  `books`.
+- **What it bought, when it's new, starts at what it cost** (asked, optional) on the day it was
+  borrowed, against Opening Balances, and is a revalued asset. **Escrow starts at what the
+  lender says it holds** (asked, optional): after the payments are staged, the difference is
+  written against Opening Balances.
+- **Counting principal and escrow as spending is opt-in** (Kael), on the last page, suggesting
+  `Expenses:Financing:Principal:X` and `…:Escrow:X`; the loan's page suggests the same.
+- **Tables are worked out from terms only** in the UI (Kael: importing a lender's table wasn't
+  likely to be useful); the CSV reader, `loans/read` and the `ai` service's operation stay.
+- **Due dates are read in UTC** (`formatMonth`, `formatFullDay`): formatted in the browser's
+  zone, the 1st showed as the month before in the Americas. Tables show full dates.
 
 ### Outflows: Loans, step 2 (2026-11-05)
 

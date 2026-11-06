@@ -23,6 +23,8 @@ type Props = {
   create?: AccountCreation;
   /** Start open, searching (a picker that appears because someone asked for it). */
   initiallyOpen?: boolean;
+  /** "Create account"'s name when nothing's been typed (renaming one not made yet). */
+  suggest?: string;
 };
 
 const CREATE = Symbol("create");
@@ -43,6 +45,7 @@ export function AccountPicker({
   disabled,
   create,
   initiallyOpen = false,
+  suggest,
 }: Props) {
   const [open, setOpen] = useState(initiallyOpen);
   const [query, setQuery] = useState("");
@@ -141,7 +144,11 @@ export function AccountPicker({
       </ul>
       {creating && create && (
         <CreateAccountDialog
-          initialName={suggestName(query, create.accounts, prefer?.[0] ?? "Expenses")}
+          initialName={
+            !query.trim() && suggest
+              ? suggest
+              : suggestName(query, create.accounts, prefer?.[0] ?? "Expenses")
+          }
           accounts={create.accounts}
           submit={create.submit}
           onCancel={stopCreating}

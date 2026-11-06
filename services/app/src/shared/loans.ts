@@ -17,7 +17,7 @@
  * Amounts are decimal strings, worked in integer cents (BigInt) so nothing passes through
  * floating point but the one formula for a payment, which is rounded to cents at once.
  */
-import { nominalDates, type Rule } from "./schedule.js";
+import { nominalDates, type Rule, type ScheduleIn } from "./schedule.js";
 
 /** What a table is worked out from. */
 export type LoanTerms = {
@@ -132,6 +132,28 @@ export type LoanIn = {
   tolerance?: string;
   auto_confirm?: boolean;
   history: LoanHistory;
+  /** What New loan makes along with it, checked with it before anything is written. */
+  setup?: LoanSetup;
+};
+
+/**
+ * What's made along with a new loan (New loan's questionnaire): accounts opened first (what it
+ * bought with what it cost, revalued), escrow set to what the lender says it holds once payments
+ * are staged, the bills paid from escrow (schedules), and accounts counted as spending.
+ */
+export type LoanSetup = {
+  open?: LoanSetupAccount[];
+  escrow_balance?: { account: string; amount: string; on: string } | null;
+  bills?: ScheduleIn[];
+  outflows?: { account: string; as: string }[];
+};
+
+/** An account to open: a leaf, optionally with its balance on a date (against Opening
+ * Balances) and revalued every so many days (a house, a car). */
+export type LoanSetupAccount = {
+  name: string;
+  opening?: { amount: string; date: string } | null;
+  revalue_every?: number | null;
 };
 
 export type LoanPatch = {

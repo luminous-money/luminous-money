@@ -153,6 +153,112 @@ describe("declaring a loan", () => {
   });
 });
 
+describe("made along with it (New loan's questionnaire)", () => {
+  const HOME = "Liabilities:Loans:Mortgages:123-Main-St";
+  const HOME_INTEREST = "Expenses:Financing:Interest:123-Main-St";
+  const PROPERTY = "Assets:Property:123-Main-St";
+  const HOME_ESCROW = "Assets:Escrow:123-Main-St";
+  const TAX = "Expenses:Taxes:Property:123-Main-St";
+  const PRINCIPAL = "Expenses:Financing:Principal:123-Main-St";
+
+  const home = (over: Partial<LoanIn> = {}, setup: LoanIn["setup"] = {}): LoanIn =>
+    loanIn({
+      name: "123 Main St mortgage",
+      accounts: { liability: HOME, paying: CHECKING, interest: HOME_INTEREST, asset: PROPERTY },
+      others: [{ name: "Escrow", account: HOME_ESCROW, amount: "450.00", from: "2016-08-01" }],
+      setup: {
+        open: [
+          { name: HOME },
+          { name: HOME_INTEREST },
+          {
+            name: PROPERTY,
+            opening: { amount: "375000.00", date: "2016-06-15" },
+            revalue_every: 350,
+          },
+          { name: HOME_ESCROW },
+          { name: TAX },
+          { name: PRINCIPAL },
+        ],
+        ...setup,
+      },
+      ...over,
+    });
+
+  const taxBill = {
+    name: "123 Main St property tax",
+    rule: {
+      every: 6,
+      unit: "month" as const,
+      days: [],
+      start: "2027-03-01",
+      until: null,
+      weekend: "keep" as const,
+    },
+    template: {
+      payee: "County Treasurer",
+      narration: "Property tax",
+      postings: [
+        { account: HOME_ESCROW, units: { number: "-2550.00", currency: "USD" } },
+        { account: TAX, units: { number: "2550.00", currency: "USD" } },
+      ],
+    },
+  };
+
+  it("opens its accounts, what it bought at its cost, escrow at the lender's figure, its bills and spending", async () => {
+    const owed = table.rows[123]!.balance;
+    const loan = await create(
+      home(
+        { history: { kind: "today", on: ON, owed, against: OPENING } },
+        {
+          escrow_balance: { account: HOME_ESCROW, amount: "2310.55", on: ON },
+          bills: [taxBill],
+          outflows: [{ account: HOME, as: PRINCIPAL }],
+        }
+      )
+    );
+    expect(ledger.created).toEqual(expect.arrayContaining([HOME, HOME_INTEREST, PROPERTY, TAX]));
+    expect(ledger.accountList.find((a) => a.name === PROPERTY)?.revalue_every).toBe(350);
+    expect(await balance(PROPERTY)).toBe("375000.00");
+    expect(await balance(HOME)).toBe(`-${owed}`);
+    expect(await balance(HOME_ESCROW)).toBe("2310.55");
+    expect(ledger.accountList.find((a) => a.name === HOME)?.outflow).toBe(PRINCIPAL);
+    const bills = db.schedules("b").filter((s) => s.id !== loan.schedule_id);
+    expect(bills.map((s) => s.name)).toEqual(["123 Main St property tax"]);
+    expect(loan.status.paid_from).toMatchObject([{ name: "123 Main St property tax" }]);
+  });
+
+  it("escrow's figure is what the books lack once every payment is recorded", async () => {
+    await create(
+      home(
+        { history: { kind: "start", on: "2016-06-15", against: OPENING, confirm: true } },
+        { escrow_balance: { account: HOME_ESCROW, amount: "1000.00", on: ON } }
+      )
+    );
+    // Checking's books begin 2026-10-01: October's and November's payments carried escrow.
+    expect(await balance(HOME_ESCROW)).toBe("1000.00");
+    const adjustment = ledger.transactions.find((t) => t.narration === "What escrow holds")!;
+    expect(adjustment.postings.find((p) => p.account === HOME_ESCROW)?.units?.number).toBe(
+      "100.00"
+    );
+  });
+
+  it("checks it all before writing anything", async () => {
+    const refused = [
+      home({}, { bills: [{ ...taxBill, template: { ...taxBill.template, postings: [] } }] }),
+      home({}, { outflows: [{ account: HOME, as: "Expenses:Nope" }] }),
+      home({}, { outflows: [{ account: HOME_INTEREST, as: PRINCIPAL }] }),
+      home({}, { escrow_balance: { account: CHECKING, amount: "1.00", on: ON } }),
+      home({}, { open: [...home().setup!.open!, { name: CHECKING }] }),
+      home({ accounts: { ...home().accounts, paying: "Assets:Bank:Nope" } }),
+    ];
+    for (const input of refused) await expect(create(input)).rejects.toBeInstanceOf(LoanProblem);
+    expect(ledger.created).toEqual([]);
+    expect(ledger.transactions).toEqual([]);
+    expect(db.loans("b")).toEqual([]);
+    expect(db.schedules("b")).toEqual([]);
+  });
+});
+
 describe("after it's declared", () => {
   const owed = table.rows[123]!.balance;
   const declared = () =>

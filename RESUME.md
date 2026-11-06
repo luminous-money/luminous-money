@@ -1,18 +1,49 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-05._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-06._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Hand-off (2026-11-05): Loans is out (both steps)
+## Hand-off (2026-11-06): New loan is a questionnaire (Loans step 3)
 
-**Read this first.** Loans is built and released: step 1 as **`v0.1.16`**, step 2 (outflows) as
-**`v0.1.17`**, and **`v0.1.18`** (the tag on its commit) after Kael reviewed its 21 decisions:
-all kept but one, a matched payment's difference now going to escrow rather than principal.
-0.1.18 also makes upgrades safe to stop (below). Emmer still runs 0.1.15 until Kael upgrades it
-(`upgrade 0.1.18`; 0.1.18's images are already pulled there). Nothing is half done.
+**Read this first.** Kael tried New loan and found it hard to follow, so it's been rebuilt as a
+step-by-step questionnaire that makes nothing until Confirm ([the loans plan's step
+3](docs/milestones/loans/PLAN.md#step-3-setting-a-loan-up-a-questionnaire): his brief, nine
+answers, eleven calls made without asking, and "as built"). It's built, tested (`pnpm test`,
+`pnpm e2e`, screens looked at) and **released as `v0.1.19`** (the tag on its commit), for Kael
+to try on Emmer, where he does all his testing. Nothing is half done.
 
-### What was done (2026-11-05)
+### What was done (2026-11-06)
+
+- **Planned with Kael:** his brief (what was confusing, and the questionnaire he wanted), then
+  nine questions answered: a home, a car or something else is asked with "what is this loan
+  for?"; history is two choices (record each payment, or start from what's owed now) and a loan
+  account that already owes is noticed; a new asset asks what it cost; counting as spending is
+  opt-in, on the last page; escrow asks what it holds now; the escrow bills can be set up here,
+  optionally; paid from defaults to a bank-linked account; the loan's page is only aligned; one
+  step a screen.
+- **New loan (Menu → Loans → New loan)** is now: what it's for → terms (and the table, to check)
+  → extras (escrow, what it holds, its tax and insurance bills; PMI; anything else) → payments
+  so far (only when some are due) → payment → check it over (where each part of the payment
+  goes, every account changeable and marked new or in the books, what Confirm writes, what
+  happens as payments come in, what to do later). Accounts are named from what it's for
+  (`Liabilities:Loans:Mortgages:123-Main-St`, `Expenses:Financing:Interest:123-Main-St`,
+  `Assets:Property:123-Main-St`, …). The answers are kept for the browser's session.
+- **Confirm is one request:** `POST loans` takes a `setup` (accounts to open, the asset at its
+  cost, escrow's balance, the bills, spending), all checked before anything is written.
+- **The "month early" bug** was display only: due dates were formatted at UTC midnight in the
+  browser's zone, so the 1st showed as the month before in Chicago. The payments were always
+  right. Tables now show full dates.
+- **The CSV and PDF imports and "already in the books" are off the UI,** their code kept.
+- **The loan's page:** fixed dates, a "What to do when…" card, "Create account" for what it
+  bought, and As spending suggesting `Expenses:Financing:Principal:<…>` with pickers.
+
+### Done before (2026-11-05): Loans is out (both steps)
+
+Loans is built and released: step 1 as **`v0.1.16`**, step 2 (outflows) as **`v0.1.17`**, and
+**`v0.1.18`** (the tag on its commit) after Kael reviewed its 21 decisions: all kept but one, a
+matched payment's difference now going to escrow rather than principal. 0.1.18 also makes
+upgrades safe to stop (below). Emmer still runs 0.1.15 until Kael upgrades it.
 
 - **Loans planned with Kael** ([the plan](docs/milestones/loans/PLAN.md): his brief, the model,
   "Decided with Kael"). Four answers: the books win and the table is where they start; the
@@ -91,13 +122,11 @@ all kept but one, a matched payment's difference now going to escrow rather than
 
 ### What to do next
 
-1. **Kael upgrades Emmer to 0.1.18** and declares his mortgage (Menu → Loans): most likely "from
-   today" with the lender's balance, or "from the start" for the interest history (payments
-   before checking's books began come from Opening Balances). Escrow's tax and insurance
-   payments become schedules paid from escrow (the loan's page links them). Reading a PDF
-   schedule is a real Claude call (Sonnet 5): watch `luminous-money logs ai` the first time.
-   With "Count the whole payment as monthly spending" (on by default), budgets on Housing then
-   include principal and escrow: budgets set before may want raising.
+1. **Kael upgrades Emmer to 0.1.19** (`upgrade 0.1.19`), tries New loan, and looks over step
+   3's "Calls made without asking" in the loans plan. Then he declares his mortgage through it: "record each payment" for the interest history (payments
+   before checking's books began come from Opening Balances), or "start from what I owe now";
+   what's in escrow from his latest statement; the tax and insurance bills there or later.
+   Counting principal and escrow as spending is now off unless chosen on the last page.
 2. **Kael sets his Fidelity accounts up in funds on Emmer** (0.1.15 is installed there): both
    IRAs' default fund Retirement, from their opening (the account editor, or beside each link on
    Bank connections); the brokerage divided among Wedding, Emergency, Special Home Maintenance
@@ -114,6 +143,10 @@ all kept but one, a matched payment's difference now going to escrow rather than
 
 ### Working on it
 
+- **New loan's code:** `services/app/src/web/lib/loan-setup.ts` holds the questionnaire but its
+  screens (the draft, default names, each step's checks, what Confirm sends); the screens are
+  `pages/LoanSetup.tsx`, `components/LoanSetupSteps.tsx` and `components/LoanConfirm.tsx`;
+  the server's half is `setup` in `createLoan` (`server/loans.ts`).
 - **Loans' code:** the engine is `services/app/src/shared/loans.ts` (shared with the PWA, so the
   form previews what the server stages); staging a loan's payments is
   `server/loan-payments.ts`, which `server/schedules.ts` hands a loan's occurrences to; the rest

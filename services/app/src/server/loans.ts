@@ -18,6 +18,7 @@ import {
   type LoanIn,
   type LoanPatch,
   type LoanRebaseIn,
+  type LoanSetup,
   type LoanTable,
   type LoanView,
 } from "../shared/loans.js";
@@ -25,7 +26,13 @@ import { addDays, nominalDates } from "../shared/schedule.js";
 import type { AppDb, StoredLoan } from "./db.js";
 import type { LedgerPort } from "./ledger.js";
 import { loanTemplate, OPENING_BALANCES, refillLoanPayments } from "./loan-payments.js";
-import { bookToday, runSchedules, view as scheduleView } from "./schedules.js";
+import {
+  bookToday,
+  createSchedule,
+  runSchedules,
+  scheduleProblem,
+  view as scheduleView,
+} from "./schedules.js";
 
 /** Something the caller has to fix: 404 (no such book or loan) or 422 (not a valid one). */
 export class LoanProblem extends Error {
@@ -58,12 +65,7 @@ function accountProblem(accounts: Account[], name: string | null, role: string):
   return null;
 }
 
-async function accountsProblem(
-  ledger: LedgerPort,
-  book: string,
-  l: Pick<Loan, "accounts" | "others">
-) {
-  const accounts = await ledger.accounts(book);
+function accountsProblem(accounts: Account[], l: Pick<Loan, "accounts" | "others">) {
   return (
     accountProblem(accounts, l.accounts.liability, "what's owed") ??
     accountProblem(accounts, l.accounts.paying, "what pays it") ??
@@ -72,6 +74,79 @@ async function accountsProblem(
     l.others.map((o) => accountProblem(accounts, o.account, o.name)).find(Boolean) ??
     null
   );
+}
+
+const TYPES: Record<string, Account["type"]> = {
+  Assets: "asset",
+  Liabilities: "liability",
+  Equity: "equity",
+  Income: "income",
+  Expenses: "expense",
+};
+
+/** The chart as it will be once a setup's accounts are open. */
+function withOpened(accounts: Account[], setup: LoanSetup): Account[] {
+  return [
+    ...accounts,
+    ...(setup.open ?? []).map(
+      (a) =>
+        ({
+          name: a.name,
+          kind: "leaf",
+          implicit: false,
+          close: null,
+          type: TYPES[a.name.split(":")[0]!] ?? null,
+          currencies: [],
+        }) as unknown as Account
+    ),
+  ];
+}
+
+/**
+ * Why what's made along with a loan can't be, or null: accounts to open that are new leaves
+ * (what they cost an amount on a date), escrow's balance on one of the loan's others, bills that
+ * are valid schedules, and spending counted for an asset or liability as an expense leaf.
+ * `chart` already has the accounts to open.
+ */
+function setupProblem(
+  setup: LoanSetup,
+  before: Account[],
+  chart: Account[],
+  loan: Pick<Loan, "others">
+): string | null {
+  const names = new Set(before.map((a) => a.name));
+  const opening = new Set<string>();
+  for (const a of setup.open ?? []) {
+    if (!a?.name || !TYPES[a.name.split(":")[0]!])
+      return `${a?.name || "An account"} isn't a full account name`;
+    if (names.has(a.name) || opening.has(a.name)) return `${a.name} is already in the chart`;
+    opening.add(a.name);
+    if (a.opening && (!/^-?\d+(\.\d{1,2})?$/.test(a.opening.amount) || !DATE.test(a.opening.date)))
+      return `What ${a.name} cost is an amount on a date`;
+    if (a.revalue_every != null && !(Number.isInteger(a.revalue_every) && a.revalue_every > 0))
+      return `${a.name} is revalued every so many days`;
+  }
+  const escrow = setup.escrow_balance;
+  if (escrow) {
+    if (!loan.others.some((o) => o.account === escrow.account))
+      return `${escrow.account} isn't one of the loan's accounts`;
+    if (!/^-?\d+(\.\d{1,2})?$/.test(escrow.amount) || !DATE.test(escrow.on))
+      return "What escrow holds is an amount on a date";
+  }
+  for (const bill of setup.bills ?? []) {
+    const problem = scheduleProblem(bill, chart);
+    if (problem) return `${bill.name || "A bill"}: ${problem}`;
+  }
+  const byName = new Map(chart.map((a) => [a.name, a]));
+  for (const o of setup.outflows ?? []) {
+    const from = byName.get(o.account);
+    if (!from || !["asset", "liability"].includes(from.type ?? ""))
+      return `Only an asset or a liability counts as spending, not ${o.account}`;
+    const as = byName.get(o.as);
+    if (!as || as.type !== "expense" || as.kind !== "leaf" || as.close)
+      return `${o.account} counts as spending as an open expense account, not ${o.as || "nothing"}`;
+  }
+  return null;
 }
 
 /** A table as sent, a terms table's rows worked out if they weren't sent (scripts may send
@@ -180,7 +255,11 @@ export async function createLoan({
     extras: input.extras ?? [],
     tolerance: input.tolerance || "0",
   };
-  const problem = loanProblem(loan) ?? (await accountsProblem(ledger, book, loan));
+  const setup = input.setup ?? {};
+  const before = await ledger.accounts(book);
+  const chart = withOpened(before, setup);
+  const problem =
+    loanProblem(loan) ?? accountsProblem(chart, loan) ?? setupProblem(setup, before, chart, loan);
   if (problem) throw new LoanProblem(422, problem);
   const currency = input.currency || "USD";
   const history = input.history;
@@ -225,6 +304,30 @@ export async function createLoan({
     lastApplied = lastDue(loan, today);
   } else {
     throw new LoanProblem(422, "Say how its history comes into the books");
+  }
+
+  // Everything's been checked: the setup's accounts open first, in one write.
+  if (setup.open?.length)
+    await ledger.createAccounts(
+      book,
+      setup.open.map((a) => ({
+        name: a.name,
+        kind: "leaf",
+        ...(a.opening
+          ? { opening_balance: { amount: a.opening.amount, currency, date: a.opening.date } }
+          : {}),
+        ...(a.revalue_every ? { revalue_every: a.revalue_every } : {}),
+      }))
+    );
+  if (setup.outflows?.length) {
+    const accounts = await ledger.accounts(book);
+    for (const o of setup.outflows) {
+      const found = accounts.find((a) => a.name === o.account)!;
+      await ledger.setAccount(book, o.account, {
+        updated_at: found.updated_at!,
+        outflow: o.as,
+      });
+    }
   }
 
   if (opening) {
@@ -291,6 +394,34 @@ export async function createLoan({
   });
   const made = db.loan(book, id)!;
   await syncSchedule(db, ledger, made, today);
+
+  // Escrow, once the payments are in, holds what the lender says it does.
+  if (setup.escrow_balance) {
+    const { account, amount, on: day } = setup.escrow_balance;
+    const balances = await ledger.dayBalances(book, account, day, day);
+    const difference = cents(amount) - cents(balances.days.at(-1)?.balance ?? balances.before);
+    if (difference !== 0n) {
+      if (!(await ledger.accounts(book)).some((a) => a.name === OPENING_BALANCES))
+        await ledger.createAccount(book, OPENING_BALANCES, { open: day });
+      await ledger.createTransactions(book, [
+        {
+          date: day,
+          flag: "*",
+          payee: input.payee?.trim() || loan.name,
+          narration: "What escrow holds",
+          tags: [],
+          links: [],
+          meta: {},
+          postings: [
+            { account, units: { number: money(difference), currency } },
+            { account: OPENING_BALANCES, units: { number: money(-difference), currency } },
+          ],
+        },
+      ]);
+    }
+  }
+  for (const bill of setup.bills ?? [])
+    await createSchedule({ db, ledgerFor, user, book, input: bill, on: today });
   return loanView(db, ledger, made, { on: today });
 }
 
@@ -360,7 +491,7 @@ export async function editLoan({
     ...(patch.extras ? { extras: patch.extras } : {}),
     ...(patch.tolerance !== undefined ? { tolerance: patch.tolerance || "0" } : {}),
   };
-  const problem = loanProblem(merged) ?? (await accountsProblem(ledger, book, merged));
+  const problem = loanProblem(merged) ?? accountsProblem(await ledger.accounts(book), merged);
   if (problem) throw new LoanProblem(422, problem);
 
   db.updateLoan(book, id, current.updated_at, {

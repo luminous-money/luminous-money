@@ -271,6 +271,109 @@ describe("Loans", () => {
     assert.equal((await app(`/schedules/${loan.schedule_id}`)).status, 404);
   });
 
+  it("New loan's setup: its accounts, what it bought at its cost, escrow at the lender's figure, a bill and spending, all in one request", async () => {
+    const { app, ledger } = await setUp();
+    const x = "123-Main-St";
+    const accounts = {
+      liability: `Liabilities:Loans:Mortgages:${x}`,
+      interest: `Expenses:Financing:Interest:${x}`,
+      asset: `Assets:Property:${x}`,
+      escrow: `Assets:Escrow:${x}`,
+      tax: `Expenses:Taxes:Property:${x}`,
+      principal: `Expenses:Financing:Principal:${x}`,
+    };
+    const first = monthFrom(-3);
+    const bill = {
+      name: "123 Main St property tax",
+      rule: {
+        every: 6,
+        unit: "month",
+        days: [],
+        start: monthFrom(4),
+        until: null,
+        weekend: "keep",
+      },
+      template: {
+        payee: null,
+        narration: "Property tax",
+        tags: [],
+        links: [],
+        meta: {},
+        postings: [
+          { account: accounts.escrow, units: usd("-2550.00") },
+          { account: accounts.tax, units: usd("2550.00") },
+        ],
+      },
+    };
+    const setup = {
+      open: [
+        { name: accounts.liability },
+        { name: accounts.interest },
+        { name: accounts.escrow },
+        { name: accounts.tax },
+        { name: accounts.principal },
+        {
+          name: accounts.asset,
+          opening: { amount: "375000.00", date: monthFrom(-4) },
+          revalue_every: 350,
+        },
+      ],
+      escrow_balance: { account: accounts.escrow, amount: "1200.00", on: monthFrom(0) },
+      bills: [bill],
+      outflows: [{ account: accounts.liability, as: accounts.principal }],
+    };
+    const input = loanIn(
+      first,
+      { kind: "today", on: monthFrom(0), owed: "296000.00", against: OPENING },
+      {
+        name: "123 Main St mortgage",
+        accounts: {
+          liability: accounts.liability,
+          paying: CHECKING,
+          interest: accounts.interest,
+          asset: accounts.asset,
+        },
+        others: [{ name: "Escrow", account: accounts.escrow, amount: "450.00", from: first }],
+        setup,
+      }
+    );
+
+    // Something wrong anywhere in it, and nothing's written.
+    const bad = await app("/loans", "POST", {
+      ...input,
+      setup: { ...setup, outflows: [{ account: accounts.liability, as: "Expenses:Nope" }] },
+    });
+    assert.equal(bad.status, 422, await bad.clone().text());
+    const chart = async () =>
+      ((await (await ledger("/accounts")).json()) as { name: string }[]).map((a) => a.name);
+    assert.ok(!(await chart()).includes(accounts.liability));
+
+    const made = await app("/loans", "POST", input);
+    assert.equal(made.status, 201, await made.clone().text());
+    const loan = (await made.json()) as Loan & { status: { paid_from: { name: string }[] } };
+    assert.equal(loan.status.owed, "296000.00");
+    assert.deepEqual(
+      loan.status.paid_from.map((p) => p.name),
+      ["123 Main St property tax"]
+    );
+
+    const summary = (await (
+      await ledger(
+        `/accounts/summary?${[accounts.asset, accounts.escrow, accounts.liability].map((a) => `account=${encodeURIComponent(a)}`).join("&")}`
+      )
+    ).json()) as {
+      name: string;
+      balance: { number: string }[];
+      revalue_every: number | null;
+      outflow: string | null;
+    }[];
+    const of = (name: string) => summary.find((a) => a.name === name)!;
+    assert.equal(of(accounts.asset).balance[0]?.number, "375000.00");
+    assert.equal(of(accounts.asset).revalue_every, 350);
+    assert.equal(of(accounts.escrow).balance[0]?.number, "1200.00");
+    assert.equal(of(accounts.liability).outflow, accounts.principal);
+  });
+
   it("refuses what doesn't fit, and a second opening for a liability that already owes", async () => {
     const { app } = await setUp();
     const first = monthFrom(-6);

@@ -116,7 +116,10 @@ export class FakeLedger implements LedgerPort {
   async createAccount(_book: string, name: string, extra: Partial<AccountIn> = {}) {
     this.created.push(name);
     const opening = extra.opening_balance;
-    this.addAccount(name, opening ? { as_of: opening.date } : {});
+    this.addAccount(name, {
+      ...(opening ? { as_of: opening.date } : {}),
+      ...(extra.revalue_every ? { revalue_every: extra.revalue_every } : {}),
+    });
     if (opening)
       this.addTransaction({
         date: opening.date,
@@ -571,10 +574,15 @@ export class FakeLedger implements LedgerPort {
     return found;
   }
 
-  async setAccount(_book: string, account: string, patch: { divided?: boolean | null }) {
+  async setAccount(
+    _book: string,
+    account: string,
+    patch: { divided?: boolean | null; outflow?: string | null }
+  ) {
     const found = this.accountList.find((a) => a.name === account);
     if (!found) throw new LedgerError(404, "not found");
     if (patch.divided !== undefined) found.divided = !!patch.divided;
+    if (patch.outflow !== undefined) found.outflow = patch.outflow || null;
     return found;
   }
 

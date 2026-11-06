@@ -1,12 +1,14 @@
 Loans: plan
 ==================================================================================================
 
-> **Status (2026-11-05): both steps built; step 1 released as `v0.1.16`, step 2 as `v0.1.17`;
-> the decisions reviewed with Kael (one changed) in `v0.1.18`.**
+> **Status (2026-11-06): steps 1 and 2 built; step 1 released as `v0.1.16`, step 2 as
+> `v0.1.17`; the decisions reviewed with Kael (one changed) in `v0.1.18`. Step 3 (setting a
+> loan up as a questionnaire) is planned with Kael and released as `v0.1.19`: [Step 3](#step-3-setting-a-loan-up-a-questionnaire).**
 > Kael's brief is below, then the model. Kael's answers are under [Decided with Kael](#decided-with-kael); the calls made without asking go
-> under [Decisions to review](#decisions-to-review). Loans come in two steps: **step 1 is
-> loans** (the amortization table, dated changes, the payment schedule, history, escrow), and
-> **step 2 is outflows** (a loan's payments counted as spending in budgets and charts).
+> under [Decisions to review](#decisions-to-review). Loans come in steps: **step 1 is
+> loans** (the amortization table, dated changes, the payment schedule, history, escrow),
+> **step 2 is outflows** (a loan's payments counted as spending in budgets and charts), and
+> **step 3 replaces New loan with a questionnaire**.
 
 ## The brief (Kael, 2026-11-05)
 
@@ -241,7 +243,8 @@ now escrow (`v0.1.18`).
     64,000 tokens (a 30-year schedule is 360 rows), a 15-minute wait in `app` and 20 in the PWA,
     since `app` checks the rows add up rather than trusting them. A PDF is at most 5 MB.
 14. **Escrow's account defaults to `Assets:Escrow:<the loan's name>`,** and accounts named but not
-    yet in the chart are opened when the loan is saved.
+    yet in the chart are opened when the loan is saved. (Step 3: `Assets:Escrow:<what it's
+    for>`, opened by Confirm's one request.)
 15. **"Paid from escrow"** is every other schedule whose template posts to one of the loan's
     others' asset accounts, each a link to its own editor; "+ A payment from escrow" opens New
     schedule paid out of it, yearly.
@@ -255,6 +258,8 @@ Step 2's:
     followed. It covers the account's subtree.
 18. **What it counts as must be an open expense leaf.** New loan offers it checked, opening
     `<interest's parent>:<Loan>-Principal` and `-<the other's name>` (`Mortgage-Escrow`).
+    (Step 3: opt-in, on the last page, suggesting `Expenses:Financing:Principal:<what it's
+    for>` and `…:Escrow:…`; Kael.)
 19. **What comes out of a counting account masks the transaction's expenses first,** then what it
     pays into another counting account (escrow's surplus applied to principal), each in
     proportion, in cents. Borrowing, a refund out of it to the bank, and anything else aren't
@@ -264,3 +269,176 @@ Step 2's:
 21. **Reports' switch is in the address** (`?lens=expenses`), so it survives a reload and a
     tag filter; net worth and an account's Typically read the books as booked. The cash flow's
     total keeps its "Expenses" label, as the chart's legend does.
+
+## Step 3: setting a loan up (a questionnaire)
+
+### Kael's brief (2026-11-06)
+
+Trying New loan, Kael found it hard to follow:
+
+- The accounts asked for up front are confusing: it isn't clear what each is for.
+- What the loan bought can't be a new account.
+- Importing a lender's table (CSV, or a PDF read by the AI) isn't likely to be useful: working
+  it out from the terms is easy and should be close to bullet-proof. Take the import off the UI
+  and keep its code, in case it comes back.
+- A first payment on the 1st of a month showed in the table as the month before.
+- The history choices are confusing: simplify and explain them, and perhaps drop "already in
+  the books" from the UI (keeping its code).
+
+Instead, a questionnaire (Typeform-like) that builds up what's to be made and creates nothing
+until the end:
+
+1. **What is this loan for?** "Be specific. Something like '123 Main St' for a home or '2023
+   Chevy Spark' for a car."
+2. **Terms:** the loan's figures, and the table they make, to confirm.
+3. **Extras:** escrow, PMI and the like, their accounts defaulting to
+   `Assets:Escrow:123-Main-St`, `Expenses:Insurance:PMI:123-Main-St`.
+4. **History.**
+5. **Payment options.**
+6. **Confirmation:** where all the money will flow (new accounts included), what Confirm does,
+   what happens when payments come in, and what to do on an extra payment, an escrow change,
+   or a tax or insurance bill paid from escrow. Adjust anything, then Confirm creates the
+   accounts, schedules and the rest.
+
+Default accounts are named from the answer to question 1: what's owed
+`Liabilities:Loans:Mortgages:123-Main-St`, interest `Expenses:Financing:Interest:123-Main-St`,
+what it bought `Assets:Property:123-Main-St`, and paid from the first starred bank account, else
+the first bank account, else blank.
+
+### What was wrong before
+
+- **The month a payment was due was shown a month early** in the Americas: the tables showed a
+  due date as its month, formatted at UTC midnight in the browser's time zone, so the 1st was
+  the last day of the month before. The payments themselves were right (due on the 1st). The
+  loan page's tables and its "Paid off …" had the same bug.
+- **"What it bought" was the one picker without "Create account".**
+- **Accounts typed into New loan were opened as soon as they were named,** and the loan, then
+  counting it as spending, were separate requests after: a failure part way left accounts behind.
+
+### What it looks like
+
+A made-up home: "123 Main St", $300,000 borrowed on 2024-07-19 at 6.5% for 30 years, first
+payment 2024-09-01, bought for $375,000, escrow $450.00 a month, PMI $125.00.
+
+1. **What is this loan for?** A home, a car, or something else; then "123 Main St" (the help
+   text above). One screen.
+2. **Terms:** borrowed, rate, monthly payments, first payment, borrowed on (a month before the
+   first payment until changed), what it cost (a home or a car; optional), and the payment if the
+   lender's differs by a cent. The table below, with full due dates: "Does this match your
+   paperwork?"
+3. **Extras** (a home): escrow (a month's amount, what's in it now from the lender's statement,
+   and, optionally, the property tax and homeowner's insurance it pays: amount, how often, next
+   due), PMI, and anything else (a name and an amount). A car or something else: anything else.
+   Each says where it will go ("to Assets:Escrow:123-Main-St; you can change it at the end").
+4. **History**, only when payments are already due: "26 payments were due from Sep 1, 2024 to
+   Oct 1, 2026. How should they go into your books?" **Record each payment** (the borrowing,
+   then each payment split into principal, interest and escrow; payments the bank already sent
+   are split, not added twice; the whole interest history, for taxes) or **Start from what I
+   owe now** (one entry for what's owed today, from the table, corrected from a statement;
+   payments from the next one).
+5. **Payment:** paid from (the default above), the lender (the payments' payee), the match
+   tolerance, and confirming payments automatically.
+6. **Confirmation:** each month's payment and where each part goes, the escrow bills, every
+   account (marked new or existing, each changeable: rename a new one or pick another), what
+   Confirm writes, "Count principal and escrow as spending" (off; its accounts chosen there
+   when on), and what to do later. Each step has a Change link back to it. **Confirm** sends it
+   all in one request, and opens the loan's page.
+
+Back and Next on every step, and a progress bar. The answers are kept in the browser's session,
+so a reload doesn't lose them.
+
+### Decided with Kael (2026-11-06)
+
+1. **The kind of loan is asked with question 1:** a home (mortgage), a car, or something else.
+   It picks the default names and which extras are offered (escrow and PMI for a home).
+2. **History is two choices,** Record each payment or Start from what I owe now, with no
+   "Against" and no "Confirm them" (always Opening Balances; recorded payments confirmed).
+   A loan account that already says what's owed is noticed, and nothing is written for it
+   ("already in the books", no longer a choice). The step is skipped when nothing is due yet.
+3. **A new asset account asks what it cost** (optional), dated when it was borrowed, so net
+   worth reads its value less what's owed. An existing one gets nothing written.
+4. **Counting principal and escrow as spending is opt-in,** on the confirmation page, its
+   accounts chosen there.
+5. **Escrow asks what's in it now** (optional, from the lender's statement), and the books'
+   escrow is set to it.
+6. **The tax and insurance bills paid from escrow can be set up here,** optionally; if they're
+   left for later, the confirmation page says how (the loan's page, "+ A payment from escrow").
+7. **Paid from defaults to a bank-linked account:** the first starred asset account linked to a
+   bank feed (home's order), else the first linked one A–Z; with none linked, the same for
+   accounts under `Assets:Bank`; else blank.
+8. **The loan's page is only aligned:** no CSV or PDF for a new table either, the dates fixed,
+   and the confirmation page's "what to do when" wording.
+9. **One step per screen,** not one question per screen.
+
+### Calls made without asking (to review)
+
+1. **The loan's name** is "123 Main St mortgage" (a home), "2023 Chevy Spark loan" (a car or
+   something else), changeable on the confirmation page. The kind isn't kept on the loan.
+2. **Default names by kind:**
+
+   | | A home | A car | Something else |
+   |---|---|---|---|
+   | What's owed | `Liabilities:Loans:Mortgages:X` | `Liabilities:Loans:Auto:X` | `Liabilities:Loans:X` |
+   | What it bought | `Assets:Property:X` | `Assets:Vehicles:X` | none (one can be added) |
+
+   Always: interest `Expenses:Financing:Interest:X`; escrow `Assets:Escrow:X`; PMI
+   `Expenses:Insurance:PMI:X`; anything else `Expenses:Financing:<its name>:X`; the property tax
+   `Expenses:Taxes:Property:X`, homeowner's insurance `Expenses:Insurance:Homeowners:X`. X is the
+   answer to question 1 as an account part ("123 Main St" is `123-Main-St`).
+3. **A new asset is a revalued asset** (a new value asked for yearly, as Add account's are),
+   opened with what it cost on the borrowing date, against Opening Balances. The borrowing is
+   against Opening Balances too, so the asset holds the price and the loan what's owed. When
+   the paying account's books cover the borrowing date, the confirmation page says that a down
+   payment among the bank's transactions goes to Opening Balances, or the house is counted
+   twice.
+4. **"Borrowed on" is asked in Terms** (it dates the borrowing and what it cost), a month before
+   the first payment until changed.
+5. **Escrow's balance now** has its date (today until changed): after the payments are staged,
+   the difference between it and what the books say escrow holds then is written against
+   Opening Balances. Blank writes nothing.
+6. **The escrow bills** are the property tax (yearly, twice a year or quarterly) and homeowner's
+   insurance (yearly), each an amount and its next due date: schedules paid from escrow, not
+   confirmed automatically (a tax bill changes from year to year, and review is where it's
+   corrected).
+7. **Confirm is one request:** `POST loans` takes a `setup` (accounts to open, with the
+   asset's opening and revaluing; escrow's balance; the bills; what counts as spending), all
+   checked before anything is written. The accounts open first in one all-or-none write.
+8. **"Count as spending" suggests** `Expenses:Financing:Principal:X` and
+   `Expenses:Financing:Escrow:X` when it's turned on. The loan page's As spending card suggests
+   the same (X from each account's last part), with pickers rather than one press.
+9. **The answers are kept per book in `sessionStorage`,** cleared by Confirm or "Start over".
+10. **The CSV and PDF code stays:** the table's source component offers only "work it out"
+    unless told otherwise, so its choice is hidden; `loans/read`, the CSV reader and the `ai`
+    service's operation are untouched.
+11. **A loan account chosen at the end that already says what's owed** makes the history
+    "already in the books" (the server's `books`), and the confirmation page says so. It's
+    noticed there, since that's where accounts are chosen.
+
+### Step 3: as built (2026-11-06)
+
+Built as planned above.
+
+- **Where things are:**
+  - `services/app/src/web/lib/loan-setup.ts`: the questionnaire without its screens: the
+    draft, the default accounts, the steps and what each still needs, the paid-from default, and
+    `requestOf` (what Confirm sends). `loan-setup.test.ts` covers it.
+  - `web/pages/LoanSetup.tsx` (the page: steps, progress, Back and Next, the session's copy),
+    `web/components/LoanSetupSteps.tsx` (the five questions) and `LoanConfirm.tsx` (the last
+    page, and `LoanHowTo`, the "what to do when" list the loan's page shows too).
+    `pages/LoanEditor.tsx` (the old form) is gone.
+  - `server/loans.ts`: `createLoan` takes `setup` (`LoanSetup` in `shared/loans.ts`), checks it
+    with the loan (`setupProblem`, against the chart as it will be), then opens its accounts
+    (`createAccounts`), sets what counts as spending, declares the loan, sets escrow's balance and
+    creates the bills (`createSchedule`).
+  - `components/AccountPicker.tsx` gained `suggest` ("Create account"'s name when nothing's
+    typed: renaming one not made yet); `components/Loans.tsx` has `planned` (a "Create account"
+    that only names one) and `inChart`. `LoanTableSource` offers only "work it out" unless given
+    `sources`.
+  - The loan's page: the dates, a "What to do when…" card, "Create account" for what it bought
+    in Settings, and As spending suggesting `Expenses:Financing:<part>:<the account's last part>`
+    with pickers.
+- **Tests:** `loan-setup.test.ts` (8), `format.test.ts` (the dates in Chicago's zone), the server
+  (3 more in `server/loans.test.ts`: the setup made, escrow's figure after a backfill, and nothing
+  written when any of it is wrong), an API test (`tests/e2e/src/loans.test.ts`, the setup in one
+  request) and `tests/ui/src/loans.spec.ts`, rewritten in Chicago's zone (a home step by step to
+  its page; a car's with no history step, a reload, an account already owing, and spending).

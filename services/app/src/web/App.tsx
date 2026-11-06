@@ -38,7 +38,7 @@ import { Review } from "./pages/Review.js";
 import { TradePage } from "./pages/TradePage.js";
 import { RuleEditor } from "./pages/RuleEditor.js";
 import { Rules } from "./pages/Rules.js";
-import { LoanEditor } from "./pages/LoanEditor.js";
+import { LoanSetup } from "./pages/LoanSetup.js";
 import { LoanPage } from "./pages/LoanPage.js";
 import { Loans } from "./pages/Loans.js";
 import { ScheduleEditor } from "./pages/ScheduleEditor.js";
@@ -228,7 +228,7 @@ function Gate() {
           </Route>
           <Route path="/books/:book/loans">{({ book: id }) => <Loans key={id} book={id} />}</Route>
           <Route path="/books/:book/loans/new">
-            {({ book: id }) => <LoanEditor key="new" book={id} />}
+            {({ book: id }) => <LoanSetup key="new" book={id} />}
           </Route>
           <Route path="/books/:book/loans/:id">
             {({ book: id, id: loan }) => <LoanPage key={loan} book={id} id={loan} />}

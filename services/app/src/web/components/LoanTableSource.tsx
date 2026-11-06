@@ -27,7 +27,7 @@ import { formatDay } from "../lib/format.js";
 import { explain, useAiSettings } from "../lib/queries.js";
 import { RowsTable, usd } from "./Loans.js";
 
-type Source = "terms" | "csv" | "ai";
+export type Source = "terms" | "csv" | "ai";
 
 const COLUMN_LABELS: Record<LoanColumn, string> = {
   number: "Payment number",
@@ -46,6 +46,10 @@ export type TableExtras = { lender: string | null; escrow: string | null; from: 
  * and changeable), or a PDF or image the book's AI reads. Says what it makes (`onChange`, null
  * until there's a table that adds up), and what else the schedule showed (`onExtras`).
  * `starting` prefills the terms (a new table from a date starts from what's owed then).
+ *
+ * Only working it out is offered unless `sources` says otherwise (Kael, 2026-11-06: importing
+ * a lender's table wasn't likely to be useful), so the choice is hidden; the rest is kept in
+ * case it comes back.
  */
 export function LoanTableSource({
   book,
@@ -53,15 +57,17 @@ export function LoanTableSource({
   onChange,
   onExtras,
   starting,
+  sources = ["terms"],
 }: {
   book: string;
   currency: string;
   onChange: (table: LoanTable | null) => void;
   onExtras?: (extras: TableExtras) => void;
   starting?: { amount?: string; first?: string; rate?: string };
+  sources?: Source[];
 }) {
   const ai = useAiSettings(book);
-  const [source, setSource] = useState<Source>("terms");
+  const [source, setSource] = useState<Source>(sources[0] ?? "terms");
   const [amount, setAmount] = useState(starting?.amount ?? "");
   const [rate, setRate] = useState(starting?.rate ?? "");
   const [payments, setPayments] = useState("360");
@@ -134,26 +140,30 @@ export function LoanTableSource({
 
   return (
     <>
-      <div className="segmented" role="radiogroup" aria-label="Where the table comes from">
-        {(
-          [
-            ["terms", "Work it out"],
-            ["csv", "Import a CSV"],
-            ["ai", "Read a PDF or image"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={source === value}
-            className={source === value ? "on" : ""}
-            onClick={() => setSource(value)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {sources.length > 1 && (
+        <div className="segmented" role="radiogroup" aria-label="Where the table comes from">
+          {(
+            [
+              ["terms", "Work it out"],
+              ["csv", "Import a CSV"],
+              ["ai", "Read a PDF or image"],
+            ] as const
+          )
+            .filter(([value]) => sources.includes(value))
+            .map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={source === value}
+                className={source === value ? "on" : ""}
+                onClick={() => setSource(value)}
+              >
+                {label}
+              </button>
+            ))}
+        </div>
+      )}
 
       {source === "terms" && (
         <>

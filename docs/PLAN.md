@@ -206,6 +206,14 @@ milestone starts.
         P&L view.
   - [x] **Its decisions reviewed** (Kael, 2026-11-05; `v0.1.18`): all 21 kept but number 6, so
         a matched payment's different amount now goes to escrow (principal, without escrow).
+  - [x] **Step 3: setting a loan up as a questionnaire** (Kael, 2026-11-06;
+        [planned with Kael](milestones/loans/PLAN.md#step-3-setting-a-loan-up-a-questionnaire)
+        and [built](milestones/loans/PLAN.md#step-3-as-built-2026-11-06) 2026-11-06, released
+        as `v0.1.19`):
+        New loan becomes a step-by-step questionnaire (what it's for, terms, extras, history,
+        payment, then a confirmation page showing where the money flows) that creates nothing
+        until Confirm. Default accounts are named from what the loan is for; the CSV and PDF
+        imports and "already in the books" leave the UI; due dates no longer show a month early.
 - [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules
       that add tags, a Tags field on schedules (their templates carry tags already, unseen) and
       on Capture receipt, the AI and history proposing the book's own tags, and transfers

@@ -18,6 +18,7 @@ import {
   PickerField,
   usd,
 } from "../components/Loans.js";
+import { LoanHowTo } from "../components/LoanConfirm.js";
 import { LoanTableSource } from "../components/LoanTableSource.js";
 import { LoanSpending } from "../components/Outflow.js";
 import { formatDay, today } from "../lib/format.js";
@@ -113,6 +114,15 @@ function Loan({ book, loan, here }: { book: string; loan: LoanView; here: string
           <PaymentsTable payments={status.ahead} currency={currency} />
         </section>
       )}
+
+      <section className="card" aria-label="What to do when">
+        <h2 className="section-title">What to do when…</h2>
+        <LoanHowTo
+          escrow={loan.others.some((o) => o.account.startsWith("Assets:"))}
+          bills={status.paid_from.length > 0}
+          where="page"
+        />
+      </section>
 
       <Settings book={book} loan={loan} />
     </div>
@@ -616,6 +626,7 @@ function Settings({ book, loan }: { book: string; loan: LoanView }) {
           value={asset}
           onChange={setAsset}
           prefer={["Assets"]}
+          {...(create ? { create } : {})}
         />
         <label>
           Match tolerance

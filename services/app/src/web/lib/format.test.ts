@@ -1,6 +1,18 @@
 import { expect, it } from "vitest";
 
-import { statusMessage } from "./format.js";
+import { formatFullDay, formatMonth, statusMessage } from "./format.js";
+
+it("a due date is its own month and day west of Greenwich", () => {
+  // Shown as the month before in Chicago, once (Kael, 2026-11-06).
+  const zone = process.env.TZ;
+  process.env.TZ = "America/Chicago";
+  try {
+    expect(formatMonth("2024-09-01")).toBe("Sep 2024");
+    expect(formatFullDay("2024-09-01")).toBe("Sep 1, 2024");
+  } finally {
+    process.env.TZ = zone;
+  }
+});
 
 it("says what a failed response means when its body doesn't (a proxy's error page)", () => {
   // Emmer's nginx cut a long receipt read off this way (2026-11-02).

@@ -1,18 +1,16 @@
 import type { Account } from "@luminous-money/ledger-client";
 import { useState, type ComponentProps } from "react";
 
-import { cents, money, type LoanOther, type LoanRow, type Payment } from "../../shared/loans.js";
+import { cents, money, type LoanRow, type Payment } from "../../shared/loans.js";
 import { formatMoney } from "../lib/decimal.js";
+import { formatFullDay, formatMonth } from "../lib/format.js";
 import { AccountPicker, type AccountCreation } from "./AccountPicker.js";
 
 /** Amounts in the loan's currency. */
 export const usd = (n: string, currency = "USD") => formatMoney(n, currency);
 
 /** A date as a month: "Jul 2046". */
-export const monthOf = (iso: string) =>
-  new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(
-    new Date(`${iso}T00:00:00Z`)
-  );
+export const monthOf = formatMonth;
 
 /** Leaves that can take postings (archived ones aside), under the given roots. */
 export function leavesUnder(accounts: Account[] | undefined, roots: string[]): string[] {
@@ -26,6 +24,19 @@ export function leavesUnder(accounts: Account[] | undefined, roots: string[]): s
     )
     .map((a) => a.name);
 }
+
+/**
+ * "Create account" that makes nothing: the name is only picked, and opened by Confirm. A name
+ * that isn't in the chart is a new account.
+ */
+export const planned = (chart: Account[]): AccountCreation => ({
+  accounts: chart,
+  submit: async (name) => ({ name, kind: "leaf", implicit: false }) as Account,
+});
+
+/** Whether a name is in the chart already (not one Confirm will open). */
+export const inChart = (chart: Account[], name: string) =>
+  chart.some((a) => a.name === name && !a.implicit);
 
 /** An account picker with its label shown above it, as the app's forms have them. */
 export function PickerField(props: ComponentProps<typeof AccountPicker>) {
@@ -60,7 +71,7 @@ export function RowsTable({ rows, currency }: { rows: LoanRow[]; currency: strin
             {shown.map((r) => (
               <tr key={r.number}>
                 <td>{r.number}</td>
-                <td className="due">{monthOf(r.date)}</td>
+                <td className="due">{formatFullDay(r.date)}</td>
                 <td className="num">{usd(r.principal, currency)}</td>
                 <td className="num">{usd(r.interest, currency)}</td>
                 <td className="num">{usd(r.balance, currency)}</td>
@@ -108,7 +119,7 @@ export function PaymentsTable({
           <tbody>
             {shown.map((p) => (
               <tr key={p.nominal}>
-                <td className="due">{monthOf(p.nominal)}</td>
+                <td className="due">{formatFullDay(p.nominal)}</td>
                 <td className="num">{usd(money(cents(p.principal) + cents(p.extra)), currency)}</td>
                 <td className="num">{usd(p.interest, currency)}</td>
                 {others && (
@@ -137,95 +148,10 @@ export function paymentParts(p: Payment, currency: string): string {
   return [
     `${usd(money(cents(p.principal) + cents(p.extra)), currency)} principal${cents(p.extra) > 0n ? ` (${usd(p.extra, currency)} extra)` : ""}`,
     `${usd(p.interest, currency)} interest`,
-    ...p.others.map((o) => `${usd(o.amount, currency)} ${o.name.toLowerCase()}`),
+    // An initialism (PMI) stays as it's written; a word reads as one ("escrow").
+    ...p.others.map(
+      (o) =>
+        `${usd(o.amount, currency)} ${o.name === o.name.toUpperCase() ? o.name : o.name.toLowerCase()}`
+    ),
   ].join(", ");
-}
-
-/** Where a new escrow account goes for a loan: `Assets:Escrow:<its name>`. */
-export const escrowAccount = (loan: string) =>
-  `Assets:Escrow:${loan.trim().replace(/\s+/g, "-") || "Loan"}`;
-
-/**
- * The parts of a payment beyond principal and interest (escrow, PMI, fees): each a name, an
- * account and an amount. `from` is when they start; changing one later is a dated change, made
- * on the loan's page.
- */
-export function OthersFieldset({
-  others,
-  onChange,
-  accounts,
-  create,
-  from,
-  loanName,
-}: {
-  others: LoanOther[];
-  onChange: (others: LoanOther[]) => void;
-  accounts: Account[] | undefined;
-  create?: AccountCreation;
-  from: string;
-  loanName: string;
-}) {
-  const names = leavesUnder(accounts, ["Assets", "Expenses", "Liabilities"]);
-  const set = (i: number, patch: Partial<LoanOther>) =>
-    onChange(others.map((o, j) => (j === i ? { ...o, ...patch } : o)));
-  const add = (name: string, account: string) =>
-    onChange([...others, { name, account, amount: "", from }]);
-  return (
-    <fieldset className="loan-others">
-      <legend>Paid with it</legend>
-      <p className="muted small">
-        Beyond principal and interest: escrow (the taxes and insurance the lender pays for you),
-        PMI, a fee. Each goes to an account of its own.
-      </p>
-      {others.map((o, i) => (
-        <div className="loan-other" key={i}>
-          <div className="pair">
-            <label>
-              Name
-              <input value={o.name} onChange={(e) => set(i, { name: e.target.value })} />
-            </label>
-            <label>
-              Amount
-              <input
-                inputMode="decimal"
-                value={o.amount}
-                onChange={(e) => set(i, { amount: e.target.value.trim() })}
-                placeholder="450.00"
-              />
-            </label>
-          </div>
-          <PickerField
-            label={`${o.name || "It"} goes to`}
-            accounts={names}
-            value={o.account}
-            onChange={(account) => set(i, { account })}
-            prefer={["Assets", "Expenses"]}
-            {...(create ? { create } : {})}
-          />
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => onChange(others.filter((_, j) => j !== i))}
-          >
-            Remove {o.name || "it"}
-          </button>
-        </div>
-      ))}
-      <div className="actions">
-        {!others.some((o) => /escrow/i.test(o.name)) && (
-          <button type="button" onClick={() => add("Escrow", escrowAccount(loanName))}>
-            + Escrow
-          </button>
-        )}
-        {!others.some((o) => /pmi/i.test(o.name)) && (
-          <button type="button" onClick={() => add("PMI", "")}>
-            + PMI
-          </button>
-        )}
-        <button type="button" onClick={() => add("", "")}>
-          + Other
-        </button>
-      </div>
-    </fieldset>
-  );
 }
