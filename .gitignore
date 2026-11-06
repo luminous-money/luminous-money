@@ -9,5 +9,8 @@ test-results/
 playwright-report/
 /.env
 
-# Private notes beside the docs (real figures): never committed
-docs/**/*.private.md
+# Any private file
+*.private
+*.private.*
+.*.private
+.*.private.*
