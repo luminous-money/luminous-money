@@ -14,9 +14,11 @@ base="http://127.0.0.1:$port"
 work=$(mktemp -d)
 home="$work/home"
 cli="$home/luminous-money"
+images="gateway auth ledger app ai"
 
 cleanup() {
   docker compose -p "$project" -f compose.yaml down --volumes --remove-orphans >/dev/null 2>&1 || true
+  for s in $images; do docker image rm "luminous-money/$s:clitest" >/dev/null 2>&1 || true; done
   rm -rf "$work"
 }
 trap cleanup EXIT
@@ -67,6 +69,16 @@ if books | grep -q '"After"'; then fail "restoring kept what came after the back
 step "upgrade"
 "$cli" upgrade dev --from . | grep -q "Now on dev" || fail "upgrade didn't finish"
 [ "$(ls -1 "$home"/backups/luminous-money-*.tar.gz | wc -l | tr -d ' ')" = 2 ] || fail "upgrade didn't back up first"
+
+step "an upgrade stopped part way"
+"$cli" upgrade dev | grep -q "Already on dev" || fail "upgrading to what runs didn't say it's already on it"
+# Pinned to a version the services don't run yet (an upgrade stopped while pulling once left
+# Emmer so): upgrading to it again finishes it, rather than saying it's already on it.
+for s in $images; do docker tag "luminous-money/$s:dev" "luminous-money/$s:clitest"; done
+sed 's/^LUMINOUS_MONEY_VERSION=.*/LUMINOUS_MONEY_VERSION=clitest/' "$home/.env" >"$work/env"
+cat "$work/env" >"$home/.env"
+"$cli" upgrade clitest | grep -q "Now on clitest" || fail "upgrade didn't finish one stopped part way"
+"$cli" upgrade clitest | grep -q "Already on clitest" || fail "a finished upgrade isn't already on its version"
 
 step "auto-upgrade"
 LUMINOUS_MONEY_CRONTAB="$work/crontab" # a stand-in: never this machine's crontab

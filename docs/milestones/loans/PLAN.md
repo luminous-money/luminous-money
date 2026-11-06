@@ -1,7 +1,8 @@
 Loans: plan
 ==================================================================================================
 
-> **Status (2026-11-05): both steps built; step 1 released as `v0.1.16`, step 2 as `v0.1.17`.**
+> **Status (2026-11-05): both steps built; step 1 released as `v0.1.16`, step 2 as `v0.1.17`;
+> the decisions reviewed with Kael (one changed) in `v0.1.18`.**
 > Kael's brief is below, then the model. Kael's answers are under [Decided with Kael](#decided-with-kael); the calls made without asking go
 > under [Decisions to review](#decisions-to-review). Loans come in two steps: **step 1 is
 > loans** (the amortization table, dated changes, the payment schedule, history, escrow), and
@@ -87,8 +88,9 @@ A made-up mortgage: $300,000 borrowed on 2016-06-15 at 3.75% for 30 years, first
   matching the bank's row, auto-confirm, "Not this time", upcoming rows and projected balances
   all work as they do for any schedule. Its editor says it follows the loan, and links there.
 - **The payment's splits:** paying account −(the total), liability +principal, interest
-  +interest, each other +its amount. The paying split carries the match tolerance; the
-  principal takes up any difference, as a lender applies an overpayment to principal.
+  +interest, each other +its amount. The paying split carries the match tolerance; escrow
+  takes up any difference (Kael, reviewing decision 6: a bill that differs is most often an
+  escrow change not recorded yet), and principal does for a loan without escrow.
 - **Changes** (each from a date):
   - **an other's amount** (escrow, PMI; 0 ends one), or a new other;
   - **extra principal** with every payment from a date (a one-off extra payment is just a
@@ -135,7 +137,7 @@ Built as planned, with the departures noted under [Decisions to review](#decisio
   when they aren't sent, so a script can send only terms. A loan's schedule refuses `PATCH` and
   `DELETE` (422: change the loan).
 - **Tests:** the engine (15) and the CSV (4) in `shared/`, the server (10, `server/loans.test.ts`),
-  the ai service (reading a schedule), `tests/e2e/src/loans.test.ts` (4) and
+  the ai service (reading a schedule), `tests/e2e/src/loans.test.ts` (5, with a matched payment's difference) and
   `tests/ui/src/loans.spec.ts` (2). Screens looked at on a phone and a desktop, light and dark;
   wide tables scroll inside their card.
 
@@ -197,7 +199,8 @@ Asked and answered on 2026-11-05:
 
 ## Decisions to review
 
-Made without asking; each is easy to change.
+Made without asking. **Reviewed with Kael on 2026-11-05:** all 21 kept as built but number 6,
+now escrow (`v0.1.18`).
 
 1. **Loans live in `app`, beside schedules,** not in the ledger: the loan drives a schedule, which
    is `app`'s, and a table is hundreds of rows. So a book's Beancount export doesn't carry a loan
@@ -213,9 +216,10 @@ Made without asking; each is easy to change.
 5. **An imported table's rate** is the median of its first 24 rows' interest on what was owed
    (three places), and its **payment** the most common principal and interest, so an odd first or
    last payment doesn't count.
-6. **Principal is left blank in a staged payment only when it has a match tolerance,** so the
-   bank's different amount goes to principal on confirming (as M3's blank split does); otherwise
-   every split has its amount.
+6. **Changed by Kael: escrow takes up the bank's different amount.** A staged payment with a
+   match tolerance (and the bank's copy filled in) leaves escrow blank, so on confirming the
+   difference goes to escrow (as M3's blank split does); without escrow, principal is left blank.
+   Otherwise every split has its amount. (First built with principal taking it up.)
 7. **Payments due before the paying account's books begin** (its open date) come from Opening
    Balances and are principal and interest only: the money left before that account's history
    (its opening balance already counts it), and what the lender did with escrow then isn't known.

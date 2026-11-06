@@ -233,7 +233,15 @@ finding it on GitHub to running it, on a laptop or a public server, in one comma
 - **One command for the host** (`scripts/luminous-money`, bash 3.2 and Docker, nothing else): install,
   status, up/down, upgrade, backup, restore, logs, report, config. It's tested end to end in
   `pnpm e2e` (`scripts/cli-test.sh`).
-- **Upgrades back up first,** then pin, pull, restart and wait for health. Migrations stay
+- **Upgrades back up first,** then pull, pin, restart and wait for health. **Pulling comes
+  before anything changes** (`compose.yaml`, the command, `.env`'s version), so an upgrade stopped
+  while pulling leaves the deployment as it was; one stopped later is finished by `upgrade` to
+  the same version, which checks what's running against what's pinned rather than trusting `.env`
+  alone. **Images are pulled one at a time:** with Docker's containerd image store, images
+  unpacking the same layer at once can wait on each other for good. Both from Emmer's upgrade to
+  0.1.17 (2026-11-05): `compose pull` hung on app, ai and auth (one Node base) for 17 minutes,
+  and once stopped, `.env` said 0.1.17 while 0.1.15 ran, so `upgrade` said it was done; one at a
+  time, the same images took under a minute. Migrations stay
   automatic and forward-only (each service migrates as it starts and refuses a newer database),
   so going back is restoring the pre-upgrade backup with the old version: simpler and safer than
   down-migrations nobody exercises.
@@ -1185,7 +1193,8 @@ has the walkthrough, Kael's answers and the calls made without asking.
   an extra payment invalidates the rest of the original table.
 - **The payment is an M3 schedule the loan keeps,** its occurrences worked out by the loan
   (`server/loan-payments.ts`), so review, matching the bank's row (the paying split carries the
-  tolerance; principal takes up the difference), auto-confirm and upcoming rows are schedules'.
+  tolerance; escrow takes up the difference, principal without escrow: Kael), auto-confirm and
+  upcoming rows are schedules'.
   Its schedule can't be edited or deleted on its own. A payment already in the paying account
   (the bank's) is filled in rather than staged twice.
 - **History, when a loan is declared already under way:** *from the start* (the borrowing, then

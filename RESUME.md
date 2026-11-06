@@ -7,8 +7,10 @@ _Updated 2026-11-05._ Keep this current: every finalized change set updates it (
 ## Hand-off (2026-11-05): Loans is out (both steps)
 
 **Read this first.** Loans is built and released: step 1 as **`v0.1.16`**, step 2 (outflows) as
-**`v0.1.17`** (the tag on its commit). Emmer still runs 0.1.15 until Kael upgrades it (`upgrade
-0.1.17`). Nothing is half done.
+**`v0.1.17`**, and **`v0.1.18`** (the tag on its commit) after Kael reviewed its 21 decisions:
+all kept but one, a matched payment's difference now going to escrow rather than principal.
+0.1.18 also makes upgrades safe to stop (below). Emmer still runs 0.1.15 until Kael upgrades it
+(`upgrade 0.1.18`; 0.1.18's images are already pulled there). Nothing is half done.
 
 ### What was done (2026-11-05)
 
@@ -29,7 +31,21 @@ _Updated 2026-11-05._ Keep this current: every finalized change set updates it (
   spending, as an expense account, and what it pays for (escrow's tax bill) isn't counted again.
   Budgets, home's "Spent this month" and Reports count outflows (the ledger's lens, one
   implementation); Reports has an **Outflows | Expenses** switch for the books as booked.
-- **21 calls made without asking** are in the plan's "Decisions to review", for Kael to look over.
+- **The 21 calls made without asking** (the plan's "Decisions to review") were put to Kael and
+  all kept but number 6: with a match tolerance, the bank's different amount now goes to escrow
+  (principal for a loan without escrow).
+
+- **Emmer's upgrade to 0.1.17 hung** (Kael, 2026-11-05 20:19 to 20:39 Chicago time), and
+  looked done after: `docker compose pull` sat for 17 minutes (dockerd: app, ai and auth, one
+  Node base, all unpacking the same layer at once under Docker 29's containerd image store),
+  Kael stopped it, and `upgrade` again said "Already on 0.1.17", since `.env` had been pinned
+  before the pull while 0.1.15 still ran. Pulled one at a time, the same images took under a
+  minute. Fixed in `scripts/luminous-money` (design.md, "Operating it"): images are pulled one
+  at a time, before anything changes, and `upgrade` to the pinned version finishes one stopped
+  after pinning (`behind`: running images against compose.yaml's). `cli-test.sh` covers the
+  second. On Emmer, `.env`'s version was put back to 0.1.15 (what runs) and 0.1.18's images
+  pulled one at a time, so its own 0.1.17 command (which still pulls all at once) finds them
+  there. Its auto-upgrade (03:30) would otherwise have taken 0.1.18 that night.
 
 ### Done before (2026-11-03): Funds B step 1 (shares in funds), `v0.1.15`
 
@@ -75,24 +91,23 @@ _Updated 2026-11-05._ Keep this current: every finalized change set updates it (
 
 ### What to do next
 
-1. **Kael upgrades Emmer to 0.1.17** and declares his mortgage (Menu → Loans): most likely "from
+1. **Kael upgrades Emmer to 0.1.18** and declares his mortgage (Menu → Loans): most likely "from
    today" with the lender's balance, or "from the start" for the interest history (payments
    before checking's books began come from Opening Balances). Escrow's tax and insurance
    payments become schedules paid from escrow (the loan's page links them). Reading a PDF
    schedule is a real Claude call (Sonnet 5): watch `luminous-money logs ai` the first time.
    With "Count the whole payment as monthly spending" (on by default), budgets on Housing then
    include principal and escrow: budgets set before may want raising.
-2. **Kael looks over Loans' calls** (the plan's "Decisions to review", 21 of them).
-3. **Kael sets his Fidelity accounts up in funds on Emmer** (0.1.15 is installed there): both
+2. **Kael sets his Fidelity accounts up in funds on Emmer** (0.1.15 is installed there): both
    IRAs' default fund Retirement, from their opening (the account editor, or beside each link on
    Bank connections); the brokerage divided among Wedding, Emergency, Special Home Maintenance
    and Repair, and Special Home Improvement with Move money from Unallocated; then whatever the
    bell has. Watch the first bank sync after: a sale or transfer out of shares that every fund
    holds should land in the bell, not fail.
-4. **Kael looks over Funds B step 1's calls** ([B's plan](docs/milestones/funds/B/PLAN.md),
+3. **Kael looks over Funds B step 1's calls** ([B's plan](docs/milestones/funds/B/PLAN.md),
    "Decisions to review" and "Where the build departed from the plan"), and Funds A's (A's plan,
    "Decisions to review"), whenever suits.
-5. Then the rest of Funds B (the [design record](docs/milestones/funds/B/design-record.md), and
+4. Then the rest of Funds B (the [design record](docs/milestones/funds/B/design-record.md), and
    the 71 [scenarios](docs/milestones/funds/B/scenarios.md) with Kael; splits and corporate
    actions are waiting there, with how the bank feed books a split), or M18 (suggested
    recurring transactions and matching rules); see "Next steps" below.
@@ -225,8 +240,9 @@ system, **`v0.1.11`** what the AI costs, **`v0.1.12`** (2026-10-29) tags (M17) a
 migration's clearer word on what's kept, **`v0.1.13`** (2026-11-02) Funds A, and **`v0.1.14`**
 (2026-11-02) receipts read in the background, plainer errors, and account lists A–Z, and
 **`v0.1.15`** (2026-11-03) Funds B's step 1: shares in funds, default funds and Notifications, and
-**`v0.1.16`** (2026-11-05) Loans' step 1, and **`v0.1.17`** (2026-11-05) Loans' step 2,
-outflows. The history was rewritten once before
+**`v0.1.16`** (2026-11-05) Loans' step 1, **`v0.1.17`** (2026-11-05) Loans' step 2,
+outflows, and **`v0.1.18`** (2026-11-05) escrow taking up a matched payment's difference, and
+upgrades that are safe to stop. The history was rewritten once before
 the first push (an email taken out of RESUME), so commit IDs from before then are gone.
 
 What a user can do now:
@@ -493,9 +509,9 @@ How it's put together:
 - **Tests, all passing:**
   - `pnpm test`:
     - ledger: 254 tests, including the table lint
-    - auth: 24; app: 291; ai: 15; db: 10; csv-import: 22
+    - auth: 24; app: 292; ai: 15; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 108 API tests and 128 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 109 API tests and 128 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Its `.env` (not committed: its keys) sets `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand`, so it never
@@ -515,7 +531,7 @@ How it's put together:
    categorizing it took about 76 seconds, hence background jobs), but none with a reference
    yet; watch the first suggestions' quality and `docker compose logs ai`. Not built from the
    proposal: a by-payee view in review (categorize a payee's group at once).
-3. **Loans is out** (`v0.1.16` and `v0.1.17`, [its plan](docs/milestones/loans/PLAN.md)); Kael
+3. **Loans is out** (`v0.1.16` to `v0.1.18`, [its plan](docs/milestones/loans/PLAN.md)); Kael
    declares his mortgage on Emmer. **Funds B's step 1 is out** (`v0.1.15`); Kael sets his
    Fidelity accounts up in funds. Then the rest of B (where a loan is grouped with its asset) or
    M18 (suggested recurring transactions and matching rules).

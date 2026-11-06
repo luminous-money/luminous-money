@@ -478,22 +478,35 @@ export function project(spec: Spec, after: string | null, owed: bigint, limit = 
   return out;
 }
 
-/** A payment's splits: the paying account the total, the liability principal and extra (blank
- * to take up a matched amount's difference, when the paying split has a tolerance), interest,
- * and each other. */
+/** The other that takes up a matched amount's difference: escrow (by name, else the first that
+ * goes to an asset), or none, when principal does (Kael: a bill that differs is most often an
+ * escrow change not recorded yet). */
+export function absorbingOther(p: Pick<Payment, "others">): number {
+  const named = p.others.findIndex((o) => /escrow/i.test(o.name));
+  return named >= 0 ? named : p.others.findIndex((o) => o.account.startsWith("Assets:"));
+}
+
+/** A payment's splits: the paying account the total, the liability principal and extra,
+ * interest, and each other. With `absorb` (a match tolerance, or the bank's amount kept), one is
+ * left blank to take up the difference between the bank's amount and the total: escrow if the
+ * payment has it, else principal. */
 export function paymentPostings(
   accounts: Pick<LoanAccounts, "liability" | "paying" | "interest">,
   p: Payment,
   currency: string,
-  { blankPrincipal = false }: { blankPrincipal?: boolean } = {}
+  { absorb = false }: { absorb?: boolean } = {}
 ): { account: string; units: { number: string; currency: string } | null }[] {
   const units = (number: string) => ({ number, currency });
   const paid = money(cents(p.principal) + cents(p.extra));
+  const escrow = absorb ? absorbingOther(p) : -1;
   return [
     { account: accounts.paying, units: units(money(-cents(p.total))) },
-    { account: accounts.liability, units: blankPrincipal ? null : units(paid) },
+    { account: accounts.liability, units: absorb && escrow < 0 ? null : units(paid) },
     ...(cents(p.interest) !== 0n ? [{ account: accounts.interest, units: units(p.interest) }] : []),
-    ...p.others.map((o) => ({ account: o.account, units: units(o.amount) })),
+    ...p.others.map((o, i) => ({
+      account: o.account,
+      units: i === escrow ? null : units(o.amount),
+    })),
   ];
 }
 

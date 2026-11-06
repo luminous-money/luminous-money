@@ -166,6 +166,44 @@ describe("Loans", () => {
     assert.equal(await owed(), `-${loan.status.owed}`);
   });
 
+  it("with a match tolerance, the bank's different amount is the payment, escrow taking up the difference", async () => {
+    const { app, ledger } = await setUp();
+    // Last month's came in $10.65 more than the loan says: an escrow change not in the books.
+    const lastMonth = monthFrom(-1);
+    const bank = await ledger("/transactions", "POST", {
+      date: lastMonth.replace(/-01$/, "-02"),
+      flag: "!",
+      payee: "BIG BANK MTG",
+      narration: "",
+      postings: [
+        { account: CHECKING, units: usd("-1850.00") },
+        { account: "Expenses:Uncategorized", units: null },
+      ],
+    });
+    assert.equal(bank.status, 201, await bank.clone().text());
+    const { id: bankId } = (await bank.json()) as { id: string };
+
+    const response = await app(
+      "/loans",
+      "POST",
+      loanIn(
+        monthFrom(-2),
+        { kind: "start", on: monthFrom(-3), against: OPENING, confirm: true },
+        { tolerance: "25.00" }
+      )
+    );
+    assert.equal(response.status, 201, await response.clone().text());
+    const loan = (await response.json()) as Loan;
+    assert.equal(loan.status.paid.find((p) => p.nominal === lastMonth)?.transaction_id, bankId);
+
+    // Every other payment put 450.00 in escrow; the bank's, 460.65.
+    const [summary] = (await (
+      await ledger(`/accounts/summary?account=${encodeURIComponent(ESCROW)}`)
+    ).json()) as { balance: { number: string }[] }[];
+    const others = (loan.status.paid.length - 1) * 450;
+    assert.equal(summary!.balance[0]?.number, (others + 460.65).toFixed(2));
+  });
+
   it("from today, then an extra payment, an escrow change and the lender's figure", async () => {
     const { app, owed } = await setUp();
     const first = monthFrom(-6);

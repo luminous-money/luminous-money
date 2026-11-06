@@ -154,6 +154,29 @@ ask() { # ask PROMPT DEFAULT -> the answer
 
 stamp() { date -u +%Y%m%dT%H%M%SZ; }
 
+# The images a compose file names at VERSION, pulled one at a time: with Docker's containerd
+# image store, images unpacking the same layer at once can wait on each other for good (Emmer's
+# upgrade to 0.1.17 hung so, pulling app, ai and auth together). None for images built here.
+pull_images() { # pull_images COMPOSE_FILE VERSION
+  [ "$(setting LUMINOUS_MONEY_REGISTRY)" != luminous-money ] || return 0
+  local image
+  LUMINOUS_MONEY_VERSION="$2" docker compose --project-directory "$HOME_DIR" -f "$1" config --images |
+    while read -r image; do
+      say "Pulling $image"
+      docker pull --quiet "$image" >/dev/null || die "couldn't pull $image"
+    done
+}
+
+# The running services on an image other than the one compose.yaml and .env name (an upgrade
+# stopped part way), a "SERVICE VERSION" line each.
+behind() {
+  local want service image
+  want="$(compose config --images)"
+  compose ps --format '{{.Service}} {{.Image}}' | while read -r service image; do
+    printf '%s\n' "$want" | grep -qxF "$image" || say "$service ${image##*:}"
+  done
+}
+
 # --- install --------------------------------------------------------------------------------
 
 cmd_install() {
@@ -249,9 +272,7 @@ cmd_install() {
   chmod +x "$HOME_DIR/luminous-money"
   mkdir -p "$HOME_DIR/backups"
 
-  if [ "$registry" != luminous-money ]; then
-    compose pull --quiet
-  fi
+  pull_images "$HOME_DIR/compose.yaml" "$version"
   compose up -d --wait --wait-timeout 180
   say ""
   if [ -n "$domain" ]; then
@@ -431,13 +452,25 @@ cmd_upgrade() {
     [ -n "$target" ] || die "couldn't find the latest release: give the version"
   fi
   if [ "$target" = "$current" ] && [ -z "$from" ]; then
-    say "Already on $current."
+    local stale
+    stale="$(behind)"
+    if [ -z "$stale" ]; then
+      say "Already on $current."
+      return
+    fi
+    # Pinned, but not all running: an upgrade stopped part way. Finish it.
+    say "On $current, but these still run another version: $(printf '%s\n' "$stale" |
+      awk '{ printf "%s%s (%s)", (NR > 1 ? ", " : ""), $1, $2 }'). Finishing the upgrade:"
+    pull_images "$HOME_DIR/compose.yaml" "$current"
+    come_up "$current" "$(printf '%s\n' "$stale" | awk 'NR == 1 { print $2 }')"
     return
   fi
   say "Upgrading from ${current:-dev} to $target. First, a backup:"
   cmd_backup
   local next="$HOME_DIR/compose.yaml.next"
   fetch compose.yaml "$target" "$from" "$next"
+  # Its images before anything changes, so an upgrade stopped while pulling leaves it as it was.
+  pull_images "$next" "$target"
   if [ -z "$from" ]; then
     fetch luminous-money "$target" "" "$HOME_DIR/luminous-money.next" &&
       chmod +x "$HOME_DIR/luminous-money.next" && mv "$HOME_DIR/luminous-money.next" "$HOME_DIR/luminous-money"
@@ -445,16 +478,22 @@ cmd_upgrade() {
   cp "$HOME_DIR/compose.yaml" "$HOME_DIR/compose.yaml.before-$target"
   mv "$next" "$HOME_DIR/compose.yaml"
   set_setting LUMINOUS_MONEY_VERSION "$target"
-  if [ "$(setting LUMINOUS_MONEY_REGISTRY)" != luminous-money ]; then compose pull --quiet; fi
-  # Each service migrates its own database as it starts.
+  come_up "$target" "${current:-dev}"
+}
+
+# Start what's pinned (each service migrates its own database as it starts), or say how to go
+# back to PREVIOUS.
+come_up() { # come_up TARGET PREVIOUS
   if compose up -d --wait --wait-timeout 300 --remove-orphans; then
-    say "Now on $target."
-  else
-    warn "It didn't come up healthy. \`luminous-money logs --since 10m\` says why. To go back:"
-    warn "  cp $HOME_DIR/compose.yaml.before-$target $HOME_DIR/compose.yaml"
-    warn "  $HOME_DIR/luminous-money restore $(ls -1 "$HOME_DIR"/backups/luminous-money-*.tar.gz | sort | tail -1) --version ${current:-dev}"
-    exit 1
+    say "Now on $1."
+    return
   fi
+  warn "It didn't come up healthy. \`luminous-money logs --since 10m\` says why. To go back:"
+  if [ -f "$HOME_DIR/compose.yaml.before-$1" ]; then
+    warn "  cp $HOME_DIR/compose.yaml.before-$1 $HOME_DIR/compose.yaml"
+  fi
+  warn "  $HOME_DIR/luminous-money restore $(ls -1 "$HOME_DIR"/backups/luminous-money-*.tar.gz | sort | tail -1) --version $2"
+  exit 1
 }
 
 # The crontab, or a file standing in for it (LUMINOUS_MONEY_CRONTAB: tests).

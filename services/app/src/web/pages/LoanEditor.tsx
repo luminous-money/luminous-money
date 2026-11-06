@@ -350,8 +350,8 @@ function Form({ book, back }: { book: string; back: string }) {
             placeholder="0.00"
           />
           <span className="small muted">
-            A bank&apos;s amount within it matches the payment, and the difference goes to
-            principal.
+            A bank&apos;s amount within it matches the payment, and the difference goes to escrow
+            (to principal, without escrow).
           </span>
         </label>
         <label className="check">

@@ -100,7 +100,7 @@ function paymentTransaction(
     links: [],
     meta,
     postings: paymentPostings(accountsFor(loan, early), payment, loan.currency, {
-      blankPrincipal: hasTolerance(loan),
+      absorb: hasTolerance(loan),
     }) as TransactionIn["postings"],
   };
 }
@@ -184,7 +184,7 @@ export async function stageLoanPayments({
       if (!pays) {
         const paying = t.postings.find((s) => s.account === loan.accounts.paying)!;
         const [, ...rest] = paymentPostings(loan.accounts, payment, loan.currency, {
-          blankPrincipal: true,
+          absorb: true,
         });
         update.push({
           id: t.id,
@@ -266,7 +266,7 @@ export async function refillLoanPayments(
     const paying = t.postings.find((s) => s.account === accounts.paying);
     const keepPaying = held.has(t.id) && !!paying?.units;
     const postings = paymentPostings(accounts, payment, loan.currency, {
-      blankPrincipal: keepPaying || hasTolerance(loan),
+      absorb: keepPaying || hasTolerance(loan),
     });
     if (keepPaying) postings[0] = { account: paying!.account, units: paying!.units! };
     const before = paidDown(t, loan.accounts.liability);
@@ -290,7 +290,7 @@ export async function refillLoanPayments(
  * what's owed now. */
 export function loanTemplate(loan: StoredLoan, next: Payment | null): TransactionTemplate {
   const postings = next
-    ? paymentPostings(loan.accounts, next, loan.currency, { blankPrincipal: true })
+    ? paymentPostings(loan.accounts, next, loan.currency, { absorb: true })
     : [
         { account: loan.accounts.paying, units: null },
         { account: loan.accounts.liability, units: null },

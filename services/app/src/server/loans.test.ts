@@ -94,7 +94,10 @@ describe("declaring a loan", () => {
     // October's is the bank's, filled in; November's is new, with escrow.
     const october = paid.find((p) => p.nominal === "2026-10-01")!;
     expect(october.transaction_id).toBe(bank.id);
-    expect(posting(bank.id, ESCROW)?.units?.number).toBe("450.00");
+    // The bank's amount is kept; escrow, left blank, takes up any difference.
+    expect(posting(bank.id, CHECKING)?.units?.number).toBe("-1839.35");
+    expect(posting(bank.id, MORTGAGE)?.units?.number).toBe(table.rows[122]!.principal);
+    expect(posting(bank.id, ESCROW)).toMatchObject({ units: null });
     expect(posting(bank.id, "Expenses:Uncategorized")).toBeUndefined();
     const november = ledger.transactions.find(
       (t) => t.id === paid.find((p) => p.nominal === "2026-11-01")!.transaction_id
@@ -125,9 +128,9 @@ describe("declaring a loan", () => {
     expect(schedule.last_applied).toBe("2026-11-01");
     expect(schedule.template.postings.map((p) => [p.account, p.units?.number])).toEqual([
       [CHECKING, "-1839.35"],
-      [MORTGAGE, undefined],
+      [MORTGAGE, table.rows[124]!.principal],
       [INTEREST, table.rows[124]!.interest],
-      [ESCROW, "450.00"],
+      [ESCROW, undefined], // takes up a matched amount's difference
     ]);
   });
 
@@ -154,6 +157,19 @@ describe("after it's declared", () => {
   const owed = table.rows[123]!.balance;
   const declared = () =>
     create(loanIn({ history: { kind: "today", on: ON, owed, against: OPENING } }));
+
+  it("with a tolerance, escrow takes up the bank's different amount; without escrow, principal", async () => {
+    const loan = await create(
+      loanIn({ tolerance: "50.00", history: { kind: "today", on: ON, owed, against: OPENING } })
+    );
+    await runSchedules({ db, ledgerFor, on: "2026-12-01" });
+    const december = ledger.transactions.at(-1)!;
+    expect(posting(december.id, ESCROW)).toMatchObject({ units: null });
+    expect(posting(december.id, MORTGAGE)?.units?.number).toBe(table.rows[124]!.principal);
+    expect(db.schedule("b", loan.schedule_id)!.template.postings[0]).toMatchObject({
+      tolerance: "50.00",
+    });
+  });
 
   it("stages each payment as it comes due, worked out by the loan", async () => {
     const loan = await declared();

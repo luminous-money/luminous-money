@@ -171,8 +171,11 @@ you change it. `./luminous-money status` says when there's a newer one; its note
 ./luminous-money upgrade 0.3.0      # to a particular one
 ```
 
-It **backs up first**, downloads the release's `compose.yaml` (and the newer `luminous-money`
-command), pins the version, pulls the images, restarts, and waits until everything is healthy.
+It **backs up first**, downloads the release's `compose.yaml`, pulls its images (one at a time),
+and only then puts the new `compose.yaml` and `luminous-money` command in place, pins the version,
+restarts, and waits until everything is healthy. Stopped while pulling, nothing has changed: run it
+again. Stopped after pinning, `upgrade` to the same version again finishes it (it notices services
+still running another version, rather than saying it's already on it).
 
 - **Migrations happen by themselves:** each service brings its own database up to date as it
   starts. They only go forward: a service refuses a database newer than itself.
@@ -180,7 +183,8 @@ command), pins the version, pulls the images, restarts, and waits until everythi
   `./luminous-money restore backups/<the one before the upgrade> --version <old version>`. If an
   upgrade doesn't come up healthy, it prints exactly that.
 - **By hand:** set `LUMINOUS_MONEY_VERSION`, replace `compose.yaml` with that release's, then
-  `docker compose pull && docker compose up -d --wait`. Back up first.
+  pull each image (`docker compose config --images | xargs -n1 docker pull`) and `docker compose
+  up -d --wait`. Back up first.
 
 ### Knowing there's a new release, and upgrading by itself
 
@@ -406,6 +410,10 @@ data.
 - **"this database is at schema N, newer than this service":** the version went back without its
   data. Pin the version you came from, or restore the backup made before the upgrade with
   `--version`.
+- **An upgrade sits at pulling for minutes:** with Docker's containerd image store (Docker 29's
+  default), images unpacking the same layer at once can wait on each other for good, which
+  `docker compose pull` (all at once) can set off. `upgrade` pulls one at a time; if you pulled by
+  hand, stop it and pull each image on its own.
 - **"address already in use":** another program (or stack) has the port: choose another
   (`LUMINOUS_MONEY_PORT`).
 - **No certificate, or it's expiring:** the domain's DNS must point at this machine, and ports 80

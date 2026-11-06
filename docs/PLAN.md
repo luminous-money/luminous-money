@@ -146,7 +146,9 @@ milestone starts.
       [docs/deploying.md](deploying.md). Questions answered 2026-10-23 (host-only upgrades,
       GitHub as luminous-money/luminous-money, GPL-2.0-or-later, HTTPS kept with its certificate
       watched, open sign-ups). Phase 2 built 2026-10-23: admins by email (once confirmed),
-      the system page, update checks, `auto-upgrade`.
+      the system page, update checks, `auto-upgrade`. Upgrades made safe to stop (2026-11-05,
+      `v0.1.18`, after Emmer's hung): images pulled one at a time and before anything changes,
+      and `upgrade` finishing one stopped after pinning.
 - [x] **Chart of accounts import** (before M17; Kael, 2026-10-26): Accounts → Import, a CSV of
       full names and the fields an account can start with, every name title-cased by the one
       normalizer. [Built](milestones/chart-of-accounts-import/PLAN.md) 2026-10-26: a preview of
@@ -202,6 +204,8 @@ milestone starts.
         expense account), with the expenses paid out of it masked; budgets, home and Reports
         count outflows (the ledger's lens), and Reports switches to Expenses, the traditional
         P&L view.
+  - [x] **Its decisions reviewed** (Kael, 2026-11-05; `v0.1.18`): all 21 kept but number 6, so
+        a matched payment's different amount now goes to escrow (principal, without escrow).
 - [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules
       that add tags, a Tags field on schedules (their templates carry tags already, unseen) and
       on Capture receipt, the AI and history proposing the book's own tags, and transfers

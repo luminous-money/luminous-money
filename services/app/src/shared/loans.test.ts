@@ -179,7 +179,16 @@ group("payments", () => {
       ["Expenses:Interest", "937.50"],
       ["Assets:Escrow", "450.00"],
     ]);
-    expect(paymentPostings(accounts, p, "USD", { blankPrincipal: true })[1]!.units).toBeNull();
+    // A matched amount's difference: escrow takes it up, else principal (Kael).
+    const absorbing = paymentPostings(accounts, p, "USD", { absorb: true });
+    expect(absorbing.map((s) => s.units?.number ?? null)).toEqual([
+      "-1839.35",
+      "451.85",
+      "937.50",
+      null,
+    ]);
+    const plain = paymentOn(spec, "2016-08-01", cents("300000.00"))!;
+    expect(paymentPostings(accounts, plain, "USD", { absorb: true })[1]!.units).toBeNull();
   });
 });
 
