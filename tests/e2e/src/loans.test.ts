@@ -109,7 +109,7 @@ const loanIn = (first: string, history: object, more: object = {}) => ({
 describe("Loans", () => {
   before(stackIsUp);
 
-  it("from the start: borrowed, every payment since, those before the books from Opening Balances, the bank's copy filled in", async () => {
+  it("from the start: borrowed, every payment since (escrow and all), those before the books from Opening Balances, the bank's copy filled in", async () => {
     const { app, ledger, transaction, owed, opened } = await setUp();
     // Last month's payment came in from the bank, uncategorized.
     const lastMonth = monthFrom(-1);
@@ -140,14 +140,15 @@ describe("Loans", () => {
     assert.equal(loan.status.next?.follows_table, true);
     assert.equal(loan.status.next?.number, paid.length + 1);
 
-    // The first, before checking's books began, came from Opening Balances: no escrow.
+    // The first, before checking's books began, came from Opening Balances, escrow and all.
     const early = await transaction(paid[0]!.transaction_id);
     assert.deepEqual(
       early.postings.map((p) => [p.account, p.units?.number]),
       [
-        [OPENING, "-1389.35"],
+        [OPENING, "-1839.35"],
         [MORTGAGE, "451.85"],
         [INTEREST, "937.50"],
+        [ESCROW, "450.00"],
       ]
     );
     // One since checking opened has escrow, from checking.

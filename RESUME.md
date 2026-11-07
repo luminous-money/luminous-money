@@ -4,9 +4,54 @@ Where We Left Off
 _Updated 2026-11-06._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Hand-off (2026-11-06): New loan is a questionnaire (Loans step 3)
+## Hand-off (2026-11-06, evening): backfilled escrow, Delete, the footer
 
-**Read this first.** Kael tried New loan and found it hard to follow, so it's been rebuilt as a
+**Read this first.** Kael set his mortgage up with New loan (from the start) and found that the
+backfilled payments, the ones before the paying account's books, carried no escrow, though
+escrow's bills were backfilled. Changes followed (and a fix for System), built and tested (`pnpm test`, `pnpm
+e2e`) but **not committed or released yet**: that's Kael's call (the next release would be
+`v0.1.20`).
+
+- **Backfilled payments carry escrow** (the loans plan's decision 7, changed by Kael): one due
+  before the paying account's books begin is the whole payment, still from Opening Balances
+  (`server/loan-payments.ts`: `beforeBooks` is gone). And New loan now stages escrow's bills
+  *before* setting escrow to the lender's figure, so a bill already paid counts (it left escrow
+  short by those bills, since the figure defaults to today). Tests: `server/loans.test.ts` (the
+  early payment's escrow, the figure after a backfill, and a new one for a past bill) and
+  `tests/e2e/src/loans.test.ts`.
+- **Delete on a transaction's page** (Kael): for writers, asking first (the browser's confirm,
+  saying so when a schedule wrote it or it's reconciled), against the version last read or
+  saved (`useDeleteTransaction`). What `app` kept about its import stays, so a bank feed doesn't
+  bring it back. Browser test in `tests/ui/src/m1.spec.ts`. design.md, under "The review app".
+- **The footer is the brand** (Kael): the Lu logo and "Luminous Money", replacing "Early build ·
+  nothing here touches real money yet".
+- **Kael's own book was put right through the API** (at his request): the backfilled payments
+  given their escrow and the escrow deposits he'd added by hand deleted, in one atomic change
+  (no balance moved), and the bank's duplicate copies of the payments since checking took over
+  deleted (each the same amount as its payment).
+- **System crashed once a backup existed** (Kael, on Emmer): the ledger writes the backup's
+  time as `…+00:00`, and `formatWhen` cut any stamp over 24 characters to 23 and added `Z` (for
+  Python's microseconds), making `…+00:0Z`, which `Intl` refused with a `RangeError`. It now
+  trims only the fraction, reads `Z` or an offset, takes a stamp without a zone as UTC, and
+  shows one it can't read as it is (`web/lib/format.test.ts`).
+- **Found on the way:** a book holding a lot of no shares with a cost (`0.00 X {0 # 0 USD}`)
+  makes the ledger's `/problems` and `/query` 500 for the whole book (docs/PLAN.md, Polish).
+  The PWA uses neither, so nothing in the UI shows it. Not fixed.
+
+**Next project: Amazon orders** (Kael, 2026-11-06): [its plan](docs/milestones/amazon-orders/PLAN.md)
+has the brief, the ways Amazon's data could come in, and Kael's five answers: **the server logs
+in to Amazon as him** (Copilot's way; he weighed the costs), tax and shipping as their own
+splits, discounts against items, a gift card from `Income:Uncategorized`, his Amazon only. The
+model reads each charge into the bank's copy as M16 reads a receipt. **Step 1 is a spike from
+Emmer** (can a server log in and read his orders? how does his two-factor work?), with Kael
+typing his own credentials and nothing kept. "Still open" has four smaller questions.
+
+**Also next:** commit and release when Kael says; then the zero-share lot (refuse it, and turn a
+book that fails to load into a problem rather than a 500).
+
+## Before that (2026-11-06): New loan is a questionnaire (Loans step 3)
+
+Kael tried New loan and found it hard to follow, so it's been rebuilt as a
 step-by-step questionnaire that makes nothing until Confirm ([the loans plan's step
 3](docs/milestones/loans/PLAN.md#step-3-setting-a-loan-up-a-questionnaire): his brief, nine
 answers, eleven calls made without asking, and "as built"). It's built, tested (`pnpm test`,

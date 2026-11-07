@@ -61,7 +61,7 @@ beforeEach(() => {
 });
 
 describe("declaring a loan", () => {
-  it("from the start: the borrowing, then every payment due, those before the books from Opening Balances", async () => {
+  it("from the start: the borrowing, then every payment due, escrow and all, those before the books from Opening Balances", async () => {
     // The bank's copy of October's payment is already in checking, uncategorized.
     const bank = ledger.addTransaction({
       date: "2026-10-02",
@@ -84,12 +84,13 @@ describe("declaring a loan", () => {
     expect(paid).toHaveLength(124); // 2016-08-01 through 2026-11-01
     expect(await balance(MORTGAGE)).toBe(`-${table.rows[123]!.balance}`);
 
-    // Before checking's books began: principal and interest, from Opening Balances.
+    // Before checking's books began: the whole payment, escrow included, from Opening Balances.
     const first = ledger.transactions.find((t) => t.id === paid[0]!.transaction_id)!;
     expect(first.postings.map((p) => [p.account, p.units?.number])).toEqual([
-      [OPENING, "-1389.35"],
+      [OPENING, "-1839.35"],
       [MORTGAGE, "451.85"],
       [INTEREST, "937.50"],
+      [ESCROW, "450.00"],
     ]);
     // October's is the bank's, filled in; November's is new, with escrow.
     const october = paid.find((p) => p.nominal === "2026-10-01")!;
@@ -234,12 +235,27 @@ describe("made along with it (New loan's questionnaire)", () => {
         { escrow_balance: { account: HOME_ESCROW, amount: "1000.00", on: ON } }
       )
     );
-    // Checking's books begin 2026-10-01: October's and November's payments carried escrow.
+    // Every payment since 2016 carried escrow (124 of 450.00), and none of what it paid out is in
+    // the books: the figure takes that away.
     expect(await balance(HOME_ESCROW)).toBe("1000.00");
     const adjustment = ledger.transactions.find((t) => t.narration === "What escrow holds")!;
     expect(adjustment.postings.find((p) => p.account === HOME_ESCROW)?.units?.number).toBe(
-      "100.00"
+      "-54800.00"
     );
+  });
+
+  it("escrow's figure counts the bills it has already paid", async () => {
+    const pastBill = { ...taxBill, rule: { ...taxBill.rule, start: "2026-03-01" } };
+    await create(
+      home(
+        { history: { kind: "start", on: "2016-06-15", against: OPENING, confirm: true } },
+        { escrow_balance: { account: HOME_ESCROW, amount: "1000.00", on: ON }, bills: [pastBill] }
+      )
+    );
+    // March's and September's tax are staged, from escrow, before its figure is worked out.
+    const taxes = ledger.transactions.filter((t) => t.narration === "Property tax");
+    expect(taxes.map((t) => t.date)).toEqual(["2026-03-01", "2026-09-01"]);
+    expect(await balance(HOME_ESCROW)).toBe("1000.00");
   });
 
   it("checks it all before writing anything", async () => {

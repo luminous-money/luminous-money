@@ -1199,8 +1199,9 @@ has the walkthrough, Kael's answers and the calls made without asking.
   (the bank's) is filled in rather than staged twice.
 - **History, when a loan is declared already under way:** *from the start* (the borrowing, then
   every payment due, confirmed or not; those due before the paying account's books begin come
-  from Opening Balances and are principal and interest only, so that account's balance isn't
-  changed by money that left before its history); *from today* (one transaction saying what's
+  from Opening Balances, so that account's balance isn't changed by money that left before its
+  history, and are the whole payment, escrow and the rest included: Kael, 2026-11-06, since
+  escrow's bills were backfilled but not what paid for them, so escrow came out short); *from today* (one transaction saying what's
   owed, against Opening Balances or, for an asset not in the books, the asset; Kael); or
   *already in the books*. Payments from the next one. Since step 3, New loan offers the first
   two (against Opening Balances) and notices the third.
@@ -1242,8 +1243,9 @@ has his answers and the calls made without asking).
   `books`.
 - **What it bought, when it's new, starts at what it cost** (asked, optional) on the day it was
   borrowed, against Opening Balances, and is a revalued asset. **Escrow starts at what the
-  lender says it holds** (asked, optional): after the payments are staged, the difference is
-  written against Opening Balances.
+  lender says it holds** (asked, optional): after the payments and the bills paid from escrow
+  are staged (a bill that started in the past stages what's due since), the difference is
+  written against Opening Balances, so escrow holds that on the day given (today, unless said).
 - **Counting principal and escrow as spending is opt-in** (Kael), on the last page, suggesting
   `Expenses:Financing:Principal:X` and `…:Escrow:X`; the loan's page suggests the same.
 - **Tables are worked out from terms only** in the UI (Kael: importing a lender's table wasn't
@@ -1593,6 +1595,8 @@ Reskinned from the original Luminous Money app (2026-10-23; its files are in
   round and crop them.
 - **On a phone, signed in, the logo stands alone:** "Luminous Money" is long, and the camera,
   the book switcher and the menu need the room.
+- **The footer is the brand,** the Lu logo small beside "Luminous Money" (Kael, 2026-11-06). It
+  said "Early build · nothing here touches real money yet" until real books were kept here.
 
 ### How the review queue works
 
@@ -1664,6 +1668,12 @@ case without hiding the general one.
     transaction is off.
   - Lots and prices are preserved untouched and left to the ledger to check on save, since their
     weights depend on booking.
+  - **Delete** (Kael, 2026-11-06), for anyone who can write, asks first (the browser's confirm,
+    as a rule's or a schedule's Delete does), then deletes it against the version last read or
+    saved and goes back. It's for good: a schedule doesn't stage its date again ("Not this
+    time" is the same delete), and what `app` kept about its import stays, so a bank feed or a
+    CSV doesn't bring it back. The question says so when a schedule wrote it, or when it's
+    reconciled (its statement can go out of balance).
 
 ## Components
 

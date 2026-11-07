@@ -222,9 +222,11 @@ now escrow (`v0.1.18`).
    match tolerance (and the bank's copy filled in) leaves escrow blank, so on confirming the
    difference goes to escrow (as M3's blank split does); without escrow, principal is left blank.
    Otherwise every split has its amount. (First built with principal taking it up.)
-7. **Payments due before the paying account's books begin** (its open date) come from Opening
-   Balances and are principal and interest only: the money left before that account's history
-   (its opening balance already counts it), and what the lender did with escrow then isn't known.
+7. **Changed by Kael (2026-11-06): payments due before the paying account's books begin** (its
+   open date) come from Opening Balances, since the money left before that account's history
+   (its opening balance already counts it), **and are the whole payment, escrow and the rest
+   included.** (First built as principal and interest only, since what the lender did with
+   escrow then isn't known; but escrow's bills were backfilled, so escrow came out short.)
 8. **A payment already in the paying account** (the same total within the tolerance, five days
    either side, not staged by a schedule) becomes the payment rather than a second one, every
    time payments are staged, not only in a backfill. One that already pays down the loan is taken
@@ -428,8 +430,9 @@ Built as planned above.
     `pages/LoanEditor.tsx` (the old form) is gone.
   - `server/loans.ts`: `createLoan` takes `setup` (`LoanSetup` in `shared/loans.ts`), checks it
     with the loan (`setupProblem`, against the chart as it will be), then opens its accounts
-    (`createAccounts`), sets what counts as spending, declares the loan, sets escrow's balance and
-    creates the bills (`createSchedule`).
+    (`createAccounts`), sets what counts as spending, declares the loan, creates the bills
+    (`createSchedule`), then sets escrow's balance (bills first since 2026-11-06, so a bill
+    already paid counts).
   - `components/AccountPicker.tsx` gained `suggest` ("Create account"'s name when nothing's
     typed: renaming one not made yet); `components/Loans.tsx` has `planned` (a "Create account"
     that only names one) and `inChart`. `LoanTableSource` offers only "work it out" unless given

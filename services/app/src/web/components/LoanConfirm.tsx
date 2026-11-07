@@ -357,7 +357,7 @@ export function LoanConfirm({
                 ? `, then the ${due.length === 1 ? "payment" : `${due.length} payments`} due through today, confirmed, each split into its parts. A payment already in ${paying} (the same amount, within 5 days) is split up rather than added again.`
                 : "."}
               {beforeBooks > 0 &&
-                ` The ${beforeBooks} due before ${paying}'s records begin (${formatFullDay(payingOpens!)}) come from Opening Balances, principal and interest only, so ${paying}'s balance stays as it is.`}
+                ` The ${beforeBooks} due before ${paying}'s records begin (${formatFullDay(payingOpens!)}) come from Opening Balances (escrow and the rest included), so ${paying}'s balance stays as it is.`}
             </li>
           )}
           {history.kind === "today" && (

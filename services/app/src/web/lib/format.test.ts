@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { formatFullDay, formatMonth, statusMessage } from "./format.js";
+import { formatFullDay, formatMonth, formatWhen, statusMessage } from "./format.js";
 
 it("a due date is its own month and day west of Greenwich", () => {
   // Shown as the month before in Chicago, once (Kael, 2026-11-06).
@@ -12,6 +12,23 @@ it("a due date is its own month and day west of Greenwich", () => {
   } finally {
     process.env.TZ = zone;
   }
+});
+
+it("a timestamp reads in any of the forms the services write, and one that doesn't is shown as is", () => {
+  // A backup's `+00:00` was cut to `+00:0Z`, and System threw (Kael, 2026-11-06).
+  const when = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+  const expected = when.format(new Date(Date.UTC(2026, 10, 6, 21, 49, 51)));
+  for (const stamp of [
+    "2026-11-06T21:49:51+00:00",
+    "2026-11-06T16:49:51-05:00",
+    "2026-11-06T21:49:51Z",
+    "2026-11-06T21:49:51.123Z",
+    "2026-11-06T21:49:51.123456Z",
+    "2026-11-06T21:49:51.123456+00:00",
+    "2026-11-06T21:49:51.123456",
+  ])
+    expect(formatWhen(stamp), stamp).toBe(expected);
+  expect(formatWhen("soon")).toBe("soon");
 });
 
 it("says what a failed response means when its body doesn't (a proxy's error page)", () => {

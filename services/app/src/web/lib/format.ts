@@ -1,8 +1,14 @@
 /** Display helpers. */
 
-/** A stored timestamp (microseconds, UTC) as a local date and time. */
+/** A stored timestamp (UTC unless it says otherwise) as a local date and time. One that can't
+ * be read is shown as it is, rather than taking the page down. */
 export function formatWhen(stamp: string): string {
-  const date = new Date(Date.parse(stamp.length > 24 ? `${stamp.slice(0, 23)}Z` : stamp));
+  // Dates read at most milliseconds (Python writes microseconds), and a time without a zone as
+  // local. Its zone may be `Z` or an offset (`+00:00`: the backup's, 2026-11-06).
+  const iso = stamp.replace(/(\.\d{3})\d+/, "$1");
+  const zoned = /[T ]\d\d:\d\d/.test(iso) && !/(Z|[+-]\d\d:?\d\d)$/i.test(iso) ? `${iso}Z` : iso;
+  const date = new Date(zoned);
+  if (Number.isNaN(date.getTime())) return stamp;
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
     date
   );

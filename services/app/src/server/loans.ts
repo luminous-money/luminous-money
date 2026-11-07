@@ -395,7 +395,11 @@ export async function createLoan({
   const made = db.loan(book, id)!;
   await syncSchedule(db, ledger, made, today);
 
-  // Escrow, once the payments are in, holds what the lender says it does.
+  // The bills paid from escrow, staged from their start (a past one included).
+  for (const bill of setup.bills ?? [])
+    await createSchedule({ db, ledgerFor, user, book, input: bill, on: today });
+
+  // Escrow, once the payments and the bills are in, holds what the lender says it does.
   if (setup.escrow_balance) {
     const { account, amount, on: day } = setup.escrow_balance;
     const balances = await ledger.dayBalances(book, account, day, day);
@@ -420,8 +424,6 @@ export async function createLoan({
       ]);
     }
   }
-  for (const bill of setup.bills ?? [])
-    await createSchedule({ db, ledgerFor, user, book, input: bill, on: today });
   return loanView(db, ledger, made, { on: today });
 }
 

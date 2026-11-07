@@ -19,6 +19,7 @@ import {
   useAccounts,
   useCanWrite,
   useCreateTransaction,
+  useDeleteTransaction,
   useEditTransaction,
   useFunds,
   useTags,
@@ -130,6 +131,7 @@ function Editor({
   const create = useAccountCreation(book);
   const edit = useEditTransaction(book, t.id);
   const add = useCreateTransaction(book);
+  const remove = useDeleteTransaction(book, t.id);
   const [date, setDate] = useState(t.date);
   const [payee, setPayee] = useState(t.payee ?? "");
   const [narration, setNarration] = useState(t.narration);
@@ -151,7 +153,7 @@ function Editor({
   // Lines are checked only when they change (as the ledger does): ones that no longer fit are
   // said, not a reason the rest can't be saved. A share no fund has to give is (Funds B).
   const fundsBlocked = (funds.changed && !!funds.problem) || funds.short;
-  const busy = edit.isPending || add.isPending;
+  const busy = edit.isPending || add.isPending || remove.isPending;
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
   const names = accounts.data ? postable(accounts.data, date) : [];
   const staged = t.flag === "!";
@@ -187,6 +189,22 @@ function Editor({
       await edit.mutateAsync(changes);
       if (then) navigate(then);
       else setMessage({ kind: "ok", text: "Saved" });
+    } catch (e) {
+      setMessage({ kind: "error", text: explain(e) });
+    }
+  };
+
+  const deleteIt = async () => {
+    const question = [
+      "Delete this transaction? It's for good.",
+      ...(t.meta?.schedule ? ["Its schedule won't write it again."] : []),
+      ...(reconciled.length ? ["It's reconciled, so its statement can go out of balance."] : []),
+    ].join(" ");
+    if (!window.confirm(question)) return;
+    setMessage(null);
+    try {
+      await remove.mutateAsync();
+      navigate(back);
     } catch (e) {
       setMessage({ kind: "error", text: explain(e) });
     }
@@ -294,6 +312,11 @@ function Editor({
         <Link href={back} className="button">
           Back
         </Link>
+        {!isNew && canWrite && (
+          <button type="button" disabled={busy} onClick={() => void deleteIt()}>
+            Delete
+          </button>
+        )}
         <button
           type="submit"
           disabled={busy || balance.state === "invalid" || fundsBlocked}

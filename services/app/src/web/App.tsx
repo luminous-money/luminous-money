@@ -51,7 +51,10 @@ export function App() {
     <Router base="/ui">
       <div className="shell">
         <Gate />
-        <footer className="footer">Early build · nothing here touches real money yet</footer>
+        <footer className="footer">
+          <img src="/ui/icon.svg" alt="" className="footer-logo" />
+          Luminous Money
+        </footer>
       </div>
     </Router>
   );

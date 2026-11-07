@@ -214,6 +214,17 @@ milestone starts.
         payment, then a confirmation page showing where the money flows) that creates nothing
         until Confirm. Default accounts are named from what the loan is for; the CSV and PDF
         imports and "already in the books" leave the UI; due dates no longer show a month early.
+  - [x] **Backfilled payments carry escrow** (Kael, 2026-11-06): a payment due before the paying
+        account's books begin is the whole payment (escrow, PMI and the rest), still from
+        Opening Balances, rather than principal and interest only (the plan's decision 7, changed);
+        and New loan stages escrow's bills before setting escrow's balance, so one already paid
+        counts.
+- [ ] **Amazon orders** (Kael, 2026-11-06; [planned with Kael](milestones/amazon-orders/PLAN.md),
+      not started): Amazon's charges pulled in with the items behind each, matched to the
+      bank's and cards' rows by date and amount, and read into them as splits the categorize
+      chain places (item history, then the AI). The server logs in to Amazon as Kael (his
+      choice), through one shop-agnostic orders API in `app`. Step 1 is a spike from Emmer:
+      can a server get in?
 - [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules
       that add tags, a Tags field on schedules (their templates carry tags already, unseen) and
       on Capture receipt, the AI and history proposing the book's own tags, and transfers
@@ -367,6 +378,13 @@ Smaller improvements to pick up between milestones or at the end.
 - [x] **Pair transfers in review** (2026-10-17): money out of one account and the same into
       another within 7 days, both imported, become one transfer, with "Reject" to restore the
       two.
+- [x] **Delete a transaction from its page** (Kael, 2026-11-06), asking first.
+- [ ] **A lot of no shares crashes the book's engine** (found in a live book, 2026-11-06): a
+      posting like `0.00 VTI {0 # 0 USD, 2026-01-02}` makes Beancount's booking divide 0 by 0,
+      so the ledger's `/problems` and `/query` answer 500 for the whole book (the PWA uses
+      neither today). The ledger should refuse or drop a zero-unit posting with a cost, and a
+      book that fails to load should be a problem rather than a 500. What wrote it (an
+      investment account's opening balance, by the look of it) is still to be found.
 - [ ] **Mobile usability,** across the app.
 - [ ] **Tapping a report's bar or slice opens its transactions** (that month's, or that
       category's).

@@ -991,6 +991,30 @@ export function useEditTransaction(book: string, id: string) {
   });
 }
 
+/** Delete a transaction for good, against the version last read or saved. What showed it is
+ * read again; the transaction itself isn't, since it's gone. */
+export function useDeleteTransaction(book: string, id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    scope: { id: `transaction:${book}:${id}` },
+    mutationFn: async () => api.deleteTransaction(book, await latest(book, id)),
+    onSuccess: () => {
+      client.setQueryData<Transaction[]>(keys.queue(book), (queue) =>
+        queue?.filter((q) => q.id !== id)
+      );
+      void client.invalidateQueries({
+        queryKey: keys.book(book),
+        predicate: (query) => query.queryKey[2] !== "transaction" || query.queryKey[3] !== id,
+      });
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.conflict) {
+        void client.invalidateQueries({ queryKey: keys.book(book) });
+      }
+    },
+  });
+}
+
 export function useCreateAccount(book: string) {
   const client = useQueryClient();
   return useMutation({

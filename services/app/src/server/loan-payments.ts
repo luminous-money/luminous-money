@@ -5,8 +5,8 @@
  * What's owed before each payment is what the books say (the liability's balance the day
  * before it's due), less the principal of the payments staged before it in the same write. A
  * payment due before the paying account's books begin (a loan backfilled from its start into a
- * book that starts later) is paid from Opening Balances, and is only principal and interest: the
- * money left before those books did, and what the lender did with escrow then isn't known.
+ * book that starts later) is paid from Opening Balances, since the money left before those books
+ * did, and is the whole payment, escrow and the rest included (Kael).
  *
  * A payment already in the paying account (the bank's, imported: the same total within the
  * tolerance, five days either side, not staged by a schedule) becomes the payment rather than
@@ -17,7 +17,6 @@ import type { Transaction, TransactionIn } from "@luminous-money/ledger-client";
 
 import {
   cents,
-  money,
   paymentOn,
   paymentPostings,
   project,
@@ -59,12 +58,6 @@ async function booksBegin(ledger: LedgerPort, loan: StoredLoan): Promise<string 
   return paying?.open ?? null;
 }
 
-/** A payment made before the paying account's books began: principal and interest only. */
-function beforeBooks(p: Payment): Payment {
-  const total = money(cents(p.principal) + cents(p.extra) + cents(p.interest));
-  return { ...p, others: [], total };
-}
-
 /** The accounts a payment posts to: from Opening Balances before the books begin. */
 const accountsFor = (loan: StoredLoan, early: boolean): LoanAccounts =>
   early ? { ...loan.accounts, paying: OPENING_BALANCES } : loan.accounts;
@@ -90,7 +83,6 @@ function paymentTransaction(
   flag: "*" | "!",
   meta: Record<string, string>
 ): TransactionIn {
-  const payment = early ? beforeBooks(p) : p;
   return {
     date: o.date,
     flag,
@@ -99,7 +91,7 @@ function paymentTransaction(
     tags: [],
     links: [],
     meta,
-    postings: paymentPostings(accountsFor(loan, early), payment, loan.currency, {
+    postings: paymentPostings(accountsFor(loan, early), p, loan.currency, {
       absorb: hasTolerance(loan),
     }) as TransactionIn["postings"],
   };
@@ -164,8 +156,7 @@ export async function stageLoanPayments({
     owedAfter = p ? cents(p.owed_after) : 0n;
     if (!p) continue;
     const early = !!begins && o.date < begins;
-    const payment = early ? beforeBooks(p) : p;
-    const total = cents(payment.total);
+    const total = cents(p.total);
     const found = early
       ? undefined
       : nearby.find((t) => {
@@ -183,7 +174,7 @@ export async function stageLoanPayments({
       const pays = t.postings.some((s) => s.account === loan.accounts.liability);
       if (!pays) {
         const paying = t.postings.find((s) => s.account === loan.accounts.paying)!;
-        const [, ...rest] = paymentPostings(loan.accounts, payment, loan.currency, {
+        const [, ...rest] = paymentPostings(loan.accounts, p, loan.currency, {
           absorb: true,
         });
         update.push({
@@ -260,12 +251,10 @@ export async function refillLoanPayments(
   for (const { o, t } of open) {
     const p = paymentOn(loan, o.nominal, owed(o.date) - shifted);
     if (!p) continue;
-    const early = !!begins && o.date < begins;
-    const payment = early ? beforeBooks(p) : p;
-    const accounts = accountsFor(loan, early);
+    const accounts = accountsFor(loan, !!begins && o.date < begins);
     const paying = t.postings.find((s) => s.account === accounts.paying);
     const keepPaying = held.has(t.id) && !!paying?.units;
-    const postings = paymentPostings(accounts, payment, loan.currency, {
+    const postings = paymentPostings(accounts, p, loan.currency, {
       absorb: keepPaying || hasTolerance(loan),
     });
     if (keepPaying) postings[0] = { account: paying!.account, units: paying!.units! };

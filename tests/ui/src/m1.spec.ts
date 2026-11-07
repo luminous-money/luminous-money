@@ -196,6 +196,53 @@ test.describe("an account's ledger", () => {
     await expect(page.getByRole("heading", { name: "PNC Checking" })).toBeVisible();
   });
 
+  test("a transaction is deleted from its page, asking first, and leaves the ledger", async ({
+    page,
+  }) => {
+    const { session, book, account } = await setUpUser(page);
+    await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+      params: { path: { book_id: book.id } },
+      body: { name: "Expenses:Food", kind: "leaf" },
+    });
+    const { data: made } = await session.ledger.POST(
+      "/api/ledger/v1/books/{book_id}/transactions",
+      {
+        params: { path: { book_id: book.id } },
+        body: {
+          date: "2024-03-01",
+          flag: "*",
+          payee: "Corner Cafe",
+          narration: "",
+          postings: [
+            { account, units: { number: "-4.50", currency: "USD" } },
+            { account: "Expenses:Food" },
+          ],
+        },
+      }
+    );
+    await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
+    await page.getByRole("button", { name: /Corner Cafe/ }).click();
+    await expect(page.getByRole("heading", { name: "Transaction" })).toBeVisible();
+
+    // Saying no keeps it.
+    const asked: string[] = [];
+    page.once("dialog", (dialog) => (asked.push(dialog.message()), void dialog.dismiss()));
+    await page.getByRole("button", { name: "Delete" }).click();
+    expect(asked).toEqual(["Delete this transaction? It's for good."]);
+    await expect(page.getByRole("heading", { name: "Transaction" })).toBeVisible();
+
+    page.once("dialog", (dialog) => void dialog.accept());
+    await page.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "PNC Checking" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Opening balance/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Corner Cafe/ })).toHaveCount(0);
+    const gone = await session.ledger.GET(
+      "/api/ledger/v1/books/{book_id}/transactions/{directive_id}",
+      { params: { path: { book_id: book.id, directive_id: made!.id } } }
+    );
+    expect(gone.response.status).toBe(404);
+  });
+
   test("the line above the transactions adds one", async ({ page }) => {
     const { session, book, account } = await setUpUser(page);
     await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
@@ -302,7 +349,9 @@ test("a transaction's Back and Save stay on screen, and settle into place at the
   await expect(page.getByRole("link", { name: "Back", exact: true })).toBeInViewport();
   expect(await gapBelow()).toBeLessThan(30); // pinned to the bottom of the screen
 
-  await page.getByText("Early build").scrollIntoViewIfNeeded();
+  const footer = page.getByRole("contentinfo");
+  await expect(footer).toHaveText("Luminous Money");
+  await footer.scrollIntoViewIfNeeded();
   await expect(save).toBeInViewport();
   expect(await gapBelow()).toBeGreaterThan(30); // back in place, with the page's end below it
 });
