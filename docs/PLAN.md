@@ -228,7 +228,9 @@ milestone starts.
         and reads charges and their orders; the PWA's Amazon page sets it up, syncs, and shows
         what it read. Nothing written to the books. For Kael to try on Emmer. **`v0.1.21`**:
         a challenged home page is passed over (Kael's first sync timed out on it), and which
-        charges are the book's is chosen by card.
+        charges are the book's is chosen by card. **`v0.1.22`: proven on Emmer**: the sign-in
+        is done in a browser (and Amazon's "I am human" box ticked); a sync read 112 charges
+        and their 92 orders.
   - [ ] **Step 2: orders in `app`** (matched to the bank's rows, itemized, reviewed), then
         tests for both.
 - [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules

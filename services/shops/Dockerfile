@@ -16,9 +16,9 @@ RUN uv sync --frozen --no-dev
 
 FROM base AS runtime
 ENV SHOPS_DATA_DIR=/data
-# Amazon's JavaScript and AWS WAF sign-in challenges are met in a headless Chromium
-# (amazon-orders' browser extra), installed with its system libraries where the service's user
-# can read it.
+# Amazon's sign-in is done in a headless Chromium (Playwright's full build, in its new headless
+# mode: shops.amazon.browser_sign_in), installed with its system libraries where the service's
+# user can read it.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install --with-deps chromium && rm -rf /var/lib/apt/lists/*
 # The same UID as the other services' users, so all of them can share the data volume.

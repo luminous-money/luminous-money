@@ -1,13 +1,14 @@
 Amazon orders: plan
 ==================================================================================================
 
-> **Status (2026-11-07): step 1 (the spike) built, and on Emmer as `v0.1.21` after Kael's first
-> try met Amazon's bot check: [as built](#step-1-the-spike-as-built-2026-11-06), then [after the
-> first try](#after-the-first-try-on-emmer-2026-11-07-v0121).** Before it: Kael's brief, what's already here,
-> the ways Amazon's data could come in, then [Decided with Kael](#decided-with-kael-2026-11-06):
-> **the server logs in to Amazon as him** (Copilot's way). The model and steps below follow
-> that; [Still open](#still-open) has what's left to ask. Step 1 is a spike: proving the
-> server can log in and read his orders from Emmer, before anything else is built.
+> **Status (2026-11-07): step 1 (the spike) is proven on Emmer.** The server signed in to
+> Kael's Amazon and read 112 charges and all 92 orders behind them (since 2026-07-25), in
+> `v0.1.22`: [as built](#step-1-the-spike-as-built-2026-11-06), [after the first
+> try](#after-the-first-try-on-emmer-2026-11-07-v0121), then [proven](#proven-on-emmer-2026-11-07-v0122).
+> Step 2 (orders in `app`) is next. Before it: Kael's brief, what's already here, the ways
+> Amazon's data could come in, then [Decided with Kael](#decided-with-kael-2026-11-06): **the
+> server logs in to Amazon as him** (Copilot's way). [Still open](#still-open) has what's left
+> to ask.
 
 ## The brief (Kael, 2026-11-06)
 
@@ -199,6 +200,38 @@ set up on Emmer. No tests yet (his call), until reading is proven.
   choose from, with how many charges and the latest; one can be added by its last four before
   the first sync. A sync reads every charge on the Transactions page (cheap), keeps only the
   book's, reads orders only for those, and forgets ones no longer the book's.
+
+### Proven on Emmer (2026-11-07, `v0.1.22`)
+
+`v0.1.21` met Amazon's bot check again, now in the sign-in itself, and amazon-orders' browser
+still never cleared it. Probed from Emmer without an account: Playwright's headless shell (what
+amazon-orders launches, saying "HeadlessChrome") never got a page, while a full Chromium in its
+new headless mode, with an ordinary user agent and no automation flag, got Amazon's sign-in at
+once. So **the sign-in moved into that browser** (`shops.amazon.browser_sign_in`), and three
+tries with Kael's account on Emmer (run in its `shops` container with the new code) found the
+rest:
+
+1. The email went through; **the password page's own script never sent the form** in the
+   headless browser (Enter, then its button; its passkey code fails there), and the first try
+   pressed again, so an answer is now never sent twice.
+2. **A form nothing was sent for in 20 seconds is sent as a plain form** (what amazon-orders
+   posts anyway): the password went, then the code from the setup key, and Amazon signed in.
+3. **Amazon then put "Check the box to continue: I am human" in front of every page** (a token
+   and a checkbox). It's ticked in the browser and, whenever it shows up later, by the reading
+   session.
+
+Then a sync read **112 charges and the 92 orders behind them, none failing.** What they hold
+(counted on Emmer, nothing else read):
+
+- **Items are reliable:** 147, every one with a title and price, and each order's items times
+  their quantities make its subtotal (92 of 92). No parse failures.
+- **Charges make an order's grand total in 70 of 92;** the others have refunds (18 charges are
+  refunds, 17 orders have a refund total), gift cards (6 orders), or charges outside the window.
+- **Split shipments are common:** 21 orders shipped in parts, 16 of them charged more than once.
+- **Seven cards** paid for them, so which charges are the book's matters; six charges were paid
+  with no card (gift card or points), and two have no order number.
+- Totals seen: subtotal, tax, shipping and free shipping, promotions, a coupon, gift cards and
+  refunds; no Subscribe & Save, rewards points or Whole Foods orders in this window.
 
 ## Still open
 

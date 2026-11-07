@@ -1015,20 +1015,33 @@ same money in through another's, a day or so later. Both would sit in review, un
   `SHOPS_ENCRYPTION_KEY`, else `AI_ENCRYPTION_KEY` (every deployment has it, and backups and
   restores carry it with the data). Amazon's session is kept between syncs, so most don't sign
   in at all.
-- **A headless Chromium meets Amazon's challenges** (the library's browser extra): from here,
-  plain requests got Amazon's real sign-in answer one time and a JavaScript challenge the next.
-  It makes the image large (about 1.6 GB). Image captchas aren't solved (that extra pins a
-  Pillow with no build for Python 3.12): they stop the sync, saying what Amazon asked.
+- **It signs in in a browser, as a person would** (2026-11-07, after two tries on Emmer): a
+  full Chromium in its new headless mode, with an ordinary user agent and without the
+  automation flag, answers each sign-in page (the email, the password, a code from the setup
+  key, "remember this device") and hands its cookies to amazon-orders, which reads the pages.
+  amazon-orders' own way (requests and forms, and Playwright's headless shell for a challenge)
+  met Amazon's bot check from Emmer every time, on the home page and then the sign-in, and its
+  browser never cleared it; probed without an account, the headless shell never got a page,
+  while the full Chromium got Amazon's sign-in at once. Two more things it learned there:
+  Amazon's own script holds the password form back in a headless browser (its passkey code
+  fails), so a form nothing was sent for in 20 seconds is sent as a plain form, which is what
+  amazon-orders posts anyway; and an email or password is never sent twice (a page asking
+  again with an error ends the sign-in with Amazon's words, one without waits, then stops).
+  Image captchas, codes Amazon sends by email or text, and approvals stop the sync, saying what
+  Amazon asked (status `login`); a sign-up page (an email Amazon doesn't know) is never filled
+  in. The page a sign-in stopped on is kept beside the session (`output/signin-failed.png` and
+  `.html`), on the server only. It makes the image large (about 1.6 GB).
+- **Amazon's "I am human" checkpoint is ticked:** right after signing in, Amazon put a "Check
+  the box to continue" page in front of every page of the account (a hidden token and a
+  checkbox). The browser ticks it while signing in, and the reading session submits its form
+  and asks again whenever it shows up later; if it comes straight back, the sync stops.
 - **A sync runs in the background** (Emmer's nginx gives up at 60 seconds), one per book, and
   says its step; its outcome is the connection's status (`ok`, `login`, `failed`), which isn't
   an edit, so it doesn't move the settings' version.
 - **It reads gently:** Amazon's Transactions page back to `sync_from`, then the orders behind
   new charges (and the last 14 days' again), one at a time, a second apart.
-- **Amazon's home page is passed over when it asks for its bot check** (2026-11-07): from
-  Emmer, Amazon challenged its home page but not its sign-in page, and a browser started from
-  the challenged session's cookies never cleared it. The home page only gives the first
-  cookies, so the sign-in goes ahead without them (`shops.amazon.Session`). A challenge after
-  logging in is an error that says so.
+- **A bot check on a page read after signing in is an error that says so,** rather than a page
+  read as having no charges.
 - **A charge is the book's by its card** (Kael, 2026-11-07): only the cards included (every
   card, if none is), never one excluded; one paid with no card (a gift card or points) is
   always kept. A sync reads every charge (the Transactions page is cheap), keeps the book's,

@@ -1,20 +1,38 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-06._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-07._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Hand-off (2026-11-07): the Amazon spike, `v0.1.21` after Kael's first try
+## Hand-off (2026-11-07): Amazon's spike proven on Emmer, `v0.1.22`; step 2 next
 
-**Read this first.** Kael set his Amazon account up on Emmer (`v0.1.20`) and the first sync
+**Read this first.** Kael asked for the Amazon login and order reading to be proven on Emmer
+before anything else is built. **It is:** the server signed in to his Amazon and a sync read 112
+charges and the 92 orders behind them, none failing ([the
+plan](docs/milestones/amazon-orders/PLAN.md#proven-on-emmer-2026-11-07-v0122) has how, and what
+the data holds). `v0.1.21` (released, and on Emmer) still met Amazon's bot check, now in the
+sign-in itself, so **the sign-in moved into a full headless Chromium** that answers each page as
+a person would (`shops.amazon.browser_sign_in`), sending a form Amazon's own script holds back as
+a plain form, and ticking Amazon's "I am human" checkpoint, there and whenever reading meets it.
+That was tried on Emmer by running the new code in its `shops` container (`docker exec` with
+`PYTHONPATH`), three sign-ins in all; the session it signed in is kept there, so the next sync
+needn't sign in. **Released as `v0.1.22`, for Emmer.** Next: step 2, orders in `app` (matched to
+the bank's rows, itemized, reviewed), then tests for both, then step 3. Don't sign in to Amazon
+from Emmer more than needed: every try counts toward its bot score.
+
+- **To see a sync on Emmer:** `ssh kael@emmer.local`, then `docker logs -t
+  luminous-money-shops-1` (each step of the sign-in, and the page it stopped on is kept as
+  `/data/shops/amazon/<book>/output/signin-failed.png` and `.html`, in the container).
+
+## Before that (2026-11-07): `v0.1.21` after Kael's first try
+
+Kael set his Amazon account up on Emmer (`v0.1.20`) and the first sync
 timed out on Amazon's bot check, on its very first page. Probed from Emmer without his account
 (see [the plan](docs/milestones/amazon-orders/PLAN.md#after-the-first-try-on-emmer-2026-11-07-v0121)):
 Amazon challenges its home page but not its sign-in page, and amazon-orders' browser can't clear
 a challenge it's handed the challenged session's cookies for. So `v0.1.21` passes over a
 challenged home page (`shops.amazon.Session`), and adds Kael's other ask: **which charges are
-the book's, by card** (include, exclude; no card at all is always kept). Released and on Emmer;
-**waiting on Kael's next Sync now.** Don't probe Amazon from Emmer more than needed: every visit
-counts toward its bot score.
+the book's, by card** (include, exclude; no card at all is always kept).
 
 The rest of this section is from the night before.
 

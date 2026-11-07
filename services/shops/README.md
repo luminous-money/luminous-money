@@ -24,11 +24,12 @@ Roles are the ledger's, asked as the caller (`X-User-Id`, set by the gateway).
 ## How a sync goes
 
 1. Log in: reuse Amazon's session from last time (`/data/shops/amazon/<book>/cookies.json`),
-   or sign in with the email and password, making two-step codes from the authenticator app's
-   setup key. A home page answered with Amazon's bot check is passed over (the sign-in page
-   isn't challenged, and a browser handed the challenged cookies never clears it). Anything
-   Amazon asks that only a person can answer (an image captcha, a choice of device) stops the
-   sync with what was asked (status `login`).
+   or sign in in a headless Chromium as a person would: the email, the password, a two-step
+   code made from the authenticator app's setup key, and Amazon's "I am human" box. Anything
+   Amazon asks that only a person can answer (an image captcha, a code sent by email or text,
+   an approval) stops the sync with what was asked (status `login`), and the page it stopped on
+   is kept as `output/signin-failed.png` and `.html` beside the session. The "I am human" box
+   is ticked whenever Amazon puts it in front of a page later.
 2. Read Amazon's Transactions page back to the connection's `sync_from` (30 days if unset):
    each charge to a card, with its date, amount, card and order number. Every card seen is
    noted; only the book's charges are kept (by card: the included ones, or all, never the
