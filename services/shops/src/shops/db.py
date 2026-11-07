@@ -77,6 +77,23 @@ MIGRATIONS: list[list[str]] = [
             ["PRIMARY KEY (book_id, order_number)"],
         ),
     ],
+    # Which charges are the book's, by card (Kael, 2026-11-07): the cards included and excluded
+    # (JSON lists of last fours), and every card Amazon's charges were seen on, to choose from.
+    [
+        "ALTER TABLE amazon_connection ADD COLUMN include_cards TEXT",
+        "ALTER TABLE amazon_connection ADD COLUMN exclude_cards TEXT",
+        create_table(
+            "amazon_card",
+            [
+                "book_id TEXT NOT NULL",
+                "last4 TEXT NOT NULL",
+                "label TEXT",  # Amazon's, like "Visa ****1234"
+                "charges INTEGER NOT NULL DEFAULT 0",  # in the last sync's window
+                "last_seen TEXT",  # the latest charge's date
+            ],
+            ["PRIMARY KEY (book_id, last4)"],
+        ),
+    ],
 ]
 
 
@@ -152,7 +169,7 @@ class Db:
             if current is None or current["updated_at"] != expected:
                 raise StaleVersion(current["updated_at"] if current else None)
             self.conn.execute("BEGIN")
-            for table in ("amazon_connection", "amazon_charge", "amazon_order"):
+            for table in ("amazon_connection", "amazon_charge", "amazon_order", "amazon_card"):
                 self.conn.execute(f"DELETE FROM {table} WHERE book_id = ?", (book,))
             self.conn.execute("COMMIT")
 
@@ -185,6 +202,49 @@ class Db:
                     )
             self.conn.execute("COMMIT")
         return new
+
+    def put_cards(self, book: str, charges: list[dict[str, Any]]) -> None:
+        """The cards a sync's charges were on, with how many and the latest's date."""
+        seen: dict[str, dict[str, Any]] = {}
+        for c in charges:
+            if not c["last4"]:
+                continue
+            card = seen.setdefault(c["last4"], {"label": c["payment_method"], "charges": 0, "last_seen": c["date"]})
+            card["charges"] += 1
+            card["last_seen"] = max(card["last_seen"], c["date"])
+        stamp = now()
+        with self.lock:
+            for last4, card in seen.items():
+                self.conn.execute(
+                    "INSERT INTO amazon_card (book_id, last4, label, charges, last_seen, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (book_id, last4) DO UPDATE SET label = excluded.label, "
+                    "charges = excluded.charges, last_seen = MAX(COALESCE(last_seen, ''), excluded.last_seen), "
+                    "updated_at = excluded.updated_at",
+                    (book, last4, card["label"], card["charges"], card["last_seen"], stamp, stamp),
+                )
+
+    def cards(self, book: str) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT last4, label, charges, last_seen FROM amazon_card WHERE book_id = ? ORDER BY last_seen DESC",
+            (book,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def prune(self, book: str, keep: Any) -> int:
+        """Forget charges no longer the book's (`keep(last4)` says), and orders only they had."""
+        with self.lock:
+            rows = self.conn.execute("SELECT id, last4 FROM amazon_charge WHERE book_id = ?", (book,)).fetchall()
+            gone = [r["id"] for r in rows if not keep(r["last4"])]
+            self.conn.execute("BEGIN")
+            for id in gone:
+                self.conn.execute("DELETE FROM amazon_charge WHERE book_id = ? AND id = ?", (book, id))
+            self.conn.execute(
+                "DELETE FROM amazon_order WHERE book_id = ? AND order_number NOT IN "
+                "(SELECT order_number FROM amazon_charge WHERE book_id = ? AND order_number IS NOT NULL)",
+                (book, book),
+            )
+            self.conn.execute("COMMIT")
+        return len(gone)
 
     def order_numbers(self, book: str) -> set[str]:
         rows = self.conn.execute("SELECT order_number FROM amazon_order WHERE book_id = ?", (book,)).fetchall()

@@ -226,7 +226,9 @@ milestone starts.
       choice), through one shop-agnostic orders API in `app`.
   - [x] **Step 1: the spike** (2026-11-06, `v0.1.20`): the `shops` service logs in to Amazon
         and reads charges and their orders; the PWA's Amazon page sets it up, syncs, and shows
-        what it read. Nothing written to the books. For Kael to try on Emmer.
+        what it read. Nothing written to the books. For Kael to try on Emmer. **`v0.1.21`**:
+        a challenged home page is passed over (Kael's first sync timed out on it), and which
+        charges are the book's is chosen by card.
   - [ ] **Step 2: orders in `app`** (matched to the bank's rows, itemized, reviewed), then
         tests for both.
 - [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules

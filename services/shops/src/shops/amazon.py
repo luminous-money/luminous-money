@@ -9,11 +9,14 @@ has no API for a shopper's orders. Nothing here writes to the books.
 
 import datetime
 import hashlib
+import json
 import logging
 import os
+import re
 import time
 from decimal import Decimal
 from typing import Any, Callable
+from urllib.parse import urlparse
 
 from amazonorders.conf import AmazonOrdersConfig
 from amazonorders.exception import AmazonOrdersAuthError, AmazonOrdersError
@@ -46,6 +49,68 @@ class NoPrompts(IODefault):
     def prompt(self, msg: str, type: Any = None, **kwargs: Any) -> Any:
         choices = kwargs.get("choices")
         raise NeedsPerson(f"Amazon asked: {msg}" + (f" ({', '.join(map(str, choices))})" if choices else ""))
+
+
+class BotCheck(AmazonOrdersError):
+    """Amazon showed its "not a robot" check on a page read after logging in."""
+
+
+def challenged(constants: Any, parsed: Any) -> bool:
+    """Whether a page is Amazon's JavaScript bot check (its "not a robot" text, or Akamai's
+    interstitial)."""
+    if parsed is None:
+        return False
+    return bool(
+        re.search(constants.JS_ROBOT_TEXT_REGEX, parsed.text)
+        or re.search(constants.AKAMAI_INTERSTITIAL_REGEX, str(parsed))
+    )
+
+
+class Session(AmazonSession):
+    """amazon-orders' session, with two changes from what Emmer met (2026-11-07):
+
+    - **A challenged home page is passed over.** Logging in starts by fetching Amazon's home page
+      for its first cookies. From Emmer, Amazon often answered it with its bot check while its
+      sign-in page let the same requests through (six times of six), and a browser started from
+      the challenged session's cookies never cleared it (the sync timed out after a minute). So
+      a challenged home page is left, and the sign-in goes ahead without its cookies; the
+      browser forms still meet any challenge in the sign-in itself.
+    - **A challenge after logging in is an error that says so,** rather than a page read as
+      having no charges.
+    """
+
+    def _provision_cookies(self) -> None:
+        config = self.config
+        for attempt in range(config.max_cookie_attempts):
+            if attempt:
+                time.sleep(config.cookie_reattempt_wait)
+            response = self.get(config.constants.BASE_URL)
+            if challenged(config.constants, response.parsed):
+                log.info("Amazon's home page asked for its bot check; going straight to sign-in")
+                return
+            self._process_forms(response)
+            # Amazon sometimes answers with its tablet page; ask again for the desktop one.
+            if response.parsed.select_one(config.selectors.BAD_INDEX_SELECTOR) is None:
+                return
+
+    def request(self, method: str, url: str, persist_cookies: bool | None = None, binary: bool = False, **kwargs: Any) -> Any:
+        response = super().request(method, url, persist_cookies=persist_cookies, binary=binary, **kwargs)
+        if self.is_authenticated and not binary and challenged(self.config.constants, response.parsed):
+            raise BotCheck(
+                f"Amazon asked for its \"not a robot\" check reading {urlparse(url).path}. Try again later."
+            )
+        return response
+
+
+def belongs(last4: str | None, include: set[str], exclude: set[str]) -> bool:
+    """Whether a charge is the book's, by its card: one of the cards included (any card, if none
+    is), and not one excluded. One with no card (a gift card or points paid all of it) is kept:
+    it's likely wanted, and nothing else could tell (Kael)."""
+    if not last4:
+        return True
+    if last4 in exclude:
+        return False
+    return not include or last4 in include
 
 
 def money(value: float | int | None) -> str | None:
@@ -148,7 +213,7 @@ def sync(db: Db, data_dir: str, book: str, step: Callable[[str], None]) -> dict[
         raise AmazonOrdersAuthError("Set the Amazon account's email and password first.")
     directory = os.path.join(data_dir, "amazon", book)
     config = _config(directory)
-    session = AmazonSession(
+    session = Session(
         connection["email"],
         seal.unseal(connection["password"]),
         otp_secret_key=seal.unseal(connection["otp_secret"]) if connection["otp_secret"] else None,
@@ -157,9 +222,15 @@ def sync(db: Db, data_dir: str, book: str, step: Callable[[str], None]) -> dict[
     )
 
     step("Logging in to Amazon…")
-    if session.auth_cookies_stored() and not session.check_session(verify=True):
-        log.info("book %s: the kept Amazon session has expired; logging in again", book)
-        session.logout()
+    if session.auth_cookies_stored():
+        try:
+            valid = session.check_session(verify=True)
+        except AmazonOrdersError as e:
+            log.info("book %s: couldn't check the kept Amazon session (%s)", book, e)
+            valid = False
+        if not valid:
+            log.info("book %s: logging in to Amazon again", book)
+            session.logout()
     session.login()
     log.info("book %s: logged in to Amazon", book)
 
@@ -171,8 +242,17 @@ def sync(db: Db, data_dir: str, book: str, step: Callable[[str], None]) -> dict[
         days=days, progress=lambda n: step(f"Reading Amazon's charges since {since.isoformat()}… {n} so far")
     )
     rows = _charge_rows(transactions)
-    new_charges = db.put_charges(book, rows)
-    log.info("book %s: %d charges read (%d new)", book, len(rows), new_charges)
+    db.put_cards(book, rows)
+    include = set(json.loads(connection["include_cards"] or "[]"))
+    exclude = set(json.loads(connection["exclude_cards"] or "[]"))
+    mine = [r for r in rows if belongs(r["last4"], include, exclude)]
+    new_charges = db.put_charges(book, mine)
+    pruned = db.prune(book, lambda last4: belongs(last4, include, exclude))
+    log.info(
+        "book %s: %d charges read, %d the book's (%d new), %d kept before no longer the book's",
+        book, len(rows), len(mine), new_charges, pruned,
+    )
+    rows = mine
 
     known = db.order_numbers(book)
     recent = (today - datetime.timedelta(days=RECENT_DAYS)).isoformat()
@@ -191,4 +271,10 @@ def sync(db: Db, data_dir: str, book: str, step: Callable[[str], None]) -> dict[
             log.warning("book %s: order %s couldn't be read: %s", book, number, e)
             failed.append(f"{number}: {e}")
         time.sleep(ORDER_PAUSE_SECONDS)
-    return {"charges": len(rows), "new_charges": new_charges, "orders": len(wanted) - len(failed), "failed": failed}
+    return {
+        "charges": len(rows),
+        "new_charges": new_charges,
+        "other_cards": len(transactions) - len(rows),
+        "orders": len(wanted) - len(failed),
+        "failed": failed,
+    }

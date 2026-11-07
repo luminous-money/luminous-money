@@ -1024,6 +1024,16 @@ same money in through another's, a day or so later. Both would sit in review, un
   an edit, so it doesn't move the settings' version.
 - **It reads gently:** Amazon's Transactions page back to `sync_from`, then the orders behind
   new charges (and the last 14 days' again), one at a time, a second apart.
+- **Amazon's home page is passed over when it asks for its bot check** (2026-11-07): from
+  Emmer, Amazon challenged its home page but not its sign-in page, and a browser started from
+  the challenged session's cookies never cleared it. The home page only gives the first
+  cookies, so the sign-in goes ahead without them (`shops.amazon.Session`). A challenge after
+  logging in is an error that says so.
+- **A charge is the book's by its card** (Kael, 2026-11-07): only the cards included (every
+  card, if none is), never one excluded; one paid with no card (a gift card or points) is
+  always kept. A sync reads every charge (the Transactions page is cheap), keeps the book's,
+  reads only their orders, and forgets what's no longer the book's, so another card's orders
+  aren't kept where the book's members could see them.
 - **It writes nothing to the books yet:** the spike proves reading. Matching charges to the
   bank's rows and itemizing them comes next, once it's proven on Emmer.
 

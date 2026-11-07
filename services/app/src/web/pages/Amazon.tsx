@@ -21,6 +21,24 @@ import {
   type AmazonPatch,
 } from "../lib/shops.js";
 
+type Choice = "include" | "exclude" | "";
+
+/** Each card's choice, from the connection's lists. */
+const choicesOf = (c: AmazonConnection): Map<string, Choice> =>
+  new Map<string, Choice>([
+    ...c.cards.map((card) => [card.last4, ""] as [string, Choice]),
+    ...c.include_cards.map((n) => [n, "include"] as [string, Choice]),
+    ...c.exclude_cards.map((n) => [n, "exclude"] as [string, Choice]),
+  ]);
+
+const listOf = (choices: Map<string, Choice>, choice: Choice) =>
+  [...choices]
+    .filter(([, c]) => c === choice)
+    .map(([n]) => n)
+    .sort();
+
+const same = (a: string[], b: string[]) => a.join() === [...b].sort().join();
+
 const keys = {
   health: ["shops", "health"] as const,
   amazon: (book: string) => ["shops", book, "amazon"] as const,
@@ -90,6 +108,18 @@ function Settings({
   const [from, setFrom] = useState(c.sync_from ?? "");
   const [other, setOther] = useState(c.other_payments);
   const [rewards, setRewards] = useState(c.rewards ?? "");
+  const [choices, setChoices] = useState(() => choicesOf(c));
+  const [newCard, setNewCard] = useState("");
+  const choose = (last4: string, choice: Choice) =>
+    setChoices((m) => new Map(m).set(last4, choice));
+  const addCard = () => {
+    const last4 = newCard.trim();
+    if (!/^\d{2,6}$/.test(last4))
+      return setMessage({ kind: "error", text: "A card is its last four digits, like 1234" });
+    setMessage(null);
+    choose(last4, "include");
+    setNewCard("");
+  };
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
@@ -101,11 +131,16 @@ function Settings({
     if ((from || null) !== c.sync_from) patch.sync_from = from || null;
     if (other !== c.other_payments) patch.other_payments = other;
     if ((rewards || null) !== c.rewards) patch.rewards = rewards || null;
+    const include = listOf(choices, "include");
+    const exclude = listOf(choices, "exclude");
+    if (!same(include, c.include_cards)) patch.include_cards = include;
+    if (!same(exclude, c.exclude_cards)) patch.exclude_cards = exclude;
     setBusy(true);
     setMessage(null);
     try {
       const saved = await shopsApi.patchAmazon(book, patch);
       client.setQueryData(keys.amazon(book), saved);
+      void client.invalidateQueries({ queryKey: keys.charges(book) });
     } catch (e) {
       setMessage({ kind: "error", text: explain(e) });
       void client.invalidateQueries({ queryKey: keys.amazon(book) });
@@ -216,6 +251,62 @@ function Settings({
         Blank: as gift cards and other payments. A part of a charge paid other than by card comes
         from these, so the bank&apos;s amount still balances.
       </p>
+      <fieldset className="amazon-cards">
+        <legend>Which charges are this book&apos;s</legend>
+        <p className="small muted">
+          By the card each was paid with: only the cards marked Include (every card, if none is),
+          and never one marked Exclude. A charge paid with no card at all (a gift card or points) is
+          always kept. Cards show up here once a sync has seen them; to choose before the first one,
+          add a card by its last four.
+        </p>
+        {choices.size > 0 && (
+          <ul>
+            {[...choices.keys()].map((last4) => {
+              const card = c.cards.find((x) => x.last4 === last4);
+              const label = card?.label ?? `Card ending ${last4}`;
+              return (
+                <li key={last4}>
+                  <span>
+                    {label}
+                    {card && (
+                      <span className="small muted">
+                        {" "}
+                        · {card.charges} {card.charges === 1 ? "charge" : "charges"}
+                        {card.last_seen && `, latest ${formatFullDay(card.last_seen)}`}
+                      </span>
+                    )}
+                  </span>
+                  <select
+                    aria-label={label}
+                    value={choices.get(last4)}
+                    disabled={!manage}
+                    onChange={(e) => choose(last4, e.target.value as Choice)}
+                  >
+                    <option value="">—</option>
+                    <option value="include">Include</option>
+                    <option value="exclude">Exclude</option>
+                  </select>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {manage && (
+          <div className="amazon-card-add">
+            <input
+              inputMode="numeric"
+              aria-label="Card's last four"
+              placeholder="Card's last four"
+              value={newCard}
+              onChange={(e) => setNewCard(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCard())}
+            />
+            <button type="button" onClick={addCard}>
+              Add a card
+            </button>
+          </div>
+        )}
+      </fieldset>
       {message && <p className={message.kind}>{message.text}</p>}
       {manage && (
         <div className="actions">

@@ -15,6 +15,7 @@ import datetime
 import json
 import logging
 import os
+import re
 import threading
 import urllib.error
 import urllib.parse
@@ -22,7 +23,7 @@ import urllib.request
 from typing import Any, Callable
 
 import pyotp
-from amazonorders.exception import AmazonOrdersAuthError
+from amazonorders.exception import AmazonOrdersAuthError, AmazonOrdersError
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -62,11 +63,20 @@ class ConnectionPatch(BaseModel):
     sync_from: datetime.date | None = None
     other_payments: str | None = None
     rewards: str | None = None  # "" or null: as other payments
+    include_cards: list[str] | None = None  # last fours: only charges on these (all, if none)
+    exclude_cards: list[str] | None = None  # last fours: never charges on these
 
 
-def view(row: dict[str, Any] | None) -> dict[str, Any]:
+def card_list(text: str | None) -> list[str]:
+    return json.loads(text) if text else []
+
+
+def view(row: dict[str, Any] | None, cards: list[dict[str, Any]]) -> dict[str, Any]:
     row = row or {}
     return {
+        "include_cards": card_list(row.get("include_cards")),
+        "exclude_cards": card_list(row.get("exclude_cards")),
+        "cards": cards,
         "email": row.get("email", ""),
         "has_password": bool(row.get("password")),
         "has_otp_secret": bool(row.get("otp_secret")),
@@ -108,7 +118,7 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf) -> FastAPI:
     @api.get("/books/{book}/amazon")
     def get_connection(book: str, caller: str = Depends(user)) -> dict[str, Any]:
         need(caller, book, "read")
-        return view(db.connection(book))
+        return view(db.connection(book), db.cards(book))
 
     @api.patch("/books/{book}/amazon")
     def patch_connection(book: str, patch: ConnectionPatch, caller: str = Depends(user)) -> dict[str, Any]:
@@ -135,12 +145,18 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf) -> FastAPI:
             changes["other_payments"] = (patch.other_payments or "").strip() or "Income:Uncategorized"
         if "rewards" in given:
             changes["rewards"] = (patch.rewards or "").strip() or None
+        for name in ("include_cards", "exclude_cards"):
+            if name in given:
+                cards = sorted({c.strip() for c in getattr(patch, name) or [] if c.strip()})
+                if any(not re.fullmatch(r"\d{2,6}", c) for c in cards):
+                    raise HTTPException(422, "A card is its last four digits, like 1234")
+                changes[name] = json.dumps(cards) if cards else None
         if given & {"email", "password", "otp_secret"}:
             # New credentials: the next sync logs in afresh.
             changes["status"] = "new"
             changes["status_detail"] = None
         try:
-            return view(db.set_connection(book, changes, patch.updated_at))
+            return view(db.set_connection(book, changes, patch.updated_at), db.cards(book))
         except StaleVersion as e:
             raise HTTPException(409, {"message": "it changed since it was read", "current": e.current})
 
@@ -164,13 +180,21 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf) -> FastAPI:
         try:
             result = amazon.sync(db, data_dir, book, step)
             failed = f"; {len(result['failed'])} orders couldn't be read" if result["failed"] else ""
+            others = f" ({result['other_cards']} on other cards left out)" if result["other_cards"] else ""
             db.set_status(
-                book, "ok", f"{result['charges']} charges and {result['orders']} orders read{failed}.", synced=True
+                book,
+                "ok",
+                f"{result['charges']} charges{others} and {result['orders']} orders read{failed}.",
+                synced=True,
             )
             job.update(state="done", step="Done", result=result)
         except (amazon.NeedsPerson, AmazonOrdersAuthError) as e:
             log.warning("book %s: Amazon login: %s", book, e)
             db.set_status(book, "login", str(e))
+            job.update(state="failed", error=str(e))
+        except AmazonOrdersError as e:
+            log.warning("book %s: the Amazon sync stopped: %s", book, e)
+            db.set_status(book, "failed", str(e))
             job.update(state="failed", error=str(e))
         except Exception as e:  # a spike: say what went wrong, whatever it was
             log.exception("book %s: the Amazon sync failed", book)
@@ -197,7 +221,10 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf) -> FastAPI:
     @api.get("/books/{book}/amazon/charges")
     def charges(book: str, caller: str = Depends(user)) -> list[dict[str, Any]]:
         need(caller, book, "read")
-        return db.charges(book)
+        connection = db.connection(book) or {}
+        include = set(card_list(connection.get("include_cards")))
+        exclude = set(card_list(connection.get("exclude_cards")))
+        return [c for c in db.charges(book) if amazon.belongs(c["last4"], include, exclude)]
 
     @app.exception_handler(HTTPException)
     async def detail(request: Request, e: HTTPException) -> JSONResponse:

@@ -20,6 +20,21 @@ export type AmazonConnection = {
   updated_at: string | null;
   /** Whether the service has a key to seal the password with. */
   sealing: boolean;
+  /** Which charges are the book's, by card (last fours): only these (all, if none)… */
+  include_cards: string[];
+  /** …and never these. A charge with no card (gift card, points) is always kept. */
+  exclude_cards: string[];
+  /** The cards Amazon's charges were seen on. */
+  cards: AmazonCard[];
+};
+
+export type AmazonCard = {
+  last4: string;
+  /** Amazon's, like "Visa ****1234". */
+  label: string | null;
+  /** In the last sync's window. */
+  charges: number;
+  last_seen: string | null;
 };
 
 export type AmazonPatch = {
@@ -30,13 +45,21 @@ export type AmazonPatch = {
   sync_from?: string | null;
   other_payments?: string;
   rewards?: string | null;
+  include_cards?: string[];
+  exclude_cards?: string[];
 };
 
 export type AmazonSync = {
   state: "none" | "running" | "done" | "failed";
   step?: string;
   error?: string;
-  result?: { charges: number; new_charges: number; orders: number; failed: string[] };
+  result?: {
+    charges: number;
+    new_charges: number;
+    other_cards: number;
+    orders: number;
+    failed: string[];
+  };
   started_at?: string;
   finished_at?: string;
 };

@@ -4,7 +4,21 @@ Where We Left Off
 _Updated 2026-11-06._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Hand-off (2026-11-06, night): the Amazon spike, released as `v0.1.20`
+## Hand-off (2026-11-07): the Amazon spike, `v0.1.21` after Kael's first try
+
+**Read this first.** Kael set his Amazon account up on Emmer (`v0.1.20`) and the first sync
+timed out on Amazon's bot check, on its very first page. Probed from Emmer without his account
+(see [the plan](docs/milestones/amazon-orders/PLAN.md#after-the-first-try-on-emmer-2026-11-07-v0121)):
+Amazon challenges its home page but not its sign-in page, and amazon-orders' browser can't clear
+a challenge it's handed the challenged session's cookies for. So `v0.1.21` passes over a
+challenged home page (`shops.amazon.Session`), and adds Kael's other ask: **which charges are
+the book's, by card** (include, exclude; no card at all is always kept). Released and on Emmer;
+**waiting on Kael's next Sync now.** Don't probe Amazon from Emmer more than needed: every visit
+counts toward its bot score.
+
+The rest of this section is from the night before.
+
+## The Amazon spike, released as `v0.1.20` (2026-11-06, night)
 
 **Read this first.** Kael asked for Amazon's charges, and the items behind them, in his books
 ([the plan](docs/milestones/amazon-orders/PLAN.md): his brief, ten answers, and step 1 "as

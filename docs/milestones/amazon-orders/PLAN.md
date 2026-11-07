@@ -1,8 +1,9 @@
 Amazon orders: plan
 ==================================================================================================
 
-> **Status (2026-11-06): step 1 (the spike) built and released for Kael to try on Emmer:
-> [as built](#step-1-the-spike-as-built-2026-11-06).** Before it: Kael's brief, what's already here,
+> **Status (2026-11-07): step 1 (the spike) built, and on Emmer as `v0.1.21` after Kael's first
+> try met Amazon's bot check: [as built](#step-1-the-spike-as-built-2026-11-06), then [after the
+> first try](#after-the-first-try-on-emmer-2026-11-07-v0121).** Before it: Kael's brief, what's already here,
 > the ways Amazon's data could come in, then [Decided with Kael](#decided-with-kael-2026-11-06):
 > **the server logs in to Amazon as him** (Copilot's way). The model and steps below follow
 > that; [Still open](#still-open) has what's left to ask. Step 1 is a spike: proving the
@@ -179,8 +180,30 @@ set up on Emmer. No tests yet (his call), until reading is proven.
   but not what each shipment cost, so a split order's charges will have to be matched to its
   shipments by their sums.
 
+### After the first try on Emmer (2026-11-07, `v0.1.21`)
+
+- **Kael's first sync timed out on Amazon's bot check:** "Timed out after 60 seconds waiting
+  for the JavaScript challenge to resolve in the browser", on the very first page, before any
+  sign-in. Probed from Emmer without his account: Amazon answered the home page with its "not a
+  robot" check, but never the sign-in page (six of six); a clean browser cleared the check in
+  about 8 seconds once and not at all three times; and a browser started from the challenged
+  session's cookies (what amazon-orders does) never cleared it. The home page only gives the
+  first cookies, so **a challenged home page is now passed over** and the sign-in goes ahead
+  (`shops.amazon.Session`); the browser forms still meet any challenge in the sign-in itself.
+  And a challenge on a page read after logging in is now an error that says so, rather than a
+  page read as having no charges.
+- **Which charges are the book's** (Kael): not every Amazon order is this book's. Chosen by the
+  card each was paid with: only the cards marked Include (every card, if none is), never one
+  marked Exclude, and a charge paid with no card (all by gift card or points) is always kept,
+  since it's likely wanted and nothing else could tell. Cards seen by a sync are listed to
+  choose from, with how many charges and the latest; one can be added by its last four before
+  the first sync. A sync reads every charge on the Transactions page (cheap), keeps only the
+  book's, reads orders only for those, and forgets ones no longer the book's.
+
 ## Still open
 
 1. **Amazon charges already categorized by hand:** left alone (recommended) or itemized too?
-2. **A split order's charges:** which items each paid for (by the shipments' sums, tax shared
+2. **The book's own cards as the default?** The book already knows its accounts' payment
+   cards (M16): charges on those could be the book's by default, without listing them here.
+3. **A split order's charges:** which items each paid for (by the shipments' sums, tax shared
    in proportion), when Amazon doesn't say.
