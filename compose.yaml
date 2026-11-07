@@ -116,6 +116,19 @@ services:
     logging: *logging
     deploy: *restart
 
+  # Shops (the Amazon orders spike): a book's Amazon connection (its password and authenticator
+  # key sealed with SHOPS_ENCRYPTION_KEY, or AI_ENCRYPTION_KEY when that isn't set), and the
+  # charges and orders read from Amazon. Optional: without it, nothing else changes.
+  shops:
+    image: ${LUMINOUS_MONEY_REGISTRY:-luminous-money}/shops:${LUMINOUS_MONEY_VERSION:-dev}
+    environment:
+      - SHOPS_ENCRYPTION_KEY
+      - AI_ENCRYPTION_KEY
+    volumes:
+      - data:/data
+    logging: *logging
+    deploy: *restart
+
 volumes:
   data:
   certs:

@@ -5,7 +5,7 @@ import { usePopover } from "../lib/popover.js";
 import { useBooks, useLogOut, useMe, useSystemAccess } from "../lib/queries.js";
 
 /** The hamburger menu: the selected book's Home, Review, Transactions, Accounts, Budgets, Funds, Reports, Schedules, Loans, Rules,
- * Commodities, Bank connections and AI;
+ * Commodities, Bank connections, Amazon and AI;
  * Manage books; your account; for admins, System; and logging out. */
 export function Menu() {
   const { open, setOpen, ref } = usePopover();
@@ -47,6 +47,7 @@ export function Menu() {
           {home && item(`${home}/rules`, "Rules")}
           {home && item(`${home}/commodities`, "Commodities")}
           {home && item(`${home}/connections`, "Bank connections")}
+          {home && item(`${home}/amazon`, "Amazon")}
           {home && item(`${home}/ai`, "AI")}
           {item("/books", "Manage books")}
           {item("/account", "Your account")}

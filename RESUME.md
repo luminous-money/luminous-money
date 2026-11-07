@@ -4,13 +4,37 @@ Where We Left Off
 _Updated 2026-11-06._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Hand-off (2026-11-06, evening): backfilled escrow, Delete, the footer
+## Hand-off (2026-11-06, night): the Amazon spike, released as `v0.1.20`
 
-**Read this first.** Kael set his mortgage up with New loan (from the start) and found that the
+**Read this first.** Kael asked for Amazon's charges, and the items behind them, in his books
+([the plan](docs/milestones/amazon-orders/PLAN.md): his brief, ten answers, and step 1 "as
+built"). He chose the server logging in to Amazon as him, and asked for a spike: build it as if
+it works, check it reaches Amazon from here, release it, upgrade Emmer, and he sets it up
+there. **That's where it stands: `v0.1.20` is released and on Emmer, waiting for Kael to set
+up his Amazon account** (Menu → Amazon). If it reads his orders, step 2 (orders in `app`,
+matched and itemized) and tests for both come next; if Amazon won't let Emmer in, the plan's
+other ways in (a browser extension, the data export) are the fallback.
+
+- **`services/shops`** (new, Python): the book's Amazon connection (sealed with
+  `SHOPS_ENCRYPTION_KEY`, else `AI_ENCRYPTION_KEY`), syncing in the background, the charges
+  and orders read. Its README has the routes; design.md has "Shops: reading Amazon". It uses
+  `amazon-orders[browser]`, so its image carries a headless Chromium (about 1.6 GB; the arm64
+  build was tried here before release).
+- **The PWA's Amazon page**: the account, Sync now with its step, the charges read. Writes
+  nothing to the books.
+- **Checked from here** with a made-up email: Amazon's real sign-in answer reaches the page.
+  No tests (Kael's call, for the spike); `pnpm test` and `pnpm e2e` still pass.
+- **To see what happened on Emmer:** `ssh kael@emmer.local`, then `docker logs -t
+  luminous-money-shops-1` (it logs each step, never a secret).
+
+`v0.1.20` also carries the change set below (it was committed first, on its own).
+
+## Before that (2026-11-06, evening): backfilled escrow, Delete, the footer
+
+Kael set his mortgage up with New loan (from the start) and found that the
 backfilled payments, the ones before the paying account's books, carried no escrow, though
-escrow's bills were backfilled. Changes followed (and a fix for System), built and tested (`pnpm test`, `pnpm
-e2e`) but **not committed or released yet**: that's Kael's call (the next release would be
-`v0.1.20`).
+escrow's bills were backfilled. Changes followed (and a fix for System), released in
+`v0.1.20`.
 
 - **Backfilled payments carry escrow** (the loans plan's decision 7, changed by Kael): one due
   before the paying account's books begin is the whole payment, still from Opening Balances
@@ -38,15 +62,7 @@ e2e`) but **not committed or released yet**: that's Kael's call (the next releas
   makes the ledger's `/problems` and `/query` 500 for the whole book (docs/PLAN.md, Polish).
   The PWA uses neither, so nothing in the UI shows it. Not fixed.
 
-**Next project: Amazon orders** (Kael, 2026-11-06): [its plan](docs/milestones/amazon-orders/PLAN.md)
-has the brief, the ways Amazon's data could come in, and Kael's five answers: **the server logs
-in to Amazon as him** (Copilot's way; he weighed the costs), tax and shipping as their own
-splits, discounts against items, a gift card from `Income:Uncategorized`, his Amazon only. The
-model reads each charge into the bank's copy as M16 reads a receipt. **Step 1 is a spike from
-Emmer** (can a server log in and read his orders? how does his two-factor work?), with Kael
-typing his own credentials and nothing kept. "Still open" has four smaller questions.
-
-**Also next:** commit and release when Kael says; then the zero-share lot (refuse it, and turn a
+**Also next:** the zero-share lot (refuse it, and turn a
 book that fails to load into a problem rather than a 500).
 
 ## Before that (2026-11-06): New loan is a questionnaire (Loans step 3)

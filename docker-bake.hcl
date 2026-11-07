@@ -22,7 +22,7 @@ variable "SOURCE" {
 }
 
 group "default" {
-  targets = ["gateway", "auth", "ledger", "app", "ai"]
+  targets = ["gateway", "auth", "ledger", "app", "ai", "shops"]
 }
 
 group "test" {
@@ -30,7 +30,7 @@ group "test" {
 }
 
 group "release" {
-  targets = ["gateway-release", "auth-release", "ledger-release", "app-release", "ai-release"]
+  targets = ["gateway-release", "auth-release", "ledger-release", "app-release", "ai-release", "shops-release"]
 }
 
 # Service images
@@ -66,6 +66,13 @@ target "app" {
   }
   tags = ["${REGISTRY}/app:${VERSION}"]
   args = { VERSION = VERSION }
+}
+
+# Shops (the Amazon orders spike): reading a book's Amazon order history.
+target "shops" {
+  context = "services/shops"
+  tags    = ["${REGISTRY}/shops:${VERSION}"]
+  args    = { VERSION = VERSION }
 }
 
 # AI (M16): a book's AI settings and credential, and reading receipts.
@@ -172,4 +179,8 @@ target "app-release" {
 
 target "ai-release" {
   inherits = ["ai", "_release"]
+}
+
+target "shops-release" {
+  inherits = ["shops", "_release"]
 }

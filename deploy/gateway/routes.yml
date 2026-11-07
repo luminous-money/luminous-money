@@ -23,6 +23,10 @@ http:
       rule: PathPrefix(`/api/ai/v1`)
       service: ai
       middlewares: [session]
+    shops-api:
+      rule: PathPrefix(`/api/shops/v1`)
+      service: shops
+      middlewares: [session]
     # The stack's health, for uptime monitors: public, so no session (app answers it).
     health:
       rule: Path(`/api/health`)
@@ -63,3 +67,7 @@ http:
       loadBalancer:
         servers:
           - url: http://ai:3000
+    shops:
+      loadBalancer:
+        servers:
+          - url: http://shops:8000

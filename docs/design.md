@@ -999,6 +999,34 @@ same money in through another's, a day or so later. Both would sit in review, un
 - **Review takes one item** (`?only=<id>&back=…`), so a capture lands on its transaction and
   confirming or skipping it returns to where the capture started.
 
+### Shops: reading Amazon (the Amazon orders spike, 2026-11-06)
+
+[The plan](milestones/amazon-orders/PLAN.md) has Kael's brief and answers; the service is
+`services/shops` (its README has the routes).
+
+- **A service of its own, in Python** (`shops`, `/api/shops/v1`), mirroring `ai`: it owns each
+  book's Amazon connection and its secrets, and narrow operations other services can compose.
+  Python because [amazon-orders](https://github.com/alexdlaird/amazon-orders) is: Amazon has no
+  API for a shopper's orders, and that library keeps up with Amazon's pages, its sign-in, its
+  two-step codes and its bot checks, validated nightly. Porting it would be owning all of that.
+- **The server logs in as the book's manager** (Kael's choice, knowing it's against Amazon's
+  conditions of use and can break when Amazon changes): the email, the password and the
+  authenticator app's setup key (so it makes its own codes), sealed with
+  `SHOPS_ENCRYPTION_KEY`, else `AI_ENCRYPTION_KEY` (every deployment has it, and backups and
+  restores carry it with the data). Amazon's session is kept between syncs, so most don't sign
+  in at all.
+- **A headless Chromium meets Amazon's challenges** (the library's browser extra): from here,
+  plain requests got Amazon's real sign-in answer one time and a JavaScript challenge the next.
+  It makes the image large (about 1.6 GB). Image captchas aren't solved (that extra pins a
+  Pillow with no build for Python 3.12): they stop the sync, saying what Amazon asked.
+- **A sync runs in the background** (Emmer's nginx gives up at 60 seconds), one per book, and
+  says its step; its outcome is the connection's status (`ok`, `login`, `failed`), which isn't
+  an edit, so it doesn't move the settings' version.
+- **It reads gently:** Amazon's Transactions page back to `sync_from`, then the orders behind
+  new charges (and the last 14 days' again), one at a time, a second apart.
+- **It writes nothing to the books yet:** the spike proves reading. Matching charges to the
+  bank's rows and itemizing them comes next, once it's proven on Emmer.
+
 ### Split flags and categorizing splits (M16)
 
 - **What's unconfirmed is a split:** a proposed split carries Beancount's posting flag

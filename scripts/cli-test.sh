@@ -14,7 +14,7 @@ base="http://127.0.0.1:$port"
 work=$(mktemp -d)
 home="$work/home"
 cli="$home/luminous-money"
-images="gateway auth ledger app ai"
+images="gateway auth ledger app ai shops"
 
 cleanup() {
   docker compose -p "$project" -f compose.yaml down --volumes --remove-orphans >/dev/null 2>&1 || true

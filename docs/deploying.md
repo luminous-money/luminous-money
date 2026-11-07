@@ -364,6 +364,7 @@ All in `.env` (`env.example` in the release lists them). After changing any, `./
 | `LUMINOUS_MONEY_TRUSTED_PROXIES` | Behind a proxy: the addresses whose `X-Forwarded-*` headers are believed. Default: private networks and loopback. |
 | `SIMPLEFIN_ENCRYPTION_KEY` | **Required.** Seals stored bank-feed credentials. 32 random bytes, base64. Without it, saved bank connections can't be opened (reconnect them with new setup tokens). |
 | `AI_ENCRYPTION_KEY` | **Required.** Seals each book's AI provider key. 32 random bytes, base64. |
+| `SHOPS_ENCRYPTION_KEY` | Seals each book's Amazon password and authenticator key (the `shops` service). Optional: without it, `AI_ENCRYPTION_KEY` does. 32 random bytes, base64. |
 | `SMTP_URL`, `MAIL_FROM` | Email, for password resets and confirming addresses, e.g. `smtps://user:pass@smtp.example.com` and `Luminous Money <books@example.com>`. Optional. |
 | `AUTH_BREACHED_PASSWORDS` | `true` (default) checks new passwords against Have I Been Pwned. Only the first five characters of the password's SHA-1 leave the server. |
 | `AUTH_SIGNUPS_PER_HOUR` | Sign-ups allowed per client address per hour (default 20). |

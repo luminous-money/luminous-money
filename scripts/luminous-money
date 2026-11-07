@@ -297,7 +297,7 @@ cmd_down() { compose down "$@"; }
 service_health() {
   compose exec -T app node -e '
     const services = { gateway: null, auth: "http://auth:3000", ledger: "http://ledger:8000",
-      app: "http://127.0.0.1:3000", ai: "http://ai:3000" };
+      app: "http://127.0.0.1:3000", ai: "http://ai:3000", shops: "http://shops:8000" };
     (async () => {
       for (const [name, url] of Object.entries(services)) {
         if (!url) continue;

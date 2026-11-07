@@ -15,6 +15,7 @@ import { ResetPassword, VerifyEmail } from "./pages/EmailLinks.js";
 import { AccountLedger } from "./pages/AccountLedger.js";
 import { Reconcile } from "./pages/Reconcile.js";
 import { AiSettings } from "./pages/AiSettings.js";
+import { AmazonPage } from "./pages/Amazon.js";
 import { CaptureReceipt } from "./pages/CaptureReceipt.js";
 import { ReceiptButton } from "./components/ReceiptButton.js";
 import { NotificationsBell } from "./components/NotificationsBell.js";
@@ -194,6 +195,9 @@ function Gate() {
           </Route>
           <Route path="/books/:book/ai">
             {({ book: id }) => <AiSettings key={id} book={id} />}
+          </Route>
+          <Route path="/books/:book/amazon">
+            {({ book: id }) => <AmazonPage key={id} book={id} />}
           </Route>
           <Route path="/books/:book/accounts/:account/reconcile">
             {({ book: id, account }) => (

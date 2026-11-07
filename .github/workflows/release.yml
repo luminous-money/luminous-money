@@ -52,7 +52,7 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           registry="ghcr.io/${GITHUB_REPOSITORY,,}"
-          for image in gateway auth ledger app ai; do
+          for image in gateway auth ledger app ai shops; do
             docker buildx imagetools create -t "$registry/$image:latest" "$registry/$image:$version"
           done
       - name: Release, with the bundle

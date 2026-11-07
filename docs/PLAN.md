@@ -223,8 +223,12 @@ milestone starts.
       not started): Amazon's charges pulled in with the items behind each, matched to the
       bank's and cards' rows by date and amount, and read into them as splits the categorize
       chain places (item history, then the AI). The server logs in to Amazon as Kael (his
-      choice), through one shop-agnostic orders API in `app`. Step 1 is a spike from Emmer:
-      can a server get in?
+      choice), through one shop-agnostic orders API in `app`.
+  - [x] **Step 1: the spike** (2026-11-06, `v0.1.20`): the `shops` service logs in to Amazon
+        and reads charges and their orders; the PWA's Amazon page sets it up, syncs, and shows
+        what it read. Nothing written to the books. For Kael to try on Emmer.
+  - [ ] **Step 2: orders in `app`** (matched to the bank's rows, itemized, reviewed), then
+        tests for both.
 - [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules
       that add tags, a Tags field on schedules (their templates carry tags already, unseen) and
       on Capture receipt, the AI and history proposing the book's own tags, and transfers
