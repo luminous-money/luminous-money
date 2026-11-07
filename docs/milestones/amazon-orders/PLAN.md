@@ -256,8 +256,10 @@ design.md has the model ("Shops' orders in the book"); what was decided along th
      and readable into a transaction by hand (`…/orders/{shop}/{id}/assign`; no button yet).
   2. **A charge paid with no card** (all gift card or points) waits too: there's no account it
      came from.
-  3. **A refund is one line** ("Refund: <the order's items>"), since Amazon doesn't say which
-     items came back; the categorize chain places it.
+  3. ~~A refund is one line~~: matched to its items (Kael asked, 2026-11-07): the order's only
+     item, else the only item in a shipment Amazon marks returned, else the one set of items
+     whose share is the refund; else one line. Kael's one refund in the book's cards matched by
+     its "Return complete" shipment.
   4. **A split order's charge** is matched to its shipments by their sums (the best fit within
      5%, clearly better than the next), else one line naming the order's items: on Kael's
      data, 6 charges of 3 orders, two of them charged twice for one shipment.
@@ -268,6 +270,11 @@ design.md has the model ("Shops' orders in the book"); what was decided along th
      each time (not dismissable; it goes once a sync gets in), linking to the Amazon page.
   7. **The Amazon page shows what the book made of each charge** ("Itemized in the book", a
      link to it; or "Waiting:" and why), not a separate list.
+- **After Kael's first sync** (`v0.1.23`, his cards chosen): 39 charges handed over (73 on
+  other cards left out): 24 read into their bank transactions, 9 made as their own (all on a
+  card whose account isn't on the bank feed, so nothing will match them: not duplicates), 6
+  waiting (paid without a card). **Then (`v0.1.24`, Kael):** a sync reads back only 15 days before the last
+  after the first, and refunds name their items.
 - **Tests:** `server/orders/orders.test.ts` (reading, waiting, sending again, by hand, the
   morning sync, the notification), `services/shops/tests/test_lines.py` (lines from made-up
   orders: discounts, gift cards and points, refunds, split shipments), and

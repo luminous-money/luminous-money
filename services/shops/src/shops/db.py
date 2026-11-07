@@ -94,6 +94,10 @@ MIGRATIONS: list[list[str]] = [
             ["PRIMARY KEY (book_id, last4)"],
         ),
     ],
+    # How far back a sync has read (Kael, 2026-11-07): after the first, a sync reads back only
+    # 15 days before the last. Null when a full read back to `sync_from` is owed (none yet, or
+    # the date, the cards or the account changed).
+    ["ALTER TABLE amazon_connection ADD COLUMN read_back_to TEXT"],
 ]
 
 
@@ -162,6 +166,11 @@ class Db:
                 + " WHERE book_id = ?",
                 (status, detail, *([now()] if synced else []), book),
             )
+
+    def set_read_back(self, book: str, date: str) -> None:
+        """A sync read back to `date`. Not an edit, so it doesn't move the settings' version."""
+        with self.lock:
+            self.conn.execute("UPDATE amazon_connection SET read_back_to = ? WHERE book_id = ?", (date, book))
 
     def forget(self, book: str, expected: str) -> None:
         with self.lock:

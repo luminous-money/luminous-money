@@ -1038,8 +1038,11 @@ same money in through another's, a day or so later. Both would sit in review, un
 - **A sync runs in the background** (Emmer's nginx gives up at 60 seconds), one per book, and
   says its step; its outcome is the connection's status (`ok`, `login`, `failed`), which isn't
   an edit, so it doesn't move the settings' version.
-- **It reads gently:** Amazon's Transactions page back to `sync_from`, then the orders behind
-  new charges (and the last 14 days' again), one at a time, a second apart.
+- **It reads gently:** Amazon's Transactions page back to `sync_from` the first time, after
+  that only 15 days before the last sync (Kael: "it's not the end of the world if we miss one or
+  two Amazon orders"), then the orders behind new charges (and the last 14 days' again), one at
+  a time, a second apart. Changing `sync_from`, the cards or the account owes a full read again
+  (`read_back_to` is cleared), so charges a narrower window would miss come back.
 - **A bot check on a page read after signing in is an error that says so,** rather than a page
   read as having no charges.
 - **A charge is the book's by its card** (Kael, 2026-11-07): only the cards included (every
@@ -1079,8 +1082,15 @@ pages: a shop's reader hands it charges (`shared/orders.ts`), and `server/orders
   it; one charged in parts is matched to its shipments by their sums (the order's total shared
   by each shipment's items; the best fit within 5%, clearly better than the next), each charge
   its shipments' items and its share of the rest, the difference in its tax line; when it
-  can't tell, or for a refund, the charge is one line naming the order's items. On Kael's 112
-  charges: 86 itemized, 18 refunds and 6 parts of unclear orders a line each, 2 with no order.
+  can't tell, the charge is one line naming the order's items.
+- **A refund names only its order** (Kael asked whether it could name its items): it's the
+  order's only item; else the only item in a shipment Amazon marks returned or refunded; else
+  the one set of items (the marked shipments' first) whose share of the order is the refund.
+  Each item's line is its price less its discounts (scaled down for a partial refund), the rest
+  tax, negative; its memo is the item's title, so item history credits where the purchase went.
+  Otherwise it's one line naming the order's items. On Kael's 112
+  charges: 86 itemized, 18 refunds and 6 parts of unclear orders a line each, 2 with no order
+  (before refunds were matched to their items).
 - **The same charge again changes nothing** once read (keyed by the book, shop and its ID); one
   still waiting takes what's new (its order may have been read since).
 - **The morning sync** (`orders/sync.ts`, a daily job at 09:00 in the book's zone, after the

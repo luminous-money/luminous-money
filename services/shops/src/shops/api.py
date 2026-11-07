@@ -174,6 +174,9 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf, send_orders: SendOrders |
                 if any(not re.fullmatch(r"\d{2,6}", c) for c in cards):
                     raise HTTPException(422, "A card is its last four digits, like 1234")
                 changes[name] = json.dumps(cards) if cards else None
+        if given & {"email", "sync_from", "include_cards", "exclude_cards"}:
+            # What a sync keeps changed: the next reads back to `sync_from` again.
+            changes["read_back_to"] = None
         if given & {"email", "password", "otp_secret"}:
             # New credentials: the next sync logs in afresh.
             changes["status"] = "new"

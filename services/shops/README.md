@@ -30,7 +30,9 @@ Roles are the ledger's, asked as the caller (`X-User-Id`, set by the gateway).
    an approval) stops the sync with what was asked (status `login`), and the page it stopped on
    is kept as `output/signin-failed.png` and `.html` beside the session. The "I am human" box
    is ticked whenever Amazon puts it in front of a page later.
-2. Read Amazon's Transactions page back to the connection's `sync_from` (30 days if unset):
+2. Read Amazon's Transactions page back to the connection's `sync_from` (30 days if unset) the
+   first time (and after the date, the cards or the account change), else 15 days before the
+   last sync:
    each charge to a card, with its date, amount, card and order number. Every card seen is
    noted; only the book's charges are kept (by card: the included ones, or all, never the
    excluded; one with no card always), and ones no longer the book's are forgotten.

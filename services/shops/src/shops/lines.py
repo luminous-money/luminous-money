@@ -10,11 +10,13 @@ bank's smaller amount still balances.
 Amazon charges per shipment and doesn't say which items a charge paid for. An order charged
 once is all of it. One charged more than once is matched to its shipments by their sums
 (the order's total shared in proportion to each shipment's items); when that's clear, each
-charge is its shipments' items, with its share of the rest. When it isn't, or for a refund,
-the charge is one line naming what the order held, for the categorize chain to place.
+charge is its shipments' items, with its share of the rest. When it isn't, the charge is one
+line naming what the order held, for the categorize chain to place. A refund names only its
+order, so it's matched to its items by what the order says (`_refund`), else it's one line too.
 """
 
 import itertools
+import re
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
@@ -116,6 +118,46 @@ def _assign(paid: list[Decimal], shipments: list[Decimal], partial: bool) -> lis
     return scored[0][1]
 
 
+RETURNED = re.compile(r"return|refund", re.I)
+
+
+def _refund(order: dict[str, Any], refund: Decimal, discount: Decimal, grand: Decimal) -> tuple[list[dict[str, Any]], str | None]:
+    """A refund's lines, negative: the items it was for, when the order says (Amazon's refund
+    names only the order). The order's only item; else the only item in a shipment Amazon marks
+    returned or refunded; else the one set of items (the marked shipments' first, then the
+    order's) whose share of the order is the refund. Each item's line is its price less its
+    discounts, scaled to what came back if that's less (a partial refund), then the rest as tax.
+    Else one line naming the order's items."""
+    items = order.get("items") or []
+    cost = lambda i: dec(i["price"]) * (i["quantity"] or 1)  # noqa: E731
+    subtotal = sum(cost(i) for i in items)
+    marked = [i for s in order.get("shipments") or [] if RETURNED.search(s.get("status") or "") for i in s.get("items") or []]
+    found, note = None, None
+    if len(items) == 1:
+        found = items
+    elif len(marked) == 1:
+        found, note = marked, "Its item is the one in the shipment Amazon marks returned."
+    elif subtotal and grand:
+        share = lambda group: sum(cost(i) for i in group) * grand / subtotal  # noqa: E731
+        for pool in (marked, items):
+            fits = [g for n in range(1, min(len(pool), 6) + 1) for g in itertools.combinations(pool, n) if close(refund, share(g))]
+            if len(fits) == 1:
+                found, note = list(fits[0]), "Its items are the ones whose share of the order is the refund."
+            if fits:
+                break
+    if not found:
+        return [_line(_summary(order, True, None), -refund)], None
+    costs = [cost(i) for i in found]
+    base = [c + d for c, d in zip(costs, spread(discount * sum(costs) / subtotal if subtotal else Decimal(0), costs))]
+    full = sum(base) * grand / subtotal if subtotal and grand else sum(base)
+    scale = min(Decimal(1), refund / full) if full else Decimal(1)
+    lines = [
+        _line(i["title"], -(b * scale), quantity=i["quantity"] or 1, url=i.get("link")) for i, b in zip(found, base)
+    ]
+    left = -refund - sum(dec(line["amount"]) for line in lines)
+    return ([*lines, _line("Tax", left)] if cents(left) else lines), note
+
+
 def order_charges(
     order: dict[str, Any], charges: list[dict[str, Any]], other: str, rewards: str
 ) -> dict[str, tuple[list[dict[str, Any]], str | None]]:
@@ -131,8 +173,8 @@ def order_charges(
     out: dict[str, tuple[list[dict[str, Any]], str | None]] = {}
     spent = [c for c in charges if dec(c["amount"]) < 0]
     for c in charges:
-        if dec(c["amount"]) > 0:  # a refund: Amazon doesn't say of which items
-            out[c["id"]] = ([_line(_summary(order, True, None), dec(c["amount"]) * -1)], None)
+        if dec(c["amount"]) > 0:
+            out[c["id"]] = _refund(order, dec(c["amount"]), discount, grand)
 
     if not spent:
         return out

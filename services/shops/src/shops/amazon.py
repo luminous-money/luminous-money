@@ -35,6 +35,10 @@ log = logging.getLogger("shops.amazon")
 RECENT_DAYS = 14
 # Between one order's page and the next: a person's pace, not a crawler's.
 ORDER_PAUSE_SECONDS = 1.0
+# After the first sync reads back to `sync_from`, each reads back this far before the last (Kael:
+# "it's not the end of the world if we miss one or two Amazon orders"), so each morning's is a
+# few pages, not every charge since the start.
+BACK_READ_DAYS = 15
 
 
 class NeedsPerson(Exception):
@@ -405,6 +409,17 @@ def _keep_page(session: Session, page: Any, name: str) -> None:
         log.warning("couldn't keep the sign-in page", exc_info=True)
 
 
+def read_window(connection: dict[str, Any], today: datetime.date) -> tuple[datetime.date, datetime.date]:
+    """Where a sync starts (`sync_from`, else 30 days ago) and how far back it reads: back to the
+    start once (the first sync, or when what it keeps changed), after that only `BACK_READ_DAYS`
+    before the last sync."""
+    start = datetime.date.fromisoformat(connection["sync_from"]) if connection["sync_from"] else today - datetime.timedelta(days=30)
+    if not (connection.get("read_back_to") and connection.get("last_sync_at")):
+        return start, start
+    last = datetime.datetime.fromisoformat(connection["last_sync_at"]).date()
+    return start, max(start, last - datetime.timedelta(days=BACK_READ_DAYS))
+
+
 def belongs(last4: str | None, include: set[str], exclude: set[str]) -> bool:
     """Whether a charge is the book's, by its card: one of the cards included (any card, if none
     is), and not one excluded. One with no card (a gift card or points paid all of it) is kept:
@@ -532,7 +547,7 @@ def sync(db: Db, data_dir: str, book: str, step: Callable[[str], None]) -> dict[
     log.info("book %s: logged in to Amazon", book)
 
     today = datetime.date.today()
-    since = datetime.date.fromisoformat(connection["sync_from"]) if connection["sync_from"] else today - datetime.timedelta(days=30)
+    start, since = read_window(connection, today)
     days = max((today - since).days, 1)
     step(f"Reading Amazon's charges since {since.isoformat()}…")
     transactions = AmazonTransactions(session).get_transactions(
@@ -568,6 +583,8 @@ def sync(db: Db, data_dir: str, book: str, step: Callable[[str], None]) -> dict[
             log.warning("book %s: order %s couldn't be read: %s", book, number, e)
             failed.append(f"{number}: {e}")
         time.sleep(ORDER_PAUSE_SECONDS)
+    if since == start:
+        db.set_read_back(book, start.isoformat())
     return {
         "charges": len(rows),
         "new_charges": new_charges,

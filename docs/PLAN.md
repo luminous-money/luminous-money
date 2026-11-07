@@ -235,7 +235,9 @@ milestone starts.
         receipt (Kael): the card's account, the bank's copy or one made for it, back in review;
         tests for both services.
   - [x] **Step 3: the connection** (2026-11-07): the morning sync (09:00, after the bank
-        feeds), and "Amazon wants you to log in again" in Notifications.
+        feeds), and "Amazon wants you to log in again" in Notifications. **`v0.1.24`**
+        (Kael): after the first, a sync reads back 15 days before the last; refunds name
+        their items when the order says.
   - [ ] **Later:** an Assign button for a waiting charge; the book's own cards as the default;
         receipts by email, other shops, Jess's Amazon.
 - [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules

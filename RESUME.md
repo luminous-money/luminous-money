@@ -4,6 +4,21 @@ Where We Left Off
 _Updated 2026-11-07._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
+## Latest (2026-11-07): `v0.1.24`, after Kael's first sync
+
+Kael synced on `v0.1.23` with his cards chosen: 39 charges to the book (73 on other cards left
+out), 24 read into their bank transactions, 9 made as their own, 6 waiting (paid without a
+card). **The 9 made aren't duplicates** (looked at, with Kael's leave): all are on
+`Liabilities:Credit-Cards:Capital-One-Baby-Card` (cards 6062 and 2113), which isn't linked to
+the bank feed (none of SimpleFIN's accounts is that card; its only feed row is a payment's other
+side), so no bank row ever comes to match them: they're the only record of those purchases, to
+confirm in review. Kael's to decide whether that card should be on the feed. Then, at his asking, `v0.1.24`: **a sync reads back only
+15 days before the last** after its first full read (`shops.amazon.read_window`; changing the
+date, cards or account owes a full read again), and **a refund names its items** when the
+order says (`shops.lines._refund`: the only item; the item in the shipment marked returned; the
+items whose share it is). A charge already in the book isn't read again, so his one refund
+stays a single line there (one transaction to fix by hand).
+
 ## Hand-off (2026-11-07): Amazon orders built, `v0.1.23`, for Kael to try on Emmer
 
 **Read this first.** Kael asked for the Amazon login and order reading to be proven on Emmer

@@ -1,8 +1,9 @@
 """Amazon's charges as `app` takes them (shops.lines), with made-up orders: no real ones here."""
 
+import datetime
 from decimal import Decimal
 
-from shops.amazon import belongs
+from shops.amazon import belongs, read_window
 from shops.lines import for_app, spread
 
 
@@ -80,11 +81,45 @@ def test_a_gift_card_and_points_are_lines_from_their_accounts() -> None:
     assert c["lines"][-1]["account"] == "Income:Gifts"
 
 
-def test_a_refund_is_one_line_coming_back() -> None:
+def test_a_refund_of_a_one_item_order_is_that_item_coming_back() -> None:
     o = order("111-3", [item("Kettle", "40.00")], grand_total="43.20", estimated_tax="3.20")
     [refund, paid] = for_app([charge("r1", "43.20", o, date="2026-03-20"), charge("c1", "-43.20", o)], "Income:Gifts", None)
-    assert lines_of(refund) == [("Refund: Kettle", "-43.20", None)]
+    assert lines_of(refund) == [("Kettle", "-40.00", None), ("Tax", "-3.20", None)]
     assert total(paid) == Decimal("43.20")
+    # Part of it back: shared between the item and its tax in proportion.
+    [partial] = for_app([charge("r2", "10.80", o)], "Income:Gifts", None)
+    assert lines_of(partial) == [("Kettle", "-10.00", None), ("Tax", "-0.80", None)]
+
+
+def test_a_refund_is_the_item_in_the_shipment_amazon_marks_returned() -> None:
+    lamp, bulbs = item("Lamp", "60.00"), item("Bulbs", "15.00")
+    o = order("111-8", [lamp, bulbs], [[lamp], [bulbs]], grand_total="81.00", estimated_tax="6.00")
+    o["shipments"][1]["status"] = "Return complete"
+    [refund] = for_app([charge("r1", "16.20", o)], "Income:Gifts", None)
+    assert lines_of(refund) == [("Bulbs", "-15.00", None), ("Tax", "-1.20", None)]
+    assert "marks returned" in refund["note"]
+
+
+def test_a_refund_is_the_items_whose_share_it_is_or_one_line_if_that_isnt_clear() -> None:
+    lamp, bulbs, shade = item("Lamp", "60.00"), item("Bulbs", "15.00"), item("Shade", "25.00")
+    o = order("111-9", [lamp, bulbs, shade], grand_total="108.00", estimated_tax="8.00")
+    [refund] = for_app([charge("r1", "43.20", o)], "Income:Gifts", None)  # bulbs and shade
+    assert lines_of(refund) == [("Bulbs", "-15.00", None), ("Shade", "-25.00", None), ("Tax", "-3.20", None)]
+    # Two items of the same price: which came back isn't clear.
+    a, b = item("Left glove", "20.00"), item("Right glove", "20.00")
+    o = order("111-10", [a, b], grand_total="43.20", estimated_tax="3.20")
+    [refund] = for_app([charge("r1", "21.60", o)], "Income:Gifts", None)
+    assert lines_of(refund) == [("Refund: Left glove; Right glove", "-21.60", None)]
+
+
+def test_after_the_first_sync_it_reads_back_15_days_before_the_last() -> None:
+    today = datetime.date(2026, 11, 20)
+    first = {"sync_from": "2026-07-25", "read_back_to": None, "last_sync_at": None}
+    assert read_window(first, today) == (datetime.date(2026, 7, 25), datetime.date(2026, 7, 25))
+    later = {**first, "read_back_to": "2026-07-25", "last_sync_at": "2026-11-13T06:00:00.000000Z"}
+    assert read_window(later, today)[1] == datetime.date(2026, 10, 29)
+    assert read_window({**later, "sync_from": "2026-11-01"}, today)[1] == datetime.date(2026, 11, 1)
+    assert read_window({"sync_from": None, "read_back_to": None, "last_sync_at": None}, today)[1] == datetime.date(2026, 10, 21)
 
 
 def test_a_split_order_is_charged_by_its_shipments_when_their_sums_say_which() -> None:
