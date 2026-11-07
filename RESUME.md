@@ -36,8 +36,10 @@ What changed (design.md has each with its reason; PLAN.md's Polish has the list)
   without their shares, transfers of shares as cash), with five questions for Kael. PLAN.md
   has it as "Brokerage activity", to settle before we're done.
 
-**Next:** Kael upgrades Emmer to `v0.1.25` and stars the funds he wants on home. Then the
-brokerage questions (he'll come back to them).
+**Emmer is on `v0.1.25`** (upgraded at Kael's asking, 2026-11-07 10:26 UTC, from 0.1.24; its
+backup is `/srv/luminous-money/backups/luminous-money-20261107T102611Z-0.1.24.tar.gz`), every
+service healthy. **Next:** Kael stars the funds he wants on home (none are, after the upgrade).
+Then the brokerage questions (he'll come back to them).
 
 ## Before that (2026-11-07): `v0.1.24`, after Kael's first sync
 
