@@ -558,6 +558,18 @@ export const appApi = {
       })
     ),
 
+  /** The caller's starred funds in the book (home's Funds card), in the order they were
+   * starred. */
+  fundStars: async (book: string): Promise<string[]> =>
+    json(await apiFetch(`${base(book)}/fund-stars`)),
+
+  setFundStar: async (book: string, fund: string, starred: boolean): Promise<string[]> =>
+    json(
+      await apiFetch(`${base(book)}/fund-stars/${encodeURIComponent(fund)}`, {
+        method: starred ? "PUT" : "DELETE",
+      })
+    ),
+
   /** Import rows whose match is up for review. */
   /** Migrating the book from another system: its progress, and each step's work. */
   migration: {

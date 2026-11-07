@@ -180,13 +180,49 @@ test("money moved between funds on the Funds page, and each fund's history", asy
   await change.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("region", { name: "Balance" })).toContainText("$3,000.00");
 
-  // Home shows the fund and Unallocated.
+  // Home shows only starred funds: none yet, so no card at all.
   await page.goto(`/ui/books/${book}`);
   const card = page.getByRole("region", { name: "Funds" });
+  await expect(page.getByRole("region", { name: "Accounts" })).toBeVisible();
+  await expect(card).toHaveCount(0);
+
+  // Starred on its page, it's there, under the card's own heading.
+  await page.goto(`/ui/books/${book}/funds/Wedding`);
+  await page.getByRole("button", { name: "Starred" }).click();
+  await expect(page.getByRole("button", { name: "Starred" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  await page.goto(`/ui/books/${book}`);
+  await expect(card.getByRole("heading", { name: "Funds" })).toBeVisible();
   await expect(card).toContainText("Wedding");
   await expect(card).toContainText("$3,000.00");
-  await expect(card).toContainText("Unallocated");
-  await expect(card).toContainText("$7,000.00");
+  await expect(card).not.toContainText("Unallocated");
+  await card.getByRole("link", { name: "All funds ›" }).click();
+  await expect(page.getByRole("link", { name: /Wedding/ })).toContainText("★");
+});
+
+test("a fund made with New fund is starred for whoever made it", async ({ page }) => {
+  const { book } = await fundsBook(page);
+  await page.goto(`/ui/books/${book}/funds`);
+  await page.getByRole("button", { name: "New fund" }).click();
+  const dialog = page.getByRole("dialog", { name: "New fund" });
+  await dialog.getByRole("textbox", { name: "Name" }).fill("Roof");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.goto(`/ui/books/${book}`);
+  await expect(page.getByRole("region", { name: "Funds" })).toContainText("Roof");
+
+  // Unstarred, it's gone from home, and so is the card.
+  await page.goto(`/ui/books/${book}/funds/Roof`);
+  await page.getByRole("button", { name: "Starred" }).click();
+  await expect(page.getByRole("button", { name: "Starred" })).toHaveAttribute(
+    "aria-pressed",
+    "false"
+  );
+  await page.goto(`/ui/books/${book}`);
+  await expect(page.getByRole("region", { name: "Accounts" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Funds" })).toHaveCount(0);
 });
 
 test("a review card's fund: the whole amount, and Unallocated clears it", async ({ page }) => {

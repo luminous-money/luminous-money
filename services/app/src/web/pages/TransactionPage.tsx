@@ -1,5 +1,5 @@
 import type { Transaction } from "@luminous-money/ledger-client";
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 import { Attachments, type Pending } from "../components/Attachments.js";
@@ -50,6 +50,10 @@ function currencyOf(t: Transaction): string {
 
 export function TransactionPage({ book, id }: { book: string; id: string }) {
   const loaded = useTransaction(book, id);
+  // Opened from deep in a list, it starts at its top, not wherever the list was scrolled to.
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0); // a block: newer browsers' scrollTo returns a promise, not a cleanup
+  }, [id]);
   // The editor's account pickers need the chart: before it's there, a name typed would find
   // nothing, and Enter would offer to create it.
   const accounts = useAccounts(book);

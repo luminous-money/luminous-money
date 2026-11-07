@@ -386,6 +386,15 @@ export const MIGRATIONS: Migration[] = [
     ),
     "CREATE INDEX shop_charge_waiting ON shop_charge (book_id, state)",
   ],
+  // 22: starred funds, per user: the ones home's Funds card shows (as starred accounts are the
+  // accounts it shows). Keyed by the fund's name, followed on renames.
+  [
+    createTable(
+      "fund_star",
+      ["user_id TEXT NOT NULL", "book_id TEXT NOT NULL", "fund TEXT NOT NULL"],
+      ["PRIMARY KEY (user_id, book_id, fund)"]
+    ),
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -653,6 +662,32 @@ export class AppDb {
     this.db
       .prepare("DELETE FROM star WHERE user_id = ? AND book_id = ? AND account = ?")
       .run(user, book, account);
+  }
+
+  /** The user's starred funds in the book, in the order they were starred. */
+  fundStars(user: string, book: string): string[] {
+    const rows = this.db
+      .prepare(
+        "SELECT fund FROM fund_star WHERE user_id = ? AND book_id = ? ORDER BY created_at, rowid"
+      )
+      .all(user, book) as { fund: string }[];
+    return rows.map((r) => r.fund);
+  }
+
+  starFund(user: string, book: string, fund: string): void {
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO fund_star (user_id, book_id, fund, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT DO NOTHING`
+      )
+      .run(user, book, fund, stamp, stamp);
+  }
+
+  unstarFund(user: string, book: string, fund: string): void {
+    this.db
+      .prepare("DELETE FROM fund_star WHERE user_id = ? AND book_id = ? AND fund = ?")
+      .run(user, book, fund);
   }
 
   /** Which of `fingerprints` an earlier import into the account already brought in (staged or
@@ -1307,14 +1342,17 @@ export class AppDb {
   }
 
   /**
-   * Follow a fund renamed in the ledger (Funds A): the rules that name it, and schedules'
-   * templates' fund lines. One transaction.
+   * Follow a fund renamed in the ledger (Funds A): the rules that name it, schedules' templates'
+   * fund lines, and its stars. One transaction.
    */
   renameFund(book: string, old: string, renamed: string): void {
     transaction(this.db, () => {
       const stamp = now();
       this.db
         .prepare("UPDATE category_rule SET fund = ?, updated_at = ? WHERE book_id = ? AND fund = ?")
+        .run(renamed, stamp, book, old);
+      this.db
+        .prepare("UPDATE fund_star SET fund = ?, updated_at = ? WHERE book_id = ? AND fund = ?")
         .run(renamed, stamp, book, old);
       const rows = this.db
         .prepare("SELECT id, template FROM schedule WHERE book_id = ?")

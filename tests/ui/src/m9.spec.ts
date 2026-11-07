@@ -52,6 +52,8 @@ async function connect(page: Page, book: string) {
   await expect(page.getByRole("region", { name: /Connection to/ })).toContainText(
     "Everyday Checking"
   );
+  // Named by the connection, not by every bank it reaches.
+  await expect(page.getByRole("heading", { name: /^SimpleFIN [0-9a-f]{8}$/ })).toBeVisible();
 }
 
 test("connect a bank, link a new account, and see what the bank reports", async ({ page }) => {

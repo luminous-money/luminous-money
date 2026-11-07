@@ -61,6 +61,15 @@ export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"],
 export type AccountKind = components["schemas"]["AccountIn"]["kind"];
 /** Where a ledger page is: older than `cursor`, newer than `after`, or from `date` back. */
 export type LedgerPageAt = { cursor?: string; after?: string; date?: string };
+/** Which of the journal's transactions to list: reconciled or not; with every one of `tags`
+ * (M17); whose payee, narration or a split's memo has every word of `q`; with a split in any
+ * of `accounts` or under one. */
+export type JournalFilter = {
+  reconciled?: boolean;
+  tags?: string[];
+  q?: string;
+  accounts?: string[];
+};
 
 /** An API error with its status, so callers can tell a conflict (409) from a rejection (422). */
 export class ApiError extends Error {
@@ -210,18 +219,24 @@ export const api = {
     ),
 
   /** A page of the book's journal: every account's transactions, newest first, paged as an
-   * account's ledger is. With `tags`, only those with every one (M17). */
+   * account's ledger is, filtered as `filter` says (see `JournalFilter`). */
   journal: (
     book_id: string,
     page: LedgerPageAt = {},
-    reconciled?: boolean,
-    tags: string[] = []
+    { reconciled, tags = [], q, accounts = [] }: JournalFilter = {}
   ): Promise<JournalPage> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/journal", {
         params: {
           path: { book_id },
-          query: { ...page, limit: 200, reconciled, tag: tags.length ? tags : undefined },
+          query: {
+            ...page,
+            limit: 200,
+            reconciled,
+            tag: tags.length ? tags : undefined,
+            q: q?.trim() || undefined,
+            account: accounts.length ? accounts : undefined,
+          },
         },
       })
     ),

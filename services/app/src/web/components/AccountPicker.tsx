@@ -1,5 +1,5 @@
 import type { Account } from "@luminous-money/ledger-client";
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { search, suggestName } from "../lib/accounts.js";
 import { CreateAccountDialog } from "./CreateAccountDialog.js";
@@ -25,12 +25,18 @@ type Props = {
   initiallyOpen?: boolean;
   /** "Create account"'s name when nothing's been typed (renaming one not made yet). */
   suggest?: string;
+  /** What it says with no account chosen. */
+  placeholder?: string;
 };
 
 const CREATE = Symbol("create");
 
 /**
  * A searchable account picker: tap to open, type any part of the name, pick with tap or Enter.
+ * Opened on a chosen account, the search starts as its name, selected: typing replaces it, and
+ * it can be edited instead (`…:Kitchen:Tools` to `…:Kitchen:Organizers`) to create one beside it.
+ * Until it's changed, everything is listed, the chosen account first. Tab fills the search with
+ * the highlighted account's name, to edit from.
  *
  * With `create`, the last option is always "Create account", which opens the creation dialog
  * prefilled from the search. While the dialog is open the picker stays open underneath, search
@@ -46,24 +52,38 @@ export function AccountPicker({
   create,
   initiallyOpen = false,
   suggest,
+  placeholder = "Choose an account",
 }: Props) {
   const [open, setOpen] = useState(initiallyOpen);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(value);
+  // Whether the search has been changed since it opened (until then, it's the chosen account).
+  const [edited, setEdited] = useState(false);
   const [active, setActive] = useState(0);
   const [creating, setCreating] = useState(false);
   const creatingNow = useRef(false); // read during blur, before state catches up
   const listId = useId();
   const input = useRef<HTMLInputElement>(null);
-  const matches = useMemo(
-    () => search(accounts, query, prefer).slice(0, 50),
-    [accounts, query, prefer]
-  );
+  const searching = edited ? query : "";
+  const matches = useMemo(() => {
+    const found = search(accounts, searching, prefer);
+    const first = !edited && value && accounts.includes(value);
+    return (first ? [value, ...found.filter((a) => a !== value)] : found).slice(0, 50);
+  }, [accounts, searching, prefer, edited, value]);
   const options: (string | typeof CREATE)[] = create ? [...matches, CREATE] : matches;
+  useEffect(() => {
+    if (open) input.current?.select();
+  }, [open]);
 
   const close = () => {
     setOpen(false);
     setQuery("");
+    setEdited(false);
     setActive(0);
+  };
+  const reopen = () => {
+    setQuery(value);
+    setEdited(false);
+    setOpen(true);
   };
   const choose = (option: string | typeof CREATE) => {
     if (option === CREATE) {
@@ -83,7 +103,16 @@ export function AccountPicker({
     if (e.key === "ArrowDown") setActive((i) => Math.min(i + 1, options.length - 1));
     else if (e.key === "ArrowUp") setActive((i) => Math.max(i - 1, 0));
     else if (e.key === "Enter" && options[active] !== undefined) choose(options[active]);
-    else if (e.key === "Escape") close();
+    else if (
+      e.key === "Tab" &&
+      !e.shiftKey &&
+      typeof options[active] === "string" &&
+      options[active] !== query
+    ) {
+      setQuery(options[active]);
+      setEdited(true);
+      setActive(0);
+    } else if (e.key === "Escape") close();
     else return;
     e.preventDefault();
   };
@@ -95,9 +124,9 @@ export function AccountPicker({
         className="picker-value"
         aria-label={`${label}: ${value || "none"}`}
         disabled={disabled}
-        onClick={() => setOpen(true)}
+        onClick={reopen}
       >
-        {value ? <AccountName name={value} /> : <span className="muted">Choose an account</span>}
+        {value ? <AccountName name={value} /> : <span className="muted">{placeholder}</span>}
       </button>
     );
   }
@@ -115,6 +144,7 @@ export function AccountPicker({
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
+          setEdited(true);
           setActive(0);
         }}
         onKeyDown={onKeyDown}
@@ -134,7 +164,7 @@ export function AccountPicker({
             }}
           >
             {option === CREATE ? (
-              <span>+ Create account{query.trim() ? ` “${query.trim()}”` : ""}</span>
+              <span>+ Create account{searching.trim() ? ` “${searching.trim()}”` : ""}</span>
             ) : (
               <AccountName name={option} />
             )}
@@ -145,9 +175,9 @@ export function AccountPicker({
       {creating && create && (
         <CreateAccountDialog
           initialName={
-            !query.trim() && suggest
+            !searching.trim() && suggest
               ? suggest
-              : suggestName(query, create.accounts, prefer?.[0] ?? "Expenses")
+              : suggestName(searching, create.accounts, prefer?.[0] ?? "Expenses")
           }
           accounts={create.accounts}
           submit={create.submit}

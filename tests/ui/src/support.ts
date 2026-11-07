@@ -106,6 +106,26 @@ export async function seedBook(page: Page): Promise<Seeded> {
   return { book, ids };
 }
 
+/** Stage `count` more categorized transactions in `book` (seeded), "Shop 1" to "Shop N", a day
+ * apart from 2024-04-01, so the queue is longer than a screen. Their ids, by payee. */
+export async function stageMany(book: string, count: number): Promise<Record<string, string>> {
+  const body: TransactionIn[] = Array.from({ length: count }, (_, i) => ({
+    date: new Date(Date.UTC(2024, 3, 1) + i * 864e5).toISOString().slice(0, 10),
+    flag: "!",
+    payee: `Shop ${i + 1}`,
+    narration: "Groceries",
+    postings: [
+      { account: "Assets:Bank:Checking", units: usd(`-${i + 1}.00`) },
+      { account: "Expenses:Food:Groceries", units: usd(`${i + 1}.00`) },
+    ],
+  }));
+  const { data } = await current.ledger.POST("/api/ledger/v1/books/{book_id}/transactions/batch", {
+    params: { path: { book_id: book } },
+    body,
+  });
+  return Object.fromEntries(data!.map((t, i) => [body[i]!.payee!, t.id]));
+}
+
 export async function stored(book: string, id: string): Promise<Transaction> {
   const { data } = await current.ledger.GET(
     "/api/ledger/v1/books/{book_id}/transactions/{directive_id}",

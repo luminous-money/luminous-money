@@ -1,13 +1,19 @@
 import { Link, useLocation } from "wouter";
 
 import { JournalList } from "../components/JournalList.js";
-import { filteredLabel, LedgerFilter, useLedgerView } from "../components/LedgerFilter.js";
+import {
+  filteredLabel,
+  LedgerFilter,
+  SearchBox,
+  useLedgerView,
+} from "../components/LedgerFilter.js";
 import { JumpToDate, MoreBelow, NewerRow, usePaging } from "../components/Paged.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { bookHome } from "../lib/books.js";
 import { withBack } from "../lib/navigation.js";
 import { useBulkActions } from "../lib/bulk.js";
 import { postable } from "../lib/accounts.js";
+import { filtering } from "../lib/filters.js";
 import { today } from "../lib/format.js";
 import {
   explain,
@@ -21,15 +27,16 @@ import { useSelection } from "../lib/selection.js";
 
 /**
  * Every account's transactions together, newest first, paged as an account's ledger is: 200 at
- * a time as you scroll, or from a date back (`?date=`) with Load more above; filtered by
- * reconciliation (`?reconciled=`) and tags (`?tag=`, M17). Select mode's actions confirm,
+ * a time as you scroll, or from a date back (`?date=`) with Load more above; searched (`?q=`:
+ * payees, descriptions and splits' items) and filtered by reconciliation (`?reconciled=`), tags
+ * (`?tag=`, M17) and accounts (`?account=`, any of them). Select mode's actions confirm,
  * categorize, tag or suggest categories for several at once.
  */
 export function Transactions({ book }: { book: string }) {
   const [, navigate] = useLocation();
   const base = `/books/${book}/transactions`;
-  const { date, reconciled, tags, here, href } = useLedgerView(base);
-  const pages = useJournal(book, date, reconciled, tags);
+  const { date, filter, here, href } = useLedgerView(base);
+  const pages = useJournal(book, date, filter);
   const canWrite = useCanWrite(book);
   const selection = useSelection();
   const accounts = useAccounts(book);
@@ -88,15 +95,19 @@ export function Transactions({ book }: { book: string }) {
         )
       )}
       <div className="ledger-tools">
+        <SearchBox
+          value={filter.q ?? ""}
+          onChange={(q) => navigate(href({ date, ...filter, q }), { replace: true })}
+        />
         <JumpToDate
           key={date ?? ""}
           date={date}
-          onGo={(to) => navigate(href({ date: to, reconciled, tags }))}
+          onGo={(to) => navigate(href({ ...filter, date: to }))}
         />
         <LedgerFilter
           book={book}
-          reconciled={reconciled}
-          tags={tags}
+          filter={filter}
+          byAccount
           onChange={(view) => navigate(href({ date, ...view }))}
         />
       </div>
@@ -104,8 +115,8 @@ export function Transactions({ book }: { book: string }) {
       {pages.error && <p className="card error">{explain(pages.error)}</p>}
       {pages.data && rows.length === 0 && (
         <p className="card muted">
-          {reconciled !== undefined || tags.length
-            ? `No ${filteredLabel(reconciled, tags)}${date ? ` on or before ${date}` : ""}.`
+          {filtering(filter)
+            ? `No ${filteredLabel(filter)}${date ? ` on or before ${date}` : ""}.`
             : date
               ? `Nothing on or before ${date}.`
               : "No transactions yet."}

@@ -45,6 +45,36 @@ def tagged(alias: str, tags: list[str]) -> tuple[str, list[str | int]]:
     )
 
 
+def _like(text: str) -> str:
+    """`text` as a LIKE pattern that finds it anywhere (`\\` escaping LIKE's wildcards)."""
+    return "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+
+def searched(alias: str, search: str) -> tuple[str, list[str | int]]:
+    """A WHERE clause (and its arguments) keeping the transactions whose payee, narration or a
+    split's memo has every word of `search` (ignoring case, as SQLite's LIKE does for ASCII)."""
+    clauses, args = [], []
+    for word in search.split():
+        pattern = _like(word)
+        clauses.append(
+            f"({alias}.payee LIKE ? ESCAPE '\\' OR {alias}.narration LIKE ? ESCAPE '\\' OR EXISTS"
+            f" (SELECT 1 FROM posting s WHERE s.directive_id = {alias}.id AND s.memo LIKE ? ESCAPE '\\'))"
+        )
+        args += [pattern] * 3
+    return " AND ".join(clauses) or "1", args
+
+
+def touching(alias: str, accounts: list[str]) -> tuple[str, list[str | int]]:
+    """A WHERE clause (and its arguments) keeping the transactions with a split in any of
+    `accounts`, or under one."""
+    wanted = sorted(set(accounts))
+    under = " OR ".join(["a.account = ? OR substr(a.account, 1, length(?) + 1) = ? || ':'"] * len(wanted))
+    return (
+        f"EXISTS (SELECT 1 FROM posting a WHERE a.directive_id = {alias}.id AND ({under}))",
+        [x for name in wanted for x in (name, name, name)],
+    )
+
+
 def split_tags(text: str | None) -> list[str]:
     """`TAGS`' column as a sorted list."""
     return sorted(text.split(" ")) if text else []
@@ -670,17 +700,29 @@ class Store:
         through: str | None = None,
         reconciled: tuple[bool, list[str]] | None = None,
         tags: list[str] | None = None,
+        search: str | None = None,
+        accounts: list[str] | None = None,
         limit: int,
     ) -> list[sqlite3.Row]:
         """Live transactions, a keyset page: newest first, older than a row's key (date,
         ordinal) and dated `through` or earlier if given; or, `newer_than` a key, the closest
         newer ones first (oldest first). With `reconciled` (wanted, and the roots whose postings
         reconcile), only those whose postings under the roots are all reconciled, or those with
-        one that isn't; with `tags`, only those with all of them. Each row has its tags
+        one that isn't; with `tags`, only those with all of them; with `search`, only those whose
+        payee, narration or a split's memo has every word of it (ignoring case); with `accounts`,
+        only those with a split in any of them (or under one). Each row has its tags
         (space-separated)."""
         where, args = ["book_id = ?", "deleted = 0", "kind = 'transaction'"], [book_id]
         if tags:
             clause, more = tagged("directive", tags)
+            where.append(clause)
+            args += more
+        if search:
+            clause, more = searched("directive", search)
+            where.append(clause)
+            args += more
+        if accounts:
+            clause, more = touching("directive", accounts)
             where.append(clause)
             args += more
         if reconciled is not None:

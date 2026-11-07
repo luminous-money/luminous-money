@@ -124,11 +124,11 @@ function ConnectionCard({
   const sync = useSyncBank();
   const disconnect = useDisconnectBank();
   const [linking, setLinking] = useState<string | null>(null);
-  const institutions = [...new Set(connection.accounts.map((a) => a.institution))].join(", ");
   return (
     <section className="card" aria-label={`Connection to ${connection.host}`}>
       <div className="row-between">
-        <h2 className="section-title">{institutions || connection.host}</h2>
+        {/* Named by its id: its banks are its accounts', and a connection can hold many. */}
+        <h2 className="section-title">SimpleFIN {connection.id.slice(0, 8)}</h2>
         <span className="small muted">{connection.host}</span>
       </div>
       <p className="small muted">
@@ -149,7 +149,7 @@ function ConnectionCard({
         </p>
       )}
       {sync.error && <p className="small error">{explain(sync.error)}</p>}
-      <ul className="plain-list" aria-label="Bank accounts">
+      <ul className="plain-list bank-accounts" aria-label="Bank accounts">
         {connection.accounts.map((a) => (
           <li key={a.account_id}>
             <BankAccountRow

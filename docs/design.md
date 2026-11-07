@@ -1162,6 +1162,28 @@ pages: a shop's reader hands it charges (`shared/orders.ts`), and `server/orders
   "Spent this month" and an account's "Typically" aren't filtered.
 - **Not funds:** a tag overlaps others and adds up to nothing, while setting money aside needs
   something exclusive and conserved. That's what funds are for (Funds A, below).
+- **Tags are the transaction's,** as Beancount's are, so a review card's Tags (2026-11-07) tag
+  the whole of it. One item tagged on its own would be per-split tags, noted in PLAN.md
+  ("Funds and tags per split").
+
+### Search and the filter by accounts (2026-11-07)
+
+Kael asked for both on review and Transactions.
+
+- **Search** reads the payee, the description and every split's memo (a receipt's or an Amazon
+  order's item), ignoring case: a transaction is found when each word typed is in one of them
+  (any of them: "megamart milk" finds the Megamart receipt with milk on it). It's `?q=` in the
+  URL, sent once typing pauses (300 ms), with what was shown kept on screen while the new pages
+  load.
+- **The filter by accounts** is the funnel's Accounts (any of them): a transaction is kept when
+  a split is in a chosen account or under it, so choosing `Expenses:Home` takes in its
+  kitchen and garden. Nodes are offered beside leaves. It's `?account=` (repeated).
+- **Transactions asks the ledger** (`/journal`'s `q` and `account`, with SQL: `LIKE` with its
+  wildcards escaped, and the posting table's `memo`), so pages stay full and paging works as
+  before. **Review filters what it holds** (`lib/filters.ts`, read the same way), since the
+  queue is loaded whole; there the funnel has Accounts and Tags, not Reconciliation.
+- **Back keeps them:** both are in the URL, and a card's links (its page, a rule, a fund) come
+  back to it.
 
 ### Funds A (2026-11-02)
 
@@ -1210,6 +1232,13 @@ in funds first (below). The whole design, with Kael's answers, is [A's plan](mil
   toward, or takes it from, that fund (an archived one is left off rather than failing the
   import); the Funds page, a fund's page (history with a running balance), Move money, and a
   home card.
+- **Starred funds are home's Funds card** (Kael, 2026-11-07), as starred accounts are its
+  accounts: per user, in `app` (`fund_star`: user, book, fund), followed on a rename (which
+  goes through `app`). ★ on a fund's page stars it; the Funds page marks starred ones and says
+  where to star. A fund made with New fund is starred for whoever made it, as an added account
+  is. The card lists only starred, active funds, under its own heading inside it, with All
+  funds ›; Unallocated isn't a fund to star, so it's left to the Funds page. With none starred,
+  there's no card (an upgraded book's funds start unstarred: nothing says whose they'd be).
 - **Roles:** managers set funds up (create, rename, describe, target, archive, delete); writers
   choose funds on transactions and move money. Renaming goes through `app`, as accounts do, so
   rules and schedule templates that name the fund follow.
@@ -1383,6 +1412,12 @@ and `holdings`, and errors either as coded `errlist` or as the older plain `erro
 - **Connections are the user's; links go into books.** One access URL usually covers every
   institution connected at the Bridge, so it's stored once and fetched once, wherever its
   accounts are linked. A link ties one bank account to one account in one book.
+- **A connection is named "SimpleFIN" and its id's first 8 characters** (Kael, 2026-11-07), not
+  its institutions, which ran long with a Bridge holding many; its accounts are listed with a
+  rule between each.
+- **A brokerage's rows are all cash** (Fidelity's, with a sweep into or out of the core money
+  market beside each event, and trades without their shares). How to read them is a proposal
+  still to settle: [the brokerage activity plan](milestones/brokerage-activity/PLAN.md).
 - **The access URL is a credential:**
   - it's sealed at rest (AES-256-GCM, `SIMPLEFIN_ENCRYPTION_KEY`, required at boot)
   - it never reaches the browser
@@ -1717,6 +1752,14 @@ case without hiding the general one.
   the detail view.
 - **Skip moves an item to the end of the queue** and changes no data. Skips last for the browser
   session.
+- **Coming back to the same place** (Kael, 2026-11-07): opening a card's transaction (or
+  anything it links to) remembers the card and where it was on screen, with the cards after it
+  and before it (`lib/place.ts`, for the session). Back or Confirm on the transaction's page
+  comes back to it at the same height, or, if it's gone (confirmed), to the next one still
+  there, and keeps it there for a moment while the page settles (cards above it loading), until
+  it's scrolled by hand. Before, the list kept whatever height the transaction's page had been
+  scrolled to: the top, or with skipped ones at the end, the bottom. A transaction's page opens
+  at its top.
 - **Swipe right to confirm, left to skip.**
   - The card follows the finger. Releasing past about a third of its width, or flicking, commits
     the action; anything less springs back. A label underneath shows what releasing will do and
@@ -1756,6 +1799,17 @@ case without hiding the general one.
     for the chart of accounts.
   - **Create** opens the account (and any nodes on the way) and picks it for the card.
   - **Cancel** returns to the dropdown exactly as it was, search included.
+- **A picker opens on its account's name** (Kael, 2026-11-07), selected: typing replaces it as
+  before, and it lists everything with the chosen account first until it's changed; but it can
+  be edited instead, `…:Kitchen:Tools` into `…:Kitchen:Organizers`, which finds nothing and
+  offers "Create account" with that name. Tab fills the search with the highlighted account's
+  name, to edit from (and with nothing new to fill, moves focus as usual). Every account picker
+  does this.
+- **Tags and the fund on a card** (Kael, 2026-11-07): the card has the transaction's Tags (the
+  Tags field of its page, quiet until it's used). The fund choice is on the card's own color,
+  as the category's picker is, and as wide as the card: a fund is often only part of a
+  transaction, which the card can't say (PLAN.md, "Funds and tags per split"), so it's kept
+  from looking like the card's main question.
 - **Edits save immediately and the item stays staged:** the description saves on blur or Enter,
   the category on pick. Nothing typed is lost to a skipped or abandoned review.
 - **Confirm saves the current state with the `*` flag,** which takes the item out of the queue.

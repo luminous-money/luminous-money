@@ -24,8 +24,10 @@ import {
   useDeleteFund,
   useFundHistory,
   useFunds,
+  useFundStars,
   usePatchFund,
   useRenameFund,
+  useSetFundStar,
   useUnarchiveFund,
 } from "../lib/queries.js";
 import { ApiError } from "../lib/ledger.js";
@@ -75,6 +77,8 @@ export function FundPage({ book, name }: { book: string; name: string }) {
   const canManage = useCanManage(book);
   const unarchive = useUnarchiveFund(book);
   const remove = useDeleteFund(book);
+  const stars = useFundStars(book);
+  const setStar = useSetFundStar(book);
   const [dialog, setDialog] = useState<
     { kind: "move"; move?: Move } | { kind: "settings" } | { kind: "archive" } | null
   >(null);
@@ -102,7 +106,16 @@ export function FundPage({ book, name }: { book: string; name: string }) {
         <Link href={list} className="back">
           ‹ Funds
         </Link>
-        <h1>{fund?.name ?? name}</h1>
+        <h1>
+          {fund?.name ?? name}{" "}
+          {fund && !fund.archived && (
+            <StarButton
+              starred={!!stars.data?.some((s) => s.toLowerCase() === fund.name.toLowerCase())}
+              disabled={!stars.data || setStar.isPending}
+              onToggle={(starred) => setStar.mutate({ fund: fund.name, starred })}
+            />
+          )}
+        </h1>
         {fund?.description && <p className="muted">{fund.description}</p>}
       </header>
 
@@ -507,5 +520,30 @@ function ArchiveFund({
         </div>
       </DialogForm>
     </Dialog>
+  );
+}
+
+/** A fund's star: starred funds are the ones home's Funds card shows. */
+function StarButton({
+  starred,
+  disabled,
+  onToggle,
+}: {
+  starred: boolean;
+  disabled: boolean;
+  onToggle: (starred: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`star${starred ? " on" : ""}`}
+      aria-pressed={starred}
+      aria-label="Starred"
+      title={starred ? "Starred: on the home page" : "Star: show on the home page"}
+      disabled={disabled}
+      onClick={() => onToggle(!starred)}
+    >
+      {starred ? "★" : "☆"}
+    </button>
   );
 }

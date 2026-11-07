@@ -77,6 +77,8 @@ import {
   useMoveFundsBatch,
   usePatchMove,
   usePrices,
+  useSetFundStar,
+  useStarredFunds,
 } from "../lib/queries.js";
 import { BudgetBar, leftWords } from "./Budget.js";
 
@@ -1246,7 +1248,8 @@ export function nameProblem(
 export const targetProblem = (target: string) =>
   target.trim() && !typedAmount(target) ? "A target is an amount more than 0, like 20000.00" : null;
 
-/** A new fund: its name, and optionally a description and a target. */
+/** A new fund: its name, and optionally a description and a target. It's starred for whoever
+ * made it (on their home page), as an account added is. */
 export function NewFundDialog({
   book,
   listing,
@@ -1259,6 +1262,7 @@ export function NewFundDialog({
   onCancel: () => void;
 }) {
   const create = useCreateFund(book);
+  const star = useSetFundStar(book);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [target, setTarget] = useState("");
@@ -1271,13 +1275,13 @@ export function NewFundDialog({
     setError(null);
     const number = typedAmount(target);
     try {
-      onCreated(
-        await create.mutateAsync({
-          name,
-          description: description.trim() || null,
-          target: number ? { number, currency: listing?.currency ?? "USD" } : null,
-        })
-      );
+      const created = await create.mutateAsync({
+        name,
+        description: description.trim() || null,
+        target: number ? { number, currency: listing?.currency ?? "USD" } : null,
+      });
+      await star.mutateAsync({ fund: created.name, starred: true }).catch(() => undefined);
+      onCreated(created);
     } catch (e) {
       setError(explain(e));
     }
@@ -1377,55 +1381,40 @@ export function TargetProgress({ fund }: { fund: Fund }) {
   );
 }
 
-/** Home's Funds card (when the book has a fund): each active fund's balance (and progress, with a
- * target), Unallocated, and All funds ›. */
+/** Home's Funds card: the funds the user starred (only when there are any), each with its
+ * balance (and progress, with a target), and All funds ›. */
 export function FundsCard({ book }: { book: string }) {
-  const listing = useFunds(book).data;
-  const active = listing?.funds.filter((f) => !f.archived) ?? [];
-  if (!listing || !active.length) return null;
+  const { funds } = useStarredFunds(book);
+  if (!funds?.length) return null;
   const all = `/books/${book}/funds`;
   return (
-    <section className="funds-home" aria-label="Funds">
-      <h2 className="section-title">
-        <Link href={all}>Funds ›</Link>
-      </h2>
-      <div className="card">
-        <ul className="fund-list">
-          {active.map((f) => (
-            <li key={f.name}>
-              <Link href={`${all}/${encodeURIComponent(f.name)}`} className="fund-row">
-                <span className="fund-row-top">
-                  <span className="fund-name">{f.name}</span>
-                  <span className={`num${isNegative(f.value.number) ? " negative" : ""}`}>
-                    {money(f.value)}
-                  </span>
-                </span>
-                {f.target && (
-                  <BudgetBar
-                    kind="goal"
-                    budget={f.target}
-                    spent={f.value}
-                    label={`${f.name}'s target`}
-                  />
-                )}
-              </Link>
-            </li>
-          ))}
-          <li>
-            <span className="fund-row unallocated">
+    <section className="card funds-home" aria-label="Funds">
+      <h2 className="section-title">Funds</h2>
+      <ul className="fund-list">
+        {funds.map((f) => (
+          <li key={f.name}>
+            <Link href={`${all}/${encodeURIComponent(f.name)}`} className="fund-row">
               <span className="fund-row-top">
-                <span className="fund-name">{UNALLOCATED}</span>
-                <span className={`num${isNegative(listing.unallocated.number) ? " negative" : ""}`}>
-                  {money(listing.unallocated)}
+                <span className="fund-name">{f.name}</span>
+                <span className={`num${isNegative(f.value.number) ? " negative" : ""}`}>
+                  {money(f.value)}
                 </span>
               </span>
-            </span>
+              {f.target && (
+                <BudgetBar
+                  kind="goal"
+                  budget={f.target}
+                  spent={f.value}
+                  label={`${f.name}'s target`}
+                />
+              )}
+            </Link>
           </li>
-        </ul>
-        <p className="small fund-all">
-          <Link href={all}>All funds ›</Link>
-        </p>
-      </div>
+        ))}
+      </ul>
+      <p className="small fund-all">
+        <Link href={all}>All funds ›</Link>
+      </p>
     </section>
   );
 }

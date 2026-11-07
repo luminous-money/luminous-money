@@ -265,8 +265,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
         />
         <LedgerFilter
           book={book}
-          reconciled={reconciled}
-          tags={tags}
+          filter={{ reconciled, tags }}
           onChange={(view) => navigate(href({ date, ...view }))}
         />
       </div>
@@ -276,7 +275,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
       {ledger.data && rows.length === 0 && (
         <p className="card muted">
           {reconciled !== undefined || tags.length
-            ? `No ${filteredLabel(reconciled, tags)}${date ? ` on or before ${date}` : ""}.`
+            ? `No ${filteredLabel({ reconciled, tags })}${date ? ` on or before ${date}` : ""}.`
             : date
               ? `Nothing on or before ${date}.`
               : "No transactions yet."}

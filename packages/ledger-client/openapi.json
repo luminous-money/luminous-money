@@ -8890,6 +8890,45 @@
               "description": "Only transactions with every tag given (M17); repeat it for several.",
               "title": "Tag"
             }
+          },
+          {
+            "description": "Only transactions whose payee, narration or a split's memo has every word of it.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only transactions whose payee, narration or a split's memo has every word of it.",
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Only transactions with a split in any account given, or under one; repeat it for several.",
+            "in": "query",
+            "name": "account",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only transactions with a split in any account given, or under one; repeat it for several.",
+              "title": "Account"
+            }
           }
         ],
         "responses": {

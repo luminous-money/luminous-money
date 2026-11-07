@@ -17,6 +17,7 @@ import type {
   TransactionIn,
 } from "@luminous-money/ledger-client";
 import {
+  keepPreviousData,
   MutationCache,
   QueryCache,
   QueryClient,
@@ -69,6 +70,7 @@ import {
   type FundMoveIn,
   type FundMovePatch,
   type FundPatch,
+  type JournalFilter,
   type LedgerPageAt,
   type TransactionChanges,
 } from "./ledger.js";
@@ -107,6 +109,7 @@ export const keys = {
   accounts: (book: string) => ["book", book, "accounts"] as const,
   summary: (book: string, accounts: string[]) => ["book", book, "summary", ...accounts] as const,
   stars: (book: string) => ["book", book, "stars"] as const,
+  fundStars: (book: string) => ["book", book, "fund-stars"] as const,
   lastImports: (book: string) => ["book", book, "last-imports"] as const,
   ledger: (book: string, account: string) => ["book", book, "ledger", account] as const,
   profiles: (book: string, account: string) => ["book", book, "profiles", account] as const,
@@ -352,6 +355,34 @@ export function useSetStar(book: string) {
   });
 }
 
+/** The user's starred funds: home's Funds card. */
+export function useFundStars(book: string) {
+  return useQuery({ queryKey: keys.fundStars(book), queryFn: () => appApi.fundStars(book) });
+}
+
+export function useSetFundStar(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fund, starred }: { fund: string; starred: boolean }) =>
+      appApi.setFundStar(book, fund, starred),
+    onSuccess: (stars) => client.setQueryData(keys.fundStars(book), stars),
+  });
+}
+
+/** The book's active funds the user starred, in the book's order (and the listing). */
+export function useStarredFunds(book: string) {
+  const listing = useFunds(book);
+  const stars = useFundStars(book);
+  const starred = new Set(stars.data?.map((s) => s.toLowerCase()));
+  return {
+    listing: listing.data,
+    funds:
+      listing.data && stars.data
+        ? listing.data.funds.filter((f) => !f.archived && starred.has(f.name.toLowerCase()))
+        : undefined,
+  };
+}
+
 /** The user's starred accounts, summarized: the home page. */
 export function useStarredAccounts(book: string) {
   const stars = useStars(book);
@@ -406,16 +437,19 @@ export const useAccountLedger = (
   );
 
 /** The book's journal: every account's transactions, newest first, paged as a ledger is. */
-export const useJournal = (
-  book: string,
-  date?: string,
-  reconciled?: boolean,
-  tags: string[] = []
-) =>
+export const useJournal = (book: string, date?: string, filter: JournalFilter = {}) =>
   usePages(
-    [...keys.book(book), "journal", reconciled ?? null, ...tags],
-    (at) => api.journal(book, at, reconciled, tags),
-    date
+    [
+      ...keys.book(book),
+      "journal",
+      filter.reconciled ?? null,
+      filter.tags ?? [],
+      filter.q?.trim() ?? "",
+      filter.accounts ?? [],
+    ],
+    (at) => api.journal(book, at, filter),
+    date,
+    true
   );
 
 /** The book's tags (M17), for pickers and filters. Under the book's key, so every edit
@@ -522,15 +556,18 @@ export const useDeleteMove = (book: string) =>
   );
 
 /** Keyset pages loading either way: older below (`fetchNextPage`), newer above
- * (`fetchPreviousPage`), from the newest or from `date` back. */
+ * (`fetchPreviousPage`), from the newest or from `date` back. With `keepShown`, what was shown
+ * stays while another key's pages load (a search being typed). */
 function usePages<P extends { next_cursor: string | null; prev_cursor: string | null }>(
   key: readonly unknown[],
   fetch: (at: LedgerPageAt) => Promise<P>,
-  date?: string
+  date?: string,
+  keepShown = false
 ) {
   return useInfiniteQuery({
     queryKey: [...key, date ?? null],
     queryFn: ({ pageParam }) => fetch(pageParam),
+    ...(keepShown ? { placeholderData: keepPreviousData } : {}),
     initialPageParam: (date ? { date } : {}) as LedgerPageAt,
     getNextPageParam: (page): LedgerPageAt | undefined =>
       page.next_cursor ? { cursor: page.next_cursor } : undefined,

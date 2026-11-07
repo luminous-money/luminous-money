@@ -15,16 +15,18 @@ import {
   useJournal,
   useLastImports,
   useStarredAccounts,
+  useStarredFunds,
 } from "../lib/queries.js";
 import { ReportedLine } from "../components/BankStatus.js";
 
 /** This month's spending against the budget, recent transactions, the user's starred
  * accounts, with their balances (as shown: a card's is what's owed) and when each was last
- * updated by an import, and the book's funds (when it has one). */
+ * updated by an import, and (a rule apart) their starred funds, when they've starred any. */
 export function Home({ book }: { book: Book }) {
   const accounts = useStarredAccounts(book.id);
   const imports = useLastImports(book.id);
   const bank = useBankStatus(book.id);
+  const starredFunds = useStarredFunds(book.id).funds;
 
   return (
     <main>
@@ -80,10 +82,8 @@ export function Home({ book }: { book: Book }) {
           })}
       </section>
 
-      {accounts.data && accounts.data.length > 0 && (
-        <p className="center">
-          <Link href={`${bookHome(book.id)}/accounts/new`}>+ Add an account</Link>
-        </p>
+      {accounts.data && accounts.data.length > 0 && !!starredFunds?.length && (
+        <hr className="home-rule" />
       )}
 
       <FundsCard book={book.id} />

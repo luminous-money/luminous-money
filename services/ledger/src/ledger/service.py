@@ -855,17 +855,23 @@ class Ledger:
         limit: int = 200,
         reconciled: bool | None = None,
         tags: list[str] | None = None,
+        search: str | None = None,
+        accounts: list[str] | None = None,
     ) -> models.JournalPage:
         """Every transaction in the book, newest first, in keyset pages as an account's ledger
         has them (`cursor`: older than a row; `after`: just newer; `date`: from it back), read
         with plain SQL a page at a time. With `reconciled`, only those whose asset and liability
         postings all are, or those with one that isn't; with `tags`, only those with all of them
-        (M17)."""
+        (M17); with `search`, only those whose payee, narration or a split's memo has every word
+        of it; with `accounts`, only those with a split in any of them or under one."""
         roots = self.reconciling_roots(self._header(book_id))
         filtered = None if reconciled is None else (reconciled, roots)
+        search = (search or "").strip() or None
 
         def page_of(**where):
-            return self.store.journal(book_id, reconciled=filtered, tags=tags, **where)
+            return self.store.journal(
+                book_id, reconciled=filtered, tags=tags, search=search, accounts=accounts, **where
+            )
 
         def key(row) -> tuple[str, int]:
             return row["date"], row["ordinal"]

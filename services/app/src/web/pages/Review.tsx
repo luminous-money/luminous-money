@@ -1,11 +1,17 @@
 import type { Transaction } from "@luminous-money/ledger-client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { ReceiptNote } from "../components/ReceiptNote.js";
-import { TagChips } from "../components/Tags.js";
+import { TagInput } from "../components/Tags.js";
+import {
+  filteredLabel,
+  LedgerFilter,
+  SearchBox,
+  useLedgerView,
+} from "../components/LedgerFilter.js";
 import { useBulkActions } from "../lib/bulk.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { FundChoice, shapesFor } from "../components/Funds.js";
@@ -18,7 +24,9 @@ import { add, formatMoney, isNegative, isZero, negate } from "../lib/decimal.js"
 import { appApi, type ProposalSummary, type ProposedMatch } from "../lib/appApi.js";
 import { bookHome } from "../lib/books.js";
 import { today } from "../lib/format.js";
+import { filtering, kept } from "../lib/filters.js";
 import { useBack, useParam, withBack } from "../lib/navigation.js";
+import { rememberPlace, useReturnToPlace } from "../lib/place.js";
 import { useSelection } from "../lib/selection.js";
 import { similarUnconfirmed } from "../lib/similar.js";
 import {
@@ -37,6 +45,7 @@ import {
   useBankStatus,
   useReviewQueue,
   useShort,
+  useTags,
   writeSkipped,
 } from "../lib/queries.js";
 import { chosen, simple, UNCATEGORIZED, unresolved, withCounterpart } from "../lib/split.js";
@@ -50,8 +59,13 @@ import type { ShortTransaction } from "../lib/ledger.js";
  * to transactions already in the account, whose matches are confirmed here too (or moved,
  * swapped, or undone). Categories proposed on import say where they came from. Select mode
  * acts on many at once: confirms them, categorizes them, or suggests their categories (rules,
- * history and the book's AI).
+ * history and the book's AI). A search (`?q=`) and a filter (`?account=`, any of them; `?tag=`,
+ * every one) narrow what's shown. Back from a transaction opened here comes back to it.
  */
+/** The single transactions (`?only=`) seen in review this session: once one has been, its being
+ * gone means it was confirmed or skipped (here, or on its page and back), so review goes back. */
+const seenOnly = new Set<string>();
+
 export function Review({ book }: { book: string }) {
   const [, navigate] = useLocation();
   // Just one transaction (a receipt just captured, M16): confirming or skipping it goes `back`.
@@ -59,6 +73,10 @@ export function Review({ book }: { book: string }) {
   // What reading it cost the AI, if it was read (an estimate, from the ai service).
   const aiCost = useParam("ai_cost");
   const back = useBack(`/books/${book}/review`);
+  const view = useLedgerView(`/books/${book}/review`);
+  const search = useSearch();
+  // Where links from a card come back to: here, as filtered (or the one transaction).
+  const here = only ? `/books/${book}/review?${search}` : view.here;
   const queue = useReviewQueue(book);
   const accounts = useAccounts(book);
   const create = useAccountCreation(book);
@@ -73,12 +91,11 @@ export function Review({ book }: { book: string }) {
 
   // Oldest first; skipped items go to the end, most recently skipped last.
   const items = (queue.items ?? []).filter((i) => !only || i.transaction.id === only);
-  const [seen, setSeen] = useState(false);
   useEffect(() => {
     if (!only || !queue.items) return;
-    if (items.length) setSeen(true);
-    else if (seen) navigate(back);
-  }, [only, queue.items, items.length, seen, back, navigate]);
+    if (items.length) seenOnly.add(only);
+    else if (seenOnly.has(only)) navigate(back);
+  }, [only, queue.items, items.length, back, navigate]);
   // A sale that takes shares no fund has comes first (Funds B): it can't be confirmed until
   // it's given one.
   const shortList = useShort(book).data ?? [];
@@ -89,8 +106,12 @@ export function Review({ book }: { book: string }) {
     ...waiting.filter((i) => !short.has(i.transaction.id)),
     ...skipped.flatMap((id) => items.filter((i) => i.transaction.id === id)),
   ];
+  const filtered = !only && filtering(view.filter);
+  const shown = filtered ? ordered.filter((i) => kept(i.transaction, view.filter)) : ordered;
+  const shownIds = queue.items ? shown.map((i) => i.transaction.id) : undefined;
+  useReturnToPlace(`review:${book}`, shownIds);
   const queued = items.map((i) => i.transaction);
-  const chosen = ordered.filter((i) => selection.has(i.transaction.id));
+  const chosen = shown.filter((i) => selection.has(i.transaction.id));
   const bulkActions = useBulkActions({
     book,
     chosen: chosen.map((i) => i.transaction),
@@ -116,7 +137,10 @@ export function Review({ book }: { book: string }) {
         <h1>Review</h1>
         <p className="muted">
           {book}
-          {queue.items && ` · ${ordered.length} left`}
+          {queue.items &&
+            (filtered
+              ? ` · ${shown.length} of ${ordered.length} left`
+              : ` · ${ordered.length} left`)}
         </p>
         {only && aiCost && Number.isFinite(Number(aiCost)) && (
           <p className="small muted" role="status">
@@ -132,11 +156,27 @@ export function Review({ book }: { book: string }) {
         </div>
       </header>
 
+      {!only && (
+        <div className="ledger-tools review-tools">
+          <SearchBox
+            value={view.q}
+            onChange={(q) => navigate(view.href({ ...view.filter, q }), { replace: true })}
+          />
+          <LedgerFilter
+            book={book}
+            filter={view.filter}
+            reconciliation={false}
+            byAccount
+            onChange={(filter) => navigate(view.href(filter))}
+          />
+        </div>
+      )}
+
       {selection.selecting && (
         <SelectBar
           count={chosen.length}
-          shown={ordered.length}
-          onSelectAll={() => selection.selectAll(ordered.map((i) => i.transaction.id))}
+          shown={shown.length}
+          onSelectAll={() => selection.selectAll(shown.map((i) => i.transaction.id))}
           actions={bulkActions.actions}
           busy={bulkActions.busy}
           note={bulkActions.note}
@@ -149,12 +189,30 @@ export function Review({ book }: { book: string }) {
       {queue.items && ordered.length === 0 && (
         <p className="card done">All caught up. Nothing is waiting for review.</p>
       )}
+      {queue.items && ordered.length > 0 && shown.length === 0 && (
+        <p className="card muted">No {filteredLabel(view.filter)} waiting for review.</p>
+      )}
 
       <ol className="queue">
-        {ordered.map(({ transaction: t, matches }) => (
-          <li key={t.id}>
+        {shown.map(({ transaction: t, matches }, index) => (
+          <li
+            key={t.id}
+            data-place={t.id}
+            // Opening anything from the card (its page, a rule, a fund) comes back to it.
+            onClickCapture={(e) => {
+              if (!(e.target as Element).closest("a[href]")) return;
+              const ids = shown.map((i) => i.transaction.id);
+              rememberPlace(
+                `review:${book}`,
+                t.id,
+                ids.slice(index + 1),
+                ids.slice(0, index).reverse()
+              );
+            }}
+          >
             <QueueItem
               book={book}
+              here={here}
               transaction={t}
               matches={matches}
               scheduled={!!scheduled.data?.[t.id]}
@@ -189,6 +247,8 @@ export function Review({ book }: { book: string }) {
 
 type ItemProps = {
   book: string;
+  /** Where links from the card come back to. */
+  here: string;
   transaction: Transaction;
   /** Import rows proposed as this transaction, if any. */
   matches: ProposedMatch[];
@@ -217,6 +277,7 @@ const memoOf = (p: { meta?: Record<string, unknown> | null }) =>
 
 function QueueItem({
   book,
+  here,
   transaction: t,
   matches,
   scheduled,
@@ -244,9 +305,12 @@ function QueueItem({
   // Shown as changed right away, like the description, while the edit saves.
   const [meta, setMeta] = useState(t.meta);
   useEffect(() => setMeta(t.meta), [t.meta]);
+  const [tags, setTags] = useState(t.tags ?? []);
+  useEffect(() => setTags(t.tags ?? []), [t.tags]);
+  const bookTags = useTags(book);
 
   const view = useMemo(() => simple(t), [t]);
-  const detail = `/books/${book}/transactions/${t.id}`;
+  const detail = withBack(`/books/${book}/transactions/${t.id}`, here);
   const busy = edit.isPending || confirmMatch.isPending;
   const blocked = t.postings.some((p) => unresolved(p.account));
 
@@ -356,12 +420,7 @@ function QueueItem({
               </span>
             </p>
           )}
-          {(t.payee || !!t.tags?.length) && (
-            <div className="payee">
-              {t.payee}
-              <TagChips tags={t.tags} />
-            </div>
-          )}
+          {t.payee && <div className="payee">{t.payee}</div>}
           <input
             className="description"
             aria-label="Description"
@@ -426,7 +485,7 @@ function QueueItem({
               {view.counterpart.account !== UNCATEGORIZED && (
                 <Link
                   className="small remember"
-                  href={withBack(`/books/${book}/rules/new?from=${t.id}`, `/books/${book}/review`)}
+                  href={withBack(`/books/${book}/rules/new?from=${t.id}`, here)}
                 >
                   Remember as a rule…
                 </Link>
@@ -475,11 +534,20 @@ function QueueItem({
           <FundChoice
             book={book}
             transaction={t}
-            here={`/books/${book}/review`}
+            here={here}
             disabled={busy}
             suggested={suggested}
             onChange={(funds) => void save({ funds })}
           />
+
+          <div className="review-tags">
+            <TagInput
+              label="Tags"
+              value={tags}
+              choices={bookTags.data ?? []}
+              onChange={(changed) => (setTags(changed), void save({ tags: changed }))}
+            />
+          </div>
 
           <ExcludeFromBudget
             meta={meta}

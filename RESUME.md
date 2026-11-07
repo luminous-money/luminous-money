@@ -4,7 +4,42 @@ Where We Left Off
 _Updated 2026-11-07._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-07): `v0.1.24`, after Kael's first sync
+## Latest (2026-11-07, late): Kael's nits, released as `v0.1.25`
+
+Kael sent a list of nits (review, bank connections, home) and one bigger question. All the nits
+are built, tested and **released as `v0.1.25`** (at Kael's asking), for him to upgrade Emmer.
+What changed (design.md has each with its reason; PLAN.md's Polish has the list):
+
+- **Review:** Back or Confirm on a transaction opened from a card comes back to the same place
+  (`lib/place.ts`; before, the list kept the transaction page's scroll: the top, or the bottom
+  with skipped cards), and a transaction's page opens at its top. **Every account picker** opens
+  on its account's name, selected, so it can be edited into a new account (`…:Tools` →
+  `…:Organizers`, then "Create account"); Tab fills in the highlighted one. The **fund choice**
+  is on the card's color and as wide as the card. **Tags** on each card. A **search** (payee,
+  description, split memos) and the funnel's **Accounts** (any of them, under them too) and
+  Tags, all in the URL, so Back keeps them (`lib/filters.ts`, filtering the queue in memory).
+- **Transactions:** the same search and an Accounts filter, at the ledger: `/journal` takes `q`
+  and `account` (`store.searched`, `store.touching`; client regenerated).
+- **Bank connections:** each is "SimpleFIN <the id's first 8>", with a rule between accounts.
+- **Home:** **starred funds** (`fund_star` in `app`, migration 22; `GET/PUT/DELETE
+  /books/:book/fund-stars[/:fund]`; ★ on a fund's page; New fund stars it for its maker;
+  renames follow). Home's Funds card lists only those, its heading inside, and isn't there
+  without any. **Kael's funds start unstarred** after the upgrade, so his home card disappears
+  until he stars some. "+ Add an account" is a short centered rule (shown only above the funds).
+- **The spending chart is real** (checked against the live book, read only): its line matched
+  November's journal day by day. It hugs the dotted line because a large payment on the 1st
+  (the mortgage, through the outflows lens) sets both lines' start, and the rest of the week is
+  a sliver on an axis scaled to the dotted line's month-end.
+- **Per-split funds and tags** aren't built: noted in PLAN.md ("Funds and tags per split").
+- **Fidelity's cash rows** (Kael's bigger question): [a proposal](docs/milestones/brokerage-activity/PLAN.md)
+  from what the live book shows (sweeps into the core money market beside every event, trades
+  without their shares, transfers of shares as cash), with five questions for Kael. PLAN.md
+  has it as "Brokerage activity", to settle before we're done.
+
+**Next:** Kael upgrades Emmer to `v0.1.25` and stars the funds he wants on home. Then the
+brokerage questions (he'll come back to them).
+
+## Before that (2026-11-07): `v0.1.24`, after Kael's first sync
 
 Kael synced on `v0.1.23` with his cards chosen: 39 charges to the book (73 on other cards left
 out), 24 read into their bank transactions, 9 made as their own, 6 waiting (paid without a
@@ -457,7 +492,8 @@ What a user can do now:
   to each fund, Unallocated included; more than the transaction is refused, and a fund taken
   below zero is noted. Review cards have a fund select (the whole amount), Select mode has
   **Fund…**, a rule's **Fund** puts what it imports toward (or takes it from) a fund, rows show
-  chips ("to Emergency"), and home has a Funds card. Writers choose funds and move money;
+  chips ("to Emergency"), and home has a Funds card of the funds you starred (★ on a fund's
+  page). Writers choose funds and move money;
   managers set funds up.
 - **Tags (M17):** a transaction's page has **Tags** (type to add: suggestions from the book's
   tags, or a new one, made lowercase and dashed: "Trip to Italy" is `#trip-to-italy`; × removes
@@ -517,7 +553,8 @@ What a user can do now:
   edit"); anyone can Leave. A book you can only view says so, and its editing is hidden.
 - **Reports (M12):** home's "Spent this month" (the month's spending by day against the budget,
   and what 85% of months stay under), then recent transactions (every account's), whose title
-  opens **Transactions** (the whole journal, paged, "Go to date"). **Reports** (menu): cash flow,
+  opens **Transactions** (the whole journal, paged, "Go to date", searched, and filtered by
+  accounts, tags and reconciliation). **Reports** (menu): cash flow,
   a breakdown to drill into, this month's largest, net worth. An expense or income account's
   page shows what its weeks, months and years typically come to.
 - **Budgets (M11):** Menu → Budgets: one card by type, each budgeted account (and those above
@@ -612,9 +649,11 @@ What a user can do now:
     payment categorized to the card on checking's import is recognized by the card's import, and
     hand-entered transactions are reconciled
   - the rest are staged for review, uncategorized
-- **Review:** unconfirmed transactions (skip, categorize, confirm, swipe, create accounts) and
-  proposed matches: confirm, "Match with this instead", "Swap" (with the row holding a
-  candidate), or "Not a match" (stages the row on its own).
+- **Review:** unconfirmed transactions (skip, categorize, confirm, swipe, create accounts, tag)
+  and proposed matches: confirm, "Match with this instead", "Swap" (with the row holding a
+  candidate), or "Not a match" (stages the row on its own). A search (payees, descriptions,
+  items) and a filter by accounts and tags narrow it; Back from a transaction comes back to
+  the same place.
 - **Categorization (M4):** imported rows are staged with a proposed category and clean payee:
   from the user's **rules** (Rules page; can confirm automatically), from **history** (what the
   same payee was confirmed as), or from **external providers** (`CATEGORIZERS`, speaking
@@ -678,10 +717,10 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 254 tests, including the table lint
-    - auth: 24; app: 292; ai: 15; db: 10; csv-import: 22
+    - ledger: 257 tests, including the table lint
+    - auth: 24; app: 319; ai: 15; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 109 API tests and 128 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 111 API tests and 134 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Its `.env` (not committed: its keys) sets `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand`, so it never
@@ -854,7 +893,9 @@ How it's put together:
 - **The PWA's URLs keep account names' colons** (`/accounts/Assets:Bank:Checking`): browser
   tests compare decoded paths, not `encodeURIComponent`'s.
 - **An effect must return a function or nothing:** `useEffect(() => cond && set(x))` returns
-  `false`, which React later calls as a cleanup ("l is not a function" in production).
+  `false`, which React later calls as a cleanup ("l is not a function" in production). So does
+  `useLayoutEffect(() => window.scrollTo(0, 0))` in current Chromium, whose `scrollTo` returns a
+  promise: the whole app went blank on leaving the page (2026-11-07). Give effects a block body.
 - **`pnpm seed` skips a book that already exists,** because the demo gets new IDs on every run
   and importing twice would duplicate everything. Pass another book ID for a fresh one.
 - **Databases from before a service's migrations are refused** with a message to recreate them

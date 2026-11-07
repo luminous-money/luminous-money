@@ -240,6 +240,24 @@ milestone starts.
         their items when the order says.
   - [ ] **Later:** an Assign button for a waiting charge; the book's own cards as the default;
         receipts by email, other shops, Jess's Amazon.
+- [ ] **Brokerage activity** (Kael, 2026-11-07; **to settle before we're done**;
+      [a proposal](milestones/brokerage-activity/PLAN.md), not started): Fidelity's rows over
+      SimpleFIN are all cash, with a sweep into or out of the core money market beside every
+      real event, trades without their shares, and transfers of shares as cash, so review fills
+      with pairs that cancel and sales read as income. Proposed: read each brokerage row by its
+      description before staging (sweeps left out, dividends to income by rule, trades with
+      their shares from the snapshot or that day's price, transfers of assets as shares), let
+      the daily snapshot settle what's left as one flagged adjustment, keep it all out of
+      review's way, and open a linked history's positions as they were on its start date. Five
+      questions for Kael in the proposal.
+- [ ] **Funds and tags per split** (Kael, 2026-11-07; noted, not planned): often only part of a
+      transaction is a fund's (one item of a receipt from Emergency), and the same is true of
+      tags (one item `#gift`). Fund lines are the transaction's today (amounts, not tied to a
+      split; the transaction's page can already split them by amount), and tags are Beancount's
+      own, which are a transaction's. Per split would mean each split saying its fund or tags
+      (posting metadata, say), with the fund lines and the tag filters following from them.
+      Until then, a review card's fund choice is made quieter (the card's own color, as the
+      category), and its tags are the transaction's.
 - [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules
       that add tags, a Tags field on schedules (their templates carry tags already, unseen) and
       on Capture receipt, the AI and history proposing the book's own tags, and transfers
@@ -400,6 +418,20 @@ Smaller improvements to pick up between milestones or at the end.
       neither today). The ledger should refuse or drop a zero-unit posting with a cost, and a
       book that fails to load should be a problem rather than a 500. What wrote it (an
       investment account's opening balance, by the look of it) is still to be found.
+- [x] **Kael's nits, 2026-11-07** (`v0.1.25`):
+  - **Review:** Back or Confirm on a transaction opened from the queue comes back to the same
+    place (it was the top, or with skipped ones the bottom); an account picker opens with the
+    chosen account's name to edit into a new one (Tab fills in the highlighted one); the fund
+    choice is quieter and as wide as the card; tags on each card; a search (payee,
+    description, items) and a filter by accounts (any of them, and tags), which Back keeps.
+  - **Transactions:** the same search, and a filter by accounts beside reconciliation and tags
+    (the ledger's `/journal` takes `q` and `account`).
+  - **Bank connections:** each connection is "SimpleFIN" and its id's first 8 characters, with
+    a rule between its accounts.
+  - **Home:** funds are starred (★ on a fund's page; a new fund is starred for whoever made
+    it), and home's Funds card lists only those, its heading inside it, and only when there
+    are any; "+ Add an account" is a short rule. The spending chart was checked against the
+    live book: it reads real data (see RESUME).
 - [ ] **Mobile usability,** across the app.
 - [ ] **Tapping a report's bar or slice opens its transactions** (that month's, or that
       category's).

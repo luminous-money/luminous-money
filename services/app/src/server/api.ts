@@ -163,11 +163,11 @@ export function createApi({
     role !== undefined && RANKS.indexOf(role) >= RANKS.indexOf(need);
 
   // Changing a book needs a member's write (M13); reading, any member's (each route checks).
-  // Stars are personal, so a reader may star too; members and invitations check their own
-  // (leaving is anyone's; the rest, a manager's).
+  // Stars (accounts' and funds') are personal, so a reader may star too; members and invitations
+  // check their own (leaving is anyone's; the rest, a manager's).
   api.use("/books/:book/*", async (c, next) => {
     if (c.req.method === "GET" || c.req.method === "HEAD") return next();
-    if (/\/(stars|members|invites)(\/|$)/.test(c.req.path)) return next();
+    if (/\/(stars|fund-stars|members|invites)(\/|$)/.test(c.req.path)) return next();
     const role = await roleIn(c.get("user"), c.req.param("book")!);
     if (!role) return c.json({ detail: "not found" }, 404);
     if (!atLeast(role, "write"))
@@ -238,6 +238,27 @@ export function createApi({
     if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
     db.unstar(c.get("user"), book, account);
     return c.json(db.stars(c.get("user"), book));
+  });
+
+  /** The caller's starred funds in the book: what home's Funds card shows. */
+  api.get("/books/:book/fund-stars", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    return c.json(db.fundStars(c.get("user"), book));
+  });
+
+  api.put("/books/:book/fund-stars/:fund", async (c) => {
+    const { book, fund } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    db.starFund(c.get("user"), book, fund);
+    return c.json(db.fundStars(c.get("user"), book));
+  });
+
+  api.delete("/books/:book/fund-stars/:fund", async (c) => {
+    const { book, fund } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    db.unstarFund(c.get("user"), book, fund);
+    return c.json(db.fundStars(c.get("user"), book));
   });
 
   /** Import a file: multipart form data with `account` and `file`. */

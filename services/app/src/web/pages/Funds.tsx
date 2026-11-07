@@ -10,7 +10,7 @@ import {
 } from "../components/Funds.js";
 import { add, formatMoney, isMoney, isNegative, negate } from "../lib/decimal.js";
 import { formatDay } from "../lib/format.js";
-import { explain, useCanManage, useCanWrite, useFunds } from "../lib/queries.js";
+import { explain, useCanManage, useCanWrite, useFunds, useFundStars } from "../lib/queries.js";
 
 const money = (a: { number: string; currency: string }) => formatMoney(a.number, a.currency);
 
@@ -24,6 +24,7 @@ const money = (a: { number: string; currency: string }) => formatMoney(a.number,
  */
 export function FundsPage({ book }: { book: string }) {
   const listing = useFunds(book);
+  const stars = new Set(useFundStars(book).data?.map((s) => s.toLowerCase()));
   const canWrite = useCanWrite(book);
   const canManage = useCanManage(book);
   const [moving, setMoving] = useState(false);
@@ -132,7 +133,15 @@ export function FundsPage({ book }: { book: string }) {
           {active.map((f) => (
             <Link key={f.name} href={href(f.name)} className="card link account-card fund-card">
               <div className="account-card-top">
-                <h2>{f.name}</h2>
+                <h2>
+                  {f.name}
+                  {stars.has(f.name.toLowerCase()) && (
+                    <span className="fund-starred" title="Starred: on the home page">
+                      {" "}
+                      ★
+                    </span>
+                  )}
+                </h2>
                 <span className={`balance${isNegative(f.value.number) ? " negative" : ""}`}>
                   {money(f.value)}
                 </span>
@@ -142,6 +151,9 @@ export function FundsPage({ book }: { book: string }) {
               <TargetProgress fund={f} />
             </Link>
           ))}
+          <p className="small muted center">
+            Starred funds (★ on a fund&apos;s page) are on your home page.
+          </p>
         </section>
       )}
 
