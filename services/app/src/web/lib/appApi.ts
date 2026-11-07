@@ -1,5 +1,6 @@
 /** The app API (imports and CSV profiles), at /api/app/v1 on the same origin. */
 import type { Notification } from "../../shared/notifications.js";
+import type { StoredCharge } from "../../shared/orders.js";
 import type { CsvProfile, ImportBatch, ImportResult, ProposedMatch } from "../../shared/imports.js";
 import {
   UPCOMING_DAYS,
@@ -490,6 +491,13 @@ export const reconciling = {
 };
 
 export const appApi = {
+  /** What the book made of a shop's charges (Amazon orders), newest first. */
+  orders: async (book: string, shop: string): Promise<StoredCharge[]> =>
+    json(await apiFetch(`${base(book)}/orders?shop=${encodeURIComponent(shop)}`)),
+  /** Read the book's waiting charges now. */
+  readOrders: async (book: string): Promise<{ read: number; waiting: number; failed: number }> =>
+    json(await apiFetch(`${base(book)}/orders/read`, { method: "POST" })),
+
   /** The user's books, oldest first, with their time zones. */
   books: async (): Promise<BookInfo[]> => json(await apiFetch("/api/app/v1/books")),
   /** What needs attention in the book (Funds B), oldest first: the bell's queue. */

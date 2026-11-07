@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # Stages:
 #   uv       the toolchain (also used to update uv.lock)
+#   test     runs the test suite at build time, so building this target means testing
 #   runtime  the default and final stage: the service image
 
 FROM python:3.12-slim AS uv
@@ -13,6 +14,11 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY src ./src
 RUN uv sync --frozen --no-dev
+
+FROM base AS test
+RUN uv sync --frozen
+COPY tests ./tests
+RUN pytest -q -p no:cacheprovider
 
 FROM base AS runtime
 ENV SHOPS_DATA_DIR=/data

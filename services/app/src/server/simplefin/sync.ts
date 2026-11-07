@@ -45,6 +45,9 @@ export type SimplefinDeps = {
   fetcher?: typeof fetch;
   /** Now, in Unix seconds (tests set it). */
   clock?: () => number;
+  /** Told the books a sync brought transactions into (shops' charges waiting for them are
+   * tried again: orders/read.ts). */
+  synced?: (books: string[]) => void;
 };
 
 export class OutOfRequests extends Error {
@@ -187,6 +190,7 @@ export async function syncConnection(
   // Then reconcile what agrees with the bank (M14), once everything's in.
   for (const link of deps.store.links(connection.id))
     await autoReconcile(deps.db, deps.store, deps.ledgerFor(link.user_id), link);
+  deps.synced?.([...new Set(deps.store.links(connection.id).map((l) => l.book_id))]);
   return results;
 }
 

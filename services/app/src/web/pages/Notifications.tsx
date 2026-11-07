@@ -38,20 +38,26 @@ export function NotificationsPage({ book }: { book: string }) {
                 <span className="small muted">{formatDay(n.added.slice(0, 10))}</span>
               </div>
               <p>{n.detail}</p>
-              <p className="small">
-                <Link
-                  href={withBack(
-                    `/books/${book}/review?only=${encodeURIComponent(n.transaction_id)}`,
-                    here
-                  )}
-                >
-                  Give it a fund in review ›
-                </Link>{" "}
-                <span className="muted">or</span>{" "}
-                <Link href={withBack(`/books/${book}/transactions/${n.transaction_id}`, here)}>
-                  open it
-                </Link>
-              </p>
+              {n.href ? (
+                <p className="small">
+                  <Link href={n.href}>Log in again ›</Link>
+                </p>
+              ) : (
+                <p className="small">
+                  <Link
+                    href={withBack(
+                      `/books/${book}/review?only=${encodeURIComponent(n.transaction_id ?? "")}`,
+                      here
+                    )}
+                  >
+                    Give it a fund in review ›
+                  </Link>{" "}
+                  <span className="muted">or</span>{" "}
+                  <Link href={withBack(`/books/${book}/transactions/${n.transaction_id}`, here)}>
+                    open it
+                  </Link>
+                </p>
+              )}
               {!n.dismissable && <p className="small muted">Goes once it&apos;s fixed.</p>}
             </li>
           ))}

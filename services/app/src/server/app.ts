@@ -12,6 +12,7 @@ import type { AppDb } from "./db.js";
 import type { Categorizer } from "./categorize/types.js";
 import type { LedgerPort } from "./ledger.js";
 import type { AiPort } from "./ai.js";
+import type { ShopsPort } from "./shops.js";
 import { stackHealth, type Peers } from "./health.js";
 import type { System } from "./system.js";
 
@@ -23,6 +24,8 @@ export function createApp(
     categorizers?: Categorizer[];
     simplefin?: SimplefinServices;
     aiFor?: (userId: string) => AiPort;
+    /** The shops service as the user (Amazon orders): its login notifications. */
+    shopsFor?: (userId: string) => ShopsPort;
     /** The other services, for the stack's public health (`/api/health`). */
     peers?: Peers;
     /** The system page's facts and its admins. */

@@ -28,13 +28,36 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from . import amazon, seal
+from . import amazon, lines, seal
 from .db import Db, StaleVersion
 
 log = logging.getLogger("shops")
 VERSION = os.environ.get("LUMINOUS_MONEY_VERSION", "dev")
 RANKS = ["read", "write", "manage", "owner"]
 RoleOf = Callable[[str, str], str | None]
+
+
+SendOrders = Callable[[str, str, list[dict[str, Any]]], dict[str, Any]]
+
+
+def orders_to(app_url: str) -> SendOrders:
+    """Hand a book's charges to `app` (`POST /books/{book}/orders`), as the user."""
+
+    def send(book: str, user: str, charges: list[dict[str, Any]]) -> dict[str, Any]:
+        request = urllib.request.Request(
+            f"{app_url}/api/app/v1/books/{urllib.parse.quote(book, safe='')}/orders",
+            data=json.dumps({"charges": charges}).encode(),
+            headers={"X-User-Id": user, "content-type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode(errors="replace")[:300]
+            raise RuntimeError(f"the book said {e.code}: {detail}") from e
+
+    return send
 
 
 def roles_from(ledger_url: str) -> RoleOf:
@@ -91,7 +114,7 @@ def view(row: dict[str, Any] | None, cards: list[dict[str, Any]]) -> dict[str, A
     }
 
 
-def create_app(db: Db, data_dir: str, role_of: RoleOf) -> FastAPI:
+def create_app(db: Db, data_dir: str, role_of: RoleOf, send_orders: SendOrders | None = None) -> FastAPI:
     app = FastAPI(title="Luminous Money shops", version=VERSION)
     api = APIRouter(prefix="/api/shops/v1")
     jobs: dict[str, dict[str, Any]] = {}
@@ -171,7 +194,26 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf) -> FastAPI:
         if os.path.exists(jar):
             os.remove(jar)
 
-    def run(book: str) -> None:
+    def hand_over(book: str, caller: str) -> str:
+        """Hand the book's charges, with their lines, to `app`; say how it went."""
+        if send_orders is None:
+            return ""
+        connection = db.connection(book) or {}
+        include = set(card_list(connection.get("include_cards")))
+        exclude = set(card_list(connection.get("exclude_cards")))
+        mine = [c for c in db.charges(book, limit=100_000) if amazon.belongs(c["last4"], include, exclude)]
+        charges = lines.for_app(
+            mine, connection.get("other_payments") or "Income:Uncategorized", connection.get("rewards")
+        )
+        try:
+            sent = send_orders(book, caller, charges)
+            log.info("book %s: %d charges handed to the book (%d new)", book, len(charges), sent.get("new", 0))
+            return f" {sent.get('new', 0)} new for the book."
+        except Exception as e:
+            log.warning("book %s: the charges couldn't be handed to the book: %s", book, e)
+            return f" They couldn't be handed to the book ({e}); the next sync tries again."
+
+    def run(book: str, caller: str) -> None:
         job = jobs[book]
 
         def step(text: str) -> None:
@@ -181,10 +223,12 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf) -> FastAPI:
             result = amazon.sync(db, data_dir, book, step)
             failed = f"; {len(result['failed'])} orders couldn't be read" if result["failed"] else ""
             others = f" ({result['other_cards']} on other cards left out)" if result["other_cards"] else ""
+            step("Handing the charges to the book…")
+            handed = hand_over(book, caller)
             db.set_status(
                 book,
                 "ok",
-                f"{result['charges']} charges{others} and {result['orders']} orders read{failed}.",
+                f"{result['charges']} charges{others} and {result['orders']} orders read{failed}.{handed}",
                 synced=True,
             )
             job.update(state="done", step="Done", result=result)
@@ -210,7 +254,7 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf) -> FastAPI:
             if jobs.get(book, {}).get("state") == "running":
                 raise HTTPException(409, "a sync is already running")
             jobs[book] = {"state": "running", "step": "Starting…", "started_at": datetime.datetime.now(datetime.UTC).isoformat()}
-        threading.Thread(target=run, args=(book,), daemon=True, name=f"amazon-sync-{book}").start()
+        threading.Thread(target=run, args=(book, caller), daemon=True, name=f"amazon-sync-{book}").start()
         return jobs[book]
 
     @api.get("/books/{book}/amazon/sync")
@@ -244,4 +288,5 @@ def from_env() -> FastAPI:
         Db(os.path.join(data, "shops.sqlite")),
         data_dir=os.path.join(data, "shops"),
         role_of=roles_from(os.environ.get("LEDGER_URL", "http://ledger:8000")),
+        send_orders=orders_to(os.environ.get("APP_URL", "http://app:3000")),
     )

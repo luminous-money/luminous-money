@@ -4,9 +4,39 @@ Where We Left Off
 _Updated 2026-11-07._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Hand-off (2026-11-07): Amazon's spike proven on Emmer, `v0.1.22`; step 2 next
+## Hand-off (2026-11-07): Amazon orders built, `v0.1.23`, for Kael to try on Emmer
 
 **Read this first.** Kael asked for the Amazon login and order reading to be proven on Emmer
+before the rest was built. **It was** (`v0.1.22`, below), and then the rest was built (`v0.1.23`,
+[the plan](docs/milestones/amazon-orders/PLAN.md#steps-2-and-3-as-built-2026-11-07); design.md,
+"Shops' orders in the book"):
+
+- **Each Amazon charge is itemized into the book as a receipt** (Kael: "look at these Amazon
+  charges as simple receipts"): paid from the account holding its card; always itemized (each
+  item a split with its memo, then tax, shipping, and a gift card or points from their
+  accounts), even into a transaction already categorized; read into the bank's copy if it's
+  here, else made as its own, which the bank's copy is matched to when it comes in; back in
+  review. One on a card no account holds waits, shown on the Amazon page with why.
+- **`shops` hands its charges to `app` after every sync** (`POST /books/:book/orders`, the one
+  door for any shop), with lines from `shops.lines` (discounts spread by price, split shipments
+  matched by their sums). `app` keeps them (`server/orders/`, `shop_charge`).
+- **The morning sync** (09:00 in the book's zone, after the bank feeds) and **"Amazon wants you
+  to log in again"** in Notifications (`server/shops.ts`, `server/orders/sync.ts`).
+- **Tests:** `server/orders/orders.test.ts`, `services/shops/tests/test_lines.py` (pytest, now
+  in `pnpm test`), `tests/e2e/src/orders.test.ts`.
+
+**What Kael's first Sync now on `v0.1.23` will do to his book:** hand over the 112 charges read
+since 2026-07-25; those on cards his accounts hold are itemized, and the bank's copies found are
+sent back to review, even ones he categorized (his call); a charge whose bank copy isn't found
+(a different amount, more than 5 days apart) is made as its own transaction, which could
+duplicate a bank row that's there. The categorize chain asks the book's AI once per charge.
+Worth choosing the book's cards (Include) on the Amazon page first. **Next:** Kael tries it;
+then the plan's calls made without asking and its "Still open" (an Assign button, the book's
+own cards as the default).
+
+## Before that (2026-11-07): Amazon's spike proven on Emmer, `v0.1.22`
+
+Kael asked for the Amazon login and order reading to be proven on Emmer
 before anything else is built. **It is:** the server signed in to his Amazon and a sync read 112
 charges and the 92 orders behind them, none failing ([the
 plan](docs/milestones/amazon-orders/PLAN.md#proven-on-emmer-2026-11-07-v0122) has how, and what
@@ -16,9 +46,8 @@ a person would (`shops.amazon.browser_sign_in`), sending a form Amazon's own scr
 a plain form, and ticking Amazon's "I am human" checkpoint, there and whenever reading meets it.
 That was tried on Emmer by running the new code in its `shops` container (`docker exec` with
 `PYTHONPATH`), three sign-ins in all; the session it signed in is kept there, so the next sync
-needn't sign in. **Released as `v0.1.22`, for Emmer.** Next: step 2, orders in `app` (matched to
-the bank's rows, itemized, reviewed), then tests for both, then step 3. Don't sign in to Amazon
-from Emmer more than needed: every try counts toward its bot score.
+needn't sign in. Released as `v0.1.22` and on Emmer. Don't sign in to Amazon from Emmer more
+than needed: every try counts toward its bot score.
 
 - **To see a sync on Emmer:** `ssh kael@emmer.local`, then `docker logs -t
   luminous-money-shops-1` (each step of the sign-in, and the page it stopped on is kept as

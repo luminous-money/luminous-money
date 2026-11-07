@@ -1,14 +1,15 @@
 Amazon orders: plan
 ==================================================================================================
 
-> **Status (2026-11-07): step 1 (the spike) is proven on Emmer.** The server signed in to
-> Kael's Amazon and read 112 charges and all 92 orders behind them (since 2026-07-25), in
-> `v0.1.22`: [as built](#step-1-the-spike-as-built-2026-11-06), [after the first
-> try](#after-the-first-try-on-emmer-2026-11-07-v0121), then [proven](#proven-on-emmer-2026-11-07-v0122).
-> Step 2 (orders in `app`) is next. Before it: Kael's brief, what's already here, the ways
-> Amazon's data could come in, then [Decided with Kael](#decided-with-kael-2026-11-06): **the
-> server logs in to Amazon as him** (Copilot's way). [Still open](#still-open) has what's left
-> to ask.
+> **Status (2026-11-07): built.** Step 1 (the spike) was proven on Emmer in `v0.1.22`: the
+> server signed in to Kael's Amazon and read 112 charges and all 92 orders behind them ([as
+> built](#step-1-the-spike-as-built-2026-11-06), [after the first
+> try](#after-the-first-try-on-emmer-2026-11-07-v0121), [proven](#proven-on-emmer-2026-11-07-v0122)).
+> Steps 2 and 3 followed ([as built](#steps-2-and-3-as-built-2026-11-07)): each charge is
+> itemized into the book as a receipt (Kael), and the morning sync and the login notification
+> are in. For Kael to try on Emmer. Before them: Kael's brief, what's already here, the ways
+> Amazon's data could come in, then [Decided with Kael](#decided-with-kael-2026-11-06).
+> [Still open](#still-open) has what's left to ask.
 
 ## The brief (Kael, 2026-11-06)
 
@@ -156,6 +157,12 @@ login reaches past years too, so it fills in the past as well, and 4 isn't neede
     Amazon from here, build the login and reading, try it here, release it and upgrade Emmer;
     Kael configures it there. Tests come once it's proven.
 
+11. **A charge is a receipt** (Kael, 2026-11-07: "look at these Amazon charges as simple
+    receipts"): match the paying account by the payment method, **always itemize** (the point
+    of the integration: so a transaction already categorized is itemized too, which settles
+    the first open question), and look for the bank's transaction in that account, linking them
+    if it's there (else it's made, and the bank's copy matched to it later, as a receipt's is).
+
 ## Step 1: the spike, as built (2026-11-06)
 
 Built as Kael asked: as if it works, checked against Amazon from here, then released for him to
@@ -233,10 +240,47 @@ Then a sync read **112 charges and the 92 orders behind them, none failing.** Wh
 - Totals seen: subtotal, tax, shipping and free shipping, promotions, a coupon, gift cards and
   refunds; no Subscribe & Save, rewards points or Whole Foods orders in this window.
 
+## Steps 2 and 3, as built (2026-11-07)
+
+design.md has the model ("Shops' orders in the book"); what was decided along the way:
+
+- **One door for any shop:** `POST /books/:book/orders` in `app` takes charges, each with its
+  lines summing to what the card paid (`shared/orders.ts`); `shops` makes Amazon's lines
+  (`shops.lines`) and hands them over after every sync, as whoever synced. `app` keeps them
+  (`shop_charge`, migration 21) and reads each (`server/orders/read.ts`) as a receipt: the
+  card's account, the bank's copy or one made, always itemized, back in review.
+- **Calls made without asking** (to review):
+  1. A charge on a card **no account in the book holds waits** rather than going to
+     `Assets:Unknown` as a receipt would: with seven cards on Kael's Amazon, most are likely
+     not this book's. Shown on the Amazon page with why, tried again after each bank feed sync,
+     and readable into a transaction by hand (`…/orders/{shop}/{id}/assign`; no button yet).
+  2. **A charge paid with no card** (all gift card or points) waits too: there's no account it
+     came from.
+  3. **A refund is one line** ("Refund: <the order's items>"), since Amazon doesn't say which
+     items came back; the categorize chain places it.
+  4. **A split order's charge** is matched to its shipments by their sums (the best fit within
+     5%, clearly better than the next), else one line naming the order's items: on Kael's
+     data, 6 charges of 3 orders, two of them charged twice for one shipment.
+  5. **The morning sync is at 09:00** in the book's zone, `app`'s daily job (after the bank
+     feeds' 06:00 to 08:00), for books that have handed charges over before, as whoever did
+     last; never while Amazon wants a person.
+  6. **"Amazon wants you to log in again"** is a Notification read from the connection's status
+     each time (not dismissable; it goes once a sync gets in), linking to the Amazon page.
+  7. **The Amazon page shows what the book made of each charge** ("Itemized in the book", a
+     link to it; or "Waiting:" and why), not a separate list.
+- **Tests:** `server/orders/orders.test.ts` (reading, waiting, sending again, by hand, the
+  morning sync, the notification), `services/shops/tests/test_lines.py` (lines from made-up
+  orders: discounts, gift cards and points, refunds, split shipments), and
+  `tests/e2e/src/orders.test.ts` (through the stack). **No browser test:** the Amazon page's
+  charges come from `shops`, which a test stack can't fill without Amazon, and the login
+  notification needs a sync Amazon refused; a fake Amazon (or seeding `shops`) would be needed.
+
 ## Still open
 
-1. **Amazon charges already categorized by hand:** left alone (recommended) or itemized too?
+1. ~~Amazon charges already categorized by hand~~: itemized too (Kael, decision 11).
 2. **The book's own cards as the default?** The book already knows its accounts' payment
-   cards (M16): charges on those could be the book's by default, without listing them here.
-3. **A split order's charges:** which items each paid for (by the shipments' sums, tax shared
-   in proportion), when Amazon doesn't say.
+   cards (M16): charges on those could be the book's by default, without listing them on the
+   Amazon page. (A charge on a card no account holds already waits, so this is about what
+   `shops` keeps and reads, not what reaches the books.)
+3. ~~A split order's charges~~: by the shipments' sums when they're clear (calls made, 4).
+4. **Assign by hand** has its route but no button on the Amazon page yet.

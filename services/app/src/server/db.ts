@@ -365,6 +365,27 @@ export const MIGRATIONS: Migration[] = [
     "CREATE INDEX loan_book ON loan(book_id)",
     "CREATE UNIQUE INDEX loan_schedule ON loan(schedule_id)",
   ],
+  // 21: shops' charges (Amazon orders, step 2): each as the shop's reader sent it, and what the
+  // book made of it (orders/store.ts). `user_id` is who sent it last, whom retries act as.
+  [
+    createTable(
+      "shop_charge",
+      [
+        "book_id TEXT NOT NULL",
+        "shop TEXT NOT NULL",
+        "id TEXT NOT NULL",
+        "user_id TEXT NOT NULL",
+        "date TEXT NOT NULL",
+        "amount TEXT NOT NULL",
+        "data TEXT NOT NULL", // JSON: the OrderCharge as sent
+        "state TEXT NOT NULL DEFAULT 'waiting'", // waiting, read, left
+        "detail TEXT",
+        "transaction_id TEXT",
+      ],
+      ["PRIMARY KEY (book_id, shop, id)"]
+    ),
+    "CREATE INDEX shop_charge_waiting ON shop_charge (book_id, state)",
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };

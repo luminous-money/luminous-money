@@ -26,7 +26,7 @@ group "default" {
 }
 
 group "test" {
-  targets = ["ledger-test", "workspace-check"]
+  targets = ["ledger-test", "shops-test", "workspace-check"]
 }
 
 group "release" {
@@ -101,6 +101,12 @@ target "ledger-test" {
   context = "services/ledger"
   target  = "test"
   tags    = ["${REGISTRY}/ledger:test"]
+}
+
+target "shops-test" {
+  context = "services/shops"
+  target  = "test"
+  tags    = ["${REGISTRY}/shops:test"]
 }
 
 target "ledger-openapi" {

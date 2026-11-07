@@ -231,8 +231,13 @@ milestone starts.
         charges are the book's is chosen by card. **`v0.1.22`: proven on Emmer**: the sign-in
         is done in a browser (and Amazon's "I am human" box ticked); a sync read 112 charges
         and their 92 orders.
-  - [ ] **Step 2: orders in `app`** (matched to the bank's rows, itemized, reviewed), then
-        tests for both.
+  - [x] **Step 2: orders in `app`** (2026-11-07): each charge itemized into the book as a
+        receipt (Kael): the card's account, the bank's copy or one made for it, back in review;
+        tests for both services.
+  - [x] **Step 3: the connection** (2026-11-07): the morning sync (09:00, after the bank
+        feeds), and "Amazon wants you to log in again" in Notifications.
+  - [ ] **Later:** an Assign button for a waiting charge; the book's own cards as the default;
+        receipts by email, other shops, Jess's Amazon.
 - [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules
       that add tags, a Tags field on schedules (their templates carry tags already, unseen) and
       on Capture receipt, the AI and history proposing the book's own tags, and transfers

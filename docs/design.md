@@ -1047,8 +1047,47 @@ same money in through another's, a day or so later. Both would sit in review, un
   always kept. A sync reads every charge (the Transactions page is cheap), keeps the book's,
   reads only their orders, and forgets what's no longer the book's, so another card's orders
   aren't kept where the book's members could see them.
-- **It writes nothing to the books yet:** the spike proves reading. Matching charges to the
-  bank's rows and itemizing them comes next, once it's proven on Emmer.
+- **After each sync, it hands the book its charges** (`POST /api/app/v1/books/{book}/orders`,
+  as whoever synced; `APP_URL`), each with its lines (`shops.lines`): what `app` takes from any
+  shop. A failed hand-over is said in the status and tried again by the next sync.
+
+### Shops' orders in the book (Amazon orders, steps 2 and 3, 2026-11-07)
+
+[The plan](milestones/amazon-orders/PLAN.md) has Kael's answers. `app` knows nothing of Amazon's
+pages: a shop's reader hands it charges (`shared/orders.ts`), and `server/orders/` does the rest.
+
+- **A charge is a receipt** (Kael: "look at these Amazon charges as simple receipts"): paid from
+  the account holding its card (`paidWith`, by its last four); **always itemized**, even into a
+  transaction already categorized (the point of reading Amazon), and back in review; read into
+  the bank's copy when it's here (`matching`, as a receipt's: exactly its amount, within the
+  window, nothing read into it yet, a clear match), else **made as its own** (`source: "order"`),
+  which the bank's copy is matched to when it comes in, as a receipt's is. Its marks:
+  `order:` (the shop and order numbers), `order-url:`, `order-read:`, `order-note:`. A
+  transaction with an order read into it isn't matched by another charge, nor a receipt.
+- **One with no account holding its card waits** (it's likely a card that isn't this book's),
+  shown on the shop's page with why; it's tried again whenever the shop sends charges and after
+  each bank feed sync (`synced`), and can be read into a transaction by hand
+  (`POST …/orders/{shop}/{id}/assign`). One paid with no card waits too.
+- **Lines are the reader's to make** (`shops.lines`), each `{text, amount, account?}`, summing
+  to what the card paid (`app` refuses ones that don't): items at their price less their share
+  of the order's discounts (in proportion to price, cents to the largest), then shipping, gift
+  wrap and tax as lines of their own, then a gift card or rewards points as negative lines from
+  their accounts (the shop's settings; `Income:Uncategorized` by default), opened if they
+  aren't yet. Items are placed by the categorize chain (item history first, so what's been
+  bought before goes where it went, the book's AI last); a line with an account isn't.
+- **Amazon charges per shipment** without saying which items: an order charged once is all of
+  it; one charged in parts is matched to its shipments by their sums (the order's total shared
+  by each shipment's items; the best fit within 5%, clearly better than the next), each charge
+  its shipments' items and its share of the rest, the difference in its tax line; when it
+  can't tell, or for a refund, the charge is one line naming the order's items. On Kael's 112
+  charges: 86 itemized, 18 refunds and 6 parts of unclear orders a line each, 2 with no order.
+- **The same charge again changes nothing** once read (keyed by the book, shop and its ID); one
+  still waiting takes what's new (its order may have been read since).
+- **The morning sync** (`orders/sync.ts`, a daily job at 09:00 in the book's zone, after the
+  bank feeds): each book that's had a shop's charges, once a local day, as whoever sent them
+  last; not while Amazon wants a person. That's said in **Notifications** ("Amazon wants you to
+  log in again", linking to its page), read from the connection's status each time, so it goes
+  once a sync gets in (`server/shops.ts`, `SHOPS_URL`).
 
 ### Split flags and categorizing splits (M16)
 

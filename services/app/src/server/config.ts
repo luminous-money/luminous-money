@@ -45,6 +45,8 @@ const configDef = {
   domain: configValue("LUMINOUS_MONEY_DOMAIN", "str"),
   /** The ai service (M16): optional; receipts are made unread without it. */
   aiUrl: configValue("AI_URL", "str", "http://ai:3000"),
+  /** The shops service (Amazon orders): optional; its notifications and morning sync. */
+  shopsUrl: configValue("SHOPS_URL", "str", "http://shops:8000"),
   /** External categorization providers, a JSON list (docs/categorizer-api.md). */
   categorizers: configValue("CATEGORIZERS", "str"),
   system: {

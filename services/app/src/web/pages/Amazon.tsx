@@ -8,8 +8,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 
+import type { StoredCharge } from "../../shared/orders.js";
 import { AccountPicker } from "../components/AccountPicker.js";
 import { postable } from "../lib/accounts.js";
+import { appApi } from "../lib/appApi.js";
 import { bookHome } from "../lib/books.js";
 import { formatAmount, formatFullDay, formatWhen, today } from "../lib/format.js";
 import { explain, useAccountCreation, useAccounts, useRole } from "../lib/queries.js";
@@ -44,6 +46,7 @@ const keys = {
   amazon: (book: string) => ["shops", book, "amazon"] as const,
   sync: (book: string) => ["shops", book, "amazon", "sync"] as const,
   charges: (book: string) => ["shops", book, "amazon", "charges"] as const,
+  inBook: (book: string) => ["orders", book, "amazon"] as const,
 };
 
 export function AmazonPage({ book }: { book: string }) {
@@ -353,6 +356,7 @@ function Sync({
   useEffect(() => {
     if (was.current && !running) {
       void client.invalidateQueries({ queryKey: keys.charges(book) });
+      void client.invalidateQueries({ queryKey: keys.inBook(book) });
       void client.invalidateQueries({ queryKey: keys.amazon(book), exact: true });
     }
     was.current = running;
@@ -420,25 +424,57 @@ const usd = (amount: string) => formatAmount(Number(amount), "USD", true);
 
 function Charges({ book }: { book: string }) {
   const charges = useQuery({ queryKey: keys.charges(book), queryFn: () => shopsApi.charges(book) });
+  // What the book made of each (itemized into a transaction, or waiting): app's, by charge.
+  const inBook = useQuery({
+    queryKey: keys.inBook(book),
+    queryFn: () => appApi.orders(book, "amazon"),
+    refetchInterval: (q) => (q.state.data?.some((c) => c.state === "waiting") ? 15_000 : false),
+  });
   if (charges.error) return <p className="card error">{explain(charges.error)}</p>;
   if (!charges.data) return null;
   const perOrder = new Map<string, number>();
   for (const c of charges.data)
     if (c.order_number) perOrder.set(c.order_number, (perOrder.get(c.order_number) ?? 0) + 1);
+  const states = new Map((inBook.data ?? []).map((c) => [c.id, c]));
+  const itemized = (inBook.data ?? []).filter((c) => c.state === "read").length;
+  const waiting = (inBook.data ?? []).filter((c) => c.state === "waiting").length;
   return (
     <section className="card" aria-label="Charges">
       <h2 className="section-title">Charges read ({charges.data.length})</h2>
+      {inBook.data && inBook.data.length > 0 && (
+        <p className="small muted">
+          {itemized} itemized in the book{waiting ? `, ${waiting} waiting` : ""}. Each is read into
+          its transaction from the bank, or made as its own until the bank&apos;s copy comes in, and
+          goes to review.
+        </p>
+      )}
       {charges.data.length === 0 && <p className="muted">None yet: Sync now reads them.</p>}
       <ul className="amazon-charges">
         {charges.data.map((c) => (
-          <Charge key={c.id} charge={c} of={perOrder.get(c.order_number ?? "") ?? 1} />
+          <Charge
+            key={c.id}
+            book={book}
+            charge={c}
+            of={perOrder.get(c.order_number ?? "") ?? 1}
+            inBook={states.get(c.id)}
+          />
         ))}
       </ul>
     </section>
   );
 }
 
-function Charge({ charge: c, of }: { charge: AmazonCharge; of: number }) {
+function Charge({
+  book,
+  charge: c,
+  of,
+  inBook,
+}: {
+  book: string;
+  charge: AmazonCharge;
+  of: number;
+  inBook: StoredCharge | undefined;
+}) {
   const refund = Number(c.amount) > 0;
   const order = c.order;
   const link = amazonUrl(c.order_link ?? order?.link ?? null);
@@ -464,6 +500,15 @@ function Charge({ charge: c, of }: { charge: AmazonCharge; of: number }) {
           </span>
         </summary>
         <div className="amazon-order small">
+          {inBook?.state === "read" && inBook.transaction_id && (
+            <p>
+              <Link href={`/books/${book}/transactions/${inBook.transaction_id}`}>
+                Itemized in the book
+              </Link>
+              {inBook.detail && <span className="muted"> · {inBook.detail}</span>}
+            </p>
+          )}
+          {inBook?.state === "waiting" && <p className="muted">Waiting: {inBook.detail}</p>}
           {c.order_number && (
             <p>
               Order{" "}

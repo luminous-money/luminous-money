@@ -1,14 +1,14 @@
 # shops
 
-Reads shops' order histories for a book, Amazon first, at `/api/shops/v1`. Built as a spike
-(2026-11-06, [the Amazon orders plan](../../docs/milestones/amazon-orders/PLAN.md)): it logs in
-to Amazon as the book's manager and reads their charges and orders, but writes nothing to the
-books yet. No tests yet, by Kael's choice, until reading is proven on Emmer.
+Reads shops' order histories for a book, Amazon first, at `/api/shops/v1`, and hands the
+charges it reads to `app`, which itemizes them into the book ([the Amazon orders
+plan](../../docs/milestones/amazon-orders/PLAN.md)). It signs in to Amazon as the book's manager.
+Tests: `tests/` (pytest, run by `pnpm test`).
 
 Amazon has no API for a shopper's orders, so this parses Amazon's own pages through
 [amazon-orders](https://github.com/alexdlaird/amazon-orders) (MIT), with its browser extra:
-Amazon's JavaScript and AWS WAF sign-in challenges are met in a headless Chromium (Playwright),
-which is why the image is large.
+the sign-in is done in a headless Chromium (Playwright), as a person would, which is why the
+image is large.
 
 | Route | What it does |
 |---|---|
@@ -36,6 +36,10 @@ Roles are the ledger's, asked as the caller (`X-User-Id`, set by the gateway).
    excluded; one with no card always), and ones no longer the book's are forgotten.
 3. Read each order behind the book's charges not read before, and any from the last 14 days
    again, one at a time, a second apart: its items, totals, shipments and payment.
+4. Hand the book's charges to `app` (`POST /api/app/v1/books/{book}/orders`, as whoever
+   synced), each with its lines (`shops.lines`: items, tax, shipping, a gift card or points from
+   their accounts), for it to itemize them into the book as receipts. `app` starts the morning's
+   sync itself (09:00 in the book's zone).
 
 ## Configuration
 
@@ -44,6 +48,7 @@ Roles are the ledger's, asked as the caller (`X-User-Id`, set by the gateway).
 | `SHOPS_DATA_DIR` | `/data` | Holds `shops.sqlite`, and Amazon's sessions under `shops/`. |
 | `SHOPS_ENCRYPTION_KEY` | `AI_ENCRYPTION_KEY` | Seals the password and setup key (32 bytes, base64). |
 | `LEDGER_URL` | `http://ledger:8000` | Where roles are asked. |
+| `APP_URL` | `http://app:3000` | Where a sync hands the book its charges. |
 
 ## Development
 

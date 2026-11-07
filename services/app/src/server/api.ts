@@ -48,6 +48,9 @@ import type { Categorizer } from "./categorize/types.js";
 import { ruleProblem } from "./categorize/rules.js";
 import { aiCategorizer } from "./categorize/ai.js";
 import { migrationRoutes } from "./migrate/routes.js";
+import { orderRoutes } from "./orders/routes.js";
+import { OrdersStore } from "./orders/store.js";
+import { shopNotifications, type ShopsPort } from "./shops.js";
 import { seenFrom } from "./migrate/history.js";
 import { MigrationStore } from "./migrate/store.js";
 import { applyRule, coveredBy, settle, suggestUnconfirmed } from "./categorize/service.js";
@@ -71,7 +74,7 @@ function isTimeZone(zone: string): boolean {
 /** What bank feeds need beyond the rest (simplefin/). */
 export type SimplefinServices = Pick<
   SimplefinDeps,
-  "store" | "sealer" | "policy" | "fetcher" | "clock"
+  "store" | "sealer" | "policy" | "fetcher" | "clock" | "synced"
 >;
 
 export function createApi({
@@ -80,12 +83,15 @@ export function createApi({
   categorizers = [],
   simplefin,
   aiFor,
+  shopsFor,
   system,
 }: {
   db: AppDb;
   ledgerFor: (userId: string) => LedgerPort;
   /** The ai service as the user (M16); without it, receipts are made unread. */
   aiFor?: (userId: string) => AiPort;
+  /** The shops service as the user (Amazon orders); without it, no login notifications. */
+  shopsFor?: (userId: string) => ShopsPort;
   /** The categorization chain, in order (see categorize/chain.ts). */
   categorizers?: Categorizer[];
   simplefin?: SimplefinServices;
@@ -894,7 +900,11 @@ export function createApi({
       const role = await roleIn(c.get("user"), book);
       if (!role) return c.json({ detail: "not found" }, 404);
       if (!atLeast(role, "write")) return c.json([]);
-      return c.json(await notifications(ledgerFor(c.get("user")), book));
+      const queue = [
+        ...(await notifications(ledgerFor(c.get("user")), book)),
+        ...(shopsFor ? await shopNotifications(shopsFor(c.get("user")), book) : []),
+      ];
+      return c.json(queue.sort((a, b) => a.added.localeCompare(b.added)));
     } catch (error) {
       return c.json(...ledgerStatus(error));
     }
@@ -1557,6 +1567,11 @@ export function createApi({
   });
 
   migrationRoutes(api, { db, migrations, ledgerFor, chainFor, roleIn });
+  orderRoutes(
+    api,
+    { db, orders: new OrdersStore(db.db), ledgerFor, aiFor, categorizers, reference: referenceFor },
+    roleIn
+  );
 
   return api;
 }

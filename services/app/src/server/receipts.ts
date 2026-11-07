@@ -34,6 +34,7 @@ import type { Account, Transaction, TransactionIn } from "@luminous-money/ledger
 
 import { isUncategorized, UNCATEGORIZED, UNKNOWN } from "../shared/accounts.js";
 import { add, isNegative, isZero, negate } from "../shared/decimal.js";
+import { hasOrder } from "../shared/orders.js";
 import { hasReceipt } from "../shared/receipts.js";
 import { landsIn } from "../shared/divided.js";
 import { addDays } from "../shared/schedule.js";
@@ -203,8 +204,8 @@ const sentences = (notes: string[]) =>
 
 /** The bank's copy of a receipt, if it's already here: one of the paying account's transactions
  * within the matcher's window of the receipt's date (as the matcher finds them), for exactly its
- * amount, a purchase or a refund (no other account of money in it) that no receipt was read into
- * yet. Only a clear match: the one candidate, or the one closest in date. */
+ * amount, a purchase or a refund (no other account of money in it) that no receipt or shop's
+ * order (orders/read.ts) was read into yet. Only a clear match: the one candidate, or the one closest in date. */
 export async function matching(
   ledger: LedgerPort,
   book: string,
@@ -232,6 +233,7 @@ export async function matching(
     const others = t.postings.filter((p) => p.account !== account);
     if (
       hasReceipt(t.meta) ||
+      hasOrder(t.meta) ||
       others.some((p) => ACCOUNTS_OF_MONEY.has(types.get(p.account) ?? "") || p.cost || p.price)
     )
       continue;

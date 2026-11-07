@@ -16,6 +16,10 @@ import { rules } from "./categorize/rules.js";
 import { startDaily } from "./daily.js";
 import { historyFrom } from "./migrate/history.js";
 import { MigrationStore } from "./migrate/store.js";
+import { readWaiting } from "./orders/read.js";
+import { OrdersStore } from "./orders/store.js";
+import { shopsJob } from "./orders/sync.js";
+import { httpShops } from "./shops.js";
 import { createSystem } from "./system.js";
 import { pricesJob } from "./prices.js";
 import { schedulesJob } from "./schedules.js";
@@ -38,10 +42,26 @@ const categorizers = [
 ];
 
 // Bank feeds: credentials sealed with SIMPLEFIN_ENCRYPTION_KEY (required: config.ts).
+const shopsFor = (user: string) => httpShops(config.shopsUrl, user);
+// Shops' charges waiting for their bank's copy (orders/read.ts) are tried again after each bank
+// feed sync brings a book's transactions in.
+const orderDeps = {
+  db,
+  orders: new OrdersStore(db.db),
+  ledgerFor,
+  aiFor: (user: string) => httpAi(config.aiUrl, user),
+  categorizers,
+};
 const simplefin = {
   store: new SimplefinStore(db.db),
   sealer: new Sealer(config.simplefin.encryptionKey, "SIMPLEFIN_ENCRYPTION_KEY"),
   policy: { hosts: config.simplefin.hosts, allowInsecure: config.simplefin.allowInsecure },
+  synced: (books: string[]) => {
+    for (const book of books)
+      readWaiting(orderDeps, book).catch((error) =>
+        console.error(`orders: reading ${book}'s waiting charges failed:`, error)
+      );
+  },
 };
 // Suggestions a migration was making when the app last stopped: they've stopped.
 if (migrations.stopInterrupted()) console.log("migration: suggestions interrupted by a restart");
@@ -87,6 +107,7 @@ serve(
       categorizers,
       simplefin,
       aiFor: (user) => httpAi(config.aiUrl, user),
+      shopsFor,
       peers,
       system: { facts: system, admins },
     }).fetch,
@@ -100,6 +121,7 @@ serve(
       ...(config.simplefin.mode === "daily"
         ? [simplefinJob({ ...simplefin, db, ledgerFor, categorizers })]
         : []),
+      shopsJob({ db, orders: orderDeps.orders, shopsFor }),
       system.job,
     ]);
   }
