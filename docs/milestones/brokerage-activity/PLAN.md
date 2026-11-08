@@ -1,7 +1,7 @@
 Brokerage activity: a brokerage's rows read as what they are
 ==================================================================================================
 
-_Raised by Kael, 2026-11-07. Not started: a proposal to decide on before the product is done._
+_Raised by Kael, 2026-11-07. Decided with Kael the same day (below), and built._
 Where it stands is in [RESUME.md](../../../RESUME.md); the roadmap is [docs/PLAN.md](../../PLAN.md).
 
 ## The brief
@@ -85,10 +85,124 @@ Four layers, each useful without the next.
 A one-time cleanup of what's already in the live book would come with it (the sweeps dropped,
 the rest read again), shown to Kael before anything's written.
 
-## Questions for Kael
+## Checked against the live book (2026-11-07, read only)
 
-1. Lots and realized gains in the books, or value and income only (gains from the 1099-B)?
-2. Dividends: one income account, one per brokerage account, or one per symbol?
-3. May sweeps and dividends skip review entirely (counted, not listed)?
-4. Other brokerages on SimpleFIN (their own description styles): which, if any, after Fidelity?
-5. The cleanup: drop the existing sweep rows and read the rest again?
+Before deciding, the proposal's claims were checked against Kael's three Fidelity cash ledgers
+and the SimpleFIN snapshot on Emmer (shapes only here). What held, and what didn't:
+
+- **Sweeps are no-ops one by one, not in pairs.** The books count the core money market as
+  cash, so each "purchase into core" or "redemption from core" moves cash to cash, whether or
+  not the event beside it is there. They don't pair neatly: one redemption covered two buys
+  together (to the cent). So each row is read for what it is; nothing is paired.
+- **Dividends are right as they come:** the bank's own amount and date. Only the category is
+  missing.
+- **Transfers of assets are three kinds of row,** not one: shares received (`ACAT RECEIVE <name>
+  (<SYM>)`, or a CUSIP for a security without a ticker), cash received from the old broker
+  (`ACAT RECEIVE (Cash)`, no symbol; it can be negative), and cash that followed later
+  (`ACAT RES.CREDIT`). Only the first is shares; the other two are cash from outside the books.
+- **Linking hid the double count in the opening balance.** Shares received, read as cash
+  income, were offset by a large *negative* opening cash balance, so the total agreed with the
+  bank. Reading them again means working out the opening balances again.
+- **The snapshot's cost basis is always `0.00`** for Fidelity, but its `purchase_price` is the
+  average cost per share. Every lot opened at a $0.00 cost (the bug noted in RESUME) for that
+  reason.
+- **A position can come without a symbol** (a unit investment trust, named only in its
+  description; its transfer row gives its CUSIP), and so was counted as cash; **and with no
+  shares** (an empty core position), which opened as a zero-share lot, the one that makes the
+  ledger's holdings fail for the account.
+- **Pairing a trade's shares with its cash during the daily sync was never proven:** every trade
+  in the book predates its link. If the holdings move on the trade date and the cash row comes
+  a day later, the old pairing (which looked only once) missed it.
+- **One of the three accounts has no sweeps at all,** so nothing may depend on them being there.
+
+## Decided with Kael (2026-11-07)
+
+1. **Lots and realized gains are in the books** (the recommendation): a sale books its gain by
+   the account's method, split by term. Lots opened from the snapshot are estimates, and the
+   1099-B is the authority.
+2. **Dividends go to one income account per link, chosen on Bank connections.** The default is
+   the one useful for taxes: `Income:Dividends` for a taxable account, and
+   `Income:Retirement:Dividends` for a retirement account (an IRA, a 401(k), a Roth, an HSA, by
+   the bank's or the book's name for it), so the year's `Income:Dividends` is the 1099-DIV's
+   ordinary dividends.
+3. **Sweeps and dividends skip review,** checked first: a sweep is left out only when the
+   symbol it names is a cash-like holding (priced at 1, or the snapshot's core) of that
+   account; a dividend is confirmed by itself only for the exact `DIVIDEND RECEIVED … (<SYM>)`.
+   Anything else that looks like income (capital gain distributions, return of capital, foreign
+   tax) stays in review until it's been seen. Both are counted where the link is shown.
+4. **Fidelity only, for now.** Linking a brokerage says whether its activity can be read; one
+   that can't comes in as cash rows as before, with a link to open an issue or send a pull
+   request.
+5. **The cleanup reads every brokerage link again** from what's already fetched (no SimpleFIN
+   requests), and runs on Kael's book after the release. Kael: "The current accounts aren't
+   accurate anyway, so I'm not concerned about losing their data."
+
+## Building it
+
+- **Reading rows** (`simplefin/activity.ts`): a reader per institution (Fidelity's), each row
+  to one of: sweep, dividend, buy, sell, shares in, cash in from another broker, or anything
+  else (the usual pipeline: transfers, deposits, the unknown).
+- **What each becomes:** a sweep, nothing (an import row marked left out, so it never comes
+  back); a dividend, confirmed to the link's dividend account; cash from another broker,
+  `Equity:Opening-Balances`, for review; a trade, M5's trade booking, for review, its shares
+  from the day's change in the snapshot when there is one, else from that day's price (fetched
+  through beanprice, and recorded), marked estimated; shares in, a lot at the snapshot's
+  average cost, against `Equity:Opening-Balances`.
+- **The snapshot settles shares:** an estimated trade is trued up when the snapshot shows the
+  shares; a difference nothing explains, for three days, is staged as before (a position
+  change, for review). Cash is compared with the bank (M14's "Matches the bank" or "Off by"),
+  not written: a pending row the snapshot already counts would otherwise be counted twice.
+- **History, at linking and when read again:** each position opens at today's shares less what
+  the history's trades and transfers moved (each estimated from its day's price, the total
+  fitted to today's shares), at a cost worked out from the average cost and the history's buys.
+- **Read again** (Bank connections, beside a brokerage link; previewed): deletes what the bank
+  brought into the brokerage (rows, positions, opening balances), keeps what touches other
+  accounts (a transfer from checking) and what you categorized yourself among rows read as
+  "anything else", and reads the mirror again. This is the cleanup.
+- **The fixes found on the way:** cost from `purchase_price`; no position without shares;
+  positions named by their description when they have no symbol.
+
+## As built (2026-11-07, `v0.1.26`)
+
+As "Building it" above, with these details:
+
+- **Code:** `simplefin/activity.ts` (readers: Fidelity's; what's cash-like; what's a retirement
+  account), `simplefin/brokerage.ts` (reading rows in, `fitHistory`, `settle`, opening
+  positions, what a link's reading made of its rows), `simplefin/reread.ts` (Read again, and
+  `readHistory`, which linking uses too), `simplefin/holdings.ts` (the snapshot's fixes, and
+  the position change both kinds of brokerage stage). Sync (`importLink`) and linking
+  (`link.ts`) send a read brokerage through them; another is as before.
+- **The ledger:** `POST /books/{book}/prices/on` gives a commodity's price on some days: the
+  book's, else fetched with beanprice from its own source or the default for its ticker
+  (`LUMINOUS_MONEY_PRICE_SOURCE`, Yahoo unless set; the e2e stack uses the fixed source), and
+  recorded. A day nothing answers for falls back to the book's nearest price, then the
+  snapshot's.
+- **The app API:** a brokerage link in `GET …/simplefin/status` has `reader`, `dividends`
+  (and whether it was chosen), `activity` (sweeps, dividends, trades, transfers in, other) and
+  its cash `comparison`; `PATCH /books/:book/simplefin/links/:id` sets `dividends` against the
+  link's `updated_at` (409 when stale); `POST …/links/:id/reread/preview` and `…/reread`
+  (with `Prefer: respond-async`, a job). A connection's accounts say their `reader`; a link
+  preview says it too.
+- **Storage:** app migration 23: `simplefin_link.dividends`, and `simplefin_position_wait` (a
+  difference in shares, since when). Import rows have a new outcome, `left-out`.
+- **The PWA:** Bank connections says, for each brokerage, whether its activity is read (or how
+  to get it read: an issue or a pull request); beside a linked one, what the reading made of its
+  rows, "Dividends go to …" (an income account, or the default), and "Read again…" with its
+  preview. A trade's review card and page say what was estimated (`brokerage-note`). A read
+  brokerage's account page says whether its cash matches the bank's.
+- **Calls made without asking:**
+  1. Cash from another broker (the cash side of a transfer of assets, and residual credits)
+     goes to `Equity:Opening-Balances`, for review, not income.
+  2. Shares received are a lot at the bank's average cost, dated the day they came; the real
+     acquisition dates aren't sent, so for a taxable account their term is a guess (labeled in
+     the note).
+  3. An estimated trade is trued up only within a week and within a quarter of its estimate;
+     anything else waits three days before it's staged as unexplained.
+  4. Read again keeps rows read as "anything else" with your categorization, and deletes your
+     own transactions in the brokerage that no bank row brought (the preview counts them).
+  5. Trades stay in review (unconfirmed), even when their shares are exact: only sweeps and
+     dividends skip it, as decided.
+- **Tests:** `simplefin/brokerage.test.ts` (reading, the snapshot's fixes, fitting, linking a
+  history, the daily sync's true-up and wait, Read again), the ledger's
+  `test_prices_on_days_…`, `tests/e2e/src/brokerage.test.ts` (against the real ledger: lots and
+  gains, a transfer of assets into an IRA, Read again) and `tests/ui/src/brokerage.spec.ts`.

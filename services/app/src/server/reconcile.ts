@@ -15,7 +15,10 @@ import { StaleVersion, type AppDb, type ReconcileDraft } from "./db.js";
 import { add, isZero, negate } from "../shared/decimal.js";
 import type { BankComparison, ReconcileView } from "../shared/reconcile.js";
 import type { LedgerPort, Reconciled } from "./ledger.js";
-import { localDate, rowsOf } from "./simplefin/sync.js";
+import { readerFor } from "./simplefin/activity.js";
+import { cashRowsOf } from "./simplefin/brokerage.js";
+import { cashOf } from "./simplefin/holdings.js";
+import { cashAccountOf, localDate, rowsOf } from "./simplefin/sync.js";
 import type { Link, SimplefinStore } from "./simplefin/store.js";
 
 /** A problem with a reconciliation the user can fix: its status says which. */
@@ -33,22 +36,28 @@ const shift = (date: string, days: number) =>
 
 /** The bank's day-end balance the day before its balance date (as stored): its reported balance
  * less what it's sent since, dated as imports date them. A late posting on the balance date
- * itself can't break it. Cash links only (a brokerage's holdings aren't reconciled). */
+ * itself can't break it. Cash links, and the cash of a brokerage whose rows are read (its
+ * reported cash, less what its rows did to cash); another brokerage's isn't compared. */
 export function bankStatement(
   store: SimplefinStore,
   db: AppDb,
   link: Link
 ): { statement_date: string; balance: string; currency: string } | null {
   const snapshot = store.account(link.connection_id, link.account_id);
-  if (!snapshot || link.kind !== "cash") return null;
+  if (!snapshot) return null;
+  const read = link.kind === "brokerage" && !!readerFor(snapshot.institution);
+  if (link.kind !== "cash" && !read) return null;
   const zone = db.timeZone(link.book_id);
   const day = shift(localDate(snapshot.balance_date, zone), -1);
-  const since = rowsOf(store.transactions(link.connection_id, link.account_id), zone).filter(
-    (r) => r.date! > day
-  );
+  const since = cashRowsOf(
+    { store, db },
+    link,
+    rowsOf(store.transactions(link.connection_id, link.account_id), zone)
+  ).filter((r) => r.date! > day);
+  const reported = read ? cashOf(snapshot.balance, snapshot.holdings) : snapshot.balance;
   return {
     statement_date: day,
-    balance: since.reduce((total, r) => add(total, negate(r.amount!)), snapshot.balance),
+    balance: since.reduce((total, r) => add(total, negate(r.amount!)), reported),
     currency: snapshot.currency,
   };
 }
@@ -167,11 +176,18 @@ export async function bankComparison(
   const bank = bankStatement(store, db, link);
   if (!bank) return null;
   const zone = db.timeZone(link.book_id);
-  const rows = rowsOf(store.transactions(link.connection_id, link.account_id), zone).filter(
-    (r) => r.date! >= link.starts_on && r.date! <= bank.statement_date
-  );
+  const rows = cashRowsOf(
+    { store, db },
+    link,
+    rowsOf(store.transactions(link.connection_id, link.account_id), zone)
+  ).filter((r) => r.date! >= link.starts_on && r.date! <= bank.statement_date);
   const from = [link.starts_on, ...rows.map((r) => r.date!)].sort()[0]!;
-  const books = await ledger.dayBalances(link.book_id, link.account, from, bank.statement_date);
+  const books = await ledger.dayBalances(
+    link.book_id,
+    cashAccountOf(link),
+    from,
+    bank.statement_date
+  );
   const booksAt = (day: string) =>
     books.days.filter((d) => d.date <= day).at(-1)?.balance ?? books.before;
   const bankAt = (day: string) =>

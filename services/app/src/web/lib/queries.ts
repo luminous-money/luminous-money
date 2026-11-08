@@ -1180,6 +1180,24 @@ export const useCancelLink = (book: string) =>
 export const useUnlinkBank = (book: string) =>
   useBankChange((id: string) => bankFeeds.unlink(book, id));
 
+/** A brokerage link's dividend account: the book's bank status says it again after. */
+export function useSetDividends(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; dividends: string | null; updated_at: string }) =>
+      bankFeeds.setDividends(book, v.id, v.dividends, v.updated_at),
+    onSettled: () => client.invalidateQueries({ queryKey: bankKeys.status(book) }),
+  });
+}
+
+/** What reading a brokerage link again would do. */
+export const useRereadPreview = (book: string) =>
+  useMutation({ mutationFn: (id: string) => bankFeeds.rereadPreview(book, id) });
+
+/** Read a brokerage link again: everything about the book may have moved. */
+export const useReread = (book: string) =>
+  useBankChange((id: string) => bankFeeds.reread(book, id));
+
 // The chart of accounts
 
 export function useAccountTree(book: string) {

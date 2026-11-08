@@ -14,6 +14,7 @@ const OUTCOMES: Record<Outcome, string> = {
   duplicate: "Already imported",
   "before-opening": "Before the opening balance",
   unreadable: "Couldn't read",
+  "left-out": "A sweep: left out",
 };
 
 const describe = (c: Candidate | undefined) =>

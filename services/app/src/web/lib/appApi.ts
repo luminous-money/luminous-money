@@ -19,6 +19,7 @@ import type {
   LinkAttempt,
   LinkPreview,
   LinkRequest,
+  RereadPreview,
 } from "../../shared/bank-feeds.js";
 import type { ChartChoice, ChartPlan } from "../../shared/chart.js";
 import type {
@@ -58,10 +59,12 @@ export type {
   BankConnection,
   BankError,
   BankStatus,
+  BrokerageActivity,
   LinkAttempt,
   LinkMode,
   LinkPreview,
   LinkRequest,
+  RereadPreview,
 } from "../../shared/bank-feeds.js";
 export type {
   BankComparison,
@@ -227,6 +230,35 @@ export const bankFeeds = {
   },
   status: async (book: string): Promise<Record<string, BankStatus>> =>
     json(await apiFetch(`${base(book)}/simplefin/status`)),
+  /** Where a brokerage link's dividends go (null: the default), against the version read. */
+  setDividends: async (
+    book: string,
+    id: string,
+    dividends: string | null,
+    updated_at: string
+  ): Promise<{ id: string; dividends: string | null; updated_at: string }> =>
+    json(
+      await apiFetch(
+        `${base(book)}/simplefin/links/${encodeURIComponent(id)}`,
+        post({ dividends, updated_at }, "PATCH")
+      )
+    ),
+  rereadPreview: async (book: string, id: string): Promise<RereadPreview> =>
+    json(
+      await apiFetch(
+        `${base(book)}/simplefin/links/${encodeURIComponent(id)}/reread/preview`,
+        post({})
+      )
+    ),
+  /** Read a brokerage link again: in the background (it fetches prices for its history). */
+  reread: async (book: string, id: string): Promise<RereadPreview> =>
+    awaited<RereadPreview>(
+      book,
+      await apiFetch(`${base(book)}/simplefin/links/${encodeURIComponent(id)}/reread`, {
+        ...post({}),
+        headers: { "content-type": "application/json", prefer: "respond-async" },
+      })
+    ),
 };
 
 const accountPath = (book: string, account: string) =>

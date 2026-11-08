@@ -17,6 +17,8 @@ export function ReportedLine({
 }) {
   const { balance, currency, balance_date } = status.reported;
   const compared = status.comparison;
+  // A brokerage's comparison is its cash's (its core money market counted as cash).
+  const what = status.kind === "brokerage" ? "Its cash" : null;
   return (
     <>
       <p className="small muted reported">
@@ -27,12 +29,13 @@ export function ReportedLine({
           <span className="reconciled-mark" aria-hidden="true">
             ✓
           </span>{" "}
-          Matches the bank
+          {what ? `${what} matches the bank's` : "Matches the bank"}
         </p>
       )}
       {compared?.off_by && (
         <p className="small error" role="status">
-          Off from the bank by {formatMoney(abs(compared.off_by), currency)}
+          {what ? `${what} is off from the bank's by ` : "Off from the bank by "}
+          {formatMoney(abs(compared.off_by), currency)}
           {compared.since ? ` since ${formatDay(compared.since)}` : ""}
         </p>
       )}

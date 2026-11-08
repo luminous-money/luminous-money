@@ -4,7 +4,7 @@ import { Link, useLocation, useSearch } from "wouter";
 
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
 import { SelectBar } from "../components/SelectBar.js";
-import { ReceiptNote } from "../components/ReceiptNote.js";
+import { BrokerageNote, ReceiptNote } from "../components/ReceiptNote.js";
 import { TagInput } from "../components/Tags.js";
 import {
   filteredLabel,
@@ -432,6 +432,7 @@ function QueueItem({
           />
 
           <ReceiptNote meta={t.meta} />
+          <BrokerageNote meta={t.meta} />
 
           <BaseChoice
             book={book}

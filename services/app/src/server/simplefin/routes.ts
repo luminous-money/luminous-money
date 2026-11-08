@@ -27,8 +27,13 @@ import {
   type SimplefinDeps,
 } from "./sync.js";
 import { isInternal, within } from "../../shared/divided.js";
+import { wantsAsync, type Jobs } from "../jobs.js";
+import { LedgerError } from "../ledger.js";
 import { bankComparison } from "../reconcile.js";
 import { pairTransfers } from "../transfers.js";
+import { readerFor } from "./activity.js";
+import { activityOf, dividendsOf } from "./brokerage.js";
+import { planReread, RereadProblem } from "./reread.js";
 
 type Env = { Variables: { user: string } };
 
@@ -47,6 +52,7 @@ function failure(error: unknown): [{ detail: string }, 403 | 404 | 409 | 422 | 4
     return [{ detail: error.message }, error.status === 400 ? 422 : error.status];
   if (error instanceof LinkProblem) return [{ detail: error.message }, error.status];
   if (error instanceof OutOfRequests) return [{ detail: error.message }, 429];
+  if (error instanceof RereadProblem) return [{ detail: error.message }, error.status];
   throw error;
 }
 
@@ -59,7 +65,8 @@ const summarize = (results: ImportResult[]) => ({
 export function simplefinRoutes(
   api: Hono<Env>,
   deps: SimplefinDeps,
-  owned: (user: string, book: string) => Promise<boolean>
+  owned: (user: string, book: string) => Promise<boolean>,
+  jobs: Jobs
 ) {
   const { store, sealer } = deps;
   const ledgerFor = deps.ledgerFor;
@@ -87,6 +94,8 @@ export function simplefinRoutes(
           balance_date: a.balance_date,
           kind: kindOf(a),
           holdings: a.holdings.length,
+          // Whether a brokerage's activity can be read (else its rows come in as cash).
+          reader: kindOf(a) === "brokerage" ? (readerFor(a.institution)?.name ?? null) : null,
           link: link
             ? {
                 id: link.id,
@@ -315,8 +324,91 @@ export function simplefinRoutes(
           connection.errors.filter((e) => !e.account_id || e.account_id === link.account_id)
         ),
         comparison: await bankComparison(deps.db, store, ledgerFor(user), link).catch(() => null),
+        updated_at: link.updated_at,
+        ...(link.kind === "brokerage"
+          ? {
+              reader: readerFor(snapshot.institution)?.name ?? null,
+              dividends: dividendsOf(link, snapshot),
+              dividends_chosen: link.dividends !== null,
+              activity: activityOf(deps, link),
+            }
+          : {}),
       };
     }
     return c.json(status);
+  });
+
+  /** A brokerage link's settings: where its dividends go (null: the default for its kind),
+   * against the version read. */
+  api.patch("/books/:book/simplefin/links/:id", async (c) => {
+    const { book, id } = c.req.param();
+    const user = c.get("user");
+    const link = store.link(user, id);
+    if (!(await owned(user, book)) || !link || link.book_id !== book)
+      return c.json({ detail: "not found" }, 404);
+    const body = (await c.req.json().catch(() => null)) as {
+      dividends?: unknown;
+      updated_at?: unknown;
+    } | null;
+    const dividends = body?.dividends ?? null;
+    if (typeof body?.updated_at !== "string")
+      return c.json({ detail: "send the updated_at you read" }, 422);
+    if (dividends !== null && (typeof dividends !== "string" || !/^Income:\S+$/.test(dividends)))
+      return c.json(
+        { detail: "dividends go to an income account (Income:…), or null for the default" },
+        422
+      );
+    if (link.kind !== "brokerage") return c.json({ detail: "only a brokerage has dividends" }, 422);
+    const changed = store.setDividends(link, dividends, body.updated_at);
+    if (!changed) return c.json({ detail: "this link changed since you read it" }, 409);
+    return c.json({ id: changed.id, dividends: changed.dividends, updated_at: changed.updated_at });
+  });
+
+  /** What reading a brokerage link again would do (from what's fetched: no requests). */
+  api.post("/books/:book/simplefin/links/:id/reread/preview", async (c) => {
+    const { book, id } = c.req.param();
+    const user = c.get("user");
+    const link = store.link(user, id);
+    if (!(await owned(user, book)) || !link || link.book_id !== book)
+      return c.json({ detail: "not found" }, 404);
+    try {
+      return c.json((await planReread(deps, link)).preview);
+    } catch (error) {
+      return c.json(...failure(error));
+    }
+  });
+
+  /** Read a brokerage link again (see reread.ts). It can take a while (prices are fetched for
+   * a long history): with `Prefer: respond-async`, it runs as a job to ask after. */
+  api.post("/books/:book/simplefin/links/:id/reread", async (c) => {
+    const { book, id } = c.req.param();
+    const user = c.get("user");
+    const link = store.link(user, id);
+    if (!(await owned(user, book)) || !link || link.book_id !== book)
+      return c.json({ detail: "not found" }, 404);
+    const work = async (step: (s: string) => void) => {
+      step("planning");
+      const planned = await planReread(deps, link);
+      step("reading");
+      const done = await planned.apply();
+      await pairTransfers({ db: deps.db, ledger: ledgerFor(user), book });
+      return done;
+    };
+    if (wantsAsync(c.req.header("prefer"))) {
+      const job = jobs.start(book, user, work, (error) =>
+        error instanceof RereadProblem || error instanceof LedgerError
+          ? { status: error.status, detail: error.message }
+          : { status: 500, detail: `reading it again failed (${(error as Error).message})` }
+      );
+      c.header("location", `/api/app/v1/books/${book}/jobs/${job}`);
+      return c.json({ id: job, state: "running", step: null }, 202);
+    }
+    try {
+      return c.json(await work(() => {}));
+    } catch (error) {
+      if (error instanceof LedgerError)
+        return c.json({ detail: error.message }, error.status as 409);
+      return c.json(...failure(error));
+    }
   });
 }

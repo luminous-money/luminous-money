@@ -8,17 +8,24 @@ import { displayName } from "../lib/accounts.js";
 import type {
   BankAccount,
   BankConnection,
+  BankStatus,
   LinkAttempt,
   LinkMode,
   LinkPreview,
   LinkRequest,
+  RereadPreview,
 } from "../lib/appApi.js";
 import { formatMoney } from "../lib/decimal.js";
 import { formatReported, formatWhen, today } from "../lib/format.js";
 import {
   explain,
+  useAccountCreation,
   useAccounts,
   useBankConnections,
+  useBankStatus,
+  useReread,
+  useRereadPreview,
+  useSetDividends,
   useConnectBank,
   useDisconnectBank,
   useAttemptLink,
@@ -245,12 +252,212 @@ function BankAccountRow({
           </button>
         )}
       </div>
+      {account.kind === "brokerage" && !link && <ReaderNote account={account} />}
+      {link && link.book_id === book && account.kind === "brokerage" && (
+        <BrokerageLink book={book} account={account} linkId={link.id} name={link.account} />
+      )}
       {link && link.book_id === book && <LinkedDefault book={book} account={link.account} />}
       {attempt && !link && <AttemptPanel book={book} attempt={attempt} />}
       {linking && !attempt && (
         <LinkForm book={book} connection={connection} account={account} onDone={onDone} />
       )}
     </>
+  );
+}
+
+const REPO = "https://github.com/luminous-money/luminous-money";
+
+/** Whether a brokerage's activity can be read: Fidelity's can; another's comes in as cash rows,
+ * and how to get it read. */
+function ReaderNote({ account }: { account: Pick<BankAccount, "reader" | "institution"> }) {
+  if (account.reader)
+    return (
+      <p className="small muted">
+        {account.reader}'s activity is read: sweeps into and out of its core money market are left
+        out, dividends are confirmed by themselves, and trades come in with their shares.
+      </p>
+    );
+  const title = encodeURIComponent(`Read ${account.institution || "a brokerage"}'s activity`);
+  return (
+    <p className="small" role="note">
+      Luminous Money can't read {account.institution || "this brokerage"}'s activity yet: its rows
+      come in as cash, for review.{" "}
+      <a href={`${REPO}/issues/new?title=${title}`} target="_blank" rel="noreferrer">
+        Open an issue
+      </a>{" "}
+      or{" "}
+      <a
+        href={`${REPO}/blob/main/services/app/src/server/simplefin/activity.ts`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        send a pull request
+      </a>{" "}
+      with a reader for it.
+    </p>
+  );
+}
+
+/** A linked brokerage: what reading its rows did, where its dividends go, and Read again. */
+function BrokerageLink({
+  book,
+  account,
+  linkId,
+  name,
+}: {
+  book: string;
+  account: BankAccount;
+  linkId: string;
+  name: string;
+}) {
+  const status = useBankStatus(book).data?.[name];
+  if (!status) return null;
+  if (!status.reader) return <ReaderNote account={account} />;
+  const a = status.activity;
+  const parts = a
+    ? [
+        count(a.sweeps, "sweep", "sweeps", "left out"),
+        count(a.dividends, "dividend", "dividends", "confirmed"),
+        count(a.trades, "trade", "trades", "booked with their shares"),
+        count(a.transfers_in, "transfer in", "transfers in", "from another broker"),
+      ].filter(Boolean)
+    : [];
+  return (
+    <div className="small">
+      <ReaderNote account={account} />
+      {parts.length > 0 && <p className="muted">From the bank's rows: {parts.join(", ")}.</p>}
+      <DividendsChoice book={book} linkId={linkId} status={status} />
+      <Reread book={book} linkId={linkId} />
+    </div>
+  );
+}
+
+/** Where a brokerage's dividends go: one income account, by default the one useful for taxes. */
+function DividendsChoice({
+  book,
+  linkId,
+  status,
+}: {
+  book: string;
+  linkId: string;
+  status: BankStatus;
+}) {
+  const accounts = useAccounts(book).data ?? [];
+  const create = useAccountCreation(book);
+  const set = useSetDividends(book);
+  const income = accounts
+    .filter((a) => a.kind === "leaf" && !a.implicit && !a.close && a.name.startsWith("Income:"))
+    .map((a) => a.name);
+  const choose = (dividends: string | null) =>
+    set.mutate({ id: linkId, dividends, updated_at: status.updated_at });
+  return (
+    <details className="linked-default">
+      <summary>Dividends go to {status.dividends}</summary>
+      <p className="muted">
+        One income account for this brokerage's dividends. By default, <code>Income:Dividends</code>{" "}
+        for a taxable account (the year's is the 1099-DIV's), and{" "}
+        <code>Income:Retirement:Dividends</code> for a retirement account, whose dividends aren't
+        taxed.
+      </p>
+      <AccountPicker
+        label="Dividends account"
+        accounts={income}
+        value={status.dividends ?? ""}
+        onChange={(a) => a && a !== status.dividends && choose(a)}
+        create={create}
+      />
+      {status.dividends_chosen && (
+        <button type="button" disabled={set.isPending} onClick={() => choose(null)}>
+          Use the default
+        </button>
+      )}
+      {set.error && <p className="error">{explain(set.error)}</p>}
+    </details>
+  );
+}
+
+/** "3 sweeps left out", or nothing for none. */
+const count = (n: number, one: string, many: string, what: string) =>
+  n ? `${n} ${n === 1 ? one : many} ${what}` : "";
+
+/** Read a brokerage link again from what's already fetched: previewed, then confirmed. */
+function Reread({ book, linkId }: { book: string; linkId: string }) {
+  const preview = useRereadPreview(book);
+  const reread = useReread(book);
+  const shown: RereadPreview | undefined = preview.data;
+  if (reread.data)
+    return (
+      <p className="ok" role="status">
+        Read again: {reread.data.deleted} transactions replaced, {reread.data.kept} kept.
+      </p>
+    );
+  return (
+    <div className="reread">
+      {!shown && (
+        <button type="button" disabled={preview.isPending} onClick={() => preview.mutate(linkId)}>
+          {preview.isPending ? "Working it out…" : "Read again…"}
+        </button>
+      )}
+      {preview.error && <p className="error">{explain(preview.error)}</p>}
+      {shown && (
+        <section className="card small" aria-label="What reading it again will do">
+          <p>
+            Read again from the bank's rows already here (no SimpleFIN requests): what the bank
+            brought into {displayName({ name: shown.account })} is replaced by what its rows say.
+          </p>
+          <ul className="plain-list">
+            <li>
+              {shown.rows} rows:{" "}
+              {[
+                count(shown.read.sweep, "sweep", "sweeps", "left out"),
+                count(
+                  shown.read.dividend,
+                  "dividend",
+                  "dividends",
+                  `confirmed to ${shown.dividends}`
+                ),
+                count(shown.read.buy + shown.read.sell, "trade", "trades", "booked"),
+                count(shown.read["shares-in"], "transfer of shares", "transfers of shares", "in"),
+                count(
+                  shown.read["cash-in"],
+                  "cash transfer",
+                  "cash transfers",
+                  "from another broker"
+                ),
+                count(shown.read.other, "row", "rows", "as usual"),
+              ]
+                .filter(Boolean)
+                .join(", ")}
+            </li>
+            <li>
+              {shown.deleted} transactions deleted
+              {shown.deleted_yours > 0 &&
+                ` (${shown.deleted_yours} of them not from the bank)`}; {shown.kept} kept (transfers
+              with other accounts, and what you made of the rest)
+            </li>
+            <li>
+              Cash opens at {formatMoney(shown.opening.cash, shown.currency)} on{" "}
+              {shown.opening.date}; {count(shown.positions, "position opens", "positions open", "")}
+              {shown.positions > 0 && "at what the history leaves of today's shares"}
+            </li>
+          </ul>
+          {reread.error && <p className="error">{explain(reread.error)}</p>}
+          <div className="actions">
+            <button type="button" onClick={() => preview.reset()}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="primary"
+              disabled={reread.isPending}
+              onClick={() => reread.mutate(linkId)}
+            >
+              {reread.isPending ? "Reading…" : "Read again"}
+            </button>
+          </div>
+        </section>
+      )}
+    </div>
   );
 }
 
@@ -510,8 +717,19 @@ function PreviewSummary({ preview }: { preview: LinkPreview }) {
             {preview.opening.was !== null && ` (was ${money(preview.opening.was)})`}
           </li>
         )}
-        {preview.kind === "brokerage" && preview.mode === "new" && (
-          <li>Each holding opens as one lot at its cost basis (an estimate: edit lots any time)</li>
+        {preview.kind === "brokerage" && preview.reader && (
+          <li>
+            {preview.reader}'s activity is read: sweeps left out, dividends confirmed, trades and
+            transfers of shares booked with their shares; each holding opens at what its history
+            leaves of today's shares, one estimated lot
+          </li>
+        )}
+        {preview.kind === "brokerage" && !preview.reader && (
+          <li>
+            Its activity can't be read yet: its rows come in as cash
+            {preview.mode === "new" &&
+              "; each holding opens as one lot at its cost basis (an estimate: edit lots any time)"}
+          </li>
         )}
       </ul>
     </section>

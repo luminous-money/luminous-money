@@ -9,3 +9,15 @@ export function ReceiptNote({ meta }: { meta: Record<string, unknown> | null | u
     </p>
   );
 }
+
+/** What reading a brokerage's row said about the trade it booked (the brokerage activity plan):
+ * that its shares are estimated, fitted to today's, or from the bank's holdings. */
+export function BrokerageNote({ meta }: { meta: Record<string, unknown> | null | undefined }) {
+  const note = meta?.["brokerage-note"];
+  if (typeof note !== "string" || !note) return null;
+  return (
+    <p className="small muted receipt-note" aria-label="About the shares">
+      {note}
+    </p>
+  );
+}

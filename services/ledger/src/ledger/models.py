@@ -308,6 +308,24 @@ class FetchResult(Api):
     errors: dict[str, str] = Field(description="Commodity to why its price couldn't be fetched.")
 
 
+class PricesOnIn(Strict):
+    """Days a commodity's price is wanted on (a trade's day, in a brokerage's history)."""
+
+    commodity: str = Field(pattern=r"^[A-Z][A-Z0-9'._-]{0,22}[A-Z0-9]$")
+    dates: list[datetime.date] = Field(max_length=400)
+    symbol: str | None = Field(
+        None,
+        pattern=r"^[A-Za-z0-9.^=-]{1,24}$",
+        description="Its ticker at the default source, for a commodity that names no source of its own.",
+    )
+
+
+class PriceOn(Api):
+    date: datetime.date
+    price: Amount | None = Field(description="Its price that day (or the last trading day before), if one could be had.")
+    source: Literal["book", "fetched"] | None
+
+
 class CommodityOut(Api):
     currency: str
     declared: bool = Field(description="Has a `commodity` directive (else only held or priced).")

@@ -262,6 +262,29 @@ def test_an_account_can_open_with_holdings_at_cost_or_estimated(ledger):
     assert ledger.problems("book") == []
 
 
+def test_prices_on_days_come_from_the_book_else_are_fetched_and_recorded(book, monkeypatch):
+    monkeypatch.setenv("LUMINOUS_MONEY_FIXED_PRICES", '{"ACME": 180.25}')
+    monkeypatch.setattr(investments, "DEFAULT_PRICE_SOURCE", "ledger.price_sources.fixed")
+    days = [datetime.date(2024, 6, 28), datetime.date(2024, 6, 3)]
+
+    # VTI names a source that can't answer, but the book has its price on the 28th.
+    listed = {c.currency: c for c in investments.commodity_list(book, "book")}
+    investments.set_commodity(
+        book, "book", "VTI", models.CommodityIn(name="VTI", price_source="USD:no.such.module/VTI", updated_at=listed["VTI"].updated_at)
+    )
+    vti = investments.prices_on(book, "book", models.PricesOnIn(commodity="VTI", dates=days))
+    # ACME has no commodity directive: its ticker at the default source.
+    acme = investments.prices_on(book, "book", models.PricesOnIn(commodity="ACME", dates=days, symbol="ACME"))
+    unnamed = investments.prices_on(book, "book", models.PricesOnIn(commodity="FT-UNIT", dates=days))
+
+    assert [(p.date.day, p.price and p.price.number, p.source) for p in vti] == [(3, None, None), (28, "240.00", "book")]
+    assert [(p.price.number, p.source) for p in acme] == [("180.25", "fetched"), ("180.25", "fetched")]
+    assert [p.price for p in unnamed] == [None, None]
+    assert {p.date for p in investments.price_list(book, "book", "ACME")} == set(days)  # recorded
+    again = investments.prices_on(book, "book", models.PricesOnIn(commodity="ACME", dates=days[:1], symbol="ACME"))
+    assert again[0].source == "book"
+
+
 def test_prices_are_fetched_for_held_commodities_with_a_source(book, monkeypatch):
     monkeypatch.setenv("LUMINOUS_MONEY_FIXED_PRICES", '{"VTI": 251.5}')
     listed = {c.currency: c for c in investments.commodity_list(book, "book")}

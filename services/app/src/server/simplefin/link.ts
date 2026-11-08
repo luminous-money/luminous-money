@@ -40,7 +40,10 @@ import { assign } from "../pipeline/assign.js";
 import { runChain } from "../pipeline/chain.js";
 import { DEFAULT_WINDOW_DAYS, matcher } from "../pipeline/matcher.js";
 import type { Existing, Incoming } from "../pipeline/types.js";
+import { readerFor } from "./activity.js";
+import { cashEffect, openingCash, OPENING_BALANCES, readRows } from "./brokerage.js";
 import { cashOf, openingHoldings, positions } from "./holdings.js";
+import { readHistory } from "./reread.js";
 import type { AccountSnapshot, Connection, Link, LinkKind } from "./store.js";
 import {
   backfill,
@@ -51,7 +54,7 @@ import {
   type SimplefinDeps,
 } from "./sync.js";
 
-export const OPENING_BALANCES = "Equity:Opening-Balances";
+export { OPENING_BALANCES };
 
 export type LinkMode = "new" | "reconcile" | "start-over" | "from-date";
 
@@ -85,6 +88,9 @@ export type LinkPreview = {
   deleted_elsewhere: number;
   opening: { date: string; amount: string; was: string | null } | null;
   starts_on: string;
+  /** A brokerage whose activity is read (its institution's reader), else null: its rows come
+   * in as cash. */
+  reader: string | null;
 };
 
 export class LinkProblem extends Error {
@@ -207,7 +213,12 @@ export async function plan(
   const S =
     rows[0]?.date ?? localDate(snapshot.balance_date || Math.floor(Date.now() / 1000), zone);
   const opensOn = dayBefore(S);
-  const bankOpening = add(reportedCash(snapshot, kind), negate(sum(rows.map((r) => r.amount!))));
+  // A brokerage whose rows are read: a sweep or shares received don't move its cash.
+  const reader = kind === "brokerage" ? readerFor(snapshot.institution) : undefined;
+  const read = reader ? readRows(reader, rows, snapshot) : null;
+  const bankOpening = read
+    ? openingCash(reportedCash(snapshot, kind), read)
+    : add(reportedCash(snapshot, kind), negate(sum(rows.map((r) => r.amount!))));
   const currency = snapshot.currency;
   const preview: LinkPreview = {
     mode,
@@ -227,6 +238,7 @@ export async function plan(
     deleted_elsewhere: 0,
     opening: { date: opensOn, amount: bankOpening, was: null },
     starts_on: S,
+    reader: reader?.name ?? null,
   };
   const link = (starts_on: string) =>
     store.addLink({
@@ -263,12 +275,13 @@ export async function plan(
     ],
   });
 
-  /** Make the account (and a brokerage's positions), opening as the bank says. */
+  /** Make the account (and a brokerage's positions, unless its history is read: then they
+   * open as the history leaves them), opening as the bank says. */
   const createAccounts = async () => {
     await ledger.createAccount(book, cash, {
       opening_balance: { amount: bankOpening, currency, date: opensOn },
     });
-    if (kind === "brokerage")
+    if (kind === "brokerage" && !read)
       for (const holding of openingHoldings(snapshot.holdings)) {
         const created = positions(snapshot.holdings).get(holding.commodity)!.created;
         const date = created ? localDate(created, zone) : opensOn;
@@ -293,6 +306,12 @@ export async function plan(
     };
   }
 
+  /** Bring the history in: read (positions opened as it leaves them), or as cash rows. */
+  const bringIn = async (made: Link) => {
+    if (read) await readHistory(deps, made, rows, read, opensOn);
+    else await importLink(deps, made);
+  };
+
   if (mode === "new") {
     return {
       preview,
@@ -300,7 +319,7 @@ export async function plan(
         needHistory();
         await createAccounts();
         const made = link(S);
-        await importLink(deps, made);
+        await bringIn(made);
         return made;
       },
     };
@@ -329,7 +348,7 @@ export async function plan(
           STAGING
         );
         const made = link(S);
-        await importLink(deps, made);
+        await bringIn(made);
         return made;
       },
     };
@@ -351,8 +370,12 @@ export async function plan(
     after.map((r) => r.id),
     "simplefin"
   );
+  // A brokerage's sweeps and shares received aren't cash anyone entered: nothing to match.
+  const moved = new Set(
+    (read ?? []).filter((r) => cashEffect(r) === "0").map((r) => r.fingerprint)
+  );
   const incoming: Incoming[] = rows
-    .filter((r) => !seen.has(`id:${r.id}`))
+    .filter((r) => !seen.has(`id:${r.id}`) && !moved.has(`id:${r.id}`))
     .map((r) => ({
       line: r.line,
       date: r.date!,

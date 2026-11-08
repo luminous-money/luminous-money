@@ -393,6 +393,12 @@ def create_app(ledger: Ledger) -> FastAPI:
         """Fetch the latest prices of the commodities still held that name a source (beanprice)."""
         return investments.fetch_prices(ledger, book_id)
 
+    @api.post("/books/{book_id}/prices/on")
+    def prices_on(book_id: MemberBook, q: models.PricesOnIn) -> list[models.PriceOn]:
+        """A commodity's price on each of some days: the book's, else fetched (beanprice) and
+        recorded; none for a day nothing answers for."""
+        return investments.prices_on(ledger, book_id, q)
+
     @api.get("/books/{book_id}/commodities")
     def commodity_list(book_id: MemberBook) -> list[models.CommodityOut]:
         """Every commodity declared, held or priced, with its latest price."""

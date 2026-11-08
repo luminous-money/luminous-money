@@ -1047,6 +1047,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ledger/v1/books/{book_id}/prices/on": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Prices On
+     * @description A commodity's price on each of some days: the book's, else fetched (beanprice) and
+     *     recorded; none for a day nothing answers for.
+     */
+    post: operations["prices_on_api_ledger_v1_books__book_id__prices_on_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/ledger/v1/books/{book_id}/problems": {
     parameters: {
       query?: never;
@@ -2774,6 +2795,18 @@ export interface components {
       /** @description What one unit was worth, in a currency. */
       price: components["schemas"]["Amount"];
     };
+    /** PriceOn */
+    PriceOn: {
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** @description Its price that day (or the last trading day before), if one could be had. */
+      price: components["schemas"]["Amount"] | null;
+      /** Source */
+      source: ("book" | "fetched") | null;
+    };
     /** PriceOut */
     PriceOut: {
       /** Commodity */
@@ -2786,6 +2819,21 @@ export interface components {
       /** Id */
       id: string;
       price: components["schemas"]["Amount"];
+    };
+    /**
+     * PricesOnIn
+     * @description Days a commodity's price is wanted on (a trade's day, in a brokerage's history).
+     */
+    PricesOnIn: {
+      /** Commodity */
+      commodity: string;
+      /** Dates */
+      dates: string[];
+      /**
+       * Symbol
+       * @description Its ticker at the default source, for a commodity that names no source of its own.
+       */
+      symbol?: string | null;
     };
     /** Problem */
     Problem: {
@@ -5971,6 +6019,41 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["FetchResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  prices_on_api_ledger_v1_books__book_id__prices_on_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        book_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PricesOnIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PriceOn"][];
         };
       };
       /** @description Validation Error */

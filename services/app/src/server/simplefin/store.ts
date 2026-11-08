@@ -77,8 +77,14 @@ export type Link = {
   kind: LinkKind;
   /** Bank transactions dated before this aren't imported (they're before the link's start). */
   starts_on: string;
+  /** A brokerage's dividend account, if chosen (else the default for its kind). */
+  dividends: string | null;
   created_at: string;
+  updated_at: string;
 };
+
+/** A difference in a position's shares the bank shows and its activity doesn't explain yet. */
+export type PositionWait = { commodity: string; units: string; since: string };
 
 const id = () => randomUUID().replace(/-/g, "");
 const today = () => new Date().toISOString().slice(0, 10);
@@ -189,8 +195,9 @@ export class SimplefinStore {
   // Accounts and the mirror
 
   /** Save what a fetch returned: each account's snapshot, and its transactions in the mirror
-   * (posted ones only: pending transactions aren't kept). */
-  saveFetch(connectionId: string, accounts: SfAccount[]): void {
+   * (posted ones only: pending transactions aren't kept). A balances-only fetch brings no
+   * holdings, so it keeps the ones already saved. */
+  saveFetch(connectionId: string, accounts: SfAccount[], { balancesOnly = false } = {}): void {
     const stamp = now();
     transaction(this.db, () => {
       const upsertAccount = this.db.prepare(
@@ -200,7 +207,8 @@ export class SimplefinStore {
          ON CONFLICT (connection_id, account_id) DO UPDATE SET name = excluded.name,
            institution = excluded.institution, currency = excluded.currency, balance = excluded.balance,
            available_balance = excluded.available_balance, balance_date = excluded.balance_date,
-           holdings = excluded.holdings, updated_at = excluded.updated_at`
+           holdings = CASE WHEN ? THEN simplefin_account.holdings ELSE excluded.holdings END,
+           updated_at = excluded.updated_at`
       );
       const upsertTransaction = this.db.prepare(
         `INSERT INTO simplefin_transaction (connection_id, account_id, id, posted, transacted_at, amount,
@@ -223,7 +231,8 @@ export class SimplefinStore {
           a.balance_date,
           JSON.stringify(a.holdings),
           stamp,
-          stamp
+          stamp,
+          balancesOnly ? 1 : 0
         );
         for (const t of a.transactions) {
           if (t.pending) continue;
@@ -403,7 +412,7 @@ export class SimplefinStore {
 
   // Links
 
-  addLink(link: Omit<Link, "id" | "created_at">): Link {
+  addLink(link: Omit<Link, "id" | "created_at" | "updated_at" | "dividends">): Link {
     const key = id();
     const stamp = now();
     this.db
@@ -448,6 +457,48 @@ export class SimplefinStore {
   /** The book's linked accounts: account name → its link. */
   linksIn(book: string): Link[] {
     return this.db.prepare("SELECT * FROM simplefin_link WHERE book_id = ?").all(book) as Link[];
+  }
+
+  /** Choose a brokerage link's dividend account (null: the default), against the version read. */
+  setDividends(link: Link, dividends: string | null, expected: string): Link | undefined {
+    const changed = this.db
+      .prepare(
+        "UPDATE simplefin_link SET dividends = ?, updated_at = ? WHERE id = ? AND updated_at = ?"
+      )
+      .run(dividends, now(), link.id, expected).changes;
+    return changed ? this.link(link.user_id, link.id) : undefined;
+  }
+
+  /** A link by its ID, whoever's it is (a book's member acting on it). */
+  linkById(link: string): Link | undefined {
+    return this.db.prepare("SELECT * FROM simplefin_link WHERE id = ?").get(link) as
+      Link | undefined;
+  }
+
+  /** The position differences a link is waiting on, by commodity. */
+  waits(link: string): Map<string, PositionWait> {
+    const rows = this.db
+      .prepare("SELECT commodity, units, since FROM simplefin_position_wait WHERE link_id = ?")
+      .all(link) as PositionWait[];
+    return new Map(rows.map((r) => [r.commodity, r]));
+  }
+
+  setWait(link: string, wait: PositionWait | null, commodity: string): void {
+    if (!wait) {
+      this.db
+        .prepare("DELETE FROM simplefin_position_wait WHERE link_id = ? AND commodity = ?")
+        .run(link, commodity);
+      return;
+    }
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO simplefin_position_wait (link_id, commodity, units, since, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (link_id, commodity) DO UPDATE SET units = excluded.units,
+           since = excluded.since, updated_at = excluded.updated_at`
+      )
+      .run(link, commodity, wait.units, wait.since, stamp, stamp);
   }
 
   deleteLink(user: string, link: string): boolean {

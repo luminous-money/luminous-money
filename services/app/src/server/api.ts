@@ -179,7 +179,9 @@ export function createApi({
   const owned = async (user: string, book: string) =>
     (await ledgerFor(user).book(book)) !== undefined;
 
-  if (simplefin) simplefinRoutes(api, { ...simplefin, db, ledgerFor, categorizers }, owned);
+  // Work that outlasts a request (a receipt read, a brokerage read again): see below.
+  const jobs = new Jobs();
+  if (simplefin) simplefinRoutes(api, { ...simplefin, db, ledgerFor, categorizers }, owned, jobs);
 
   const isProfile = (p: unknown): p is CsvProfile => {
     const profile = p as CsvProfile | undefined;
@@ -353,7 +355,6 @@ export function createApi({
   // Reading a receipt takes a minute or more of AI calls, longer than a proxy in front may wait
   // for a request: with `Prefer: respond-async`, it runs as a job (jobs.ts) and the caller asks
   // after it. Without, the request waits, as it always did (scripts, the API suite).
-  const jobs = new Jobs();
   const failureOf = (error: unknown): Failure =>
     error instanceof ReceiptProblem || error instanceof LedgerError || error instanceof LoanProblem
       ? { status: error.status, detail: error.message }

@@ -3718,6 +3718,48 @@
         "title": "PriceIn",
         "type": "object"
       },
+      "PriceOn": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its price that day (or the last trading day before), if one could be had."
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "book",
+                  "fetched"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": [
+          "date",
+          "price",
+          "source"
+        ],
+        "title": "PriceOn",
+        "type": "object"
+      },
       "PriceOut": {
         "properties": {
           "commodity": {
@@ -3744,6 +3786,45 @@
           "price"
         ],
         "title": "PriceOut",
+        "type": "object"
+      },
+      "PricesOnIn": {
+        "additionalProperties": false,
+        "description": "Days a commodity's price is wanted on (a trade's day, in a brokerage's history).",
+        "properties": {
+          "commodity": {
+            "pattern": "^[A-Z][A-Z0-9'._-]{0,22}[A-Z0-9]$",
+            "title": "Commodity",
+            "type": "string"
+          },
+          "dates": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "maxItems": 400,
+            "title": "Dates",
+            "type": "array"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9.^=-]{1,24}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its ticker at the default source, for a commodity that names no source of its own.",
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "commodity",
+          "dates"
+        ],
+        "title": "PricesOnIn",
         "type": "object"
       },
       "Problem": {
@@ -9241,6 +9322,60 @@
           }
         },
         "summary": "Fetch Prices"
+      }
+    },
+    "/api/ledger/v1/books/{book_id}/prices/on": {
+      "post": {
+        "description": "A commodity's price on each of some days: the book's, else fetched (beanprice) and\nrecorded; none for a day nothing answers for.",
+        "operationId": "prices_on_api_ledger_v1_books__book_id__prices_on_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PricesOnIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriceOn"
+                  },
+                  "title": "Response Prices On Api Ledger V1 Books  Book Id  Prices On Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prices On"
       }
     },
     "/api/ledger/v1/books/{book_id}/problems": {

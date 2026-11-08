@@ -27,6 +27,8 @@ export type Attachment = components["schemas"]["Attachment"];
 export type LedgerPage = components["schemas"]["LedgerPage"];
 export type TransactionEdit = components["schemas"]["TransactionEdit"];
 export type PriceIn = components["schemas"]["PriceIn"];
+export type PricesOnIn = components["schemas"]["PricesOnIn"];
+export type PriceOn = components["schemas"]["PriceOn"];
 export type TreeAccount = components["schemas"]["TreeAccount"];
 export type PurgePreview = components["schemas"]["PurgePreview"];
 export type Purged = components["schemas"]["Purged"];
@@ -94,6 +96,8 @@ export interface LedgerPort {
   holdings(book: string, account: string): Promise<Holdings>;
   /** Record a price (one per commodity and date: the same date replaces it). */
   addPrice(book: string, price: PriceIn): Promise<PriceOut>;
+  /** A commodity's price on each of some days: the book's, else fetched and recorded. */
+  pricesOn(book: string, query: PricesOnIn): Promise<PriceOn[]>;
   /** What a trade would write: its transaction (lots booked, gains split), not written. */
   previewTrade(book: string, account: string, trade: TradeIn): Promise<TradePreview>;
   accountLedger(book: string, account: string, cursor?: string): Promise<LedgerPage>;
@@ -310,6 +314,13 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
         client.POST("/api/ledger/v1/books/{book_id}/prices", {
           params: { path: { book_id: book } },
           body: price,
+        })
+      ),
+    pricesOn: (book, query) =>
+      unwrap(
+        client.POST("/api/ledger/v1/books/{book_id}/prices/on", {
+          params: { path: { book_id: book } },
+          body: query,
         })
       ),
     previewTrade: (book, account, trade) =>

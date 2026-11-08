@@ -395,6 +395,22 @@ export const MIGRATIONS: Migration[] = [
       ["PRIMARY KEY (user_id, book_id, fund)"]
     ),
   ],
+  // 23: brokerage activity. A brokerage link's dividend account (null: the default for its
+  // kind), and a difference in shares the bank's snapshot shows that its activity doesn't
+  // explain yet: since when, so it's staged only once it's lasted (simplefin/brokerage.ts).
+  [
+    "ALTER TABLE simplefin_link ADD COLUMN dividends TEXT",
+    createTable(
+      "simplefin_position_wait",
+      [
+        "link_id TEXT NOT NULL REFERENCES simplefin_link(id) ON DELETE CASCADE",
+        "commodity TEXT NOT NULL",
+        "units TEXT NOT NULL",
+        "since TEXT NOT NULL",
+      ],
+      ["PRIMARY KEY (link_id, commodity)"]
+    ),
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -691,13 +707,13 @@ export class AppDb {
   }
 
   /** Which of `fingerprints` an earlier import into the account already brought in (staged or
-   * matched). */
+   * matched, or left out as a brokerage's sweep). */
   importedBefore(book: string, account: string, fingerprints: string[]): Set<string> {
     if (!fingerprints.length) return new Set();
     const found = this.db
       .prepare(
         `SELECT r.fingerprint FROM import_row r JOIN import_batch b ON b.id = r.batch_id
-         WHERE b.book_id = ? AND b.account = ? AND r.outcome IN ('staged', 'matched')
+         WHERE b.book_id = ? AND b.account = ? AND r.outcome IN ('staged', 'matched', 'left-out')
            AND r.fingerprint IN (SELECT value FROM json_each(?))`
       )
       .all(book, account, JSON.stringify(fingerprints)) as { fingerprint: string }[];
@@ -897,6 +913,28 @@ export class AppDb {
       )
       .all(book) as (RowRecord & { account: string; filename: string })[];
     return rows.map(toHeldRow);
+  }
+
+  /** Move the rows holding a transaction to another (a trade booked again). */
+  repointRows(book: string, from: string, to: string): void {
+    this.db
+      .prepare(
+        `UPDATE import_row SET transaction_id = ?, updated_at = ?
+         WHERE transaction_id = ? AND batch_id IN (SELECT id FROM import_batch WHERE book_id = ?)`
+      )
+      .run(to, now(), from, book);
+  }
+
+  /** Forget the account's import rows with these fingerprints, so they can come in again (a
+   * brokerage read again). */
+  forgetRows(book: string, account: string, fingerprints: string[]): void {
+    if (!fingerprints.length) return;
+    this.db
+      .prepare(
+        `DELETE FROM import_row WHERE fingerprint IN (SELECT value FROM json_each(?))
+           AND batch_id IN (SELECT id FROM import_batch WHERE book_id = ? AND account = ?)`
+      )
+      .run(JSON.stringify(fingerprints), book, account);
   }
 
   /** Set rows' transactions (and so outcomes), and their match states, in one write. */

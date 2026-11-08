@@ -1415,9 +1415,57 @@ and `holdings`, and errors either as coded `errlist` or as the older plain `erro
 - **A connection is named "SimpleFIN" and its id's first 8 characters** (Kael, 2026-11-07), not
   its institutions, which ran long with a Bridge holding many; its accounts are listed with a
   rule between each.
-- **A brokerage's rows are all cash** (Fidelity's, with a sweep into or out of the core money
-  market beside each event, and trades without their shares). How to read them is a proposal
-  still to settle: [the brokerage activity plan](milestones/brokerage-activity/PLAN.md).
+- **A brokerage's rows are read for what they are** ([the brokerage activity
+  plan](milestones/brokerage-activity/PLAN.md), Kael, 2026-11-07). Its rows over SimpleFIN are
+  all cash, each saying in words what it was, so a reader per institution
+  (`simplefin/activity.ts`; Fidelity's, for now) reads each before it's staged:
+  - **A sweep** (into or out of the core money market, which the books count as cash) is left
+    out: an import row marked `left-out`, so it never comes back. Read one by one, never paired:
+    a sweep moves cash to cash whether or not the event beside it is there, and Fidelity's don't
+    pair neatly (one redemption covered two buys).
+  - **A dividend** (only the exact `DIVIDEND RECEIVED … (<SYM>)`) is confirmed by itself to the
+    link's dividend account. Nothing that merely looks like income is, so capital gain
+    distributions and returns of capital wait in review until they've been seen.
+  - **A trade** (bought, sold, reinvested into a fund) is M5's trade booking, for review: lots
+    by the account's method, gains by term (Kael chose lots in the books; the 1099-B is the
+    authority). Its shares are the snapshot's change since the books when that accounts for
+    the day's trades, else the row's amount over that day's price (fetched and recorded,
+    `POST /prices/on`), marked estimated, for the snapshot to settle.
+  - **A transfer of assets** is shares (a lot at the snapshot's average cost, against
+    `Equity:Opening-Balances`), or cash from the old broker (`Equity:Opening-Balances`, for
+    review): it was never income.
+  - **Anything else** (a deposit, a transfer, the unknown) goes through the usual pipeline.
+  - **Why read rather than settle everything from the snapshot:** the rows say what happened
+    and when (income, a trade's price, what's taxable); the snapshot only says where things
+    ended up. The snapshot settles what the rows can't: an estimate's shares, and a difference
+    nothing explains.
+- **Dividends go to one income account per brokerage link** (Kael: "configurable somewhere"),
+  chosen beside the link. The default is the one useful for taxes: `Income:Dividends` for a
+  taxable account, so its year is the 1099-DIV's ordinary dividends, and
+  `Income:Retirement:Dividends` for a retirement account (an IRA, a Roth, a 401(k), an HSA, by
+  the bank's or the book's name), whose dividends aren't taxed.
+- **The snapshot is the truth for shares** (`settle`, after each sync): an estimated trade from
+  the last week is booked again with the snapshot's shares when that's within a quarter of its
+  estimate; a difference nothing explains is staged as a position change only once it's been
+  seen on three days, since a trade's row can come a day after its shares. **Cash isn't
+  written:** a read brokerage's cash is compared with the bank's (M14's "Matches the bank" or
+  "Off by", as its cash), because a pending row the bank already counts would otherwise be
+  counted twice when it posts.
+- **A history opens positions as they were** (at linking, and when read again): each position
+  opens at today's shares less what the history's trades and transfers moved. When that leaves
+  next to nothing (within 5%) or less, there was none, and the estimates take up the difference
+  in proportion to their size, so the books end at today's shares exactly and only the split
+  between opening and trades is estimated. The opening lot's cost is today's cost less what the
+  history's buys paid.
+- **Read again** (`simplefin/reread.ts`, beside a brokerage link; previewed) rebuilds a
+  brokerage from what's already fetched, with no SimpleFIN requests: it keeps what touches
+  another account (a transfer from checking) and what reads as anything else (with what you
+  made of it), deletes the rest of what's in the brokerage, and reads the rows again. It isn't
+  one atomic write (a sale's lots depend on what's written before it), but it can always be
+  run again: it deletes everything the bank brought each time.
+- **Only institutions with a reader are read.** Linking a brokerage says whether its activity
+  can be read; another's comes in as cash, as before, with a link to open an issue or send a
+  pull request with a reader.
 - **The access URL is a credential:**
   - it's sealed at rest (AES-256-GCM, `SIMPLEFIN_ENCRYPTION_KEY`, required at boot)
   - it never reaches the browser
@@ -1462,12 +1510,22 @@ and `holdings`, and errors either as coded `errlist` or as the older plain `erro
   sync, and with it the morning's resuming of link attempts, so only Sync now spends a
   connection's requests: for a development stack holding the same connection as a live one.
 - **Brokerages** (seen with Fidelity, 2026-10-16):
-  - **Holdings come only with transactions,** not with balances-only requests.
-  - **Each sync's holdings are a snapshot.** It records that day's price per symbol. Where the
-    bank's shares differ from the books', it stages a buy or sale for review through M5's trade
-    booking, paired with the bank's matching cash transaction when there is one.
-  - **Money-market core positions** (priced at 1, like SPAXX) count as cash.
-  - **A new brokerage opens with one estimated lot per position,** at its cost basis: SimpleFIN
+  - **Holdings come only with transactions,** not with balances-only requests, so a
+    balances-only fetch keeps the holdings already saved.
+  - **Each sync's holdings are a snapshot.** It records that day's price per symbol. For a
+    brokerage whose rows aren't read, where the bank's shares differ from the books', it stages
+    a buy or sale for review through M5's trade booking, paired with the bank's matching cash
+    transaction when there is one. One whose rows are read settles them (above).
+  - **Money-market core positions** (priced at 1, like SPAXX, or a known core fund with no
+    shares) count as cash. **A position without shares isn't one** (it opened as a zero-share
+    lot, which broke the ledger's holdings for the account).
+  - **Cost is the snapshot's cost basis, else its `purchase_price` times the shares:**
+    Fidelity's cost basis is always `0.00`, which opened every lot at no cost; its purchase price
+    is the average cost per share. Zero is unknown, not free.
+  - **A position without a symbol** (a unit investment trust) is named by its description's first
+    words (`XT-UNIT-98765-EXAMPLE`); a transfer row naming a CUSIP is read as the one such
+    position.
+  - **A new brokerage opens with one estimated lot per position,** at its cost: SimpleFIN
     sends totals, not lots.
 - **What an account shows:** its balance is the books', as everywhere. A synced account adds
   "Reported today 6:00am: $…", the bank's. The Bridge's errors are shown in plain words, and its

@@ -23,6 +23,8 @@ import type { LedgerPort } from "../ledger.js";
 import { fetchAccounts, type SfAccountSet, type SfTransaction } from "./client.js";
 import type { Sealer } from "./crypto.js";
 import { resumeAttempts } from "./attempts.js";
+import { readerFor } from "./activity.js";
+import { importBrokerage, settle } from "./brokerage.js";
 import { holdingChanges } from "./holdings.js";
 import type { Connection, Link, SimplefinStore } from "./store.js";
 import type { UrlPolicy } from "./urls.js";
@@ -71,7 +73,7 @@ export async function request(
     deps.policy,
     deps.fetcher
   );
-  deps.store.saveFetch(connection.id, set.accounts);
+  deps.store.saveFetch(connection.id, set.accounts, { balancesOnly: !!query.balancesOnly });
   deps.store.recordSync(connection.id, set.errors);
   return set;
 }
@@ -150,20 +152,25 @@ export async function importLink(deps: SimplefinDeps, link: Link): Promise<Impor
     rows.map((r) => `id:${r.id}`)
   );
   const fresh = rows.filter((r) => !seen.has(`id:${r.id}`)).map((r, i) => ({ ...r, line: i + 1 }));
-  const result = fresh.length
-    ? await importRows({
-        db,
-        ledger: deps.ledgerFor(link.user_id),
-        book: link.book_id,
-        account: cash,
-        userId: link.user_id,
-        source: "simplefin",
-        label: snapshot?.institution || "SimpleFIN",
-        rows: fresh,
-        categorizers: deps.categorizers,
-      })
-    : null;
-  if (link.kind === "brokerage") await holdingChanges(deps, link);
+  // A brokerage whose rows can be read: each read for what it is (brokerage.ts).
+  const reader = link.kind === "brokerage" ? readerFor(snapshot?.institution) : undefined;
+  const result = !fresh.length
+    ? null
+    : reader
+      ? await importBrokerage(deps, link, reader, fresh)
+      : await importRows({
+          db,
+          ledger: deps.ledgerFor(link.user_id),
+          book: link.book_id,
+          account: cash,
+          userId: link.user_id,
+          source: "simplefin",
+          label: snapshot?.institution || "SimpleFIN",
+          rows: fresh,
+          categorizers: deps.categorizers,
+        });
+  if (reader) await settle(deps, link);
+  else if (link.kind === "brokerage") await holdingChanges(deps, link);
   // Even with nothing new, what's in review may pair now (the other side came in earlier).
   const pairing = { db, ledger: deps.ledgerFor(link.user_id), book: link.book_id };
   return result ? pairAfterImport(pairing, result) : (await pairTransfers(pairing), null);

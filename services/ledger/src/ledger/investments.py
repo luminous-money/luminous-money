@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import datetime
+import os
 import threading
 from dataclasses import dataclass
 from decimal import Decimal
@@ -656,6 +657,53 @@ def held(ledger, book_id: str) -> set[str]:
         (book_id,),
     ).fetchall()
     return {currency for currency, total in rows if abs(total or 0) > 1e-9}
+
+
+DEFAULT_PRICE_SOURCE = os.environ.get("LUMINOUS_MONEY_PRICE_SOURCE", "yahoo")
+
+
+def prices_on(ledger, book_id: str, q: models.PricesOnIn) -> list[models.PriceOn]:
+    """A commodity's price on each of some days: the book's, if it has one that day; else fetched
+    with beanprice (the last close on or before the day) from the commodity's own source, or the
+    default source (`LUMINOUS_MONEY_PRICE_SOURCE`, Yahoo unless set) for its ticker, and recorded.
+    A day nothing answers for is left without one."""
+    from beanprice import price as beanprice
+
+    target = operating_currency(ledger._header(book_id))
+    known = {r["date"]: r for r in ledger.store.price_history(book_id, q.commodity) if r["currency"] == target}
+    declared = commodities(ledger, book_id).get(q.commodity)
+    spec = (declared.price_source if declared else None) or (
+        f"{target}:{DEFAULT_PRICE_SOURCE}/{q.symbol}" if q.symbol else None
+    )
+    try:
+        sources = [ps for _, found in beanprice.parse_source_map(spec).items() for ps in found] if spec else []
+    except Exception:  # a source that can't be loaded: the book's prices only
+        sources = []
+    out: list[models.PriceOn] = []
+    for day in sorted(set(q.dates)):
+        had = known.get(day.isoformat())
+        if had is not None:
+            out.append(models.PriceOn(date=day, price=models.Amount(number=had["number"], currency=had["currency"]), source="book"))
+            continue
+        found = None
+        for ps in sources:
+            try:
+                # The day's close: asked for the end of the day, so a trade's own day counts.
+                end = datetime.datetime.combine(day + datetime.timedelta(days=1), datetime.time(), datetime.timezone.utc)
+                answer = ps.module.Source().get_historical_price(ps.symbol, end)
+            except Exception:  # a source's failure leaves the day without a price
+                continue
+            if answer is not None and answer.price is not None:
+                found = (1 / answer.price) if ps.invert else answer.price
+                break
+        if found is None:
+            out.append(models.PriceOn(date=day, price=None, source=None))
+            continue
+        number = engine.decimal_text(Decimal(found).quantize(Decimal("0.000001")))
+        number = number.rstrip("0").rstrip(".") if "." in number else number
+        add_price(ledger, book_id, models.PriceIn(date=day, commodity=q.commodity, price=models.Amount(number=number, currency=target)))
+        out.append(models.PriceOn(date=day, price=models.Amount(number=number, currency=target), source="fetched"))
+    return out
 
 
 def fetch_prices(ledger, book_id: str, on: datetime.date | None = None) -> models.FetchResult:

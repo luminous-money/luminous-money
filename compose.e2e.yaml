@@ -17,6 +17,12 @@ services:
       - APP_ENV=test
     depends_on: [simplefin-fake]
 
+  # No outside calls: a share's price on a past day (a brokerage's history) comes from the fixed
+  # source, 100 a share.
+  ledger:
+    environment:
+      - LUMINOUS_MONEY_PRICE_SOURCE=ledger.price_sources.fixed
+
   ai:
     environment:
       - APP_ENV=test

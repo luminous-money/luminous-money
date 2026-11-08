@@ -4,7 +4,39 @@ Where We Left Off
 _Updated 2026-11-07._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-07, late): Kael's nits, released as `v0.1.25`
+## Latest (2026-11-07, night): brokerage activity, released as `v0.1.26`
+
+Kael answered [the brokerage activity plan](docs/milestones/brokerage-activity/PLAN.md)'s
+questions and asked for all of it, the cleanup included, released, on Emmer and run on his
+book. Before deciding, the proposal was checked against his Fidelity ledgers and Emmer's
+snapshot (read only): sweeps are no-ops one by one but don't pair neatly; transfers of assets
+are three kinds of row; linking had hidden the double count in a negative opening cash
+balance; and three more bugs (below). The plan has "Checked against the live book", "Decided
+with Kael", and "As built" with five calls made without asking.
+
+- **A brokerage's rows are read** (Fidelity's, `simplefin/activity.ts`): sweeps left out (an
+  import row `left-out`), dividends confirmed to the link's dividend account (default
+  `Income:Dividends`, or `Income:Retirement:Dividends` for an IRA and the like, changeable on
+  Bank connections), trades booked with their shares (lots and gains in the books, Kael's
+  choice), transfers of assets as shares at the bank's average cost, cash from another broker
+  to `Equity:Opening-Balances`. Another brokerage is as before, and Bank connections says so,
+  with a link to open an issue or send a pull request.
+- **The snapshot settles shares** (`settle`): estimates trued up, a difference nothing explains
+  staged after three days. A read brokerage's cash is compared with the bank's (not written).
+- **A history opens positions as they were** (linking, and **Read again**, which is the
+  cleanup: Bank connections → beside a brokerage link, previewed; no SimpleFIN requests).
+  Prices on past days come from the ledger's new `POST /prices/on` (beanprice; Yahoo by
+  default, `LUMINOUS_MONEY_PRICE_SOURCE`).
+- **Bugs fixed on the way:** every Fidelity lot opened at $0.00 (its cost basis is always
+  `0.00`; `purchase_price` is the average cost, now used); a zero-share core position opened as
+  a zero-share lot (the ROTH's holdings page 500'd); a position without a symbol (the ROTH's
+  unit trust) was counted as cash; and a balances-only fetch wiped the saved holdings.
+- **Tests:** `pnpm test` and `pnpm e2e` pass (unit, ledger, API against the real ledger,
+  browser).
+
+**Next:** Emmer upgraded to `v0.1.26`, then Read again on each of Kael's Fidelity links.
+
+## Before that (2026-11-07, late): Kael's nits, released as `v0.1.25`
 
 Kael sent a list of nits (review, bank connections, home) and one bigger question. All the nits
 are built, tested and **released as `v0.1.25`** (at Kael's asking), for him to upgrade Emmer.
@@ -379,11 +411,9 @@ upgrades safe to stop (below). Emmer still runs 0.1.15 until Kael upgrades it.
   its `v`, `upgrade 0.1.14`, or left out for the latest). Kael's to run unless he asks: he asked
   for 0.1.14's, run 2026-11-03 02:57 UTC from 0.1.12 (its backups are in
   `/srv/luminous-money/backups`), all healthy after.
-- **A bug found on the live server, not fixed:** a linked brokerage opened with its lots at a
-  $0.00 cost basis, so its gains (and any sale's capital gains) are wrong. The likely cause:
-  `openingHoldings` (`services/app/src/server/simplefin/holdings.ts`) takes a reported
-  `cost_basis` of `0` as a real cost rather than as unknown (which would let the ledger use the
-  day's price). Fixing the code is small; the live book's lots need Kael's say.
+- **Fixed (2026-11-07, `v0.1.26`):** a linked brokerage opened with its lots at a $0.00 cost
+  basis (Fidelity's `cost_basis` is always `0.00`); its `purchase_price` (the average cost) is
+  used now, and Read again reopens a brokerage's lots with it.
 - **Tags in rules, schedules, receipts and the AI are planned, not started:**
   [docs/milestones/tags-more/PLAN.md](docs/milestones/tags-more/PLAN.md) (2026-10-29). M17
   left them out on purpose. Schedules already carry a template's tags but have no field for
@@ -719,10 +749,10 @@ How it's put together:
   the server).
 - **Tests, all passing:**
   - `pnpm test`:
-    - ledger: 257 tests, including the table lint
-    - auth: 24; app: 319; ai: 15; db: 10; csv-import: 22
+    - ledger: 258 tests, including the table lint
+    - auth: 24; app: 329; ai: 15; db: 10; csv-import: 22
     - plus the client drift check, typechecks and Prettier
-  - `pnpm e2e`: 111 API tests and 134 browser tests (with Mailpit, a fake SimpleFIN server and
+  - `pnpm e2e`: 114 API tests and 135 browser tests (with Mailpit, a fake SimpleFIN server and
     the fake AI provider), then the `luminous-money` command's test (`pnpm test:cli` alone)
 - **The local dev stack** (`docker compose up -d`) runs on `http://localhost:8080`, without
   mail. Its `.env` (not committed: its keys) sets `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand`, so it never

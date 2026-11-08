@@ -3,7 +3,7 @@ import { useLayoutEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 import { Attachments, type Pending } from "../components/Attachments.js";
-import { ReceiptNote } from "../components/ReceiptNote.js";
+import { BrokerageNote, ReceiptNote } from "../components/ReceiptNote.js";
 import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
 import { FundsFieldset, fundsShown, useFundRows } from "../components/Funds.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
@@ -286,6 +286,7 @@ function Editor({
       <ExcludeFromBudget meta={meta} onChange={setMeta} />
 
       <ReceiptNote meta={t.meta} />
+      <BrokerageNote meta={t.meta} />
 
       <Attachments
         book={book}

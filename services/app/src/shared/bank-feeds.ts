@@ -18,7 +18,18 @@ export type BankAccount = {
   balance_date: number;
   kind: LinkKind;
   holdings: number;
+  /** A brokerage whose activity can be read (its institution's reader), else null. */
+  reader: string | null;
   link: { id: string; book_id: string; book_name: string | null; account: string } | null;
+};
+
+/** What a brokerage link's reading made of the bank's rows since its start. */
+export type BrokerageActivity = {
+  sweeps: number;
+  dividends: number;
+  trades: number;
+  transfers_in: number;
+  other: number;
 };
 
 export type BankConnection = {
@@ -53,6 +64,8 @@ export type LinkPreview = {
   deleted_elsewhere: number;
   opening: { date: string; amount: string; was: string | null } | null;
   starts_on: string;
+  /** A brokerage whose activity is read (its institution's reader), else null. */
+  reader: string | null;
 };
 
 /** A link the user chose, while the bank's history is fetched in the background. */
@@ -81,6 +94,30 @@ export type BankStatus = {
   last_sync_at: string | null;
   not_at_bank: string[];
   errors: BankError[];
-  /** The books against the bank (M14); null for a brokerage. */
+  /** The books against the bank (M14): a brokerage's cash, when its rows are read; else null
+   * for a brokerage. */
   comparison: BankComparison | null;
+  /** The link's version, for changing its settings. */
+  updated_at: string;
+  /** A brokerage's: whether its rows are read (the reader's name), where its dividends go
+   * (`dividends_chosen`: chosen, not the default), and what the reading made of its rows. */
+  reader?: string | null;
+  dividends?: string;
+  dividends_chosen?: boolean;
+  activity?: BrokerageActivity | null;
+};
+
+/** What reading a brokerage link again would do (and, once done, did). */
+export type RereadPreview = {
+  account: string;
+  institution: string;
+  rows: number;
+  read: Record<"sweep" | "dividend" | "buy" | "sell" | "shares-in" | "cash-in" | "other", number>;
+  kept: number;
+  deleted: number;
+  deleted_yours: number;
+  opening: { date: string; cash: string };
+  positions: number;
+  dividends: string;
+  currency: string;
 };

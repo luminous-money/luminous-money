@@ -240,16 +240,12 @@ milestone starts.
         their items when the order says.
   - [ ] **Later:** an Assign button for a waiting charge; the book's own cards as the default;
         receipts by email, other shops, Jess's Amazon.
-- [ ] **Brokerage activity** (Kael, 2026-11-07; **to settle before we're done**;
-      [a proposal](milestones/brokerage-activity/PLAN.md), not started): Fidelity's rows over
-      SimpleFIN are all cash, with a sweep into or out of the core money market beside every
-      real event, trades without their shares, and transfers of shares as cash, so review fills
-      with pairs that cancel and sales read as income. Proposed: read each brokerage row by its
-      description before staging (sweeps left out, dividends to income by rule, trades with
-      their shares from the snapshot or that day's price, transfers of assets as shares), let
-      the daily snapshot settle what's left as one flagged adjustment, keep it all out of
-      review's way, and open a linked history's positions as they were on its start date. Five
-      questions for Kael in the proposal.
+- [ ] **Brokerage activity** (Kael, 2026-11-07; [the plan](milestones/brokerage-activity/PLAN.md),
+      decided with Kael and being built): each brokerage row read by its description (Fidelity
+      first): sweeps left out, dividends confirmed to a per-link income account, trades booked
+      with their shares, transfers of assets as shares; the snapshot settles what's left; a
+      linked history opens positions as they were; "Read again" is the cleanup, run on Kael's
+      book after the release.
 - [ ] **Funds and tags per split** (Kael, 2026-11-07; noted, not planned): often only part of a
       transaction is a fund's (one item of a receipt from Emergency), and the same is true of
       tags (one item `#gift`). Fund lines are the transaction's today (amounts, not tied to a

@@ -216,6 +216,21 @@ export class FakeLedger implements LedgerPort {
     return { ...price, id: `p${this.prices.length}`, source: null } as never;
   }
 
+  /** Prices by commodity and day the fake "fetches" (else none). */
+  sourcePrices = new Map<string, number>();
+  async pricesOn(_book: string, q: { commodity: string; dates: string[]; symbol?: string | null }) {
+    return [...new Set(q.dates)].sort().map((date) => {
+      const had = this.prices.find((p) => p.commodity === q.commodity && p.date === date);
+      const fetched = this.sourcePrices.get(`${q.commodity} ${date}`);
+      const number = had?.price.number ?? (fetched === undefined ? undefined : String(fetched));
+      return {
+        date,
+        price: number === undefined ? null : { number, currency: "USD" },
+        source: had ? ("book" as const) : number === undefined ? null : ("fetched" as const),
+      };
+    });
+  }
+
   /** Units (and total cost) per commodity in the account or under it, unconfirmed included. */
   async holdings(_book: string, account: string): Promise<Holdings> {
     const totals = new Map<string, { units: number; cost: number }>();

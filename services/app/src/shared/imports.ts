@@ -16,7 +16,10 @@ export type Outcome =
   /** Dated on or before the account's opening balance, which already includes it: skipped. */
   | "before-opening"
   /** Couldn't be read (see `error`): skipped. */
-  | "unreadable";
+  | "unreadable"
+  /** A brokerage's sweep into or out of its core money market, which the books count as cash:
+   * nothing to bring in (kept, so it never comes again). */
+  | "left-out";
 
 /** An existing transaction that might be the same event as an imported row. */
 export type Candidate = {
