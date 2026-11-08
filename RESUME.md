@@ -34,7 +34,19 @@ with Kael", and "As built" with five calls made without asking.
 - **Tests:** `pnpm test` and `pnpm e2e` pass (unit, ledger, API against the real ledger,
   browser).
 
-**Next:** Emmer upgraded to `v0.1.26`, then Read again on each of Kael's Fidelity links.
+**Emmer is on `v0.1.26`** (2026-11-08 00:46 UTC, from 0.1.25; its backup is
+`/srv/luminous-money/backups/luminous-money-20261108T004608Z-0.1.25.tar.gz`), every service
+healthy, and **Read again has run on Kael's three Fidelity links** (Joint WROS, ROTH IRA,
+Traditional IRA; previewed first, nothing made by hand deleted). Checked after: each account's
+cash matches the bank's ("Matches the bank"; all three were off before), every position's
+shares match the snapshot (a single-letter ticker is held under its description's name), no
+lot is at $0.00, and nothing waits to be settled. What's in review from them is as planned: the
+brokerage's trades (with their gains), the transfers of assets and cash from the old broker
+(against `Equity:Opening-Balances`), and the rows read as anything else, kept as they were.
+
+**Next:** Kael confirms those in review (most are the Traditional IRA's transfers of assets).
+One Fidelity account on the connection (an individual account) isn't linked to the book;
+linking it now reads its history the new way.
 
 ## Before that (2026-11-07, late): Kael's nits, released as `v0.1.25`
 

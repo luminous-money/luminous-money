@@ -240,12 +240,12 @@ milestone starts.
         their items when the order says.
   - [ ] **Later:** an Assign button for a waiting charge; the book's own cards as the default;
         receipts by email, other shops, Jess's Amazon.
-- [ ] **Brokerage activity** (Kael, 2026-11-07; [the plan](milestones/brokerage-activity/PLAN.md),
-      decided with Kael and being built): each brokerage row read by its description (Fidelity
-      first): sweeps left out, dividends confirmed to a per-link income account, trades booked
-      with their shares, transfers of assets as shares; the snapshot settles what's left; a
-      linked history opens positions as they were; "Read again" is the cleanup, run on Kael's
-      book after the release.
+- [x] **Brokerage activity** (Kael, 2026-11-07; [the plan](milestones/brokerage-activity/PLAN.md),
+      `v0.1.26`): each brokerage row read by its description (Fidelity first): sweeps left out,
+      dividends confirmed to a per-link income account, trades booked with their shares,
+      transfers of assets as shares; the snapshot settles what's left; a linked history opens
+      positions as they were; "Read again" is the cleanup, run on Kael's three Fidelity links
+      on Emmer (2026-11-07): each matches the bank, in cash and in every position's shares.
 - [ ] **Funds and tags per split** (Kael, 2026-11-07; noted, not planned): often only part of a
       transaction is a fund's (one item of a receipt from Emergency), and the same is true of
       tags (one item `#gift`). Fund lines are the transaction's today (amounts, not tied to a

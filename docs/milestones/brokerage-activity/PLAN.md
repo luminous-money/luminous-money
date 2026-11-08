@@ -206,3 +206,11 @@ As "Building it" above, with these details:
   history, the daily sync's true-up and wait, Read again), the ledger's
   `test_prices_on_days_…`, `tests/e2e/src/brokerage.test.ts` (against the real ledger: lots and
   gains, a transfer of assets into an IRA, Read again) and `tests/ui/src/brokerage.spec.ts`.
+
+## Run on Kael's book (2026-11-07)
+
+Released as `v0.1.26`, Emmer upgraded, and Read again run on his three Fidelity links, each
+previewed first (none deleted anything made by hand). After: each account's cash matches the
+bank's, every position's shares match the snapshot, every lot has the bank's average cost, and
+nothing waits to be settled. What stays in review is what was decided: trades, transfers of
+assets and cash from the old broker, and rows read as anything else (kept as they were).
