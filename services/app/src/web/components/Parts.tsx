@@ -157,7 +157,6 @@ export function MoveMoney({
             flag: "*",
             payee: null,
             narration: `Moved to ${name(to)}`,
-            tags: [],
             links: [],
             meta: {},
             postings: [

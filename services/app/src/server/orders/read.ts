@@ -24,6 +24,7 @@ import { isUncategorized, UNCATEGORIZED, UNKNOWN } from "../../shared/accounts.j
 import { isNegative, negate } from "../../shared/decimal.js";
 import { landsIn } from "../../shared/divided.js";
 import type { OrderCharge, OrderState, StoredCharge } from "../../shared/orders.js";
+import { inheriting } from "../../shared/tags.js";
 import type { AiPort } from "../ai.js";
 import { aiCategorizer } from "../categorize/ai.js";
 import { categorize, placed, representative } from "../categorize/chain.js";
@@ -176,11 +177,13 @@ export async function readCharge(
   const request = await buildRequest(ledger, { id: book, name: info.name }, [incoming]);
   const decision = chain.length ? ((await categorize(chain, request)).get(incoming.id) ?? {}) : {};
   const staged = placed(postings, incoming, decision);
-  // Read into a transaction, its paying side stays as it is (its part, its reconciliation).
+  // Read into a transaction, its paying side stays as it is (its part, its reconciliation), and
+  // the items take the tags of the splits they replace.
   const own = target?.postings.find(
     (p) => p.account === account && !!p.units && sameNumber(p.units.number, charge.amount)
   );
-  const final = [own ?? staged[0]!, ...staged.slice(1)];
+  const replaced = target?.postings.filter((p) => p !== own) ?? [];
+  const final = [own ?? staged[0]!, ...inheriting(staged.slice(1), replaced)];
 
   // Open what it posts to that isn't there yet: the placeholders, a line's own account (a gift
   // card's, as the shop's settings name it), and (with account creation on) what the AI proposed.
@@ -229,7 +232,6 @@ export async function readCharge(
           flag: "!",
           payee: decision.payee?.payee ?? shopName(charge.shop),
           narration: "",
-          tags: [],
           links: [],
           meta: { source: "order", ...marks },
           postings: final as TransactionIn["postings"],

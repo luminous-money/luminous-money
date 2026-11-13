@@ -192,9 +192,10 @@ describe("importing CSVs", () => {
     };
     assert.deepEqual([imported.batch.staged, imported.batch.matched], [1, 1]);
     const cafe = imported.rows.find((r) => r.description === "CORNER CAFE")!;
+    // Confirmed already, so the match is final at once.
     assert.deepEqual(
       [cafe.outcome, cafe.transaction_id, cafe.match],
-      ["matched", manual!.id, "proposed"]
+      ["matched", manual!.id, "confirmed"]
     );
     assert.deepEqual(
       cafe.candidates.map((c) => [c.transaction_id, c.days]),

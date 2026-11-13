@@ -104,17 +104,39 @@ def _backfill_split_flags(conn: sqlite3.Connection) -> None:
 
 
 def _backfill_tags(conn: sqlite3.Connection) -> None:
-    """Fill in migration 12's table from the transactions written before it."""
-    from . import engine
+    """Fill in migration 12's table from the transactions written before it. Beancount's own tags,
+    read with its parser: the engine reads tags per split since migration 14, which drops this
+    table."""
+    from beancount.parser import parser
 
     rows = conn.execute(
         "SELECT id, book_id, text FROM directive WHERE deleted = 0 AND kind = 'transaction' AND text LIKE '%#%'"
     ).fetchall()
     for row in rows:
         stamp = now()
+        entries, _, _ = parser.parse_string(row[2])
         conn.executemany(
             "INSERT INTO transaction_tag (directive_id, book_id, tag, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-            [(row[0], row[1], tag, stamp, stamp) for tag in engine.parse_one(row[2], row[0]).tags],
+            [(row[0], row[1], tag, stamp, stamp) for entry in entries for tag in sorted(entry.tags or ())],
+        )
+
+
+def _backfill_split_tags(conn: sqlite3.Connection) -> None:
+    """Fill in migration 14's table from the postings written before it."""
+    from . import engine
+
+    rows = conn.execute(
+        "SELECT id, book_id, text FROM directive WHERE deleted = 0 AND kind = 'transaction' AND text LIKE '%tags:%'"
+    ).fetchall()
+    for row in rows:
+        stamp = now()
+        conn.executemany(
+            "INSERT INTO posting_tag (directive_id, idx, book_id, tag, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            [
+                (row[0], idx, row[1], tag, stamp, stamp)
+                for idx, p in enumerate(engine.parse_one(row[2], row[0]).postings)
+                for tag in p.tags
+            ],
         )
 
 
@@ -309,6 +331,24 @@ MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
         ),
         "CREATE INDEX fund_line_book ON fund_line(book_id, fund)",
         _backfill_funds,
+    ],
+    # 14: tags per split (2026-11-12). A tag is a split's, its posting's `tags:`, so filters and
+    # reports read which splits have one with SQL. A transaction's own Beancount `#tag`s aren't
+    # read any more (Kael: the tags already used can go), so their table goes too.
+    [
+        create_table(
+            "posting_tag",
+            [
+                "directive_id TEXT NOT NULL REFERENCES directive(id) ON DELETE CASCADE",
+                "idx INTEGER NOT NULL",
+                "book_id TEXT NOT NULL",
+                "tag TEXT NOT NULL",
+            ],
+            ["PRIMARY KEY (directive_id, idx, tag)"],
+        ),
+        "CREATE INDEX posting_tag_book ON posting_tag(book_id, tag)",
+        "DROP TABLE transaction_tag",
+        _backfill_split_tags,
     ],
 ]
 

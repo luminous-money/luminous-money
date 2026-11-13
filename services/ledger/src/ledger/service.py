@@ -654,7 +654,8 @@ class Ledger:
     ) -> list[models.CompactTransaction]:
         """Every transaction dated `date_from` or later (or every one), oldest first, in compact
         form: the context categorizers work from, and reports' posting stream, read with plain SQL
-        so a long window stays fast. With `tags`, only those with all of them (M17). With `lens`
+        so a long window stays fast. With `tags`, only those with a split that has all of them
+        (M17), every split kept: each says its own tags. With `lens`
         "outflows", as outflows read them (outflows.py, Loans step 2)."""
         out = self._compact(book_id, date_from, tags)
         return self.outflows(book_id, out) if lens == "outflows" else out
@@ -702,14 +703,19 @@ class Ledger:
             )
             out[-1].postings.append(
                 models.CompactPosting(
-                    account=r["account"], amount=amount, reconciled=r["reconciled"], flag=r["posting_flag"], memo=r["memo"]
+                    account=r["account"],
+                    amount=amount,
+                    reconciled=r["reconciled"],
+                    flag=r["posting_flag"],
+                    memo=r["memo"],
+                    tags=split_tags(r["split_tags"]),
                 )
             )
         return out
 
     def tags(self, book_id: str) -> list[models.TagUse]:
-        """The book's tags, alphabetically, with how many transactions have each and their first
-        and last dates (M17)."""
+        """The book's tags, alphabetically, with how many transactions have a split with each and
+        their first and last dates (M17)."""
         self._header(book_id)
         return [models.TagUse(**dict(r)) for r in self.store.tags(book_id)]
 
@@ -775,7 +781,8 @@ class Ledger:
         outward from any one until the whole ledger is. Running balances accumulate from the
         oldest transaction, unconfirmed ones included; after an amount only booking could work
         out, they're unknown (None). With `reconciled`, only the rows that are (or aren't); with
-        `tags`, only those with all of them (M17): either way, the balances stay the account's.
+        `tags`, only those with a split (in any account) that has all of them (M17): either way,
+        the balances stay the account's.
         """
         rows = []
         totals: dict[str, Decimal] | None = {}
@@ -825,7 +832,8 @@ class Ledger:
         if reconciled is not None:
             rows = [r for r in rows if (r[1].reconciled is not None) == reconciled]
         if tags:
-            rows = [r for r in rows if set(tags) <= set(r[1].tags)]
+            kept = self.store.with_tags(book_id, tags)
+            rows = [r for r in rows if r[1].id in kept]
         if after:  # the `limit` rows just newer, so up to the row it names
             end = sum(1 for r in rows if r[0] > _ledger_key(after))
             top = max(end - limit, 0)
@@ -861,8 +869,8 @@ class Ledger:
         """Every transaction in the book, newest first, in keyset pages as an account's ledger
         has them (`cursor`: older than a row; `after`: just newer; `date`: from it back), read
         with plain SQL a page at a time. With `reconciled`, only those whose asset and liability
-        postings all are, or those with one that isn't; with `tags`, only those with all of them
-        (M17); with `search`, only those whose payee, narration or a split's memo has every word
+        postings all are, or those with one that isn't; with `tags`, only those with a split that
+        has all of them (M17); with `search`, only those whose payee, narration or a split's memo has every word
         of it; with `accounts`, only those with a split in any of them or under one."""
         roots = self.reconciling_roots(self._header(book_id))
         filtered = None if reconciled is None else (reconciled, roots)
@@ -899,7 +907,9 @@ class Ledger:
         for p in self.store.postings_of([r["id"] for r in page]) if page else []:
             amount = models.Amount(number=p["amount"], currency=p["amount_currency"]) if p["amount"] is not None else None
             postings.setdefault(p["directive_id"], []).append(
-                models.CompactPosting(account=p["account"], amount=amount, reconciled=p["reconciled"])
+                models.CompactPosting(
+                    account=p["account"], amount=amount, reconciled=p["reconciled"], tags=split_tags(p["split_tags"])
+                )
             )
 
         def is_reconciled(mine: list[models.CompactPosting]) -> bool | None:

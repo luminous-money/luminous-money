@@ -2,7 +2,7 @@
 
 Reads shops' order histories for a book, Amazon first, at `/api/shops/v1`, and hands the
 charges it reads to `app`, which itemizes them into the book ([the Amazon orders
-plan](../../docs/milestones/amazon-orders/PLAN.md)). It signs in to Amazon as the book's manager.
+plan](../../docs/milestones/.archived/amazon-orders/PLAN.md)). It signs in to Amazon as the book's manager.
 Tests: `tests/` (pytest, run by `pnpm test`).
 
 Amazon has no API for a shopper's orders, so this parses Amazon's own pages through

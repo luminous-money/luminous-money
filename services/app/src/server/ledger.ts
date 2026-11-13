@@ -109,7 +109,8 @@ export interface LedgerPort {
   ): Promise<Transaction[]>;
   transaction(book: string, id: string): Promise<Transaction>;
   /** Every transaction from `from` on (or every one), oldest first, compactly: categorizers'
-   * context and reports' stream. With `tags`, only those with every one (M17). */
+   * context and reports' stream. With `tags`, only those with a split that has every one (M17),
+   * every split kept, each with its own tags. */
   compact(
     book: string,
     from?: string,

@@ -36,7 +36,7 @@ const PALETTE = [
  * unconfirmed transactions and those kept out of budgets.
  *
  * Filtered by tags (M17, `?tag=`, repeated): cash flow, the breakdown and the largest count only
- * the transactions with every one; the breakdown starts on All time and the largest covers all
+ * the splits with every one (a receipt's tagged item, not the rest of it); the breakdown starts on All time and the largest covers all
  * time (a tag is usually a trip or a project, not this month's); net worth, which is balances,
  * is set aside.
  *
@@ -103,7 +103,7 @@ export function Reports({ book }: { book: string }) {
           />
           {tags.length > 0 && (
             <p className="small muted">
-              Only transactions tagged {tagList(tags)}.{" "}
+              Only splits tagged {tagList(tags)}.{" "}
               <Link
                 href={withBack(
                   `/books/${book}/transactions?${query(tags, "outflows")}`,

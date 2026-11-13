@@ -101,9 +101,13 @@ test("Commodities lists prices and their sources, and fetches now", async ({ pag
   await page.goto(`/ui/books/${book.id}/commodities`);
 
   const vti = page.getByRole("article", { name: "VTI" });
+  // The latest price is the file's (by hand); the morning's fetch asks its source.
   await expect(vti).toContainText("$230.00");
-  await expect(vti).toContainText("fetched from USD:ledger.price_sources.fixed/VTI");
+  await expect(vti).toContainText(
+    "entered by hand · fetches from USD:ledger.price_sources.fixed/VTI"
+  );
   await page.getByRole("button", { name: "Fetch prices now" }).click();
   await expect(vti).toContainText("$100"); // the fixed source
+  await expect(vti).toContainText("fetched from USD:ledger.price_sources.fixed/VTI");
   await expect(page.getByText(`Prices last fetched ${day(0)}`)).toBeVisible();
 });

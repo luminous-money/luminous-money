@@ -190,7 +190,6 @@ export function describe(rule: Rule): string {
 export type TransactionTemplate = {
   payee: string | null;
   narration: string;
-  tags: string[];
   links: string[];
   /** Fund lines every occurrence carries (Funds A). */
   funds?: FundLine[];
@@ -201,6 +200,8 @@ export type TransactionTemplate = {
     /** How far an imported amount may be from this split's, either way, and still match it
      * (a decimal string; absent or "0" for exact). Kept in the schedule, not the books. */
     tolerance?: string | null;
+    /** Its tags, which every occurrence's split has. */
+    tags?: string[];
     [more: string]: unknown;
   }[];
 };

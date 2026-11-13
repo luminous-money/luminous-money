@@ -1,8 +1,8 @@
 /**
  * Migrate from another system (GnuCash, for now): the book's chart of accounts and history
  * brought in, then optionally bank feeds and the AI, the reference, rules from history, and
- * suggestions for everything uncategorized (docs/milestones/migrate-from-another-system). The
- * steps are listed with what each did; progress is kept on the server, so it can be left (to
+ * suggestions for everything uncategorized (docs/milestones/.archived/migrate-from-another-system).
+ * The steps are listed with what each did; progress is kept on the server, so it can be left (to
  * wait a day for SimpleFIN, say) and picked up. The history read from the files is kept; the
  * files themselves aren't, so a step that needs one asks again. Finishing makes its entry points
  * go.

@@ -6,8 +6,11 @@
 - **Every finalized change set updates RESUME.md** (state, next steps, anything a newcomer needs
   to pick up the work), and checks off or adds items in docs/PLAN.md. A change set isn't done until
   both are current.
-- **Design decisions go in docs/design.md, with their reasons.** Undecided questions go in
-  docs/PLAN.md's open questions.
+- **Milestones live in `docs/milestones/<milestone>/`;** a done one moves to
+  `docs/milestones/.archived/`, and what it leaves over goes to
+  [M99: Follow-ups](docs/milestones/m99-follow-ups/PLAN.md).
+- **Design decisions go in docs/design.md, with their reasons.** Undecided questions go in their
+  milestone's plan, or M99's open questions when no milestone ahead holds them.
 - **Before calling a change done, run `pnpm test`, plus `pnpm e2e` if it touches the API, the
   stack, routing or the UI.** UI behavior gets a browser test in `tests/ui`. If the ledger's API
   changed, run `pnpm generate` and commit the result; the check fails otherwise.

@@ -212,7 +212,6 @@ export function occurrenceTransaction(
     flag: s.auto_confirm ? "*" : "!",
     payee: template.payee,
     narration: template.narration,
-    tags: template.tags,
     links: template.links,
     ...(template.funds?.length ? { funds: template.funds } : {}),
     meta: { ...template.meta, [SCHEDULE_KEY]: s.id, [SCHEDULE_DATE_KEY]: occurrence.nominal },

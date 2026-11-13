@@ -86,7 +86,7 @@ describe("importing a file", () => {
     expect(ledger.created).toHaveLength(2); // the uncategorized accounts, once
   });
 
-  it("a row that's the same as a transaction in the account claims it, proposed for review", async () => {
+  it("a row that's the same as a transaction in the account claims it; a confirmed one, for good", async () => {
     const manual = ledger.addTransaction({
       date: "2024-03-06",
       flag: "*",
@@ -100,10 +100,11 @@ describe("importing a file", () => {
     const result = await run();
 
     const [first, second] = result.rows.filter((r) => r.description === "CORNER CAFE");
+    // Confirmed already, so the match is final at once (one unconfirmed is proposed for review).
     expect(first).toMatchObject({
       outcome: "matched",
       transaction_id: manual.id,
-      match: "proposed",
+      match: "confirmed",
     });
     expect(first!.candidates).toEqual([
       expect.objectContaining({

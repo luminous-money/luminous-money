@@ -1111,8 +1111,8 @@ export interface paths {
     };
     /**
      * Tags
-     * @description The book's tags (M17), alphabetically: each with how many transactions have it, and
-     *     the first and last of their dates. A tag exists while a transaction has it.
+     * @description The book's tags (M17), alphabetically: each with how many transactions have a split with
+     *     it, and the first and last of their dates. A tag exists while a split has it.
      */
     get: operations["tags_api_ledger_v1_books__book_id__tags_get"];
     put?: never;
@@ -1192,7 +1192,7 @@ export interface paths {
     /**
      * Compact Transactions
      * @description Every transaction from a date on, oldest first, with only payee, narration, whether it
-     *     counts against budgets, its tags, and each posting's account and amount: the context
+     *     counts against budgets, and each posting's account, amount and tags: the context
      *     categorizers work from, and reports' posting stream. Not paged.
      */
     get: operations["compact_transactions_api_ledger_v1_books__book_id__transactions_compact_get"];
@@ -1842,6 +1842,11 @@ export interface components {
       /** Price Date */
       price_date: string | null;
       /**
+       * Price From
+       * @description Where the latest price came from: a bank feed's holdings, a price source, or entered by hand; null without one.
+       */
+      price_from: ("bank" | "fetched" | "hand") | null;
+      /**
        * Price Source
        * @description Where prices are fetched from, as beanprice reads it: "USD:yahoo/VTI".
        */
@@ -1883,6 +1888,11 @@ export interface components {
        * @description The statement it was reconciled with (M14).
        */
       reconciled?: string | null;
+      /**
+       * Tags
+       * @description Its tags, sorted.
+       */
+      tags?: string[];
     };
     /**
      * CompactTransaction
@@ -1917,7 +1927,7 @@ export interface components {
       postings: components["schemas"]["CompactPosting"][];
       /**
        * Tags
-       * @description Its tags, sorted (M17).
+       * @description Every tag its splits have, sorted.
        */
       tags?: string[];
     };
@@ -2571,7 +2581,7 @@ export interface components {
       reconciled?: boolean | null;
       /**
        * Tags
-       * @description Its tags, sorted (M17).
+       * @description Every tag its splits have, sorted.
        */
       tags?: string[];
       /** Updated At */
@@ -2651,7 +2661,7 @@ export interface components {
       splits: number;
       /**
        * Tags
-       * @description Its tags, sorted (M17).
+       * @description Every tag its splits have, sorted.
        */
       tags?: string[];
       /** Updated At */
@@ -2780,6 +2790,11 @@ export interface components {
       };
       /** @description Per-unit price, as in `@`. */
       price?: components["schemas"]["Amount"] | null;
+      /**
+       * Tags
+       * @description Its tags, sorted: a split's (a transaction's are its splits'). In the books, its `tags:`.
+       */
+      tags?: string[];
       /** @description Omit to let booking fill in the balancing amount. */
       units?: components["schemas"]["Amount"] | null;
     };
@@ -2794,6 +2809,11 @@ export interface components {
       date: string;
       /** @description What one unit was worth, in a currency. */
       price: components["schemas"]["Amount"];
+      /**
+       * Source
+       * @description Where it came from: "bank" (a bank feed's holdings) or "fetched" (a price source); none when it's entered by hand.
+       */
+      source?: ("bank" | "fetched") | null;
     };
     /** PriceOn */
     PriceOn: {
@@ -3106,7 +3126,7 @@ export interface components {
     };
     /**
      * TagUse
-     * @description A tag the book's transactions have (M17): a tag exists while one does.
+     * @description A tag the book's splits have (M17): a tag exists while one does.
      */
     TagUse: {
       /**
@@ -3125,7 +3145,7 @@ export interface components {
       name: string;
       /**
        * Transactions
-       * @description How many transactions have it.
+       * @description How many transactions have a split with it.
        */
       transactions: number;
     };
@@ -3245,8 +3265,6 @@ export interface components {
       payee?: string | null;
       /** Postings */
       postings: components["schemas"]["Posting"][];
-      /** Tags */
-      tags?: string[];
       /**
        * Updated At
        * @description Changes on every write; send it back with edits.
@@ -3304,8 +3322,6 @@ export interface components {
       payee?: string | null;
       /** Postings */
       postings?: components["schemas"]["Posting"][] | null;
-      /** Tags */
-      tags?: string[] | null;
       /**
        * Updated At
        * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
@@ -3350,8 +3366,6 @@ export interface components {
       payee?: string | null;
       /** Postings */
       postings: components["schemas"]["Posting"][];
-      /** Tags */
-      tags?: string[];
     };
     /**
      * TransactionPatch
@@ -3384,8 +3398,6 @@ export interface components {
       payee?: string | null;
       /** Postings */
       postings?: components["schemas"]["Posting"][] | null;
-      /** Tags */
-      tags?: string[] | null;
       /**
        * Updated At
        * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
@@ -3433,8 +3445,6 @@ export interface components {
       payee?: string | null;
       /** Postings */
       postings: components["schemas"]["Posting"][];
-      /** Tags */
-      tags?: string[];
       /**
        * Updated At
        * @description The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.
@@ -4208,7 +4218,7 @@ export interface operations {
         limit?: number;
         /** @description Only reconciled transactions (true), or only those not (false). */
         reconciled?: boolean | null;
-        /** @description Only transactions with every tag given (M17); repeat it for several. */
+        /** @description Only transactions with a split that has every tag given (M17); repeat it for several. */
         tag?: string[] | null;
       };
       header?: never;
@@ -5794,7 +5804,7 @@ export interface operations {
         limit?: number;
         /** @description Only reconciled transactions (true), or only those not (false). */
         reconciled?: boolean | null;
-        /** @description Only transactions with every tag given (M17); repeat it for several. */
+        /** @description Only transactions with a split that has every tag given (M17); repeat it for several. */
         tag?: string[] | null;
         /** @description Only transactions whose payee, narration or a split's memo has every word of it. */
         q?: string | null;
@@ -6328,7 +6338,7 @@ export interface operations {
       query?: {
         /** @description The first date included; every one without it. */
         from?: string | null;
-        /** @description Only transactions with every tag given (M17); repeat it for several. */
+        /** @description Only transactions with a split that has every tag given (M17); repeat it for several. */
         tag?: string[] | null;
         /** @description `outflows`: as outflows read them (Loans): what's paid into an asset or liability that counts as spending is added as spending (`outflow_of`), and the expenses paid out of one are masked. */
         lens?: "outflows" | null;

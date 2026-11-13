@@ -30,6 +30,7 @@ UNREALIZED_GAINS = "Income:Unrealized-Gains"
 REVALUATION_KEY = "revaluation"
 STALE_AFTER_KEY = "stale-after"
 PRICE_SOURCE_KEY = "price"
+PRICE_FROM_KEY = "source"  # on a price directive: "bank" or "fetched"; none by hand
 NAME_KEY = "name"
 DEFAULT_STALE_AFTER = 7
 
@@ -332,9 +333,12 @@ def price_list(ledger, book_id: str, commodity: str) -> list[models.PriceOut]:
 
 
 def add_price(ledger, book_id: str, p: models.PriceIn) -> models.PriceOut:
-    """Record a price. One per commodity, quote currency and date: a second replaces the first."""
+    """Record a price. One per commodity, quote currency and date: a second replaces the first.
+    Where it came from (a bank feed's holdings, a price source) is its `source:`."""
     ledger._header(book_id)
     text = f"{p.date.isoformat()} price {p.commodity} {p.price.number} {p.price.currency}\n"
+    if p.source:
+        text += f'  {PRICE_FROM_KEY}: "{p.source}"\n'
     same = [
         r
         for r in ledger.store.price_history(book_id, p.commodity)
@@ -360,6 +364,12 @@ def commodity_list(ledger, book_id: str) -> list[models.CommodityOut]:
             (book_id,),
         )
     }
+    # Each commodity's latest price's directive (in the operating currency, if it has one there),
+    # for where it came from.
+    latest: dict[str, str] = {}
+    for r in ledger.store.latest_prices(book_id, datetime.date.today().isoformat()):
+        if r["commodity"] not in latest or r["currency"] == target:
+            latest[r["commodity"]] = r["directive_id"]
     out = []
     for currency in sorted(seen - {target}):
         meta = declared.get(currency)
@@ -373,10 +383,19 @@ def commodity_list(ledger, book_id: str) -> list[models.CommodityOut]:
                 stale_after=meta.stale_after if meta else DEFAULT_STALE_AFTER,
                 price=models.Amount(number=engine.decimal_text(found[0]), currency=target) if found else None,
                 price_date=found[1] if found else None,
+                price_from=_price_from(ledger, book_id, latest[currency]) if found and currency in latest else None,
                 updated_at=meta.updated_at if meta else None,
             )
         )
     return out
+
+
+def _price_from(ledger, book_id: str, directive_id: str) -> str:
+    """Where a price directive came from: its `source:`, else entered by hand."""
+    row = ledger.store.get(book_id, directive_id)
+    entries, _, _ = parser.parse_string(row.text) if row else ([], None, None)
+    source = entries[0].meta.get(PRICE_FROM_KEY) if entries else None
+    return source if source in ("bank", "fetched") else "hand"
 
 
 def set_commodity(ledger, book_id: str, currency: str, c: models.CommodityIn) -> models.CommodityOut:
@@ -701,7 +720,11 @@ def prices_on(ledger, book_id: str, q: models.PricesOnIn) -> list[models.PriceOn
             continue
         number = engine.decimal_text(Decimal(found).quantize(Decimal("0.000001")))
         number = number.rstrip("0").rstrip(".") if "." in number else number
-        add_price(ledger, book_id, models.PriceIn(date=day, commodity=q.commodity, price=models.Amount(number=number, currency=target)))
+        add_price(
+            ledger,
+            book_id,
+            models.PriceIn(date=day, commodity=q.commodity, price=models.Amount(number=number, currency=target), source="fetched"),
+        )
         out.append(models.PriceOn(date=day, price=models.Amount(number=number, currency=target), source="fetched"))
     return out
 
@@ -747,6 +770,7 @@ def fetch_prices(ledger, book_id: str, on: datetime.date | None = None) -> model
                         date=date,
                         commodity=c.currency,
                         price=models.Amount(number=engine.decimal_text(number), currency=quote),
+                        source="fetched",
                     ),
                 )
             fetched.append(

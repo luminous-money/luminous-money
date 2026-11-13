@@ -1,6 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { problems, seedBook, stageMany, stored, type Seeded } from "./support.js";
+import {
+  editSplit,
+  problems,
+  seedBook,
+  splitRows,
+  stageMany,
+  stored,
+  type Seeded,
+} from "./support.js";
 
 let seeded: Seeded;
 
@@ -82,20 +90,26 @@ test("a transaction can be split in the detail view, with one amount left to bal
   await item(page, "Costco").getByRole("link", { name: "Split…" }).click();
   await expect(page.getByRole("heading", { name: "Transaction" })).toBeVisible();
 
-  const accounts = page.getByRole("button", { name: /^Account:/ });
-  const amounts = page.getByRole("textbox", { name: "Amount" });
-
-  await accounts.nth(1).click();
-  await page.getByRole("combobox", { name: "Account" }).fill("groc");
+  // The category's split, opened in the split editor: Enter saves it back to the page.
+  await splitRows(page).nth(1).click();
+  const editor = page.getByRole("dialog", { name: "Split", exact: true });
+  await editor.getByRole("button", { name: /^Account:/ }).click();
+  await editor.getByRole("combobox", { name: "Account" }).fill("groc");
   await page.keyboard.press("Enter");
-  await amounts.nth(1).fill("100.00");
+  await editor.getByRole("textbox", { name: "Amount" }).fill("100.00");
+  await page.keyboard.press("Enter");
+  await expect(editor).toBeHidden();
+  await expect(splitRows(page).nth(1)).toContainText("Expenses:Food:Groceries");
 
+  // A new one starts blank, searching for its account.
   await page.getByRole("button", { name: "+ Add split" }).click();
-  await accounts.nth(2).click();
-  await page.getByRole("combobox", { name: "Account" }).fill("supplies");
+  const added = page.getByRole("dialog", { name: "New split" });
+  await added.getByRole("combobox", { name: "Account" }).fill("supplies");
   await page.keyboard.press("Enter");
+  await added.getByRole("button", { name: "Save" }).click();
 
   await expect(page.getByText("Balanced. The blank amount will be $50.00.")).toBeVisible();
+  await expect(splitRows(page).nth(2)).toContainText("$50.00 auto");
   await page.getByRole("button", { name: "Confirm" }).click();
 
   await expect(page).toHaveURL(new RegExp(`/ui/books/${seeded.book}/review$`));
@@ -114,7 +128,7 @@ test("unbalanced splits can't be saved", async ({ page }) => {
   await openQueue(page);
   await item(page, "Grocer").getByRole("link", { name: "Split…" }).click();
 
-  await page.getByRole("textbox", { name: "Amount" }).nth(1).fill("80.00");
+  await editSplit(page, 1, { amount: "80.00" });
 
   await expect(page.getByText("Off by -2.10 USD")).toBeVisible();
   await expect(page.getByRole("button", { name: "Save" })).toBeDisabled();
@@ -196,7 +210,7 @@ test("a search and a filter by accounts narrow the queue, and Back keeps them", 
   await expect(queue(page)).toHaveCount(3);
 });
 
-test("a card is tagged where it is", async ({ page }) => {
+test("a card is tagged where it is, on what the money was for", async ({ page }) => {
   await openQueue(page);
   const tags = item(page, "Grocer").getByRole("combobox", { name: "Tags" });
   await tags.fill("Weekly Run");
@@ -204,9 +218,12 @@ test("a card is tagged where it is", async ({ page }) => {
   await expect(
     item(page, "Grocer").getByRole("button", { name: "Remove #weekly-run" })
   ).toBeVisible();
+  // The split being categorized, not the card's side.
   await expect
-    .poll(async () => (await stored(seeded.book, seeded.ids["Grocer"]!)).tags)
-    .toEqual(["weekly-run"]);
+    .poll(async () =>
+      (await stored(seeded.book, seeded.ids["Grocer"]!)).postings.map((p) => p.tags)
+    )
+    .toEqual([[], ["weekly-run"]]);
   expect((await stored(seeded.book, seeded.ids["Grocer"]!)).flag).toBe("!");
 });
 

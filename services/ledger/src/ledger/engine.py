@@ -61,6 +61,10 @@ CARDS_KEY = "cards"
 CARD_BRANDS = ("visa", "mastercard", "amex", "discover", "other")
 # On a posting: what it is, in words ("Eggs Hppy 18", a receipt's line) (M16).
 MEMO_KEY = "memo"
+# On a posting: its tags, one string, "#gift #hsa-eligible" (tags are a split's since
+# 2026-11-12). A transaction's own Beancount `#tag`s aren't read.
+TAGS_KEY = "tags"
+_TAG = re.compile(r"[A-Za-z0-9\-_/.]+")
 # Funds (Funds A): on a transaction, its fund lines, one string: "Emergency +500.00 USD; Wedding
 # -20.00 USD" (`+` into the fund, `-` out of it). A fund is a `custom "fund"` directive; a move
 # between funds a `custom "fund-move"`. Unallocated is what isn't in a fund: never a line.
@@ -110,6 +114,7 @@ class Posting:
     reconciled: datetime.date | None = None  # its `reconciled:` statement date (M14)
     flag: str | None = None  # `!`: a split still to confirm (M16)
     memo: str | None = None  # its `memo:` (M16)
+    tags: tuple[str, ...] = ()  # its `tags:`, sorted
 
 
 @dataclass(frozen=True)
@@ -124,7 +129,6 @@ class Directive:
     narration: str | None = None  # transactions only
     price: tuple[str, Decimal, str] | None = None  # price directives only: commodity, number, currency
     budgeted: bool = True  # transactions only: False with `budget: FALSE`, kept out of budgets (M11)
-    tags: tuple[str, ...] = ()  # transactions only, sorted (M17)
     # A transaction's fund lines, or a fund move's two sides (Unallocated's left out): (fund,
     # signed number, commodity), `+` into the fund (Funds A).
     funds: tuple[tuple[str, Decimal, str], ...] = ()
@@ -224,6 +228,7 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
                 reconciled=_mark(p.meta),
                 flag=p.flag,
                 memo=_memo(p.meta),
+                tags=tuple(tags_of(p.meta)),
             )
             for p, amount in zip(entry.postings, amounts)
         )
@@ -238,7 +243,6 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
         narration=getattr(entry, "narration", None),
         price=(entry.currency, entry.amount.number, entry.amount.currency) if isinstance(entry, data.Price) else None,
         budgeted=not (isinstance(entry, data.Transaction) and entry.meta.get(BUDGET_KEY) is False),
-        tags=tuple(sorted(entry.tags or ())) if isinstance(entry, data.Transaction) else (),
         funds=_fund_lines_of(entry),
     )
 
@@ -246,6 +250,34 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
 def _memo(meta: dict | None) -> str | None:
     value = (meta or {}).get(MEMO_KEY)
     return value if isinstance(value, str) and value else None
+
+
+def tags_of(meta: dict | None) -> list[str]:
+    """A posting's `tags:`, sorted: whitespace apart, each with or without its `#`. Refused
+    (ParseFailure) if it isn't a string of tags Beancount allows."""
+    value = (meta or {}).get(TAGS_KEY)
+    if value is None:
+        return []
+    if not isinstance(value, str):
+        raise ParseFailure([f"{TAGS_KEY}: must be a string"])
+    tags = {word.removeprefix("#") for word in value.split()}
+    bad = sorted(tag for tag in tags if not _TAG.fullmatch(tag))
+    if bad:
+        raise ParseFailure([f"{TAGS_KEY}: {bad[0]!r} isn't a tag (letters, digits, -, _, / and .)"])
+    return sorted(tags)
+
+
+def tags_text(tags: list[str]) -> str:
+    """A posting's `tags:` value: "#gift #hsa-eligible"."""
+    return " ".join(f"#{tag}" for tag in sorted(set(tags)))
+
+
+def _posting_meta_in(p: models.Posting) -> dict[str, Any] | None:
+    """A posting's metadata as written: its own, with its tags as `tags:`."""
+    meta = {k: v for k, v in _meta_in(p.meta).items() if k != TAGS_KEY}
+    if p.tags:
+        meta[TAGS_KEY] = tags_text(p.tags)
+    return meta or None
 
 
 def confirmed(entry: data.Transaction) -> data.Transaction:
@@ -359,7 +391,7 @@ def transaction_directive(t: models.TransactionIn, directive_id: str | None = No
         flag=t.flag,
         payee=t.payee,
         narration=t.narration,
-        tags=frozenset(t.tags),
+        tags=frozenset(),
         links=frozenset(t.links),
         postings=[
             data.Posting(
@@ -368,7 +400,7 @@ def transaction_directive(t: models.TransactionIn, directive_id: str | None = No
                 cost=_cost_in(p.cost),
                 price=_amount_in(p.price) if p.price else None,
                 flag=p.flag,
-                meta=_meta_in(p.meta) or None,
+                meta=_posting_meta_in(p),
             )
             for p in t.postings
         ],
@@ -663,7 +695,6 @@ def _transaction_model(entry: data.Transaction) -> models.TransactionIn:
         flag=entry.flag,
         payee=entry.payee,
         narration=entry.narration or "",
-        tags=sorted(entry.tags or ()),
         links=sorted(entry.links or ()),
         funds=[fund_line(line) for line in _fund_lines_of(entry)] or None,
         meta=_meta_out({k: v for k, v in entry.meta.items() if k != FUNDS_KEY}),
@@ -674,7 +705,8 @@ def _transaction_model(entry: data.Transaction) -> models.TransactionIn:
                 cost=_cost_out(p.cost),
                 price=_amount_out(p.price),
                 flag=p.flag,
-                meta=_meta_out(p.meta),
+                tags=tags_of(p.meta),
+                meta=_meta_out({k: v for k, v in (p.meta or {}).items() if k != TAGS_KEY}),
             )
             for p in entry.postings
         ],

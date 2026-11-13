@@ -41,7 +41,6 @@ const rent = (over: Partial<ScheduleIn["rule"]> = {}): ScheduleIn => ({
   template: {
     payee: "Landlord",
     narration: "Rent",
-    tags: [],
     links: [],
     meta: {},
     postings: [
@@ -254,6 +253,29 @@ describe("answers to M3's questions", () => {
     expect(imported.rows.map((r) => r.outcome)).toEqual(["matched", "staged"]); // 1530 is too far
     await confirmRow(db, ledger, "b", { batch: imported.batch.id, line: 2 });
     const rentPaid = ledger.transactions.find((t) => t.payee === "Landlord")!;
+    expect(rentPaid.postings.map((p) => p.units?.number ?? null)).toEqual(["-1510.00", null]);
+  });
+
+  it("a confirmed occurrence matched within its tolerance takes the bank's amount at once", async () => {
+    const tolerant = rent({ start: "2024-03-01" });
+    tolerant.template.postings[0]!.tolerance = "25.00";
+    await create({ ...tolerant, auto_confirm: true }, "2024-03-01");
+    const header = "Date,Description,Amount,Balance\n";
+    db.replaceProfiles("b", CHECKING, [guessProfile(`${header}03/02/2024,X,-1.00,1\n`)!]);
+
+    const imported = await importFile({
+      db,
+      ledger,
+      book: "b",
+      account: CHECKING,
+      filename: "f.csv",
+      text: `${header}03/02/2024,RENT,-1510.00,1\n`,
+      userId: "u",
+    });
+
+    expect(imported.rows.map((r) => [r.outcome, r.match])).toEqual([["matched", "confirmed"]]);
+    const rentPaid = ledger.transactions.find((t) => t.payee === "Landlord")!;
+    expect(rentPaid.flag).toBe("*");
     expect(rentPaid.postings.map((p) => p.units?.number ?? null)).toEqual(["-1510.00", null]);
   });
 

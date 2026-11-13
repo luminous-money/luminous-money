@@ -1,6 +1,6 @@
 /**
- * Migrating a book from another system (docs/milestones/migrate-from-another-system): its steps
- * and what each did, as the server keeps them and the PWA shows them.
+ * Migrating a book from another system (docs/milestones/.archived/migrate-from-another-system):
+ * its steps and what each did, as the server keeps them and the PWA shows them.
  */
 import type { PayeeReference } from "@luminous-money/ai-api";
 

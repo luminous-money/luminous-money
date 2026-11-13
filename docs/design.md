@@ -46,7 +46,7 @@ So:
   purposes; reports will be built on the generic ledger-graphs libraries (PLAN.md, M12).
   Bringing Fava back would only take an image, a route, and a loop writing exports for it.
 
-**The engine spike is done and proved the approach** (see [`services/ledger`](services/ledger)):
+**The engine spike is done and proved the approach** (see [`services/ledger`](../services/ledger)):
 
 - **Each directive is stored as its canonical Beancount text** plus derived columns for SQL.
 - **The engine renders a book's rows to text and runs Beancount's public `loader.load_string`.**
@@ -219,7 +219,7 @@ operator's job; that's still one choice of three.)
 
 ### Operating it: releases, upgrades, backups, logs, health
 
-From production readiness ([its plan](milestones/production-readiness/PLAN.md)). The aim: from
+From production readiness ([its plan](milestones/.archived/production-readiness/PLAN.md)). The aim: from
 finding it on GitHub to running it, on a laptop or a public server, in one command.
 
 - **Releases are version tags:** CI builds every image for both architectures onto GitHub's
@@ -562,6 +562,13 @@ How auth works (M8; the shape is M1's):
   as one of `app`'s daily jobs (alongside the schedule generator at midnight), for books with a
   time zone and owner. A price is recorded unless that date has one; failures are per
   commodity. `ledger.price_sources.fixed` is a no-network source for demos and tests.
+- **A price says where it came from** (Kael, 2026-11-12: prices a bank feed records every sync
+  said "entered by hand"): a price directive's `source:` is `"bank"` (a linked brokerage's
+  holdings, each sync) or `"fetched"` (beanprice, the morning's or a day's for a history), none
+  by hand (`PriceIn.source`). A commodity's `price_from` is its latest price's, read from that
+  directive's text as commodities' metadata is (no derived column), and Commodities says it:
+  "from the bank feed", "fetched from USD:yahoo/VTI", "entered by hand", and, beside a price
+  that wasn't fetched, the source the morning's fetch asks.
 
 ### Importing CSVs (M1)
 
@@ -1001,7 +1008,7 @@ same money in through another's, a day or so later. Both would sit in review, un
 
 ### Shops: reading Amazon (the Amazon orders spike, 2026-11-06)
 
-[The plan](milestones/amazon-orders/PLAN.md) has Kael's brief and answers; the service is
+[The plan](milestones/.archived/amazon-orders/PLAN.md) has Kael's brief and answers; the service is
 `services/shops` (its README has the routes).
 
 - **A service of its own, in Python** (`shops`, `/api/shops/v1`), mirroring `ai`: it owns each
@@ -1056,7 +1063,7 @@ same money in through another's, a day or so later. Both would sit in review, un
 
 ### Shops' orders in the book (Amazon orders, steps 2 and 3, 2026-11-07)
 
-[The plan](milestones/amazon-orders/PLAN.md) has Kael's answers. `app` knows nothing of Amazon's
+[The plan](milestones/.archived/amazon-orders/PLAN.md) has Kael's answers. `app` knows nothing of Amazon's
 pages: a shop's reader hands it charges (`shared/orders.ts`), and `server/orders/` does the rest.
 
 - **A charge is a receipt** (Kael: "look at these Amazon charges as simple receipts"): paid from
@@ -1128,43 +1135,73 @@ pages: a shop's reader hands it charges (`shared/orders.ts`), and `server/orders
     `splits`, no memos); with several splits their one-posting answer is the fallback.
   - **The AI is in the chain for receipts and Suggest categories** (a selection, or a
     migration's last step), not imports or bank feeds: whether those should ask it by themselves
-    is an open question (PLAN.md).
+    is an open question ([M99](milestones/m99-follow-ups/PLAN.md#open-questions)).
 
-### Tags (M17)
+### Tags (M17; a split's since 2026-11-12)
 
-- **A tag says why, or what a transaction was part of** (a trip, a project, something to claim
+- **A tag says why, or what something was part of** (a trip, a project, something to claim
   back); an account says what the money was for. Tags cut across accounts, so the questions
   they answer are "what did the trip cost, and on what?" and "which are still to claim?"
-- **Beancount's own `#tag`s, on transactions:** exports carry them and imported books keep
-  theirs (`pushtag` blocks included). Not on splits: Beancount has none there, and "part of
-  the trip" is about the whole transaction. No registry: a tag exists while a transaction has
-  it, without colors, descriptions or a hierarchy.
-- **Read with SQL:** a derived `transaction_tag` table (ledger migration 12), written with the
-  postings on every write, like `posting`; the text stays the source of truth. The ledger
-  lists a book's tags (`GET /books/{b}/tags`: each with its count and first and last dates)
-  and filters the journal, an account's ledger and the compact stream by `tag` (repeated:
-  only transactions with every one). An account's ledger filters after its running balances
-  are worked out, as the reconciliation filter does.
+- **Tags are a split's** (Kael, 2026-11-12: "moving tags from transaction level to split
+  level"): since receipts and Amazon orders, a transaction is often many items, and one of them
+  is the gift or the HSA-eligible one. M17 had Beancount's own `#tag`s, on transactions; they
+  were moved rather than kept beside split tags as a shorthand, at Kael's call ("no one else is
+  using this, and I'm happy to just lose any tags I've already used"). No registry: a tag
+  exists while a split has it, without colors, descriptions or a hierarchy.
+- **In the books, the posting's `tags:`** (`tags: "#gift #hsa-eligible"`, one string, since
+  Beancount metadata has no lists; the `#` so the text reads as tags and a search for `#gift`
+  finds them), read leniently and refused (422) when a word isn't a tag. The ledger's API has
+  them as `Posting.tags`, rendered into the metadata and read back out of it, so a split's
+  `meta` never holds `tags`, as a transaction's never holds `funds`. A transaction's own
+  `#tag`s (the ones M17 wrote, or an imported book's, `pushtag` blocks included) aren't read:
+  they stay in the text unseen until the transaction is next saved, which writes it without
+  them. Nothing rewrote them, since nothing reads them.
+- **Read with SQL:** a derived `posting_tag` table (ledger migration 14, which dropped M17's
+  `transaction_tag`), written with the postings on every write; the text stays the source of
+  truth. The ledger lists a book's tags (`GET /books/{b}/tags`: each with how many transactions
+  have a split with it, and their first and last dates) and filters the journal, an account's
+  ledger and the compact stream by `tag` (repeated): **a transaction is kept when one of its
+  splits has every tag,** so `#italy-2026` and `#gift` find the gift bought in Italy, not a
+  receipt with a dinner in Italy and a gift beside it. Lists show the whole transaction; an
+  account's ledger keeps a row whose tagged split is in another account, and filters after its
+  running balances are worked out, as the reconciliation filter does. Rows' `tags` are every tag
+  their splits have; the compact stream's and the journal's postings each have their own.
 - **What's typed is made a tag by one normalizer** (`shared/tags.ts`, as `names.ts` makes
   account names): lowercased, accents off, anything Beancount doesn't allow in a tag made one
   dash ("Trip to Italy!" is `trip-to-italy`), so `Vacation` and `vacation` can't be two tags.
   The ledger accepts any tag Beancount does (an imported `#Trip2019` keeps its capitals) and
   refuses the rest with a 422 rather than a parse error.
-- **Tagging:** the transaction page's Tags field (saved with the page), and Select mode's
-  **Add tag…** and **Remove tag…** (the latter offering only the selection's tags), each a
-  versioned PATCH per transaction like the other bulk actions. Changing tags doesn't ask
-  about a reconciled transaction: they don't touch amounts.
-- **Filtering:** ledgers and Transactions (the funnel's Tags, `?tag=`), and Reports (a filter at
-  the top, `?tag=`): cash flow, the breakdown and the largest count only the tagged ones. The
-  breakdown gains **All time** (ledger-graphs' `total` window, 0.1.2) and starts on it, and the
-  largest covers all time, since a tag usually marks a trip or a project rather than this
+- **Tagging a split:** each split's Tags are in its split editor (opened from the transaction
+  page's list of splits, each shown with its memo and tags; saved with the page), and Select
+  mode there tags several at once. A schedule's template uses the same splits, so its splits'
+  tags are seen and every occurrence carries them.
+- **Tagging a whole transaction** (a review card's Tags, Select mode's **Add tag…** and **Remove
+  tag…**): its tags read as its splits' together. **A tag added goes on what the money was
+  for,** the splits off the balance sheet (the expense, the income), or on every split when all
+  are on it (a transfer, a trade): the bank's side of a purchase is the same money, and Reports
+  never count it. **A tag removed comes off every split,** so what Remove tag… offers (the
+  selection's tags) is what it can remove. One rule (`shared/tags.ts`), each a versioned PATCH
+  of the postings like the other bulk actions; a card's edit is made from the latest copy, so a
+  category picked a moment before isn't undone. Changing tags doesn't ask about a reconciled
+  transaction: amounts and accounts don't change.
+- **Kept when splits are rewritten:** every edit to a split spreads the posting it had, so its
+  tags stay. Itemizing passes them on: a receipt or a shop's order read into a transaction
+  already here, or a category with several splits placed on a bank row, gives the new splits
+  the tags of the one they replace (a charge tagged `#italy-2026` in review, then read from its
+  receipt, stays the trip's). Pairing a transfer keeps each side's tags on its split.
+- **Filtering:** ledgers and Transactions (the funnel's Tags, `?tag=`), review (the same,
+  filtered in memory), and Reports (a filter at the top, `?tag=`): **cash flow, the breakdown
+  and the largest count only the splits with every tag,** a receipt's `#gift` and not the
+  groceries beside it (`reports.ts` keeps them from the compact stream; the outflows lens reads
+  the whole transaction first, and a split it adds carries the tags of the one it comes from).
+  The breakdown gains **All time** (ledger-graphs' `total` window, 0.1.2) and starts on it, and
+  the largest covers all time, since a tag usually marks a trip or a project rather than this
   month's spending. Net worth (balances) isn't filtered and is set aside, saying so; home's
   "Spent this month" and an account's "Typically" aren't filtered.
 - **Not funds:** a tag overlaps others and adds up to nothing, while setting money aside needs
   something exclusive and conserved. That's what funds are for (Funds A, below).
-- **Tags are the transaction's,** as Beancount's are, so a review card's Tags (2026-11-07) tag
-  the whole of it. One item tagged on its own would be per-split tags, noted in PLAN.md
-  ("Funds and tags per split").
+- **Funds stay the transaction's** for now; a split's fund is [split-level tags and
+  funds](milestones/split-level-tags-and-funds/PLAN.md)' second step.
 
 ### Search and the filter by accounts (2026-11-07)
 
@@ -1189,8 +1226,8 @@ Kael asked for both on review and Transactions.
 
 Funds say what money is *for*, as a second ledger beside the accounts (where it is). Funds A is
 the version with no rules (Kael: "I've held an easy version of this milestone hostage to a hard
-version"); Funds B ([its plan](milestones/funds/B/PLAN.md)) adds the rest, in steps: shares
-in funds first (below). The whole design, with Kael's answers, is [A's plan](milestones/funds/A/PLAN.md).
+version"); Funds B ([its plan](milestones/funds-b/PLAN.md)) adds the rest, in steps: shares
+in funds first (below). The whole design, with Kael's answers, is [A's plan](milestones/.archived/funds-a/PLAN.md).
 
 - **Money reaches or leaves a fund only when you say so:** a transaction's lines ("for
   Emergency", "from Emergency"), or a move between funds. Unallocated is net worth less every
@@ -1250,7 +1287,7 @@ in funds first (below). The whole design, with Kael's answers, is [A's plan](mil
 
 Funds hold any commodity, so Kael's Fidelity accounts are represented in funds: a brokerage whose
 funds hold cash and shares, and two IRAs that are wholly Retirement's. [B's
-plan](milestones/funds/B/PLAN.md) has the walkthrough and Kael's answers ("Decided with Kael").
+plan](milestones/funds-b/PLAN.md) has the walkthrough and Kael's answers ("Decided with Kael").
 
 - **Funds read a transaction one commodity at a time.** Each commodity's change is its
   balance-sheet splits' units, with Funds A's kind and cap per commodity. A buy is dollars out
@@ -1276,7 +1313,8 @@ plan](milestones/funds/B/PLAN.md) has the walkthrough and Kael's answers ("Decid
 - **Notifications** (Kael): a bell beside the camera (for writers, per book, always there, with a
   count) opens a queue, oldest first. A notification that waits on a condition isn't stored:
   it's read from the condition (here, the short transactions), so a fix made anywhere clears it,
-  and it can't outlive its problem. Dismissable kinds, when they come, will be stored in `app`.
+  and it can't outlive its problem. Dismissing is stored in `app`, per person (a bank feed's
+  problem, the first kind that can be: "Bank feeds", below).
 - **Default funds are Kael's earlier idea, made to fit lines on the transaction.** A dated
   `custom "fund-default" <account> "<fund>"` says that from that day, what changes in the account
   (and under it) with no line saying otherwise is the fund's. Each balance-sheet split counts for
@@ -1303,7 +1341,7 @@ plan](milestones/funds/B/PLAN.md) has the walkthrough and Kael's answers ("Decid
 ### Loans, step 1 (2026-11-05)
 
 A loan is managed from an amortization table, and its payments are staged with principal,
-interest and anything paid with them (escrow, PMI) apart. [The loans plan](milestones/loans/PLAN.md)
+interest and anything paid with them (escrow, PMI) apart. [The loans plan](milestones/.archived/loans/PLAN.md)
 has the walkthrough, Kael's answers and the calls made without asking.
 
 - **A loan is accounts, tables, others and extras.** Its accounts: what's owed (a liability),
@@ -1348,7 +1386,7 @@ has the walkthrough, Kael's answers and the calls made without asking.
 
 New loan asked for its accounts up front, before saying what each was for, and opened each one
 as it was named. Kael found it hard to follow, so it became a questionnaire that only gathers
-answers ([the plan's step 3](milestones/loans/PLAN.md#step-3-setting-a-loan-up-a-questionnaire)
+answers ([the plan's step 3](milestones/.archived/loans/PLAN.md#step-3-setting-a-loan-up-a-questionnaire)
 has his answers and the calls made without asking).
 
 - **One step a screen,** each a question: what it's for (a home, a car or something else, and
@@ -1416,7 +1454,7 @@ and `holdings`, and errors either as coded `errlist` or as the older plain `erro
   its institutions, which ran long with a Bridge holding many; its accounts are listed with a
   rule between each.
 - **A brokerage's rows are read for what they are** ([the brokerage activity
-  plan](milestones/brokerage-activity/PLAN.md), Kael, 2026-11-07). Its rows over SimpleFIN are
+  plan](milestones/.archived/brokerage-activity/PLAN.md), Kael, 2026-11-07). Its rows over SimpleFIN are
   all cash, each saying in words what it was, so a reader per institution
   (`simplefin/activity.ts`; Fidelity's, for now) reads each before it's staged:
   - **A sweep** (into or out of the core money market, which the books count as cash) is left
@@ -1530,6 +1568,22 @@ and `holdings`, and errors either as coded `errlist` or as the older plain `erro
 - **What an account shows:** its balance is the books', as everywhere. A synced account adds
   "Reported today 6:00am: $…", the bank's. The Bridge's errors are shown in plain words, and its
   notices (advice like the 45-day one) are told apart from failures.
+- **An error is its connection's unless it names an account** (Kael, 2026-11-12: one bank's
+  login request showed on every linked account; and "let's not do string matching"): an
+  account's page shows only an error with that account's `account_id`. Anything else (the
+  Bridge's plain strings, like "Connection to Example 529 Plan may need
+  attention. Auth required", or a revoked connection) is shown, as the Bridge words it, on its
+  connection's card on Bank connections and in the bell, never on accounts. The Bridge sends
+  those strings, not coded errors with a connection's id (we don't ask for its protocol 2,
+  whose accounts are shaped differently).
+- **And in the bell, dismissable:** each problem a sync reports (not a notice) is a
+  notification for the book's writers: a connection's titled as Bank connections names it
+  ("SimpleFIN 1a2b3c4d needs attention"), one naming an account by its institution, each
+  linking to its connection's card (`?connection=<id>` scrolls to it) and SimpleFIN Bridge.
+  Dismissing it is the person's own (`app`'s `notification_dismissal`, migration 24); the
+  card, and a named account's page, go on saying it. Each error keeps `since`, the first sync
+  in a row that reported it, and that is in the notification's ID: one that stops being
+  reported goes, and one that comes back is new.
 
 ### Configuration: `@wymp/config-simple`
 
@@ -1658,7 +1712,13 @@ The default chain:
      change.
    - **No match is final until it's confirmed in review,** where it can be moved to another
      candidate, swapped with the row holding one (one operation, since a held transaction can't
-     be taken), or undone ("Not a match" stages the row on its own).
+     be taken), or undone ("Not a match" stages the row on its own). **Except a match with a
+     transaction already confirmed, which is final at once** (Kael, 2026-11-12, reversing the
+     first call: a receipt confirmed before its bank row came in went back to review, and
+     "confirmed transactions should stay confirmed even when they match"). It takes the bank's
+     amount within a scheduled split's tolerance as confirming would; one that can't is left
+     proposed. So two coffees typed by hand and matched crossed stay crossed (the same amounts,
+     a day apart), and a wrong match with a confirmed transaction isn't offered for undoing.
    - **Known miss:** pairing is by proximity, not order (two coffees entered on the 5th and 7th,
      imported on the 7th and 8th, pair crossed). Swapping fixes it; order-aware assignment is a
      Polish to-do.
@@ -1834,7 +1894,9 @@ case without hiding the general one.
   whose save fails comes back in place with the error.
 - **Edits to a card apply in order, and only to their own fields.** Each is a PATCH, queued per
   transaction and sent with the version current when it runs (see "Versioned, partial edits").
-  A description saved on blur and a confirm a moment later can't undo each other.
+  A description saved on blur and a confirm a moment later can't undo each other. An edit that
+  rewrites the splits for one of their fields (tags, since they're splits') is made from the
+  latest copy when it runs, so it can't undo a category picked a moment before.
 - **"Create account" is always the last option** in a posting-account picker.
   - It opens a dialog (full screen on phones) with one field: the account's **fully qualified
     name**, prefilled from the search and freely editable. "Groceries" becomes
@@ -1863,10 +1925,14 @@ case without hiding the general one.
   offers "Create account" with that name. Tab fills the search with the highlighted account's
   name, to edit from (and with nothing new to fill, moves focus as usual). Every account picker
   does this.
-- **Tags and the fund on a card** (Kael, 2026-11-07): the card has the transaction's Tags (the
-  Tags field of its page, quiet until it's used). The fund choice is on the card's own color,
+- **Tags and the fund on a card** (Kael, 2026-11-07): the card has the transaction's Tags, quiet
+  until they're used: its splits' together, a tag added going on what the money was for and one
+  removed coming off every split (tags are splits' since 2026-11-12, "Tags (M17)" above). An
+  itemized card shows each split's tags beside it; one item's are changed on its page. The fund
+  choice is on the card's own color,
   as the category's picker is, and as wide as the card: a fund is often only part of a
-  transaction, which the card can't say (PLAN.md, "Funds and tags per split"), so it's kept
+  transaction, which the card can't say ([split-level tags and
+  funds](milestones/split-level-tags-and-funds/PLAN.md)), so it's kept
   from looking like the card's main question.
 - **Edits save immediately and the item stays staged:** the description saves on blur or Enter,
   the category on pick. Nothing typed is lost to a skipped or abandoned review.
@@ -1874,8 +1940,22 @@ case without hiding the general one.
   It's disabled while the counterpart is `Expenses:Uncategorized`.
 - **The detail view edits the whole transaction.**
   - Fields: date, payee, description, and every posting.
-  - You can add and remove splits. One amount can be left blank, and Beancount balances it; the
-    editor shows the value it will get.
+  - **Splits are shown as they are, and edited one at a time** (Kael, 2026-11-12: with tags and
+    memos, a split had too much to show and change in place): each is its memo (a faint "Memo"
+    without one, so every split is spaced alike) and tags, then
+    its account (a long one losing its start, "…nses:Home:Supplies") and its amount
+    (`Splits.tsx`). Tapping one opens **the split editor**, a dialog (full screen on a phone)
+    with its memo (editable now, a posting's `memo:`), account, amount and currency, tags, and
+    a schedule's match tolerance; Save or Enter puts it back in the transaction being edited,
+    Cancel or Escape leaves it, and Delete takes it out. Nothing reaches the books until the
+    transaction is saved or confirmed. **+ Add split** opens a blank one, searching for its
+    account. The editor has no fund: funds are still the transaction's (its Funds section),
+    until [split-level tags and funds](milestones/split-level-tags-and-funds/PLAN.md)' step 2.
+  - **Select mode for splits:** a long press, or a click with Shift, Ctrl, ⌘ or Option, starts
+    it, with the bar every list has; its actions are **Add tag…** and **Delete** (not every
+    split: a transaction keeps one). A schedule's template uses the same splits.
+  - One amount can be left blank, and Beancount balances it; the list shows the value it will
+    get ("$50.00 auto").
   - A live balance check (exact decimal arithmetic, no floats) blocks saving while the
     transaction is off.
   - Lots and prices are preserved untouched and left to the ledger to check on save, since their

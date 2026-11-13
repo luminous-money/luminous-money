@@ -1,7 +1,7 @@
 /** M3: schedules made with "Repeat…", staging occurrences marked in the ledger. */
 import { expect, test } from "@playwright/test";
 
-import { app, setUpUser } from "./support.js";
+import { app, editSplit, setUpUser, splitRows } from "./support.js";
 
 const day = (offset: number) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);
 
@@ -53,19 +53,8 @@ test("a schedule can be edited from the list, paused, and deleted", async ({ pag
   await page.getByRole("textbox", { name: "Name" }).fill("Allowance");
   await page.getByRole("combobox", { name: "Unit" }).selectOption("week");
   await page.getByLabel("Starts").fill(day(10));
-  await page.getByRole("textbox", { name: "Amount" }).first().fill("-20.00");
-  await page
-    .getByRole("button", { name: /^Account:/ })
-    .first()
-    .click();
-  await page.getByRole("combobox", { name: "Account" }).fill("PNC");
-  await page.keyboard.press("Enter");
-  await page
-    .getByRole("button", { name: /^Account:/ })
-    .nth(1)
-    .click();
-  await page.getByRole("combobox", { name: "Account" }).fill("Equity:Opening");
-  await page.keyboard.press("Enter");
+  await editSplit(page, 0, { account: "PNC", amount: "-20.00" });
+  await editSplit(page, 1, { account: "Equity:Opening" });
   await page.getByRole("button", { name: "Save" }).click();
 
   await page.getByRole("link", { name: /Allowance/ }).click();
@@ -90,7 +79,6 @@ async function scheduleRent(book: string, account: string, start: string) {
       template: {
         payee: "Landlord",
         narration: "Rent",
-        tags: [],
         links: [],
         meta: {},
         postings: [
@@ -137,11 +125,21 @@ test("a schedule's splits take a match tolerance; a book's time zone can be set"
   const { book } = await setUpUser(page);
   await page.goto(`/ui/books/${book.id}/schedules/new`);
 
-  await expect(page.getByRole("textbox", { name: "Match tolerance" })).toHaveCount(0);
-  await page.getByRole("textbox", { name: "Amount" }).first().fill("-20.00");
-  await expect(page.getByRole("textbox", { name: "Match tolerance" })).toHaveCount(1);
-  await page.getByRole("textbox", { name: "Match tolerance" }).fill("abc");
-  await expect(page.getByText("A match tolerance is an amount")).toBeVisible();
+  // In the split's editor, once it has an amount; shown on the split once saved.
+  await splitRows(page).first().click();
+  const editor = page.getByRole("dialog", { name: "Split", exact: true });
+  await expect(editor.getByRole("textbox", { name: "Match tolerance" })).toHaveCount(0);
+  await editor.getByRole("button", { name: /^Account:/ }).click();
+  await editor.getByRole("combobox", { name: "Account" }).fill("PNC");
+  await page.keyboard.press("Enter");
+  await editor.getByRole("textbox", { name: "Amount" }).fill("-20.00");
+  await expect(editor.getByRole("textbox", { name: "Match tolerance" })).toHaveCount(1);
+  await editor.getByRole("textbox", { name: "Match tolerance" }).fill("abc");
+  await editor.getByRole("button", { name: "Save" }).click();
+  await expect(editor.getByText("A match tolerance is an amount")).toBeVisible();
+  await editor.getByRole("textbox", { name: "Match tolerance" }).fill("5.00");
+  await editor.getByRole("button", { name: "Save" }).click();
+  await expect(splitRows(page).first()).toContainText("−$20.00 ±5.00");
 
   await page.goto("/ui/books");
   const zone = page.getByRole("combobox", { name: "Time zone" });

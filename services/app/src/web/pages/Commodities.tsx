@@ -11,9 +11,10 @@ import {
 } from "../lib/queries.js";
 
 /**
- * Commodities: everything held or priced (shares, funds), each with its latest price, where
- * prices are fetched from (beanprice's `USD:yahoo/VTI`), and how many days until its price is
- * stale. Prices are fetched each morning; "Fetch prices now" doesn't wait.
+ * Commodities: everything held or priced (shares, funds), each with its latest price and where
+ * it came from (a bank feed, a price source such as beanprice's `USD:yahoo/VTI`, or by hand), and
+ * how many days until its price is stale. Prices are fetched each morning; "Fetch prices now"
+ * doesn't wait.
  */
 export function Commodities({ book }: { book: string }) {
   const commodities = useCommodities(book);
@@ -49,6 +50,20 @@ export function Commodities({ book }: { book: string }) {
   );
 }
 
+/** Where its prices come from: the latest one (a bank feed records one with each sync), and the
+ * source the morning's fetch asks, if it has one. */
+function priceFrom(c: CommodityOut): string[] {
+  const source = c.price_source && `fetched from ${c.price_source}`;
+  if (c.price_from === "fetched") return [source || "fetched"];
+  const latest =
+    c.price_from === "bank"
+      ? "from the bank feed"
+      : c.price_from === "hand"
+        ? "entered by hand"
+        : null;
+  return [latest, source && `fetches from ${c.price_source}`].filter((x): x is string => !!x);
+}
+
 function CommodityCard({
   book,
   commodity: c,
@@ -75,9 +90,13 @@ function CommodityCard({
         </span>
       </div>
       <p className="muted small">
-        {c.price_date && `as of ${c.price_date} · `}
-        {c.price_source ? `fetched from ${c.price_source}` : "entered by hand"} · stale after{" "}
-        {c.stale_after} days
+        {[
+          c.price_date && `as of ${c.price_date}`,
+          ...priceFrom(c),
+          `stale after ${c.stale_after} days`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       </p>
       {error && <p className="error small">Couldn&apos;t fetch: {error}</p>}
       {editing ? (

@@ -19,7 +19,6 @@ const card: Transaction = {
   flag: "!",
   payee: "Kin Soy",
   narration: "Eating out",
-  tags: [],
   links: [],
   meta: { source: "demo-import" },
   postings: [posting("Liabilities:US:Chase:Slate", "-14.93"), posting("Expenses:Uncategorized")],
@@ -128,7 +127,6 @@ it("sets the other side relative to the account being viewed", () => {
     date: "2024-03-01",
     flag: "!",
     narration: "",
-    tags: [],
     links: [],
     meta: {},
     postings: [

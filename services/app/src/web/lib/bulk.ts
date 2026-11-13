@@ -3,7 +3,8 @@
  * account's ledger, Transactions), so they all offer the same: **Confirm** the selection,
  * **Categorize as…** an account (where the page knows how), **Add tag…** and **Remove tag…**
  * (M17), and **Suggest categories** (rules, history, and the book's AI when it's set up). Each
- * says why it can't run, when it can't.
+ * says why it can't run, when it can't. Tags are splits': Add tag… tags what the money was for,
+ * Remove tag… untags every split (`shared/tags.ts`).
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -14,6 +15,7 @@ import type { AccountCreation } from "../components/AccountPicker.js";
 import { shapesFor } from "../components/Funds.js";
 import type { BulkAction } from "../components/SelectBar.js";
 import { UNALLOCATED, wholeLines } from "../../shared/funds.js";
+import { tagsOf, withoutTag, withTag } from "../../shared/tags.js";
 import { appApi } from "./appApi.js";
 import { formatMoney } from "./decimal.js";
 import { sameLines } from "./funds.js";
@@ -35,8 +37,13 @@ export function useBulkActions({
   onConfirmed,
 }: {
   book: string;
-  /** What's selected, with its tags. */
-  chosen: { id: string; flag: string; tags?: string[] }[];
+  /** What's selected, with its tags: a row's, or a transaction's splits'. */
+  chosen: {
+    id: string;
+    flag: string;
+    tags?: string[];
+    postings?: { account: string; tags?: string[] | null }[];
+  }[];
   /** Accounts to categorize as. */
   accounts?: string[];
   create?: AccountCreation;
@@ -57,20 +64,25 @@ export function useBulkActions({
   // The tags the selection has, most common first: what Remove tag… offers.
   const counts = new Map<string, number>();
   for (const t of chosen)
-    for (const tag of t.tags ?? []) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    for (const tag of t.tags ?? tagsOf(t.postings ?? []))
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
   const theirTags = [...counts].map(([name, transactions]) => ({ name, transactions }));
-  /** Change each selected transaction's tags; `edit` gives its new ones, or null to leave it. */
-  const retag = (edit: (tags: string[]) => string[] | null, said: (changed: number) => string) => {
+  /** Change each selected transaction's splits' tags as `edit` does; one it leaves as it was is
+   * left alone. */
+  const retag = (
+    edit: (postings: Transaction["postings"]) => Transaction["postings"],
+    said: (changed: number) => string
+  ) => {
     let changed = 0;
     setNote(null);
     bulk.mutate(
       {
         transactions: chosen,
         change: (t) => {
-          const tags = edit(t.tags ?? []);
-          if (!tags) return null;
+          const postings = edit(t.postings);
+          if (postings.every((p, i) => p === t.postings[i])) return null;
           changed++;
-          return { tags };
+          return { postings };
         },
       },
       { onSuccess: () => setNote(said(changed)), onError: (e) => setNote(explain(e)) }
@@ -211,7 +223,7 @@ export function useBulkActions({
       pickTag: { choices: bookTags.data ?? [], allowNew: true },
       run: (tag: string) =>
         retag(
-          (tags) => (tags.includes(tag) ? null : [...tags, tag].sort()),
+          (postings) => withTag(postings, tag),
           (changed) =>
             `Tagged ${plural(changed, "transaction")} ${tagList([tag])}` +
             (changed < chosen.length ? `; ${chosen.length - changed} had it already.` : ".")
@@ -223,7 +235,7 @@ export function useBulkActions({
       pickTag: { choices: theirTags, allowNew: false },
       run: (tag: string) =>
         retag(
-          (tags) => (tags.includes(tag) ? tags.filter((t) => t !== tag) : null),
+          (postings) => withoutTag(postings, tag),
           (changed) => `Removed ${tagList([tag])} from ${plural(changed, "transaction")}.`
         ),
     } satisfies BulkAction,

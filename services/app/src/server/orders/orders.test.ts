@@ -117,6 +117,7 @@ describe("a shop's charge, as a receipt", () => {
   it("is itemized into the bank's copy, even one already categorized, and goes back to review", async () => {
     const { ledger, orders, deps } = setUp();
     const bank = bankCopy(ledger, { flag: "*", other: "Expenses:Household" });
+    ledger.transactions.find((t) => t.id === bank.id)!.postings[1]!.tags = ["work"];
     orders.receive("b", "u", [charge()]);
 
     expect(await readWaiting(deps, "b")).toEqual({ read: 1, waiting: 0, failed: 0 });
@@ -137,6 +138,14 @@ describe("a shop's charge, as a receipt", () => {
       "Coffee beans",
       "Tax",
       "Gift card",
+    ]);
+    // The items take the tags of the split they replace; the paying side keeps its own (none).
+    expect(t.postings.map((p) => p.tags ?? [])).toEqual([
+      [],
+      ["work"],
+      ["work"],
+      ["work"],
+      ["work"],
     ]);
     expect(t.meta).toMatchObject({
       "order-read": expect.any(String),

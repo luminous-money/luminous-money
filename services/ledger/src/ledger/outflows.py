@@ -14,7 +14,8 @@ expense account, for it and its subtree):
   as they are: never spending.
 
 Only the operating currency is counted. The lens adds and scales splits; it doesn't balance, and
-it's only for reading spending (budgets, reports), never for balances.
+it's only for reading spending (budgets, reports), never for balances. A split it adds has the
+tags of the split it comes from, so reports by tag count it.
 """
 
 from __future__ import annotations
@@ -96,6 +97,7 @@ def lensed(
             account=target,
             amount=models.Amount(number=str(amount(t.postings[i]) - cut), currency=currency),
             flag=t.postings[i].flag,
+            tags=t.postings[i].tags,
             outflow_of=proxy,
         )
         for (i, (proxy, target)), cut in zip(into, cuts)

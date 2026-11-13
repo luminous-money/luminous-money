@@ -343,7 +343,6 @@ export async function createLoan({
         flag: opening.flag,
         payee: input.payee?.trim() || loan.name,
         narration: history.kind === "start" ? "Borrowed" : "What's owed",
-        tags: [],
         links: [],
         meta: {},
         postings: [
@@ -413,7 +412,6 @@ export async function createLoan({
           flag: "*",
           payee: input.payee?.trim() || loan.name,
           narration: "What escrow holds",
-          tags: [],
           links: [],
           meta: {},
           postings: [
@@ -555,7 +553,6 @@ export async function rebaseLoan({
       flag: "*",
       payee: current.payee || current.name,
       narration: "Adjusted to what the lender says is owed",
-      tags: [],
       links: [],
       meta: {},
       postings: [
@@ -620,7 +617,6 @@ export async function extraPayment({
       flag: "*",
       payee: loan.payee || loan.name,
       narration: "Extra payment toward principal",
-      tags: [],
       links: [],
       meta: {},
       postings: [

@@ -40,7 +40,6 @@ async function fill(book: string) {
       template: {
         payee: null,
         narration: "Rent",
-        tags: [],
         links: [],
         meta: {},
         postings: [

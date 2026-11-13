@@ -297,7 +297,6 @@ describe("Loans", () => {
       template: {
         payee: null,
         narration: "Property tax",
-        tags: [],
         links: [],
         meta: {},
         postings: [

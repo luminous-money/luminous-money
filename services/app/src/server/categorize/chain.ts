@@ -19,6 +19,7 @@
  */
 import { isUncategorized } from "../../shared/accounts.js";
 import { add, isZero, negate } from "../../shared/decimal.js";
+import { inheriting } from "../../shared/tags.js";
 import type {
   Categorizer,
   Chosen,
@@ -144,6 +145,7 @@ type PostingIn = {
   account: string;
   units?: { number: string; currency: string } | null;
   flag?: string | null;
+  tags?: string[];
   meta?: Record<string, unknown>;
 };
 
@@ -151,10 +153,10 @@ type PostingIn = {
  * `postings` with a decision applied to the transaction's open splits, each flagged `!` (a split
  * still to confirm). A split takes the account proposed for it, else the fallback (the
  * category), else stays where it is. With one split the category is its other side, and
- * replaces it (several postings: a provider's split of a bank row); with several, the fallback
- * only fills splits that are still uncategorized, never one placed by name. A rule may land the
- * transaction's own side (its first posting) in a part of the divided account it came into
- * (M15).
+ * replaces it (several postings: a provider's split of a bank row, each taking its tags); with
+ * several, the fallback only fills splits that are still uncategorized, never one placed by
+ * name. A rule may land the transaction's own side (its first posting) in a part of the divided
+ * account it came into (M15).
  */
 export function placed<P extends PostingIn>(postings: P[], t: Incoming, d: Decision): PostingIn[] {
   const open = new Set(t.splits.map((s) => s.index));
@@ -165,7 +167,10 @@ export function placed<P extends PostingIn>(postings: P[], t: Incoming, d: Decis
     const own = d.splits?.get(i)?.splits?.find((s) => s.index === i)?.account;
     if (own) return [{ ...p, account: own, flag: "!" }];
     if (other && other.length > 1 && t.splits.length === 1)
-      return other.map((x) => ({ account: x.account, units: x.amount ?? null, flag: "!" }));
+      return inheriting(
+        other.map((x) => ({ account: x.account, units: x.amount ?? null, flag: "!" })),
+        [p]
+      );
     const fills = t.splits.length === 1 || isUncategorized(p.account);
     return [{ ...p, account: (fills && other?.[0]?.account) || p.account, flag: "!" }];
   });

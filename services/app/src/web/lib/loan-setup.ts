@@ -272,7 +272,6 @@ const bill = (
     template: {
       payee: null,
       narration: label,
-      tags: [],
       links: [],
       meta: {},
       postings: [

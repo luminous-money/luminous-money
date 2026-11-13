@@ -1,7 +1,7 @@
 /** M14: reconciling a statement, the ledger filter, and divided accounts. */
 import { expect, test } from "@playwright/test";
 
-import { addTransactions, setUpUser } from "./support.js";
+import { addTransactions, editSplit, setUpUser } from "./support.js";
 
 test("a statement is ticked off, saved for later, and finished; ledgers show and filter it", async ({
   page,
@@ -60,9 +60,8 @@ test("a statement is ticked off, saved for later, and finished; ledgers show and
   await page.getByRole("radio", { name: "All" }).click();
   await transactions.getByRole("button", { name: /Shop 1/ }).click();
   await expect(page.getByText(/Reconciled with PNC Checking's Feb 29.* statement/)).toBeVisible();
-  const amounts = page.getByRole("textbox", { name: "Amount" });
-  await amounts.nth(0).fill("-1.25");
-  await amounts.nth(1).fill("1.25");
+  await editSplit(page, 0, { amount: "-1.25" });
+  await editSplit(page, 1, { amount: "1.25" });
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("alertdialog", { name: "Reconciled" })).toBeVisible();
   await page.getByRole("button", { name: "Save anyway" }).click();

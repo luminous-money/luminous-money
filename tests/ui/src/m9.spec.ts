@@ -1,7 +1,7 @@
 /** M9: bank feeds through SimpleFIN, against the e2e stack's fake SimpleFIN server. */
 import { expect, test, type Page } from "@playwright/test";
 
-import { setUpUser } from "./support.js";
+import { app, setUpUser } from "./support.js";
 
 const FAKE = process.env.SIMPLEFIN_FAKE_URL ?? "http://simplefin-fake:8080";
 const NOW = Math.floor(Date.now() / 1000);
@@ -123,4 +123,92 @@ test("reconciling marks what the bank doesn't know in review", async ({ page }) 
   await expect(page.getByText("Not at the bank", { exact: true })).toHaveCount(1);
   const stray = page.getByRole("listitem").filter({ hasText: "Not at the bank" });
   await expect(stray).toContainText("12.00");
+});
+
+test("a bank feed's problem is its connection's, unless it names an account; the bell has each", async ({
+  page,
+}) => {
+  const { book } = await setUpUser(page);
+  const { user, setup_token } = await fake("/control/users", "POST");
+  await fake(`/control/users/${user}/accounts/chk`, "PUT", {
+    name: "Everyday Checking",
+    institution: "Fake Bank",
+    balance: "100.00",
+  });
+  await fake(`/control/users/${user}/accounts/plan`, "PUT", {
+    name: "College Plan",
+    institution: "Fake 529 Plan",
+    balance: "200.00",
+  });
+  const post = (path: string, body: unknown) =>
+    app(path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  const connection = (await (await post("/simplefin/connections", { setup_token })).json()) as {
+    id: string;
+  };
+  for (const [account_id, account] of [
+    ["chk", "Assets:Bank:Checking"],
+    ["plan", "Assets:College:Plan"],
+  ])
+    expect(
+      (
+        await post(`/books/${book.id}/simplefin/links`, {
+          connection_id: connection.id,
+          account_id,
+          account,
+          mode: "new",
+        })
+      ).status
+    ).toBe(201);
+  // The Bridge's own words (2026-11-12): a plain string, so the connection's. And one naming an
+  // account, which is that account's.
+  await fake(`/control/users/${user}/errors`, "PUT", {
+    shape: "v1",
+    errors: [
+      { code: "gen.", msg: "Connection to Fake 529 Plan may need attention. Auth required" },
+    ],
+  });
+  await post(`/simplefin/connections/${connection.id}/sync`, {});
+
+  const plain = "Connection to Fake 529 Plan may need attention. Auth required";
+  const accountPage = (account: string) =>
+    page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
+  for (const account of ["Assets:College:Plan", "Assets:Bank:Checking"]) {
+    await accountPage(account);
+    await expect(page.getByRole("button", { name: "Sync now" })).toBeVisible();
+    await expect(page.getByText(plain)).toHaveCount(0);
+  }
+
+  // The bell has it, linking to its connection; it can be dismissed there, and the connection
+  // goes on saying it.
+  await page.getByRole("link", { name: "Notifications: 1 needs attention" }).click();
+  const notice = page.getByRole("listitem").filter({ hasText: "needs attention" });
+  await expect(notice).toContainText(`SimpleFIN ${connection.id.slice(0, 8)} needs attention`);
+  await expect(notice).toContainText(plain);
+  await notice.getByRole("link", { name: "See the connection ›" }).click();
+  await expect(page).toHaveURL(new RegExp(`connection=${connection.id}`));
+  await expect(page.getByRole("region", { name: /Connection to/ })).toContainText(plain);
+  await page.getByRole("link", { name: "Notifications: 1 needs attention" }).click();
+  await notice.getByRole("button", { name: "Dismiss" }).click();
+  await expect(page.getByText("Nothing needs you right now.")).toBeVisible();
+
+  // One naming an account is on that account's page, not the others'.
+  await fake(`/control/users/${user}/errors`, "PUT", {
+    shape: "v2",
+    errors: [{ code: "con.auth", msg: "log in", account_id: "plan" }],
+  });
+  await post(`/simplefin/connections/${connection.id}/sync`, {});
+  const said = "Your bank wants you to log in again at SimpleFIN Bridge.";
+  await accountPage("Assets:College:Plan");
+  await expect(page.getByRole("list", { name: "Bank feed problems" })).toContainText(said);
+  await accountPage("Assets:Bank:Checking");
+  await expect(page.getByRole("button", { name: "Sync now" })).toBeVisible();
+  await expect(page.getByText(said)).toHaveCount(0);
+  await page.getByRole("link", { name: "Notifications: 1 needs attention" }).click();
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Fake 529 Plan wants you to log in again" })
+  ).toBeVisible();
 });

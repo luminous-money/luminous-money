@@ -1,12 +1,130 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-07._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-12._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-07, night): brokerage activity, released as `v0.1.26`
+## Latest (2026-11-12, later): the split editor, and three fixes, released as `v0.1.27`
 
-Kael answered [the brokerage activity plan](docs/milestones/brokerage-activity/PLAN.md)'s
+Kael asked for four changes; all are built, on top of the split tags below, then adjusted after
+his comments (a faint "Memo" on a split without one; no string matching of SimpleFIN errors).
+design.md has each decision; PLAN.md's Polish has the list ("Kael's changes, 2026-11-12").
+**Committed with the split tags and the docs reorganization below (one commit), pushed, and
+released as `v0.1.27`** at Kael's asking (the tag on that commit). Emmer isn't upgraded (Kael's
+to run): on the upgrade, ledger migration 14 drops his book's old tags (his call), and `app`
+migration 24 adds the dismissals.
+
+- **The split editor** (`web/components/Splits.tsx`): the transaction page (and a schedule's)
+  shows each split as it is, its memo (a faint "Memo" without one) and tags above its account
+  (a long name loses its start) and amount. Clicking one opens a dialog with its memo (editable
+  now: a posting's `memo:`), account, amount, tags and a schedule's tolerance; Enter or Save
+  puts it back, Escape or Cancel doesn't, Delete removes it; the transaction is saved as before.
+  "+ Add split" opens a blank one. A long press (`useLongPress` in `lib/selection.ts`) or a click with Shift, Ctrl, ⌘
+  or Option starts Select mode, with only Add tag… and Delete. **No fund in it:** funds per
+  split are split-level tags and funds' step 2, unplanned, so the transaction's Funds section
+  stays (the plan's "The split editor" has this and 5 calls made without asking).
+- **Bank feed errors where they're about** (`simplefin/client.ts`' `concerns`): the Bridge sends
+  "Connection to Example 529 Plan may need attention. Auth required" as
+  a plain string with no account, which showed on every linked account. At Kael's word (no
+  string matching), an error is an account's only when it has its `account_id`; anything else
+  is the connection's: on its card on Bank connections, and in **the bell**, as a dismissable
+  "bank-feed" notification ("SimpleFIN 1a2b3c4d needs attention", the Bridge's words, links to
+  the connection's card via `?connection=<id>` and to SimpleFIN Bridge; `bankNotifications` in
+  `server/notifications.ts`). Dismissing is per person: `app` migration 24,
+  `notification_dismissal`, and `PUT /books/:book/notifications/:id/dismissed`. An error keeps
+  `since` (in the connection's stored errors), which is in the notification's ID, so one that
+  goes and comes back is new. So the 529's login shows on no account's page, only on the card
+  and in the bell.
+- **Confirmed stays confirmed** (`importRows`): a bank row matched to a transaction already
+  confirmed (a receipt confirmed in review, one typed by hand) is final at once (`match:
+  "confirmed"`), out of review, taking the bank's amount within a schedule's tolerance
+  (`takeBankAmount`, shared with `confirmRow`). Reverses M2's "no match is final until
+  confirmed" for confirmed ones; unconfirmed ones are as before.
+- **Where a price came from:** the "entered by hand" commodities are priced by the bank feed
+  (a linked brokerage's holdings record a price each sync). A price directive now has
+  `source: "bank"` or `"fetched"` (`PriceIn.source`, written by `recordPrices`, the morning's
+  fetch and `prices/on`); `CommodityOut.price_from` is the latest one's (bank, fetched, hand),
+  and Commodities says it. Kael's existing prices say "entered by hand" until the next sync
+  writes the day's again (it replaces the same day's). Client regenerated.
+- **Tests:** unit (the confirmed match final, a schedule's tolerance at once, whose error it is,
+  the bell's bank notifications and dismissals, a price's origin) and browser
+  (`tests/ui/src/splits.spec.ts`: the editor, Escape and Enter, Shift-click and long-press
+  Select mode, Add tag… and Delete; m9: a plain-string error on no account's page, on the
+  connection and in the bell, dismissed there; one naming an account on its page only). The tests that typed into the old inline splits use `editSplit` (`tests/ui/src/
+  support.ts`); the coffee examples (m2, matches) use unconfirmed coffees, since confirmed ones
+  now never reach review. `pnpm test` passes (ledger 261, app 344, the rest); `pnpm e2e` passes
+  (API 115, browser 137, the command). Once, under the full run's load, brokerage.spec's "Read
+  again" was still reading at its 5-second wait; it passed alone and in the next full run.
+  Screens looked at on a phone and a desktop, light and dark (a long account name wrapped past a
+  phone's screen in the editor, fixed).
+**Next:** Kael upgrades Emmer (`upgrade 0.1.27`) and tries the split editor and says whether the fund belongs in it now (that's step
+2's questions 3 and 4 first). The rest as below.
+
+## Before that (2026-11-12): tags are splits' now
+
+Kael asked for "a detailed plan for moving tags from transaction level to split level", built if
+nothing in it was controversial. While it was being planned he settled the one question that
+was: tags move, the transaction keeps none, and the tags already used can go ("no one else is
+using this... we don't need to bend over backwards to preserve any old behavior or accommodate
+old tags"). The plan is [split-level tags and funds](docs/milestones/split-level-tags-and-funds/PLAN.md)'s
+"Step 1: tags per split", with eight **calls to review** and "As built"; design.md's "Tags
+(M17; a split's since 2026-11-12)" has the decisions.
+
+- **In the books:** a posting's `tags: "#gift #hsa-eligible"`; in the ledger's API
+  `Posting.tags` (`TransactionIn.tags` and `TransactionPatch.tags` are gone, and a PATCH with
+  them is a 422). Ledger migration 14: `posting_tag` in place of `transaction_tag`. A
+  transaction's own `#tag`s aren't read. Client regenerated.
+- **Filters** keep a transaction with a split that has every tag; rows' `tags` are their
+  splits' together, and the compact stream's and journal's postings have their own.
+  **Reports count only the tagged splits** (a receipt's `#gift`, not the groceries beside it).
+- **Setting them:** each split on the transaction page (and a schedule's) has its own Tags, its
+  memo shown above. A card's Tags and Select mode's Add tag… put a tag on what the money was for
+  (not the bank's side; both sides of a transfer); removing one takes it off every split.
+  An itemized card shows each split's tags.
+- **Kept:** every edit spreads the split it had; a receipt's, an order's or a multi-split
+  category's items take the tags of the split they replace; pairing a transfer keeps each
+  side's.
+- **Tests:** `pnpm test` passes (ledger 260, app 338, the rest); `pnpm e2e` passes (API 114,
+  browser 135, the command).
+- **Committed and released with the change set above** (`v0.1.27`); on the upgrade, Kael's book
+  loses its tags (his call).
+
+**Next:** Kael looks over the eight calls in the plan. Then, as before: the rest of Funds B,
+Tags, more (to be read through split tags first; its plan says what changed), or HSA tracking
+(which can tag the eligible item's split from the start).
+
+## Before that (2026-11-07): the docs reorganized
+
+Kael asked for a cleanup: the README brought up to date, then docs/ reorganized. No code changed
+but three comments' paths to the migration's plan.
+
+- **Done milestones are archived** in `docs/milestones/.archived/`: M1 to M17 (M7 was dropped),
+  M19, production readiness, the chart of accounts import, migrating from another system, Funds
+  A (`funds-a`), Loans, Amazon orders and brokerage activity. Every link in the repo follows
+  them. A milestone moves there when it's done (docs/PLAN.md, "How the docs are laid out").
+- **Funds B is `docs/milestones/funds-b/`** (it was `funds/B`; `funds/PLAN.md`, the split's
+  index, is folded into its head). Its [The rest of B](docs/milestones/funds-b/PLAN.md#the-rest-of-b)
+  now lists what's left, A's known gaps and the calls still to review included. The git-ignored
+  `discussion.private.md` moved with it (on this machine only).
+- **New milestones:** [M99: Follow-ups](docs/milestones/m99-follow-ups/PLAN.md) (open questions,
+  calls made without asking still to review, a bug, polish, and every archived plan's leftovers,
+  by area; docs/PLAN.md's notes, Deferred, Open questions, Later and Polish moved there), [HSA
+  tracking](docs/milestones/hsa-tracking/PLAN.md) (Kael's brief, what's here, six questions),
+  and [split-level tags and funds](docs/milestones/split-level-tags-and-funds/PLAN.md) (from
+  PLAN.md's "Funds and tags per split"). M18 and M20 have their briefs.
+- **docs/PLAN.md** is the milestones ahead, then those done (with the polish built), and how
+  the docs are laid out. CLAUDE.md now sends open questions to their milestone or M99.
+- **README** says what it does today (`v0.1.26`), with the `shops` service and its route.
+- **Found on the way:** Amazon's "FSA or HSA eligible" mark isn't read today (`shops` keeps an
+  item's title, quantity, price, ASIN and link); HSA tracking's step 1 reads it.
+
+**Next:** Kael looks over HSA tracking's and split-level tags' questions, and picks what's next
+(the rest of Funds B, Tags more, or HSA tracking, which builds on Tags more). What came before
+(confirming the brokerage's rows in review, below) still stands.
+
+## Before that (2026-11-07, night): brokerage activity, released as `v0.1.26`
+
+Kael answered [the brokerage activity plan](docs/milestones/.archived/brokerage-activity/PLAN.md)'s
 questions and asked for all of it, the cleanup included, released, on Emmer and run on his
 book. Before deciding, the proposal was checked against his Fidelity ledgers and Emmer's
 snapshot (read only): sweeps are no-ops one by one but don't pair neatly; transfers of assets
@@ -74,8 +192,10 @@ What changed (design.md has each with its reason; PLAN.md's Polish has the list)
   November's journal day by day. It hugs the dotted line because a large payment on the 1st
   (the mortgage, through the outflows lens) sets both lines' start, and the rest of the week is
   a sliver on an axis scaled to the dotted line's month-end.
-- **Per-split funds and tags** aren't built: noted in PLAN.md ("Funds and tags per split").
-- **Fidelity's cash rows** (Kael's bigger question): [a proposal](docs/milestones/brokerage-activity/PLAN.md)
+- **Per-split funds and tags** aren't built: noted in PLAN.md ("Funds and tags per split"; a
+  milestone of its own since, [split-level tags and
+  funds](docs/milestones/split-level-tags-and-funds/PLAN.md)).
+- **Fidelity's cash rows** (Kael's bigger question): [a proposal](docs/milestones/.archived/brokerage-activity/PLAN.md)
   from what the live book shows (sweeps into the core money market beside every event, trades
   without their shares, transfers of shares as cash), with five questions for Kael. PLAN.md
   has it as "Brokerage activity", to settle before we're done.
@@ -104,7 +224,7 @@ stays a single line there (one transaction to fix by hand).
 
 **Read this first.** Kael asked for the Amazon login and order reading to be proven on Emmer
 before the rest was built. **It was** (`v0.1.22`, below), and then the rest was built (`v0.1.23`,
-[the plan](docs/milestones/amazon-orders/PLAN.md#steps-2-and-3-as-built-2026-11-07); design.md,
+[the plan](docs/milestones/.archived/amazon-orders/PLAN.md#steps-2-and-3-as-built-2026-11-07); design.md,
 "Shops' orders in the book"):
 
 - **Each Amazon charge is itemized into the book as a receipt** (Kael: "look at these Amazon
@@ -135,7 +255,7 @@ own cards as the default).
 Kael asked for the Amazon login and order reading to be proven on Emmer
 before anything else is built. **It is:** the server signed in to his Amazon and a sync read 112
 charges and the 92 orders behind them, none failing ([the
-plan](docs/milestones/amazon-orders/PLAN.md#proven-on-emmer-2026-11-07-v0122) has how, and what
+plan](docs/milestones/.archived/amazon-orders/PLAN.md#proven-on-emmer-2026-11-07-v0122) has how, and what
 the data holds). `v0.1.21` (released, and on Emmer) still met Amazon's bot check, now in the
 sign-in itself, so **the sign-in moved into a full headless Chromium** that answers each page as
 a person would (`shops.amazon.browser_sign_in`), sending a form Amazon's own script holds back as
@@ -153,7 +273,7 @@ than needed: every try counts toward its bot score.
 
 Kael set his Amazon account up on Emmer (`v0.1.20`) and the first sync
 timed out on Amazon's bot check, on its very first page. Probed from Emmer without his account
-(see [the plan](docs/milestones/amazon-orders/PLAN.md#after-the-first-try-on-emmer-2026-11-07-v0121)):
+(see [the plan](docs/milestones/.archived/amazon-orders/PLAN.md#after-the-first-try-on-emmer-2026-11-07-v0121)):
 Amazon challenges its home page but not its sign-in page, and amazon-orders' browser can't clear
 a challenge it's handed the challenged session's cookies for. So `v0.1.21` passes over a
 challenged home page (`shops.amazon.Session`), and adds Kael's other ask: **which charges are
@@ -164,7 +284,7 @@ The rest of this section is from the night before.
 ## The Amazon spike, released as `v0.1.20` (2026-11-06, night)
 
 **Read this first.** Kael asked for Amazon's charges, and the items behind them, in his books
-([the plan](docs/milestones/amazon-orders/PLAN.md): his brief, ten answers, and step 1 "as
+([the plan](docs/milestones/.archived/amazon-orders/PLAN.md): his brief, ten answers, and step 1 "as
 built"). He chose the server logging in to Amazon as him, and asked for a spike: build it as if
 it works, check it reaches Amazon from here, release it, upgrade Emmer, and he sets it up
 there. **That's where it stands: `v0.1.20` is released and on Emmer, waiting for Kael to set
@@ -216,7 +336,8 @@ escrow's bills were backfilled. Changes followed (and a fix for System), release
   trims only the fraction, reads `Z` or an offset, takes a stamp without a zone as UTC, and
   shows one it can't read as it is (`web/lib/format.test.ts`).
 - **Found on the way:** a book holding a lot of no shares with a cost (`0.00 X {0 # 0 USD}`)
-  makes the ledger's `/problems` and `/query` 500 for the whole book (docs/PLAN.md, Polish).
+  makes the ledger's `/problems` and `/query` 500 for the whole book (now in
+  [M99](docs/milestones/m99-follow-ups/PLAN.md#bugs), Bugs).
   The PWA uses neither, so nothing in the UI shows it. Not fixed.
 
 **Also next:** the zero-share lot (refuse it, and turn a
@@ -226,7 +347,7 @@ book that fails to load into a problem rather than a 500).
 
 Kael tried New loan and found it hard to follow, so it's been rebuilt as a
 step-by-step questionnaire that makes nothing until Confirm ([the loans plan's step
-3](docs/milestones/loans/PLAN.md#step-3-setting-a-loan-up-a-questionnaire): his brief, nine
+3](docs/milestones/.archived/loans/PLAN.md#step-3-setting-a-loan-up-a-questionnaire): his brief, nine
 answers, eleven calls made without asking, and "as built"). It's built, tested (`pnpm test`,
 `pnpm e2e`, screens looked at) and **released as `v0.1.19`** (the tag on its commit), for Kael
 to try on Emmer, where he does all his testing. Nothing is half done.
@@ -263,7 +384,7 @@ Loans is built and released: step 1 as **`v0.1.16`**, step 2 (outflows) as **`v0
 matched payment's difference now going to escrow rather than principal. 0.1.18 also makes
 upgrades safe to stop (below). Emmer still runs 0.1.15 until Kael upgrades it.
 
-- **Loans planned with Kael** ([the plan](docs/milestones/loans/PLAN.md): his brief, the model,
+- **Loans planned with Kael** ([the plan](docs/milestones/.archived/loans/PLAN.md): his brief, the model,
   "Decided with Kael"). Four answers: the books win and the table is where they start; the
   opening is against Opening Balances with the asset offered; step 1's dated changes are others'
   amounts, extra principal, the lender's statement and a new table; outflows are built now, as
@@ -299,9 +420,9 @@ upgrades safe to stop (below). Emmer still runs 0.1.15 until Kael upgrades it.
 ### Done before (2026-11-03): Funds B step 1 (shares in funds), `v0.1.15`
 
 - **Funds B is planned in steps, and step 1 is built** (Kael): [B's
-  plan](docs/milestones/funds/B/PLAN.md) holds only step 1, now with "As built"; the rest of B is
+  plan](docs/milestones/funds-b/PLAN.md) holds only step 1, now with "As built"; the rest of B is
   "to be continued after we've shipped non-USD assets in funds". B's old plan is now [the design
-  record](docs/milestones/funds/B/design-record.md). design.md has "Funds B, step 1".
+  record](docs/milestones/funds-b/design-record.md). design.md has "Funds B, step 1".
 - **Shares in funds:** funds read a transaction **per commodity** (A's kind and cap for each
   commodity's balance-sheet units), so a trade is one fund's two lines (`Emergency -3000.00 USD;
   Emergency +10 VTI`), the same as A for every USD-only transaction. Move money takes several
@@ -322,7 +443,7 @@ upgrades safe to stop (below). Emmer still runs 0.1.15 until Kael upgrades it.
 
 ### Done before that (2026-11-02)
 
-- **Funds A** ([its plan](docs/milestones/funds/A/PLAN.md), which now describes what was built;
+- **Funds A** ([its plan](docs/milestones/.archived/funds-a/PLAN.md), which now describes what was built;
   design.md, "Funds A"): a second ledger of funds beside the accounts, with no rules. A fund fills
   or drains only when a transaction says so (`funds:` lines: `+` into a fund, `-` out), or by a
   move between funds. Unallocated is net worth less every fund, never written. Funds hold
@@ -351,11 +472,11 @@ upgrades safe to stop (below). Emmer still runs 0.1.15 until Kael upgrades it.
    and Repair, and Special Home Improvement with Move money from Unallocated; then whatever the
    bell has. Watch the first bank sync after: a sale or transfer out of shares that every fund
    holds should land in the bell, not fail.
-3. **Kael looks over Funds B step 1's calls** ([B's plan](docs/milestones/funds/B/PLAN.md),
+3. **Kael looks over Funds B step 1's calls** ([B's plan](docs/milestones/funds-b/PLAN.md),
    "Decisions to review" and "Where the build departed from the plan"), and Funds A's (A's plan,
    "Decisions to review"), whenever suits.
-4. Then the rest of Funds B (the [design record](docs/milestones/funds/B/design-record.md), and
-   the 71 [scenarios](docs/milestones/funds/B/scenarios.md) with Kael; splits and corporate
+4. Then the rest of Funds B (the [design record](docs/milestones/funds-b/design-record.md), and
+   the 71 [scenarios](docs/milestones/funds-b/scenarios.md) with Kael; splits and corporate
    actions are waiting there, with how the bank feed books a split), or M18 (suggested
    recurring transactions and matching rules); see "Next steps" below.
 
@@ -410,7 +531,7 @@ upgrades safe to stop (below). Emmer still runs 0.1.15 until Kael upgrades it.
 ### Also
 
 - **M17 (tagging) is built and released as `v0.1.12`** (2026-10-29; see "Releases" below for
-  its Release run): its [plan](docs/milestones/m17-transaction-tagging/PLAN.md) has the calls
+  its Release run): its [plan](docs/milestones/.archived/m17-transaction-tagging/PLAN.md) has the calls
   made without asking, design.md has "Tags (M17)". It needed ledger-graphs **0.1.2**
   (breakdown's `total` window), published from its own repository first.
 - **The live server is at `https://luminous.money`** (Emmer, on 0.1.14; moved 2026-10-27).
@@ -431,8 +552,9 @@ upgrades safe to stop (below). Emmer still runs 0.1.15 until Kael upgrades it.
   left them out on purpose. Schedules already carry a template's tags but have no field for
   them, and pairing a transfer drops its sides' tags. The plan's decisions await Kael.
 - **Still open, not started:** a by-payee grouping in review, and whether imports and bank
-  feeds ask the AI by themselves (PLAN.md's open questions).
-- **Committing:** `git add -A -- . ':!docs/milestones/m16-receipt-capture/notes.md'` (never
+  feeds ask the AI by themselves ([M99](docs/milestones/m99-follow-ups/PLAN.md)'s open
+  questions).
+- **Committing:** `git add -A -- . ':!docs/milestones/.archived/m16-receipt-capture/notes.md'` (never
   commit changes to that file; the private files are ignored), ending the message with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
@@ -455,7 +577,8 @@ repositories) is archived on GitHub and kept locally in `../.archive/system`. Ev
 GPL-2.0-or-later (Beancount is GPL-2.0-only). It wears the original app's look: its palette
 (light gray and blue; deep blue and cyan in dark mode) and its Lu logo (design.md, "Its look").
 
-**M1 through M17, Funds A, Funds B's step 1 and Loans are built** (M7, cross-book transactions, was dropped: books are independent).
+**M1 through M17, Funds A, Funds B's step 1, Loans, Amazon orders and brokerage activity are
+built** (M7, cross-book transactions, was dropped: books are independent).
 M2 (credit cards, really "any account, and matching"), M3 (scheduled transactions), M4
 (categorization), M5 (investments), M6 (multiple books), M8 (auth), M9 (SimpleFIN), M10 (chart of
 accounts), M11 (budgets), M12 (reports), M13 (sharing books), M14 (reconciliation), M15 (divided
@@ -463,8 +586,9 @@ accounts), M16 (receipt capture) and M17 (tagging) are described in their plans,
 accounts import** and **migrating from another system**, slipped in before M17 (2026-10-26).
 **M19 (AI categorization) was built within M16** and is live; its PLAN.md entry was found
 unchecked and corrected on 2026-10-26 (what's left is a question: whether imports and bank feeds
-ask the AI by themselves). The milestones ahead (the rest of Funds B, M18, M20 and Polish) are in
-[docs/PLAN.md](docs/PLAN.md).
+ask the AI by themselves). Their plans are in `docs/milestones/.archived/`. The milestones ahead
+(the rest of Funds B, Tags more, split-level tags and funds, HSA tracking, M18, M20, and M99's
+follow-ups) are in [docs/PLAN.md](docs/PLAN.md).
 
 What an operator can do now (production readiness, phase 1; [docs/deploying.md](docs/deploying.md)):
 `luminous-money install` sets a deployment up (a laptop, or a public server with built-in HTTPS),
@@ -784,12 +908,12 @@ How it's put together:
    categorizing it took about 76 seconds, hence background jobs), but none with a reference
    yet; watch the first suggestions' quality and `docker compose logs ai`. Not built from the
    proposal: a by-payee view in review (categorize a payee's group at once).
-3. **Loans is out** (`v0.1.16` to `v0.1.18`, [its plan](docs/milestones/loans/PLAN.md)); Kael
+3. **Loans is out** (`v0.1.16` to `v0.1.18`, [its plan](docs/milestones/.archived/loans/PLAN.md)); Kael
    declares his mortgage on Emmer. **Funds B's step 1 is out** (`v0.1.15`); Kael sets his
    Fidelity accounts up in funds. Then the rest of B (where a loan is grouped with its asset) or
    M18 (suggested recurring transactions and matching rules).
-4. Later, not pressing: [PLAN.md's "Later"](docs/PLAN.md#later-noted-not-pressing) (email,
-   ownership transfer, the rest of M8's auth questions).
+4. Later, not pressing: [M99: Follow-ups](docs/milestones/m99-follow-ups/PLAN.md) (email,
+   ownership transfer, the rest of M8's auth questions, and the rest of what's left over).
 
 ## The ledger-graphs libraries
 

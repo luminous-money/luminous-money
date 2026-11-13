@@ -13,7 +13,15 @@
 import type { Hono } from "hono";
 
 import type { ImportResult } from "../../shared/imports.js";
-import { claim, explainError, hostOf, isNotice, SimplefinProblem, type SfError } from "./client.js";
+import {
+  claim,
+  concerns,
+  explainError,
+  hostOf,
+  isNotice,
+  SimplefinProblem,
+  type SfError,
+} from "./client.js";
 import { kindOf, LinkProblem, plan, type LinkMode } from "./link.js";
 import { attemptLink, confirmAttempt } from "./attempts.js";
 import type { Attempt, Connection, LinkKind } from "./store.js";
@@ -320,9 +328,8 @@ export function simplefinRoutes(
         last_sync_at: connection.last_sync_at,
         // Unconfirmed transactions of yours from the link's start that no bank row holds.
         not_at_bank: [...notAtBank(link.account, link.kind, link.starts_on)],
-        errors: errorsOf(
-          connection.errors.filter((e) => !e.account_id || e.account_id === link.account_id)
-        ),
+        // Only what's about this account (the bell has the rest).
+        errors: errorsOf(connection.errors.filter((e) => concerns(e, snapshot))),
         comparison: await bankComparison(deps.db, store, ledgerFor(user), link).catch(() => null),
         updated_at: link.updated_at,
         ...(link.kind === "brokerage"

@@ -29,7 +29,7 @@ import { captureReceipt, readReceipt, ReceiptProblem, type ReceiptStep } from ".
 import { Jobs, wantsAsync, type Failure } from "./jobs.js";
 import type { System } from "./system.js";
 import { pairAfterImport, pairedTransfers, rejectTransfer, TransferProblem } from "./transfers.js";
-import { notifications } from "./notifications.js";
+import { bankNotifications, notifications } from "./notifications.js";
 import { UPCOMING_DAYS, type ScheduleIn, type SchedulePatch } from "../shared/schedule.js";
 import { StaleVersion } from "./db.js";
 import {
@@ -468,8 +468,8 @@ export function createApi({
     "/books/:book/reports/spending",
     report((c, book, ledger) => spendingReport(ledger, book, reportOn(c, book)))
   );
-  // Cash flow, breakdowns and the largest take `tag` (repeated): only the transactions with
-  // every one (M17).
+  // Cash flow, breakdowns and the largest take `tag` (repeated): only the splits with every one
+  // (M17).
   const tagsOf = (c: Context) => c.req.queries("tag") ?? [];
   // Spending as outflows (Loans step 2), unless `lens=expenses` asks for the books as booked.
   const lensOf = (c: Context): Lens =>
@@ -915,18 +915,43 @@ export function createApi({
     })
   );
 
-  // Notifications (Funds B): what needs attention in the book, for those who can fix it (write).
+  // Notifications (Funds B): what needs attention in the book, for those who can fix it (write),
+  // but what the caller dismissed.
+  const queueFor = async (user: string, book: string) => {
+    const dismissed = db.dismissed(user, book);
+    const queue = [
+      ...(await notifications(ledgerFor(user), book)),
+      ...(shopsFor ? await shopNotifications(shopsFor(user), book) : []),
+      ...(simplefin ? bankNotifications(simplefin.store, book) : []),
+    ];
+    return queue.filter((n) => !dismissed.has(n.id)).sort((a, b) => a.added.localeCompare(b.added));
+  };
+
   api.get("/books/:book/notifications", async (c) => {
     const { book } = c.req.param();
     try {
       const role = await roleIn(c.get("user"), book);
       if (!role) return c.json({ detail: "not found" }, 404);
       if (!atLeast(role, "write")) return c.json([]);
-      const queue = [
-        ...(await notifications(ledgerFor(c.get("user")), book)),
-        ...(shopsFor ? await shopNotifications(shopsFor(c.get("user")), book) : []),
-      ];
-      return c.json(queue.sort((a, b) => a.added.localeCompare(b.added)));
+      return c.json(await queueFor(c.get("user"), book));
+    } catch (error) {
+      return c.json(...ledgerStatus(error));
+    }
+  });
+
+  /** Dismiss one for the caller (those that can be): the queue as it is now. */
+  api.put("/books/:book/notifications/:id/dismissed", async (c) => {
+    const { book, id } = c.req.param();
+    const user = c.get("user");
+    try {
+      const role = await roleIn(user, book);
+      if (!role || !atLeast(role, "write")) return c.json({ detail: "not found" }, 404);
+      const found = (await queueFor(user, book)).find((n) => n.id === id);
+      if (!found) return c.json({ detail: "there's no such notification" }, 404);
+      if (!found.dismissable)
+        return c.json({ detail: "this one goes once it's fixed: it can't be dismissed" }, 409);
+      db.dismiss(user, book, id);
+      return c.json(await queueFor(user, book));
     } catch (error) {
       return c.json(...ledgerStatus(error));
     }

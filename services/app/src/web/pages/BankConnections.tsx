@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 
 import { AccountPicker } from "../components/AccountPicker.js";
@@ -17,6 +17,7 @@ import type {
 } from "../lib/appApi.js";
 import { formatMoney } from "../lib/decimal.js";
 import { formatReported, formatWhen, today } from "../lib/format.js";
+import { useParam } from "../lib/navigation.js";
 import {
   explain,
   useAccountCreation,
@@ -60,10 +61,12 @@ export function BankConnections({ book }: { book: string }) {
   );
 }
 
-/** The page's connections and Connect, also a migration's bank feeds step. */
+/** The page's connections and Connect, also a migration's bank feeds step. `?connection=<id>`
+ * (the bell's link to a connection's problem) scrolls to that one. */
 export function BankConnectionsPanel({ book }: { book: string }) {
   const connections = useBankConnections();
   const attempts = useBankAttempts(book);
+  const shown = useParam("connection");
   return (
     <>
       {connections.isPending && <p className="muted">Loading…</p>}
@@ -74,6 +77,7 @@ export function BankConnectionsPanel({ book }: { book: string }) {
           book={book}
           connection={c}
           attempts={(attempts.data ?? []).filter((a) => a.connection_id === c.id)}
+          shown={c.id === shown}
         />
       ))}
       <Connect />
@@ -123,16 +127,23 @@ function ConnectionCard({
   book,
   connection,
   attempts,
+  shown,
 }: {
   book: string;
   connection: BankConnection;
   attempts: LinkAttempt[];
+  /** The one a link asked for: scrolled to. */
+  shown: boolean;
 }) {
   const sync = useSyncBank();
   const disconnect = useDisconnectBank();
   const [linking, setLinking] = useState<string | null>(null);
+  const card = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (shown) card.current?.scrollIntoView({ block: "start" });
+  }, [shown]);
   return (
-    <section className="card" aria-label={`Connection to ${connection.host}`}>
+    <section ref={card} className="card" aria-label={`Connection to ${connection.host}`}>
       <div className="row-between">
         {/* Named by its id: its banks are its accounts', and a connection can hold many. */}
         <h2 className="section-title">SimpleFIN {connection.id.slice(0, 8)}</h2>

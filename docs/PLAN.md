@@ -11,42 +11,106 @@ Two principles set the order:
 - **Grow one real use case at a time, end to end.** Each milestone is elaborated when it starts,
   not before.
 
+## How the docs are laid out
+
+- **A milestone ahead** has its plan in `milestones/<milestone>/PLAN.md` next to this file,
+  written in full when it starts (until then, its brief and what's been noted for it).
+- **A milestone that's done** moves to `milestones/.archived/<milestone>/`, its plan kept as the
+  record of what was built and why.
+- **What's left over** (open questions, polish, follow-ups from done milestones, anything with no
+  milestone of its own) is [M99: Follow-ups](milestones/m99-follow-ups/PLAN.md). Something that
+  belongs to a milestone ahead goes in that milestone's plan instead.
+
+## Ahead
+
+Roughly in order; each is elaborated with Kael when it starts.
+
+- [ ] **Funds B: Complex Fund Functionality** (next; Kael, 2026-11-02;
+      [its plan](milestones/funds-b/PLAN.md)): everything else designed for funds, built in
+      steps.
+  - [x] **Step 1: shares in funds** (Kael, 2026-11-03; [built](milestones/funds-b/PLAN.md)
+        2026-11-03, `v0.1.15`): a fund holds any commodity, so Kael's Fidelity accounts
+        can be represented in funds. Funds read a transaction per commodity, moves take shares
+        (typed in shares or dollars), the Funds pages list holdings, and an account can have a
+        default fund (an IRA's is Retirement). A sale that says no fund is flagged: refused when
+        typed by hand, queued in a new **Notifications** page (a bell beside the camera) when it
+        came in by itself.
+  - [ ] **The rest** ([what it takes in](milestones/funds-b/PLAN.md#the-rest-of-b)): spend and
+        fill rules, groups (a house and its mortgage), loans in funds, budget funds for *why*
+        money is spent, what becomes of divided accounts, and A's known gaps.
+        [The design record](milestones/funds-b/design-record.md) holds the design so far, with
+        an [example book](milestones/funds-b/example-book.md) and
+        [71 scenarios](milestones/funds-b/scenarios.md) still to gut-check.
+- [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules
+      that add tags, Capture receipt's Tags, the AI and history proposing the book's own tags.
+      [Planned](milestones/tags-more/PLAN.md) 2026-10-29, not started; its decisions to review
+      await Kael. Tags are splits' since 2026-11-12, so it's to be read through that first
+      (schedules' Tags and transfers keeping their sides' tags came with split-level tags).
+- [ ] **Split-level tags and funds** (Kael, 2026-11-07;
+      [its plan](milestones/split-level-tags-and-funds/PLAN.md)): often only part of a
+      transaction is a fund's (one item of a receipt from Emergency), and the same is true of tags
+      (one item `#gift`).
+  - [x] **Step 1, tags per split** (Kael, 2026-11-12: "moving tags from transaction level to
+        split level"; the tags already used dropped, at his call). Built 2026-11-12: a split's
+        `tags:` (`Posting.tags` in the ledger's API, ledger migration 14), Tags per split on the
+        transaction page and schedules, a card's and Select mode's tags going on what the money
+        was for, filters keeping a transaction with a split that has every tag, Reports counting
+        only the tagged splits, and tags passed on when a split is itemized or a transfer
+        paired. Eight calls to review in the plan. Released in `v0.1.27`.
+  - [x] **The split editor** (Kael, 2026-11-12): with tags and memos, splits are shown as they
+        are and edited one at a time in a dialog, several at once in Select mode (PLAN's Polish,
+        "Kael's changes, 2026-11-12").
+  - [ ] **Step 2, funds per split** (noted, not planned): fund lines are the transaction's
+        (amounts, not tied to a split); until then a review card's fund choice is quieter, and
+        the split editor has no fund (Kael asked for one there, 2026-11-12).
+- [ ] **HSA tracking** (Kael, 2026-11-07; [noted](milestones/hsa-tracking/PLAN.md), not planned):
+      the AI tags every split that appears to pay for something HSA-eligible. Amazon says so on
+      its items, so its charges need no guess. Builds on Tags, more (the chain proposing tags) and
+      split-level tags (built).
+- [ ] **M18: Suggested recurring transactions and matching rules.** Bi-weekly or on-demand via
+      a button in the schedules section (recurring transactions) or somewhere TBD for matching
+      rules. Analyze each account's last 14 months of transactions and identify ones that look
+      recurring and are not already captured by an existing recurring transaction, to suggest
+      as schedules (M3) or for matching rules. Don't re-ask. (Moved after tagging, 2026-10-17;
+      [its brief](milestones/m18-suggested-recurring-transactions/PLAN.md).)
+- [ ] **M20: Design polish** ([noted](milestones/m20-design-polish/PLAN.md)): mobile usability
+      across the app, so far.
+- [ ] **M99: Follow-ups** ([the list](milestones/m99-follow-ups/PLAN.md)): open questions, polish,
+      calls made without asking still to review, and what done milestones left over.
+
 ## Done
 
-- **Foundations.**
-  - The `ledger` service: a database as the system of record, Beancount as the engine, exact
-    round trips, and incremental backups. Also a decades-scale benchmark.
-  - Monorepo tooling: bake, the pnpm workspace, and a generated `ledger-client` with a drift
-    check.
-  - The Compose stack, with Traefik routing `/api/*` and `/ui/*`.
-  - API and browser end-to-end suites against a throwaway stack.
-- **The ledger API:**
-  - JSON writes for transactions and text writes for any directive
-  - typed responses, versioned and partial edits (PATCH with `updated_at`, 409 on conflict)
-  - snake_case JSON
-- **Migrations:** every table goes through `create_table` (created/updated timestamps), with a
-  lint check.
-- **Accounts:**
-  - Leaves hold transactions and nodes hold sub-accounts.
-  - Create an account by its fully qualified name from any account picker, with autofill
-    through node accounts; nodes on the way are created too.
-- **The review queue** (done for now):
-  - skip, categorize, edit descriptions, confirm
-  - swipe right to confirm and left to skip, with the stack sliding up
-  - a detail view with a full split editor and a live balance check
-  - TanStack Query underneath
-- **Demo data:** `pnpm seed`.
-- **Fava dropped:** reports will be our own.
+Each with its plan in [milestones/.archived](milestones/.archived/).
 
-## Milestones
-
-Each milestone's detailed plan lives in `milestones/<milestone>/PLAN.md` next to this file (e.g.
-[milestones/m1-one-account-e2e](milestones/m1-one-account-e2e/PLAN.md)), written when the
-milestone starts.
-
-- [x] **M1: One bank account end-to-end.** Built 2026-10-11, with
-      [decisions to review](milestones/m1-one-account-e2e/PLAN.md#decisions-to-review)
-      ([spec](milestones/m1-one-account-e2e/SPEC.md), [plan](milestones/m1-one-account-e2e/PLAN.md)).
+- [x] **Before the milestones:**
+  - **Foundations.**
+    - The `ledger` service: a database as the system of record, Beancount as the engine, exact
+      round trips, and incremental backups. Also a decades-scale benchmark.
+    - Monorepo tooling: bake, the pnpm workspace, and a generated `ledger-client` with a drift
+      check.
+    - The Compose stack, with Traefik routing `/api/*` and `/ui/*`.
+    - API and browser end-to-end suites against a throwaway stack.
+  - **The ledger API:**
+    - JSON writes for transactions and text writes for any directive
+    - typed responses, versioned and partial edits (PATCH with `updated_at`, 409 on conflict)
+    - snake_case JSON
+  - **Migrations:** every table goes through `create_table` (created/updated timestamps), with a
+    lint check.
+  - **Accounts:**
+    - Leaves hold transactions and nodes hold sub-accounts.
+    - Create an account by its fully qualified name from any account picker, with autofill
+      through node accounts; nodes on the way are created too.
+  - **The review queue** (done for now):
+    - skip, categorize, edit descriptions, confirm
+    - swipe right to confirm and left to skip, with the stack sliding up
+    - a detail view with a full split editor and a live balance check
+    - TanStack Query underneath
+  - **Demo data:** `pnpm seed`.
+  - **Fava dropped:** reports will be our own.
+- [x] **M1: One bank account end-to-end.** Built 2026-10-11, with [decisions to
+      review](milestones/.archived/m1-one-account-e2e/PLAN.md#decisions-to-review)
+      ([spec](milestones/.archived/m1-one-account-e2e/SPEC.md),
+      [plan](milestones/.archived/m1-one-account-e2e/PLAN.md)).
   - the "brand new empty user" homepage
   - the add-an-account flow
   - the homepage with accounts
@@ -59,25 +123,25 @@ milestone starts.
     account's ledger, the add line at the top, the editor's actions pinned
   - decisions answered (2026-10-12): several file formats per account (asked about on a
     mismatch), any ledger path for a bank account, and exporting a book
-- [x] **M2: Credit card account.** Much of the same as M1, plus some minor display decisions,
-      and testing matching with two accounts that reflect two sides of the same transaction.
-      Built 2026-10-13 ([plan](milestones/m2-credit-card/PLAN.md)): starred accounts replace
-      "money accounts" (no account kinds), liabilities and income display inverted, and imports
-      that match transactions already in the account, every match reviewed (move, swap, undo).
+- [x] **M2: Credit card account.** Much of the same as M1, plus some minor display decisions, and
+      testing matching with two accounts that reflect two sides of the same transaction. Built
+      2026-10-13 ([plan](milestones/.archived/m2-credit-card/PLAN.md)): starred accounts replace
+      "money accounts" (no account kinds), liabilities and income display inverted, and imports that
+      match transactions already in the account, every match reviewed (move, swap, undo).
 - [x] **M3: Scheduled transactions.** The editor, storage, generator logic (when and how real
       transactions are created from a schedule template), and display considerations. Built
-      2026-10-13 ([plan](milestones/m3-scheduled-transactions/PLAN.md)), with the answers to its
-      questions: daily runs, per-split match tolerances, upcoming rows with projected balances,
-      auto-confirm, book time zones, and "Not this time".
+      2026-10-13 ([plan](milestones/.archived/m3-scheduled-transactions/PLAN.md)), with the answers
+      to its questions: daily runs, per-split match tolerances, upcoming rows with projected
+      balances, auto-confirm, book time zones, and "Not this time".
 - [x] **M4: Categorization.** The categorization engine. Built 2026-10-13
-      ([plan](milestones/m4-categorization/PLAN.md)): rules and history categorizers, external
-      providers over our [categorizer API](categorizer-api.md), proposals in review with
+      ([plan](milestones/.archived/m4-categorization/PLAN.md)): rules and history categorizers,
+      external providers over our [categorizer API](categorizer-api.md), proposals in review with
       acceptance tracking, "Suggest categories", similar, "Remember", and Select mode.
-- [x] **M5: Investment accounts.** Lean on what Beancount already provides. The main
-      deliverable: storing non-currency holdings, with a currency representation of their value.
-      Built 2026-10-14 ([plan](milestones/m5-investment-accounts/PLAN.md)): holdings with cost
-      basis and gains (account-scoped booking), values and staleness everywhere, prices fetched
-      each morning (beanprice), trades with tax-aligned booking and split gains, revalued assets.
+- [x] **M5: Investment accounts.** Lean on what Beancount already provides. The main deliverable:
+      storing non-currency holdings, with a currency representation of their value. Built 2026-10-14
+      ([plan](milestones/.archived/m5-investment-accounts/PLAN.md)): holdings with cost basis and
+      gains (account-scoped booking), values and staleness everywhere, prices fetched each morning
+      (beanprice), trades with tax-aligned booking and split gains, revalued assets.
 - [x] **M6: Multiple books.** A book switcher and a books manager (create, delete). The selected
       book is the context for everything, like switching profiles; nothing spans books. Built
       2026-10-14: book-prefixed pages, the masthead switcher, creating books (also from an
@@ -100,130 +164,118 @@ milestone starts.
 - [x] **M11: Budgets.** A budget on any account, for any period: how much you're allowed to
       spend (or aim to earn or save). A node's budget can be split across the accounts under it,
       the rest its "Other"; none is higher than one above it. Shown on a Budgets page, an
-      account's ledger and home, as filled lines. [Built](milestones/m11-budgets/PLAN.md)
+      account's ledger and home, as filled lines. [Built](milestones/.archived/m11-budgets/PLAN.md)
       2026-10-17, with "Exclude from budget" on transactions and the book's week start.
 - [x] **M12: Reports.** From basic to more complex: home's "Spent this month" (against the budget
-      and a simulated month), cash flow, expense and income breakdowns, largest transactions,
-      net worth, and account statistics, on our own `ledger-graphs` libraries with ECharts.
-      [Built](milestones/m12-reports/PLAN.md) 2026-10-17, with home's recent transactions and
-      a Transactions page (every account's). Statements (P&L, balance sheet) later. The
-      libraries moved to [luminous-money/ledger-graphs](https://github.com/luminous-money/ledger-graphs)
-      (2026-10-17), and the app depends on them from npm.
-- [x] **M13: Sharing books with other users.** Any user can be added to a book with read, write
-      or manage permissions. Every book has an owner. [Built](milestones/m13-sharing-books/PLAN.md)
-      2026-10-17: invitations by link, roles enforced by the ledger and `app`, leaving and
-      removing, read-only in the PWA.
+      and a simulated month), cash flow, expense and income breakdowns, largest transactions, net
+      worth, and account statistics, on our own `ledger-graphs` libraries with ECharts.
+      [Built](milestones/.archived/m12-reports/PLAN.md) 2026-10-17, with home's recent transactions
+      and a Transactions page (every account's). Statements (P&L, balance sheet) later. The
+      libraries moved to
+      [luminous-money/ledger-graphs](https://github.com/luminous-money/ledger-graphs) (2026-10-17),
+      and the app depends on them from npm.
+- [x] **M13: Sharing books with other users.** Any user can be added to a book with read, write or
+      manage permissions. Every book has an owner.
+      [Built](milestones/.archived/m13-sharing-books/PLAN.md) 2026-10-17: invitations by link, roles
+      enforced by the ledger and `app`, leaving and removing, read-only in the PWA.
 - [x] **M14: Reconciliation.** Agree an account with the bank's statement (or feed): tick off its
-      transactions to the statement's balance, then keep it as a balance assertion and marks on
-      the postings; bank-fed accounts checked daily, with where they went off.
-      [Built](milestones/m14-reconciliation/PLAN.md) 2026-10-17: Reconcile (save for later,
-      Finish once it balances, Undo), ✓ in ledgers and their filter (with Select all), divided
-      accounts, bank-fed accounts reconciled automatically, imported files' balances checked.
+      transactions to the statement's balance, then keep it as a balance assertion and marks on the
+      postings; bank-fed accounts checked daily, with where they went off.
+      [Built](milestones/.archived/m14-reconciliation/PLAN.md) 2026-10-17: Reconcile (save for
+      later, Finish once it balances, Undo), ✓ in ledgers and their filter (with Select all),
+      divided accounts, bank-fed accounts reconciled automatically, imported files' balances
+      checked.
 - [x] **M15: Sub-accounts of linked accounts.** Split a bank-linked account's money into
-      sub-accounts, e.g. the $10,000 in a PNC checking account as $5,000 of padding and $5,000
-      for general use, while the bank feed keeps it in step with the bank. Builds on M14's
-      **divided accounts** (a node that's one real account, its sub-accounts dividing it):
-      linking one to a bank, and where the feed's transactions land among its parts.
-      [Built](milestones/m15-sub-accounts-of-linked-accounts/PLAN.md) 2026-10-18: a main part
-      new money lands in, Divide for an account you already have (its link, statements and
-      history kept), the parts on screen with Move money, choosing a transaction's part, and
-      rules that land what they match in a part.
+      sub-accounts, e.g. the $10,000 in a PNC checking account as $5,000 of padding and $5,000 for
+      general use, while the bank feed keeps it in step with the bank. Builds on M14's **divided
+      accounts** (a node that's one real account, its sub-accounts dividing it): linking one to a
+      bank, and where the feed's transactions land among its parts.
+      [Built](milestones/.archived/m15-sub-accounts-of-linked-accounts/PLAN.md) 2026-10-18: a main
+      part new money lands in, Divide for an account you already have (its link, statements and
+      history kept), the parts on screen with Move money, choosing a transaction's part, and rules
+      that land what they match in a part.
 - [x] **M16: Receipt capture.** Take a picture of a receipt, and AI makes a transaction from it.
-      [Built](milestones/m16-receipt-capture/PLAN.md) 2026-10-18: the `ai` service (per-book AI
-      settings and a sealed key; Claude, and a fake for tests), Capture receipt (camera or
-      upload, hints, itemizing) into review and back, attachments on any transaction, and a
-      capture that always makes a transaction, read or not.
-      Its second pass (2026-10-19): reading in two narrow steps (extract with Sonnet 5,
-      categorize with Opus 5), payment cards on accounts naming the paying account, and
-      categorizing by **split**: posting flags mark what's unconfirmed, fallbacks and item
-      history in the chain, and review's split pickers.
-- [x] **Production readiness** (before M17; Kael, 2026-10-19): ready for production, and simple
-      to deploy from GitHub to a laptop or a public server: upgrades and migrations, whole-system
+      [Built](milestones/.archived/m16-receipt-capture/PLAN.md) 2026-10-18: the `ai` service
+      (per-book AI settings and a sealed key; Claude, and a fake for tests), Capture receipt (camera
+      or upload, hints, itemizing) into review and back, attachments on any transaction, and a
+      capture that always makes a transaction, read or not. Its second pass (2026-10-19): reading in
+      two narrow steps (extract with Sonnet 5, categorize with Opus 5), payment cards on accounts
+      naming the paying account, and categorizing by **split**: posting flags mark what's
+      unconfirmed, fallbacks and item history in the chain, and review's split pickers.
+- [x] **Production readiness** (before M17; Kael, 2026-10-19): ready for production, and simple to
+      deploy from GitHub to a laptop or a public server: upgrades and migrations, whole-system
       backups, logs, health; releases on GitHub; admins (by email, in config) with a system page,
-      and upgrades on the admin's terms. [Its plan](milestones/production-readiness/PLAN.md).
-      Phase 1 built 2026-10-21: versions and health everywhere, the gateway image (with optional
-      HTTPS), whole-system backups, the `luminous-money` command, the release workflow,
-      [docs/deploying.md](deploying.md). Questions answered 2026-10-23 (host-only upgrades,
-      GitHub as luminous-money/luminous-money, GPL-2.0-or-later, HTTPS kept with its certificate
-      watched, open sign-ups). Phase 2 built 2026-10-23: admins by email (once confirmed),
-      the system page, update checks, `auto-upgrade`. Upgrades made safe to stop (2026-11-05,
-      `v0.1.18`, after Emmer's hung): images pulled one at a time and before anything changes,
-      and `upgrade` finishing one stopped after pinning.
-- [x] **Chart of accounts import** (before M17; Kael, 2026-10-26): Accounts → Import, a CSV of
-      full names and the fields an account can start with, every name title-cased by the one
-      normalizer. [Built](milestones/chart-of-accounts-import/PLAN.md) 2026-10-26: a preview of
-      what's added, already here or refused (and why), then one atomic write
-      (`POST /accounts/batch`); descriptions on accounts; typing and suggestions title-case too.
+      and upgrades on the admin's terms. [Its
+      plan](milestones/.archived/production-readiness/PLAN.md). Phase 1 built 2026-10-21: versions
+      and health everywhere, the gateway image (with optional HTTPS), whole-system backups, the
+      `luminous-money` command, the release workflow, [docs/deploying.md](deploying.md). Questions
+      answered 2026-10-23 (host-only upgrades, GitHub as luminous-money/luminous-money,
+      GPL-2.0-or-later, HTTPS kept with its certificate watched, open sign-ups). Phase 2 built
+      2026-10-23: admins by email (once confirmed), the system page, update checks, `auto-upgrade`.
+      Upgrades made safe to stop (2026-11-05, `v0.1.18`, after Emmer's hung): images pulled one at a
+      time and before anything changes, and `upgrade` finishing one stopped after pinning.
+- [x] **Chart of accounts import** (before M17; Kael, 2026-10-26): Accounts → Import, a CSV of full
+      names and the fields an account can start with, every name title-cased by the one normalizer.
+      [Built](milestones/.archived/chart-of-accounts-import/PLAN.md) 2026-10-26: a preview of what's
+      added, already here or refused (and why), then one atomic write (`POST /accounts/batch`);
+      descriptions on accounts; typing and suggestions title-case too.
 - [x] **Migrate from another system** (before M17; Kael, 2026-10-26): from the setup flow or
-      Accounts, until it's been done once: another system's chart and history (GnuCash first),
-      bank feeds and the AI if wanted, then a reference of the history by payee for the AI,
-      rules from history, and suggestions for everything uncategorized.
-      [Built](milestones/migrate-from-another-system/PLAN.md) 2026-10-26, with descriptions
-      going to the AI and a fix: making an account in a transaction's picker no longer submits
-      the transaction too.
+      Accounts, until it's been done once: another system's chart and history (GnuCash first), bank
+      feeds and the AI if wanted, then a reference of the history by payee for the AI, rules from
+      history, and suggestions for everything uncategorized.
+      [Built](milestones/.archived/migrate-from-another-system/PLAN.md) 2026-10-26, with
+      descriptions going to the AI and a fix: making an account in a transaction's picker no longer
+      submits the transaction too.
 - [x] **M17: Transaction tagging.** Tag transactions with one or more tags. Remove tags. Per-
       transaction or via bulk actions. Filter reports by one or more tags (AND for now).
-      [Built](milestones/m17-transaction-tagging/PLAN.md) 2026-10-29: Beancount's `#tag`s, a
-      Tags field on a transaction's page, Add tag… and Remove tag… in Select mode, tags on rows,
-      a tag filter on ledgers, Transactions and Reports (whose breakdown gains All time).
+      [Built](milestones/.archived/m17-transaction-tagging/PLAN.md) 2026-10-29: Beancount's `#tag`s,
+      a Tags field on a transaction's page, Add tag… and Remove tag… in Select mode, tags on rows, a
+      tag filter on ledgers, Transactions and Reports (whose breakdown gains All time). Tags
+      moved to splits on 2026-11-12 (split-level tags, step 1).
 - [x] **Funds A: Basic Funds** (Kael, 2026-11-02): what money is *for*, as a ledger of its
       own beside the accounts (where it is), with no rules: a fund fills or drains only when a
       transaction says so ("for Emergency", "from Emergency"), or by a move between funds.
       Funds hold dollars; Unallocated is net worth less every fund.
-      [Built](milestones/funds/A/PLAN.md) 2026-11-02 (`v0.1.13`): a Funds section on a
+      [Built](milestones/.archived/funds-a/PLAN.md) 2026-11-02 (`v0.1.13`): a Funds section on a
       transaction's page, New transaction and schedules, a fund on review cards, Select mode's
       Fund…, a rule's fund, chips on rows, the Funds page, each fund's page, Move money and a
       home card.
-- [ ] **Funds B: Complex Fund Functionality** (next; Kael, 2026-11-02): everything else
-      designed for funds, built in steps.
-  - [x] **Step 1: shares in funds** (Kael, 2026-11-03; [built](milestones/funds/B/PLAN.md)
-        2026-11-03, `v0.1.15`): a fund holds any commodity, so Kael's Fidelity accounts
-        can be represented in funds. Funds read a transaction per commodity, moves take shares
-        (typed in shares or dollars), the Funds pages list holdings, and an account can have a
-        default fund (an IRA's is Retirement). A sale that says no fund is flagged: refused when
-        typed by hand, queued in a new **Notifications** page (a bell beside the camera) when it
-        came in by itself.
-  - [ ] **The rest,** after step 1 ships: spend and fill rules, account defaults, groups (a
-        house and its mortgage), budget funds for *why* money is spent, and loans in funds.
-        [The design record](milestones/funds/B/design-record.md) holds the design so far, with
-        an [example book](milestones/funds/B/example-book.md) and
-        [71 scenarios](milestones/funds/B/scenarios.md) still to gut-check.
-- [x] **Loans** (Kael, 2026-10-30; planned with Kael and built 2026-11-05: [its plan](milestones/loans/PLAN.md)):
-      big loans managed from an amortization table (worked out, a CSV, or a PDF read by the AI),
-      with dated changes, history when one's already under way, and escrow dovetailing with
-      schedules; and their payments seen as monthly spending. In funds, a loan is grouped (Funds
-      B's open question 4), which is the rest of Funds B.
-  - [x] **Step 1: loans** ([built](milestones/loans/PLAN.md#step-1-as-built-2026-11-05)
+- [x] **Loans** (Kael, 2026-10-30; planned with Kael and built 2026-11-05: [its
+      plan](milestones/.archived/loans/PLAN.md)): big loans managed from an amortization table
+      (worked out, a CSV, or a PDF read by the AI), with dated changes, history when one's already
+      under way, and escrow dovetailing with schedules; and their payments seen as monthly spending.
+      In funds, a loan is grouped (Funds B's open question 4), which is the rest of Funds B.
+  - [x] **Step 1: loans** ([built](milestones/.archived/loans/PLAN.md#step-1-as-built-2026-11-05)
         2026-11-05): principal, interest and others (escrow, PMI) from dated versions; the books
         win and the table is where they start; the payment an M3 schedule the loan keeps; from
         the start (backfilled, Opening Balances before the paying account's books), from today,
         or already in the books; extra payments, the lender's statement, a new table; escrow's
         schedules linked from the loan.
-  - [x] **Step 2: outflows** (Kael, 2026-11-05; [built](milestones/loans/PLAN.md#step-2-as-built-2026-11-05)
-        2026-11-05): an asset or liability can count as spending (what's paid into it, as an
-        expense account), with the expenses paid out of it masked; budgets, home and Reports
-        count outflows (the ledger's lens), and Reports switches to Expenses, the traditional
-        P&L view.
+  - [x] **Step 2: outflows** (Kael, 2026-11-05;
+        [built](milestones/.archived/loans/PLAN.md#step-2-as-built-2026-11-05) 2026-11-05): an asset
+        or liability can count as spending (what's paid into it, as an expense account), with the
+        expenses paid out of it masked; budgets, home and Reports count outflows (the ledger's
+        lens), and Reports switches to Expenses, the traditional P&L view.
   - [x] **Its decisions reviewed** (Kael, 2026-11-05; `v0.1.18`): all 21 kept but number 6, so
         a matched payment's different amount now goes to escrow (principal, without escrow).
-  - [x] **Step 3: setting a loan up as a questionnaire** (Kael, 2026-11-06;
-        [planned with Kael](milestones/loans/PLAN.md#step-3-setting-a-loan-up-a-questionnaire)
-        and [built](milestones/loans/PLAN.md#step-3-as-built-2026-11-06) 2026-11-06, released
-        as `v0.1.19`):
-        New loan becomes a step-by-step questionnaire (what it's for, terms, extras, history,
-        payment, then a confirmation page showing where the money flows) that creates nothing
-        until Confirm. Default accounts are named from what the loan is for; the CSV and PDF
+  - [x] **Step 3: setting a loan up as a questionnaire** (Kael, 2026-11-06; [planned with
+        Kael](milestones/.archived/loans/PLAN.md#step-3-setting-a-loan-up-a-questionnaire) and
+        [built](milestones/.archived/loans/PLAN.md#step-3-as-built-2026-11-06) 2026-11-06, released
+        as `v0.1.19`): New loan becomes a step-by-step questionnaire (what it's for, terms, extras,
+        history, payment, then a confirmation page showing where the money flows) that creates
+        nothing until Confirm. Default accounts are named from what the loan is for; the CSV and PDF
         imports and "already in the books" leave the UI; due dates no longer show a month early.
   - [x] **Backfilled payments carry escrow** (Kael, 2026-11-06): a payment due before the paying
         account's books begin is the whole payment (escrow, PMI and the rest), still from
         Opening Balances, rather than principal and interest only (the plan's decision 7, changed);
         and New loan stages escrow's bills before setting escrow's balance, so one already paid
         counts.
-- [ ] **Amazon orders** (Kael, 2026-11-06; [planned with Kael](milestones/amazon-orders/PLAN.md),
-      not started): Amazon's charges pulled in with the items behind each, matched to the
-      bank's and cards' rows by date and amount, and read into them as splits the categorize
-      chain places (item history, then the AI). The server logs in to Amazon as Kael (his
-      choice), through one shop-agnostic orders API in `app`.
+- [x] **Amazon orders** (Kael, 2026-11-06; [planned with
+      Kael](milestones/.archived/amazon-orders/PLAN.md) and built 2026-11-06 to 2026-11-07,
+      `v0.1.20` to `v0.1.24`): Amazon's charges pulled in with the items behind each, matched to the
+      bank's and cards' rows by date and amount, and read into them as splits the categorize chain
+      places (item history, then the AI). The server logs in to Amazon as Kael (his choice), through
+      one shop-agnostic orders API in `app`.
   - [x] **Step 1: the spike** (2026-11-06, `v0.1.20`): the `shops` service logs in to Amazon
         and reads charges and their orders; the PWA's Amazon page sets it up, syncs, and shows
         what it read. Nothing written to the books. For Kael to try on Emmer. **`v0.1.21`**:
@@ -238,32 +290,16 @@ milestone starts.
         feeds), and "Amazon wants you to log in again" in Notifications. **`v0.1.24`**
         (Kael): after the first, a sync reads back 15 days before the last; refunds name
         their items when the order says.
-  - [ ] **Later:** an Assign button for a waiting charge; the book's own cards as the default;
-        receipts by email, other shops, Jess's Amazon.
-- [x] **Brokerage activity** (Kael, 2026-11-07; [the plan](milestones/brokerage-activity/PLAN.md),
-      `v0.1.26`): each brokerage row read by its description (Fidelity first): sweeps left out,
-      dividends confirmed to a per-link income account, trades booked with their shares,
-      transfers of assets as shares; the snapshot settles what's left; a linked history opens
-      positions as they were; "Read again" is the cleanup, run on Kael's three Fidelity links
-      on Emmer (2026-11-07): each matches the bank, in cash and in every position's shares.
-- [ ] **Funds and tags per split** (Kael, 2026-11-07; noted, not planned): often only part of a
-      transaction is a fund's (one item of a receipt from Emergency), and the same is true of
-      tags (one item `#gift`). Fund lines are the transaction's today (amounts, not tied to a
-      split; the transaction's page can already split them by amount), and tags are Beancount's
-      own, which are a transaction's. Per split would mean each split saying its fund or tags
-      (posting metadata, say), with the fund lines and the tag filters following from them.
-      Until then, a review card's fund choice is made quieter (the card's own color, as the
-      category), and its tags are the transaction's.
-- [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules
-      that add tags, a Tags field on schedules (their templates carry tags already, unseen) and
-      on Capture receipt, the AI and history proposing the book's own tags, and transfers
-      keeping their sides' tags. [Planned](milestones/tags-more/PLAN.md) 2026-10-29, not
-      started; its decisions to review await Kael.
-- [ ] **M18: Suggested recurring transactions and matching rules.** Bi-weekly or on-demand via
-      a button in the schedules section (recurring transactions) or somewhere TBD for matching
-      rules. Analyze each account's last 14 months of transactions and identify ones
-      that look recurring and are not already captured by an existing recurring transaction, to
-      suggest as schedules (M3) or for matching rules. Don't re-ask. (Moved after tagging, 2026-10-17.)
+  - **Left over,** in [M99](milestones/m99-follow-ups/PLAN.md): an Assign button for a waiting
+    charge; the book's own cards as the default; receipts by email, other shops, Jess's
+    Amazon; its calls made without asking, to review.
+- [x] **Brokerage activity** (Kael, 2026-11-07; [the
+      plan](milestones/.archived/brokerage-activity/PLAN.md), `v0.1.26`): each brokerage row read by
+      its description (Fidelity first): sweeps left out, dividends confirmed to a per-link income
+      account, trades booked with their shares, transfers of assets as shares; the snapshot settles
+      what's left; a linked history opens positions as they were; "Read again" is the cleanup, run
+      on Kael's three Fidelity links on Emmer (2026-11-07): each matches the bank, in cash and in
+      every position's shares.
 - [x] **M19: AI categorization.** Users set up an AI provider (one of those supported, with
       their API key) and standing instructions for categorizing, e.g. "I like highly detailed,
       deeply nested expense accounts. Accounts should always say WHAT, not WHY (tags say why, if
@@ -273,118 +309,14 @@ milestone starts.
       categorizer at the end of the chain, and Select mode's Suggest categories asking it (the
       bulk action), live since the first release. The migration's reference (2026-10-26) gives
       it the book's history by payee. Still open: whether imports and bank feeds ask the AI by
-      themselves (they don't; see the open questions).
-- [ ] **M20: Design polish.**
+      themselves (they don't; [M99](milestones/m99-follow-ups/PLAN.md#open-questions)'s open
+      questions).
 
-## Notes collected so far
+### Polish, built
 
-Decisions and ideas recorded before the milestones existed, kept here so they aren't lost. Each
-is tagged with the milestone it most likely feeds; the tag is a guess until that milestone is
-elaborated.
+Smaller improvements picked up between milestones. Those still open are in
+[M99](milestones/m99-follow-ups/PLAN.md#polish).
 
-- **Ledgers** (M1 starts this):
-  - **General ledger:** every split in the book, in chronological transaction order.
-    - The split is the primary unit; transactions are visually demarcated.
-    - Reversed and paginated: the most recent at the bottom, with earlier pages loading
-      automatically when scrolling up.
-    - The bottom row is always an empty transaction. Entering one commits it in place and opens
-      a new empty row.
-    - Adding and removing splits is simple. A transaction won't save unless it balances, and
-      each shows how much is left to distribute.
-    - Confirmed or not is a transaction-level checkbox.
-    - Any transaction's date can be set by hand, separately from `created_at`.
-  - **Scoped to one account,** it's that account's ledger. Every line shows the account's
-    running balance, and unconfirmed (`!`) transactions count.
-  - **A read-only view:** a prettier, one-line format for reading. Tapping a transaction opens
-    it for editing, including complex splits.
-- **Money accounts** (M1, M2, M5): accounts linked to a real institution that actually hold
-  money, such as bank accounts, credit cards, brokerage accounts, other asset accounts and
-  loans. The home screen lists them with their balances. (M2 replaces the explicit kind with
-  per-user **starred accounts**; there are no account kinds.) Other places likely to treat them
-  specially: the anchor side of imports, CSV and bank-feed imports, reconciliation and balance
-  assertions (M14), and net worth.
-- **Chart of accounts** (M10):
-  - view the tree
-  - create, edit, rename and close accounts
-  - move accounts between parents
-  - open any account's ledger
-
-  Renames and moves rewrite every directive that mentions the account, history included
-  (decided: acceptable).
-- **Categorization** (M4):
-  - bulk categorization
-  - the context builder (14-month window)
-  - the resolver chain: `matcher`, then `rules`, with `external` as a configurable slot (Cati,
-    eventually)
-- **Prices** (M5): `bean-price` on a schedule, and manual price entries for illiquid assets.
-- **Reports** (M12):
-  - **Check what already exists before building anything.**
-  - **If we build our own:** two independent libraries, `@luminous-money/ledger-graphs-api` (a
-    plugin for a ledger's API that returns data sets) and `@luminous-money/ledger-graphs-ui` (a
-    wrapper around a good graphing library). They'd be built and published from a small public
-    monorepo in the luminous-money GitHub account, loosely based on the wymp monorepo proof of
-    concept.
-  - **At least:** expense and income pie charts with selectable account depth, number of slices,
-    date bounds, and optional averaging per period.
-- **Budgeting** (M11):
-  - a target budget on any account, for any period
-  - no descendant may have a higher base budget than its ancestor (base amounts, before
-    rollover)
-  - rollover: dropped (2026-10-17)
-- **Infrastructure, when it's needed:**
-  - **Background validation in `ledger`,** once a screen needs Beancount's full booking (lots,
-    balance assertions, BQL) and it's too slow on the target hardware. Plain balances come from
-    SQL and don't need it.
-  - **Deploying to the Pi:** run `bench.py` on it, `docker stack deploy` on a real Swarm,
-    multi-arch release images, and operator docs.
-  - **Richer synthetic data** as milestones need it.
-- **Hydration** (after the milestones that cover real use): choose the cutover date and the
-  source of opening balances, open the real accounts, and retire GnuCash to read-only.
-
-## Deferred
-
-- Archiving closed periods (only if the Pi benchmark calls for it)
-- A native mobile app
-
-## Open questions
-
-- **Resolver contract:**
-  - What does confidence mean, and is it comparable across resolvers?
-  - Can a resolver return a partial answer (e.g. a match with a suggested split)?
-  - Should high-confidence matches ever auto-confirm, or does everything go through review?
-- **Cutover:** deferred until hydration.
-- **Should imports and bank feeds ask the AI by themselves?** Today they run rules, history and
-  item history; the AI is asked by receipts and by Suggest categories (a selection, or a
-  migration's last step). Asking on every sync costs a call per batch, every morning.
-
-## Later (noted, not pressing)
-
-- **Tags, later still** (M17): renaming or merging a tag everywhere, OR filters ("any
-  of"), tag-only rules, and tag-filtered budgets or "Spent this month". Tags in rules,
-  schedules, receipts and the AI are the **Tags, more** milestone above.
-- **Email, once there's an email system:** invitations sent by email (M13), and accounts
-  required to verify their email (M8's question 1).
-- **Transferring a book's ownership** to a manager (M13).
-- **Attachments in exports and backups** (M16): they're Beancount text today, so receipts and
-  other files stay behind.
-- **Receipts, more** (M16): tuning the reading (prompts, evals), other providers, a cheaper
-  model per book, several receipts at once, and receipts by email.
-- **Auth (M8's other questions):** session lifetime (proposed: 60 days unused, a year at most),
-  passkeys and two-factor (a milestone of their own), and which OIDC providers first (Google,
-  Apple, GitHub, or any OIDC issuer).
-
-## Polish
-
-Smaller improvements to pick up between milestones or at the end.
-
-- [ ] **Type-aware wording when creating accounts** (e.g. "amount owed" for a liability).
-- [ ] **Order-aware match assignment:** assign an import's rows to candidates over the whole
-      network of matches, weighting order, so two identical coffees entered on the 5th and 7th
-      pair with CSV rows on the 7th and 8th in order (M2 pairs by proximity, and review swaps).
-- [ ] **Import file format management:** see, edit, rename and delete an account's saved CSV
-      formats directly, rather than only replacing or adding to them when a file doesn't match.
-- [ ] **Review shows the book's ID at the top,** where its name belongs.
-- [ ] **Select all, and "select uncategorized",** in select mode. (Select all is built.)
 - [x] **Bulk actions** (2026-10-23): one Actions menu in Select mode everywhere (Confirm,
       Categorize as…, Suggest categories with the book's AI).
 - [x] **Delete an account with its transactions** (2026-10-23), after a red notice of every
@@ -401,19 +333,13 @@ Smaller improvements to pick up between milestones or at the end.
 - [x] **What the AI costs** (2026-10-26): every call logged with its estimated cost, each
       operation's shown after it runs (Suggest categories, a receipt, a migration's
       suggestions), and the month so far on the AI page.
-- [x] **Bank feeds on demand** (2026-10-24): `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand` stops the morning
-      sync (only Sync now), for the dev stack.
+- [x] **Bank feeds on demand** (2026-10-24): `LUMINOUS_MONEY_SIMPLEFIN_MODE=on-demand` stops the
+      morning sync (only Sync now), for the dev stack.
 - [x] **Review newest first** (2026-10-17), the latest entered of a day first too.
 - [x] **Pair transfers in review** (2026-10-17): money out of one account and the same into
       another within 7 days, both imported, become one transfer, with "Reject" to restore the
       two.
 - [x] **Delete a transaction from its page** (Kael, 2026-11-06), asking first.
-- [ ] **A lot of no shares crashes the book's engine** (found in a live book, 2026-11-06): a
-      posting like `0.00 VTI {0 # 0 USD, 2026-01-02}` makes Beancount's booking divide 0 by 0,
-      so the ledger's `/problems` and `/query` answer 500 for the whole book (the PWA uses
-      neither today). The ledger should refuse or drop a zero-unit posting with a cost, and a
-      book that fails to load should be a problem rather than a 500. What wrote it (an
-      investment account's opening balance, by the look of it) is still to be found.
 - [x] **Kael's nits, 2026-11-07** (`v0.1.25`):
   - **Review:** Back or Confirm on a transaction opened from the queue comes back to the same
     place (it was the top, or with skipped ones the bottom); an account picker opens with the
@@ -428,8 +354,19 @@ Smaller improvements to pick up between milestones or at the end.
     it), and home's Funds card lists only those, its heading inside it, and only when there
     are any; "+ Add an account" is a short rule. The spending chart was checked against the
     live book: it reads real data (see RESUME).
-- [ ] **Mobile usability,** across the app.
-- [ ] **Tapping a report's bar or slice opens its transactions** (that month's, or that
-      category's).
 - [x] **Go to a date in an account's ledger:** a partial view from that date back, loading
       newer pages above ("Load more") and older ones as you scroll.
+- [x] **Kael's changes, 2026-11-12** (`v0.1.27`):
+  - **The split editor:** a transaction's (and a schedule's) splits are shown as they are (memo
+    and tags, then account and amount), each opened in a dialog with its memo (now editable),
+    account, amount, tags and tolerance; "+ Add split" opens a blank one. A long press or a
+    modifier click starts Select mode for splits (Add tag…, Delete). No fund per split yet
+    (split-level tags and funds' step 2).
+  - **Bank feed errors where they're about:** one bank's login showed on every linked account;
+    now an account's page shows only an error naming it, and the rest (the Bridge's plain
+    strings) are the connection's: on its card and in the bell, dismissable per person (the
+    first notification that can be).
+  - **Confirmed stays confirmed:** a bank row matched to a transaction already confirmed (a
+    receipt, typed by hand) is final at once, out of review.
+  - **Where a price came from:** a bank feed's prices said "entered by hand"; each price now
+    keeps its source (bank, fetched, by hand) and Commodities says it.

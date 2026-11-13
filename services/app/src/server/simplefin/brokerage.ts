@@ -377,7 +377,6 @@ export async function importBrokerage(
     flag,
     payee: row.payee,
     narration: row.description,
-    tags: [],
     links: [],
     meta: { source: "simplefin", "import-batch": batchId, "import-id": row.fingerprint },
     postings: [
@@ -707,7 +706,6 @@ export async function openPositions(
       flag: "*",
       payee: null,
       narration: "Opening balance",
-      tags: [],
       links: [],
       meta: { source: "simplefin" },
       postings: [

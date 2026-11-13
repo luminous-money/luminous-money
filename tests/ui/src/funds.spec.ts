@@ -405,7 +405,6 @@ test("a schedule's funds: the editor has them, and its occurrence carries them",
       template: {
         payee: "Savings",
         narration: "",
-        tags: [],
         links: [],
         meta: {},
         postings: [

@@ -53,7 +53,6 @@ const rent = (start: string) => ({
   template: {
     payee: "Landlord",
     narration: "Rent",
-    tags: [],
     links: [],
     meta: {},
     postings: [

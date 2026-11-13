@@ -8,9 +8,11 @@
  * - **Cash flow** (6 months), **breakdowns** (6-month averages, this month, or all time),
  *   **largest transactions** (this month), **net worth** (24 month ends), and an account's
  *   **typical periods** (12 months for weeks and months, 5 years for years).
- * - **By tag** (M17): cash flow, breakdowns and the largest can count only the transactions
- *   with every one of some tags (the ledger filters the stream). Then the largest covers all
- *   time, as a tag usually marks a trip or project rather than this month's spending.
+ * - **By tag** (M17): cash flow, breakdowns and the largest can count only the splits with every
+ *   one of some tags (a split's own, since tags are splits'): the receipt's `#gift`, not the
+ *   groceries beside it. The ledger keeps the transactions with such a split, and their other
+ *   splits are left out here. Then the largest covers all time, as a tag usually marks a trip or
+ *   project rather than this month's spending.
  * - **Outflows** (Loans step 2): spending is read as outflows by default (the ledger's lens:
  *   what's paid into an asset or liability that counts as spending is spending, and the expenses
  *   it pays for are masked); `lens: "expenses"` reads the expense accounts as booked, the
@@ -30,6 +32,7 @@ import {
   type Roots,
 } from "@luminous-money/ledger-graphs-api";
 
+import { hasTags } from "../shared/tags.js";
 import type { BudgetStatus, LedgerPort } from "./ledger.js";
 
 export class ReportProblem extends Error {
@@ -67,23 +70,31 @@ async function context(ledger: LedgerPort, book: string) {
 /** How spending is read: as outflows (the default), or as the expense accounts are booked. */
 export type Lens = "outflows" | "expenses";
 
-/** The posting stream from `from` (or all of it), only the transactions with every one of `tags`
- * when there are any, through the outflows lens unless `lens` says otherwise. */
+/** The posting stream from `from` (or all of it), through the outflows lens unless `lens` says
+ * otherwise; with `tags`, only the splits with every one of them. The lens reads whole
+ * transactions first (a split it adds has the tags of the one it comes from). */
 const stream = async (
   ledger: LedgerPort,
   book: string,
   from: string | undefined,
   tags: string[] = [],
   lens: Lens | null = null
-): Promise<Posting[]> =>
-  fromTransactions(
-    await ledger.compact(
-      book,
-      from,
-      tags.length ? tags : undefined,
-      lens === "outflows" ? "outflows" : undefined
-    )
+): Promise<Posting[]> => {
+  const transactions = await ledger.compact(
+    book,
+    from,
+    tags.length ? tags : undefined,
+    lens === "outflows" ? "outflows" : undefined
   );
+  return fromTransactions(
+    tags.length
+      ? transactions.map((t) => ({
+          ...t,
+          postings: t.postings.filter((p) => hasTags(p.tags, tags)),
+        }))
+      : transactions
+  );
+};
 
 /** The highest-level expense budgets: the accounts home's budget figure covers. */
 export function topExpenseBudgets(status: BudgetStatus): string[] {
@@ -150,7 +161,8 @@ export async function breakdownReport(
   return breakdown({ postings, today: on, currency, roots, root, ...rest, window });
 }
 
-/** This month's largest expenses; with `tags`, the largest of all time with every one of them. */
+/** This month's largest expenses; with `tags`, the largest of all time, counting the splits with
+ * every one of them. */
 export async function largestReport(
   ledger: LedgerPort,
   book: string,

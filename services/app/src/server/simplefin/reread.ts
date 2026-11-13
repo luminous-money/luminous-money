@@ -78,7 +78,6 @@ export const cashOpening = (
   flag: "*",
   payee: null,
   narration: "Opening balance",
-  tags: [],
   links: [],
   meta: { source: "simplefin" },
   postings: [

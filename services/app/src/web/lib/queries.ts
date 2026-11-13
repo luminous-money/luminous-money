@@ -535,6 +535,15 @@ export const useNotifications = (book: string) =>
     refetchOnWindowFocus: true,
   });
 
+/** Dismiss a notification, for the caller (one that can be: a bank feed's problem). */
+export function useDismissNotification(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => appApi.dismissNotification(book, id),
+    onSuccess: (queue) => client.setQueryData([...keys.book(book), "notifications"], queue),
+  });
+}
+
 /** Default funds (Funds B; managers): made, changed and deleted. */
 export const useCreateDefault = (book: string) =>
   useFundChange(book, (d: FundDefaultIn) => api.createDefault(book, d));
@@ -1011,13 +1020,16 @@ function remember(book: string, saved: Transaction) {
   void queryClient.invalidateQueries({ queryKey: ["book", book, "journal"] });
 }
 
+/** Edit a transaction, its edits in order. An edit is its changes, or (for one that rewrites
+ * splits a moment after another may have) how to make them from the latest copy. */
 export function useEditTransaction(book: string, id: string) {
   const client = useQueryClient();
   return useMutation({
     scope: { id: `transaction:${book}:${id}` },
-    mutationFn: async (changes: TransactionChanges) => {
+    mutationFn: async (changes: TransactionChanges | ((t: Transaction) => TransactionChanges)) => {
       const current = await latest(book, id);
-      return api.patch(book, id, changes, current.updated_at);
+      const made = typeof changes === "function" ? changes(current) : changes;
+      return api.patch(book, id, made, current.updated_at);
     },
     onSuccess: (saved) => remember(book, saved),
     onError: (error) => {

@@ -411,6 +411,16 @@ export const MIGRATIONS: Migration[] = [
       ["PRIMARY KEY (link_id, commodity)"]
     ),
   ],
+  // 24: notifications dismissed, per user: those that can be (a bank feed's problem) stay out of
+  // that person's bell while they last. Keyed by the notification's ID, which is new when a
+  // problem comes back.
+  [
+    createTable(
+      "notification_dismissal",
+      ["user_id TEXT NOT NULL", "book_id TEXT NOT NULL", "notification_id TEXT NOT NULL"],
+      ["PRIMARY KEY (user_id, book_id, notification_id)"]
+    ),
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -704,6 +714,26 @@ export class AppDb {
     this.db
       .prepare("DELETE FROM fund_star WHERE user_id = ? AND book_id = ? AND fund = ?")
       .run(user, book, fund);
+  }
+
+  /** The notifications the user has dismissed in the book. */
+  dismissed(user: string, book: string): Set<string> {
+    const rows = this.db
+      .prepare(
+        "SELECT notification_id FROM notification_dismissal WHERE user_id = ? AND book_id = ?"
+      )
+      .all(user, book) as { notification_id: string }[];
+    return new Set(rows.map((r) => r.notification_id));
+  }
+
+  dismiss(user: string, book: string, notification: string): void {
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO notification_dismissal (user_id, book_id, notification_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`
+      )
+      .run(user, book, notification, stamp, stamp);
   }
 
   /** Which of `fingerprints` an earlier import into the account already brought in (staged or

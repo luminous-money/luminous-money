@@ -10,7 +10,7 @@ const occurrence = (date: string, postings: UpcomingOccurrence["template"]["post
     date,
     schedule_id: "s",
     name: "Rent",
-    template: { payee: "Landlord", narration: "", tags: [], links: [], meta: {}, postings },
+    template: { payee: "Landlord", narration: "", links: [], meta: {}, postings },
   }) as UpcomingOccurrence;
 
 it("projects the balance through each occurrence touching the account, newest first", () => {

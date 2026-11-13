@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { addAccount, addTransactions, logIn, setUpUser } from "./support.js";
+import { addAccount, addTransactions, editSplit, logIn, setUpUser, splitRows } from "./support.js";
 
 const menu = async (page: Page, item: string) => {
   await page.getByRole("button", { name: "Menu" }).click();
@@ -258,14 +258,8 @@ test.describe("an account's ledger", () => {
     await add.click();
     await expect(page.getByRole("heading", { name: "New transaction" })).toBeVisible();
     await page.getByRole("textbox", { name: "Payee" }).fill("Corner Cafe");
-    const amounts = page.getByRole("textbox", { name: "Amount" });
-    await amounts.nth(0).fill("-4.50");
-    await page
-      .getByRole("button", { name: /^Account:/ })
-      .nth(1)
-      .click();
-    await page.getByRole("combobox", { name: "Account" }).fill("rest");
-    await page.keyboard.press("Enter");
+    await editSplit(page, 0, { amount: "-4.50" });
+    await editSplit(page, 1, { account: "rest" });
     await expect(page.getByText("Balanced. The blank amount will be $4.50.")).toBeVisible();
     await page.getByRole("button", { name: "Save" }).click();
 
@@ -281,22 +275,25 @@ test.describe("an account's ledger", () => {
   }) => {
     const { book, account } = await setUpUser(page);
     await page.goto(`/ui/books/${book.id}/transactions/new?account=${encodeURIComponent(account)}`);
-    const amounts = page.getByRole("textbox", { name: "Amount" });
-    await amounts.nth(0).fill("-4.50");
+    await editSplit(page, 0, { amount: "-4.50" });
 
-    await page
-      .getByRole("button", { name: /^Account:/ })
-      .nth(1)
-      .click();
-    await page.getByRole("combobox", { name: "Account" }).fill("snacks");
+    await splitRows(page).nth(1).click();
+    const editor = page.getByRole("dialog", { name: "Split", exact: true });
+    await editor.getByRole("textbox", { name: "Memo" }).fill("Pretzels");
+    await editor.getByRole("button", { name: /^Account:/ }).click();
+    await editor.getByRole("combobox", { name: "Account" }).fill("snacks");
     await page.getByRole("option", { name: /Create account/ }).click();
     const dialog = page.getByRole("dialog", { name: "Create account" });
     await dialog.getByRole("combobox", { name: "Account" }).fill("Expenses:Snacks");
     await dialog.getByRole("button", { name: "Create" }).click();
     await expect(dialog).toBeHidden();
 
-    await expect(page.getByRole("button", { name: "Account: Expenses:Snacks" })).toBeVisible();
-    await expect(amounts.nth(0)).toHaveValue("-4.50");
+    // The split being edited kept its memo, and the page its first split.
+    await expect(editor.getByRole("button", { name: "Account: Expenses:Snacks" })).toBeVisible();
+    await expect(editor.getByRole("textbox", { name: "Memo" })).toHaveValue("Pretzels");
+    await editor.getByRole("button", { name: "Save" }).click();
+    await expect(splitRows(page).nth(0)).toContainText("−$4.50");
+    await expect(splitRows(page).nth(1)).toContainText("Pretzels");
     await expect(page.getByText("Balanced. The blank amount will be $4.50.")).toBeVisible();
   });
 
@@ -344,7 +341,7 @@ test("a transaction's Back and Save stay on screen, and settle into place at the
   const save = page.getByRole("button", { name: "Save" });
   const gapBelow = async () =>
     640 - (await save.boundingBox())!.y - (await save.boundingBox())!.height;
-  await expect(page.getByRole("textbox", { name: "Amount" })).toHaveCount(13);
+  await expect(splitRows(page)).toHaveCount(13);
   await expect(save).toBeInViewport();
   await expect(page.getByRole("link", { name: "Back", exact: true })).toBeInViewport();
   expect(await gapBelow()).toBeLessThan(30); // pinned to the bottom of the screen

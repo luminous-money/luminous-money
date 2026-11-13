@@ -27,9 +27,13 @@ export type Connection = {
   requests_on: string | null;
   requests: number;
   last_sync_at: string | null;
-  errors: SfError[];
+  errors: SeenError[];
   created_at: string;
 };
+
+/** A sync's error as kept: since the first sync in a row that reported it (none for one kept
+ * before this was), so the bell's notice of it lasts while it does. */
+export type SeenError = SfError & { since?: string };
 
 export type AccountSnapshot = {
   connection_id: string;
@@ -113,7 +117,7 @@ export class SimplefinStore {
   }
 
   private toConnection(r: ConnectionRow): Connection {
-    return { ...r, errors: JSON.parse(r.errors) as SfError[] };
+    return { ...r, errors: JSON.parse(r.errors) as SeenError[] };
   }
 
   connection(user: string, connection: string): Connection | undefined {
@@ -183,13 +187,24 @@ export class SimplefinStore {
     });
   }
 
+  /** Keep a sync's errors, each one the last sync had too keeping its `since`. */
   recordSync(connectionId: string, errors: SfError[]): void {
     const stamp = now();
+    const row = this.db
+      .prepare("SELECT errors FROM simplefin_connection WHERE id = ?")
+      .get(connectionId) as { errors: string } | undefined;
+    const before = row ? (JSON.parse(row.errors) as SeenError[]) : [];
+    const same = (a: SfError, b: SfError) =>
+      a.code === b.code && a.message === b.message && a.account_id === b.account_id;
+    const seen: SeenError[] = errors.map((e) => ({
+      ...e,
+      since: before.find((b) => same(b, e))?.since ?? stamp,
+    }));
     this.db
       .prepare(
         "UPDATE simplefin_connection SET last_sync_at = ?, errors = ?, updated_at = ? WHERE id = ?"
       )
-      .run(stamp, JSON.stringify(errors), stamp, connectionId);
+      .run(stamp, JSON.stringify(seen), stamp, connectionId);
   }
 
   // Accounts and the mirror

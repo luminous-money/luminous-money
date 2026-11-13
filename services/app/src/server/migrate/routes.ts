@@ -1,5 +1,6 @@
 /**
- * Migrating from another system: `/books/:book/migration` (docs/milestones/migrate-from-another-system).
+ * Migrating from another system: `/books/:book/migration`
+ * (docs/milestones/.archived/migrate-from-another-system).
  * Reading it is any member's; everything else a manager's, since it sets up the book's AI and
  * rules as well as its accounts. The history is kept (once it's read, mapped); the files
  * uploaded aren't: the chart is planned (and added) from its text each time.

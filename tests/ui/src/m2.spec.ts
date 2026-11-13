@@ -25,7 +25,8 @@ test("the coffee example: both rows matched, swapped in review, confirmed, and o
       params: { path: { book_id: book.id } },
       body: {
         date,
-        flag: "*",
+        // Unconfirmed: a match with a confirmed transaction is final at once, never reviewed.
+        flag: "!",
         payee: "Corner Cafe",
         narration: "Coffee",
         postings: [
@@ -78,5 +79,6 @@ test("the coffee example: both rows matched, swapped in review, confirmed, and o
   await expect(fresh).toHaveCount(1);
   await expect(fresh).toContainText("2024-03-08");
   await expect(fresh.getByRole("button", { name: "Match with this" })).toBeVisible();
-  await expect(cards).toHaveCount(1); // the 7th's coffee is no longer matched, so it left review
+  // The row as its own, and the 7th's coffee, no longer matched but still unconfirmed.
+  await expect(cards).toHaveCount(2);
 });

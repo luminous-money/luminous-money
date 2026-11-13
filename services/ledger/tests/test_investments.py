@@ -156,7 +156,7 @@ def test_prices_are_backfilled_for_books_from_before_migration_4(tmp_path):
     store = Store(str(path))
 
     assert [dict(r) for r in store.latest_prices("b", "2024-12-31")] == [
-        {"commodity": "VTI", "currency": "USD", "date": "2024-01-01", "number": "100"}
+        {"commodity": "VTI", "currency": "USD", "date": "2024-01-01", "number": "100", "directive_id": "p1"}
     ]
 
 
@@ -304,3 +304,19 @@ def test_prices_are_fetched_for_held_commodities_with_a_source(book, monkeypatch
     assert investments.prices(book, "book", today)[("VTI", "USD")] == (today, Decimal("251.5"))
     assert len([p for p in investments.price_list(book, "book", "VTI") if p.date == today]) == 1  # not twice
     assert again.fetched
+    assert {c.currency: c for c in investments.commodity_list(book, "book")}["VTI"].price_from == "fetched"
+
+
+def test_a_commodity_says_where_its_latest_price_came_from(book):
+    def price_from():
+        return {c.currency: c for c in investments.commodity_list(book, "book")}["VTI"].price_from
+
+    assert price_from() == "hand"  # the file's
+    today = datetime.date.today()
+    bank = models.PriceIn(date=today, commodity="VTI", price=models.Amount(number="250", currency="USD"), source="bank")
+    investments.add_price(book, "book", bank)
+    assert price_from() == "bank"
+    assert '  source: "bank"' in book.export("book")
+
+    investments.add_price(book, "book", models.PriceIn(date=today, commodity="VTI", price=models.Amount(number="251", currency="USD")))
+    assert price_from() == "hand"  # the same day's again, by hand: it replaces the bank's

@@ -29,18 +29,21 @@ from decimal import Decimal
 from .engine import Directive
 from .migrations import after, migrate, now
 
-# A transaction's tags, space-separated (tags can't hold spaces), for a query's select list; `%`
-# the directive table's alias (M17)
-TAGS = "SELECT GROUP_CONCAT(t.tag, ' ') FROM transaction_tag t WHERE t.directive_id = %s.id"
+# Every tag a transaction's splits have, space-separated (tags can't hold spaces), for a query's
+# select list; `%` the directive table's alias (M17; tags are splits' since migration 14)
+TAGS = "SELECT GROUP_CONCAT(tag, ' ') FROM (SELECT DISTINCT t.tag FROM posting_tag t WHERE t.directive_id = %s.id)"
+# A split's tags, the same way; `%` the posting table's alias
+SPLIT_TAGS = "SELECT GROUP_CONCAT(t.tag, ' ') FROM posting_tag t WHERE t.directive_id = %s.directive_id AND t.idx = %s.idx"
 
 
 def tagged(alias: str, tags: list[str]) -> tuple[str, list[str | int]]:
-    """A WHERE clause (and its arguments) keeping the transactions with every one of `tags`."""
+    """A WHERE clause (and its arguments) keeping the transactions with a split that has every one
+    of `tags`."""
     wanted = sorted(set(tags))
     marks = ",".join("?" * len(wanted))
     return (
-        f"{alias}.id IN (SELECT directive_id FROM transaction_tag WHERE tag IN ({marks})"
-        " GROUP BY directive_id HAVING COUNT(*) = ?)",
+        f"{alias}.id IN (SELECT directive_id FROM posting_tag WHERE tag IN ({marks})"
+        " GROUP BY directive_id, idx HAVING COUNT(*) = ?)",
         [*wanted, len(wanted)],
     )
 
@@ -343,10 +346,10 @@ class Store:
                     for i, p in enumerate(d.postings)
                 ],
             )
-            self._conn.execute("DELETE FROM transaction_tag WHERE directive_id = ?", (d.id,))
+            self._conn.execute("DELETE FROM posting_tag WHERE directive_id = ?", (d.id,))
             self._conn.executemany(
-                "INSERT INTO transaction_tag (directive_id, book_id, tag, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-                [(d.id, book_id, tag, stamp, stamp) for tag in d.tags],
+                "INSERT INTO posting_tag (directive_id, idx, book_id, tag, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                [(d.id, i, book_id, tag, stamp, stamp) for i, p in enumerate(d.postings) for tag in p.tags],
             )
             self._conn.execute("DELETE FROM fund_line WHERE directive_id = ?", (d.id,))
             self._conn.executemany(
@@ -379,7 +382,7 @@ class Store:
                 (seq, after(row["updated_at"]), directive_id),
             )
             self._conn.execute("DELETE FROM posting WHERE directive_id = ?", (directive_id,))
-            self._conn.execute("DELETE FROM transaction_tag WHERE directive_id = ?", (directive_id,))
+            self._conn.execute("DELETE FROM posting_tag WHERE directive_id = ?", (directive_id,))
             self._conn.execute("DELETE FROM fund_line WHERE directive_id = ?", (directive_id,))
             self._conn.execute("DELETE FROM price WHERE directive_id = ?", (directive_id,))
             for attachment in self.attachments_of(book_id, [directive_id]):
@@ -480,7 +483,8 @@ class Store:
         currency" pairs, with "?" for an amount only booking could say), and how many of the
         subtree's postings in it aren't reconciled (`unreconciled`) and the latest mark of those
         that are (`reconciled`), and each of those postings' account and amount (`parts`: "account
-        number currency", or "account ?"), and its tags (space-separated, unordered). For a leaf,
+        number currency", or "account ?"), and every tag its splits have (space-separated,
+        unordered). For a leaf,
         the subtree is just the account."""
         mine = "(%s.account = :account OR %s.account LIKE :under)"
         return self._conn.execute(
@@ -520,10 +524,10 @@ class Store:
 
     def compact(self, book_id: str, date_from: str | None, tags: list[str] | None = None) -> list[sqlite3.Row]:
         """Every live transaction dated `date_from` or later (or every one), oldest first, one row
-        per posting: the directive's id, date, flag, payee, narration, `budgeted` and tags
-        (space-separated), and the posting's account, amount (NULL where only booking could say),
-        mark, flag and memo. With `tags`, only transactions with all of them. For resolvers'
-        context and reports: plain SQL, no parsing."""
+        per posting: the directive's id, date, flag, payee, narration, `budgeted` and every tag its
+        splits have (space-separated), and the posting's account, amount (NULL where only booking
+        could say), mark, flag, memo and tags (`split_tags`). With `tags`, only transactions with a
+        split that has all of them. For resolvers' context and reports: plain SQL, no parsing."""
         where, args = ["d.book_id = ?", "d.deleted = 0", "d.kind = 'transaction'"], [book_id]
         if date_from is not None:
             where.append("d.date >= ?")
@@ -536,7 +540,8 @@ class Store:
             f"""
             SELECT d.id, d.date, d.flag, d.payee, d.narration, d.budgeted, ({TAGS % "d"}) AS tags,
                    ({FUNDS % "d"}) AS funds, p.idx,
-                   p.account, p.amount, p.amount_currency, p.reconciled, p.flag AS posting_flag, p.memo
+                   p.account, p.amount, p.amount_currency, p.reconciled, p.flag AS posting_flag, p.memo,
+                   ({SPLIT_TAGS % ("p", "p")}) AS split_tags
             FROM directive d JOIN posting p ON p.directive_id = d.id
             WHERE {" AND ".join(where)}
             ORDER BY d.date, d.ordinal, p.idx
@@ -545,17 +550,28 @@ class Store:
         ).fetchall()
 
     def tags(self, book_id: str) -> list[sqlite3.Row]:
-        """The book's tags, alphabetically: name, how many live transactions have it, and the first
-        and last of their dates."""
+        """The book's tags, alphabetically: name, how many live transactions have a split with it,
+        and the first and last of their dates."""
         return self._conn.execute(
             """
-            SELECT t.tag AS name, COUNT(*) AS transactions, MIN(d.date) AS first, MAX(d.date) AS last
-            FROM transaction_tag t JOIN directive d ON d.id = t.directive_id
+            SELECT t.tag AS name, COUNT(DISTINCT t.directive_id) AS transactions, MIN(d.date) AS first,
+                   MAX(d.date) AS last
+            FROM posting_tag t JOIN directive d ON d.id = t.directive_id
             WHERE t.book_id = ? AND d.deleted = 0
             GROUP BY t.tag ORDER BY t.tag
             """,
             (book_id,),
         ).fetchall()
+
+    def with_tags(self, book_id: str, tags: list[str]) -> set[str]:
+        """The live transactions with a split that has every one of `tags`."""
+        clause, args = tagged("d", tags)
+        return {
+            row[0]
+            for row in self._conn.execute(
+                f"SELECT d.id FROM directive d WHERE d.book_id = ? AND d.deleted = 0 AND {clause}", (book_id, *args)
+            )
+        }
 
     def fund_lines(self, book_id: str, on: str | None = None) -> list[sqlite3.Row]:
         """Every live fund line and move side dated `on` or earlier (or every one): fund, amount,
@@ -659,11 +675,11 @@ class Store:
 
     def latest_prices(self, book_id: str, on: str) -> list[sqlite3.Row]:
         """For each commodity and quote currency, its latest price dated `on` or earlier: commodity,
-        currency, date, number. The last written wins a tie on date."""
+        currency, date, number, directive_id. The last written wins a tie on date."""
         return self._conn.execute(
             """
-            SELECT commodity, currency, date, number FROM (
-                SELECT commodity, currency, date, number,
+            SELECT commodity, currency, date, number, directive_id FROM (
+                SELECT commodity, currency, date, number, directive_id,
                        ROW_NUMBER() OVER (PARTITION BY commodity, currency ORDER BY date DESC, rowid DESC) AS n
                 FROM price WHERE book_id = ? AND date <= ?
             ) WHERE n = 1
@@ -708,10 +724,10 @@ class Store:
         ordinal) and dated `through` or earlier if given; or, `newer_than` a key, the closest
         newer ones first (oldest first). With `reconciled` (wanted, and the roots whose postings
         reconcile), only those whose postings under the roots are all reconciled, or those with
-        one that isn't; with `tags`, only those with all of them; with `search`, only those whose
-        payee, narration or a split's memo has every word of it (ignoring case); with `accounts`,
-        only those with a split in any of them (or under one). Each row has its tags
-        (space-separated)."""
+        one that isn't; with `tags`, only those with a split that has all of them; with `search`,
+        only those whose payee, narration or a split's memo has every word of it (ignoring case);
+        with `accounts`, only those with a split in any of them (or under one). Each row has every
+        tag its splits have (space-separated)."""
         where, args = ["book_id = ?", "deleted = 0", "kind = 'transaction'"], [book_id]
         if tags:
             clause, more = tagged("directive", tags)
@@ -754,11 +770,11 @@ class Store:
 
     def postings_of(self, directive_ids: list[str]) -> list[sqlite3.Row]:
         """The postings of these directives, in order: directive_id, account, amount, currency,
-        reconciled."""
+        reconciled and tags (`split_tags`)."""
         marks = ",".join("?" * len(directive_ids))
         return self._conn.execute(
-            f"SELECT directive_id, account, amount, amount_currency, reconciled FROM posting"
-            f" WHERE directive_id IN ({marks}) ORDER BY directive_id, idx",
+            f"SELECT directive_id, account, amount, amount_currency, reconciled, ({SPLIT_TAGS % ('p', 'p')}) AS split_tags"
+            f" FROM posting p WHERE directive_id IN ({marks}) ORDER BY directive_id, idx",
             directive_ids,
         ).fetchall()
 

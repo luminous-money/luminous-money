@@ -34,6 +34,7 @@ line string"
   verified: TRUE
   Expenses:Food                 123.45 USD
     category-hint: Expenses:Food
+    tags: "#groceries"
   ! Assets:Bank:Checking
 poptag #household
 

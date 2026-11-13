@@ -3,10 +3,18 @@ Tags, more: tags in rules, schedules, receipts and the AI: plan
 
 > **Status: planned (2026-10-29), not started.** Kael asked whether M17's tags reached matching
 > rules, scheduled transactions, receipt processing and AI categorization. They didn't: M17
-> left all four for later on purpose ([its plan](../m17-transaction-tagging/PLAN.md), "Not in
+> left all four for later on purpose ([its plan](../.archived/m17-transaction-tagging/PLAN.md), "Not in
 > M17"; [PLAN.md](../../PLAN.md)'s Later, "Tags, more"). This plan finds what each one lacks
 > and how to add it. The calls it makes are under [Decisions to review](#decisions-to-review).
 > Renaming or merging a tag, OR filters and tag-filtered budgets stay in Later.
+>
+> **Since written (2026-11-12): tags are splits'** ([split-level tags and
+> funds](../split-level-tags-and-funds/PLAN.md), step 1; design.md, "Tags (M17)"). What below
+> says of a transaction's tags is to be read through that before this starts: a proposal's tags
+> go on the splits it places (or, for the whole transaction, on what the money was for, as a
+> card's do), and `TransactionIn.tags` is gone. Done on the way: **schedules** show and edit
+> each split's tags (the splits editor has them), and **pairing a transfer** keeps each side's
+> tags on its split.
 
 ## What's there now
 

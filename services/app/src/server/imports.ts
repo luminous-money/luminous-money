@@ -17,7 +17,8 @@
  *    are staged in one atomic ledger write as unconfirmed (`!`) transactions, uncategorized:
  *    `Expenses:Uncategorized` for money out, `Income:Uncategorized` for money in, until M4.
  * 6. The batch, each row's outcome, transaction and candidates are recorded. A row with
- *    candidates has its match proposed until it's confirmed in review.
+ *    candidates has its match proposed until it's confirmed in review, except a match with a
+ *    transaction already confirmed, which is final at once: what's confirmed stays confirmed.
  */
 import { createHash, randomUUID } from "node:crypto";
 
@@ -45,7 +46,7 @@ import { STAGING, type LedgerPort } from "./ledger.js";
 import { assign } from "./pipeline/assign.js";
 import { buildContext } from "./pipeline/context.js";
 import { runChain } from "./pipeline/chain.js";
-import { DEFAULT_WINDOW_DAYS, matcher } from "./pipeline/matcher.js";
+import { DEFAULT_WINDOW_DAYS, matcher, sameNumber } from "./pipeline/matcher.js";
 import type { Incoming } from "./pipeline/types.js";
 
 export { UNCATEGORIZED };
@@ -58,6 +59,32 @@ export class ImportProblem extends Error {
   ) {
     super(message);
   }
+}
+
+/**
+ * Make a match final for a transaction matched within a scheduled split's tolerance: it takes
+ * the bank's amount for that split (the blank split absorbs the difference).
+ */
+export async function takeBankAmount(
+  ledger: LedgerPort,
+  book: string,
+  transactionId: string,
+  account: string,
+  amount: string
+): Promise<void> {
+  const t = await ledger.transaction(book, transactionId);
+  const split = t.postings.find((p) => p.account === account);
+  if (!split?.units || sameNumber(split.units.number, amount)) return;
+  await ledger.patch(
+    book,
+    t.id,
+    {
+      postings: t.postings.map((p) =>
+        p === split ? { ...p, units: { ...split.units!, number: amount } } : p
+      ),
+    },
+    t.updated_at
+  );
 }
 
 /** What staging a row needs, so it can be staged again later (when a match is undone). */
@@ -90,7 +117,6 @@ export function stagedTransaction(
     flag: decision.category?.auto_confirm ? "*" : "!",
     payee: decision.payee?.payee ?? row.payee,
     narration: row.description,
-    tags: [],
     links: [],
     ...(lines ? { funds: lines } : {}),
     meta: { source, "import-batch": batchId, "import-id": row.fingerprint },
@@ -391,6 +417,23 @@ export async function importRows({
   });
   const stage = fresh.filter((row) => !assigned.has(row.line));
 
+  // A match with a transaction already confirmed is final at once (Kael, 2026-11-12: a receipt
+  // confirmed before its bank row came back to review): it stays confirmed. One that can't take
+  // the bank's amount is left for review, as every other match is.
+  const final = new Set<number>();
+  for (const row of fresh) {
+    const id = assigned.get(row.line);
+    const held = resolutions.get(row.line)?.find((c) => c.transaction_id === id);
+    if (!id || held?.flag !== "*") continue;
+    if (!sameNumber(held.amount, row.amount!))
+      try {
+        await takeBankAmount(ledger, book, id, account, row.amount!);
+      } catch {
+        continue;
+      }
+    final.add(row.line);
+  }
+
   const batchId = randomUUID().replace(/-/g, "");
   const ids = new Map<number, string>(assigned);
   const proposals = new Map<number, ProposalSummary | null>();
@@ -429,7 +472,11 @@ export async function importRows({
     error: row.error,
     transaction_id: ids.get(row.line) ?? null,
     candidates: resolutions.get(row.line) ?? [],
-    match: resolutions.get(row.line)?.length ? "proposed" : null,
+    match: final.has(row.line)
+      ? "confirmed"
+      : resolutions.get(row.line)?.length
+        ? "proposed"
+        : null,
     proposal: proposals.get(row.line) ?? null,
   }));
   const count = (outcome: Outcome) => outcomes.filter((o) => o === outcome).length;

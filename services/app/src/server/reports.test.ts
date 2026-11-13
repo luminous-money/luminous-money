@@ -15,18 +15,18 @@ import { FakeLedger } from "./testing.js";
 const BANK = "Assets:Bank";
 let ledger: FakeLedger;
 const usd = (number: string) => ({ number, currency: "USD" });
+/** A purchase from the bank, its expense split tagged. */
 const spend = (date: string, account: string, amount: string, meta = {}, tags: string[] = []) =>
   ledger.addTransaction({
     date,
     flag: "*",
     payee: null,
     narration: account,
-    tags,
     links: [],
     meta,
     postings: [
       { account: BANK, units: usd(`-${amount}`) },
-      { account, units: usd(amount) },
+      { account, units: usd(amount), tags },
     ],
   });
 
@@ -48,7 +48,7 @@ const status = (lines: [string, string][], budget: string | null): BudgetStatus 
   }) as BudgetStatus;
 
 describe("reports", () => {
-  it("count only the transactions with every tag asked for, the largest and All time from the start", async () => {
+  it("count only what has every tag asked for, the largest and All time from the start", async () => {
     spend("2025-04-03", "Expenses:Home", "600.00", {}, ["italy-2025", "reimbursable"]);
     spend("2025-04-09", "Expenses:Food", "90.00", {}, ["italy-2025"]);
     spend("2026-10-03", "Expenses:Food", "40.00");
@@ -76,6 +76,34 @@ describe("reports", () => {
 
     const flow = await cashFlowReport(ledger, "b", "2026-10-15", 6, ["italy-2025"]);
     expect(flow.totals.expenses).toBe(0); // the trip was more than 6 months ago
+  });
+
+  it("count only the splits with the tags, not the rest of their transactions", async () => {
+    // A receipt: groceries, and a gift beside them.
+    ledger.addTransaction({
+      date: "2026-10-03",
+      flag: "*",
+      payee: "Megamart",
+      narration: "",
+      links: [],
+      meta: {},
+      postings: [
+        { account: BANK, units: usd("-75.00") },
+        { account: "Expenses:Food", units: usd("50.00") },
+        { account: "Expenses:Home", units: usd("25.00"), tags: ["gift"] },
+      ],
+    });
+
+    const breakdown = await breakdownReport(ledger, "b", "2026-10-15", {
+      side: "expenses",
+      window: "total",
+      tags: ["gift"],
+    });
+    expect(breakdown.slices.map((s) => [s.label, s.amount])).toEqual([["Home", 25]]);
+    const largest = await largestReport(ledger, "b", "2026-10-15", 8, ["gift"]);
+    expect(largest.transactions.map((t) => t.amount)).toEqual([25]);
+    const flow = await cashFlowReport(ledger, "b", "2026-10-15", 6, ["gift"]);
+    expect(flow.totals.expenses).toBe(25);
   });
 
   it("read spending as outflows unless asked for the expenses as booked; net worth as it is", async () => {

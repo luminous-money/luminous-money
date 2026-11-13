@@ -9,7 +9,6 @@ import { FundsFieldset, fundsShown, useFundRows } from "../components/Funds.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
 import { PartChoice } from "../components/PartChoice.js";
 import { SplitsFieldset, useSplits } from "../components/Splits.js";
-import { TagInput } from "../components/Tags.js";
 import { displayName, postable } from "../lib/accounts.js";
 import { formatDay, today } from "../lib/format.js";
 import { useBack, useParam, withBack } from "../lib/navigation.js";
@@ -94,7 +93,6 @@ export function NewTransactionPage({ book }: { book: string }) {
       flag: "*",
       payee: null,
       narration: "",
-      tags: [],
       links: [],
       meta: {},
       postings: [{ account }, { account: "" }],
@@ -139,7 +137,6 @@ function Editor({
   const [date, setDate] = useState(t.date);
   const [payee, setPayee] = useState(t.payee ?? "");
   const [narration, setNarration] = useState(t.narration);
-  const [tags, setTags] = useState<string[]>(t.tags ?? []);
   const bookTags = useTags(book);
   const [meta, setMeta] = useState(t.meta);
   const fallbackCurrency = useMemo(() => currencyOf(t), [t]);
@@ -180,7 +177,6 @@ function Editor({
         flag,
         payee: payee.trim() || null,
         narration,
-        tags,
         postings,
         meta,
         ...(funds.changed ? { funds: funds.lines } : {}),
@@ -262,19 +258,15 @@ function Editor({
         Description
         <input value={narration} onChange={(e) => setNarration(e.target.value)} />
       </label>
-      <div className="field">
-        <span className="field-label">Tags</span>
-        <TagInput
-          label="Tags"
-          value={tags}
-          onChange={setTags}
-          choices={bookTags.data ?? []}
-          disabled={!canWrite}
-        />
-      </div>
 
       <PartChoice book={book} postings={splits.rows} onChange={(rows) => splits.setRows(rows)} />
-      <SplitsFieldset splits={splits} accounts={names} create={create} />
+      <SplitsFieldset
+        splits={splits}
+        accounts={names}
+        create={create}
+        tags={bookTags.data ?? []}
+        disabled={!canWrite}
+      />
       {funds.ready && fundsShown(listing.data, t.funds) && (
         <FundsFieldset
           book={book}

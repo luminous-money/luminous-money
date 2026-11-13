@@ -1,9 +1,10 @@
-/** M17: tags on a transaction's page, in Select mode, on rows, in ledger filters and reports. */
+/** M17: tags, a split's: on a transaction's page, in Select mode, on rows, in ledger filters and
+ * reports. */
 import { expect, test } from "@playwright/test";
 
-import { addTransactions, setUpUser } from "./support.js";
+import { addTransactions, setUpUser, splitRows } from "./support.js";
 
-test("a transaction is tagged on its page; rows show it and the ledger filters by it", async ({
+test("a split is tagged on its page; rows show it and the ledger filters by it", async ({
   page,
 }) => {
   const { book, account } = await setUpUser(page);
@@ -12,14 +13,22 @@ test("a transaction is tagged on its page; rows show it and the ledger filters b
   const transactions = page.getByRole("list", { name: "Transactions" });
   await transactions.getByRole("button", { name: /Shop 1/ }).click();
 
-  // What's typed is made a tag: lowercase, dashed.
-  const tags = page.getByRole("combobox", { name: "Tags" });
+  // Each split has its own Tags, in its editor; the groceries' are the second. What's typed is
+  // made a tag: lowercase, dashed.
+  await expect(splitRows(page)).toHaveCount(2);
+  await splitRows(page).nth(1).click();
+  const editor = page.getByRole("dialog", { name: "Split", exact: true });
+  const tags = editor.getByRole("combobox", { name: "Tags" });
   await tags.fill("Trip to Italy");
   await expect(page.getByRole("option", { name: /#trip-to-italy \(new\)/ })).toBeVisible();
   await tags.press("Enter");
-  await expect(page.getByRole("button", { name: "Remove #trip-to-italy" })).toBeVisible();
+  await expect(editor.getByRole("button", { name: "Remove #trip-to-italy" })).toBeVisible();
+  await editor.getByRole("button", { name: "Save" }).click();
+  await expect(splitRows(page).nth(1)).toContainText("#trip-to-italy");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(splitRows(page).nth(1)).toContainText("#trip-to-italy");
+  await expect(splitRows(page).nth(0)).not.toContainText("#trip-to-italy");
 
   await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
   await expect(transactions.getByRole("button", { name: /Shop 1/ })).toContainText(
@@ -99,9 +108,26 @@ test("Reports filter by tag: All time, the largest tagged, and net worth set asi
       flag: "*",
       payee: `Hardware ${i + 1}`,
       narration: "",
-      tags: ["kitchen"],
-      postings: [{ account, units: usd(`-${amount}`) }, { account: "Expenses:Home:Repairs" }],
+      postings: [
+        { account, units: usd(`-${amount}`) },
+        { account: "Expenses:Home:Repairs", tags: ["kitchen"] },
+      ],
     })),
+  });
+  // Groceries bought with a tagged part: only the part counts.
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+    params: { path: { book_id: book.id } },
+    body: {
+      date: "2024-03-03",
+      flag: "*",
+      payee: "Hardware 3",
+      narration: "",
+      postings: [
+        { account, units: usd("-40.00") },
+        { account: "Expenses:Food:Groceries", units: usd("30.00") },
+        { account: "Expenses:Home:Repairs", units: usd("10.00"), tags: ["kitchen"] },
+      ],
+    },
   });
 
   await page.goto(`/ui/books/${book.id}/reports`);
@@ -112,7 +138,7 @@ test("Reports filter by tag: All time, the largest tagged, and net worth set asi
   await expect(page.getByRole("option", { name: "#kitchen" })).toBeVisible();
   await filter.press("Enter");
   await expect(page).toHaveURL(/tag=kitchen/);
-  await expect(page.getByText("Only transactions tagged #kitchen.")).toBeVisible();
+  await expect(page.getByText("Only splits tagged #kitchen.")).toBeVisible();
 
   const breakdown = page.getByRole("region", { name: "Breakdown" });
   await expect(breakdown.getByLabel("Show")).toHaveValue("total");
@@ -120,14 +146,15 @@ test("Reports filter by tag: All time, the largest tagged, and net worth set asi
   await expect(breakdown.getByRole("list", { name: "Categories" })).not.toContainText("Food");
   const largest = page.getByRole("region", { name: "Largest transactions" });
   await expect(largest).toContainText("Largest tagged transactions");
-  await expect(largest.getByRole("link")).toHaveCount(2);
+  await expect(largest.getByRole("link")).toHaveCount(3);
   await expect(largest).toContainText("Hardware 1");
+  await expect(largest).toContainText("$10.00"); // Hardware 3's tagged part
   await expect(page.getByText("Net worth isn't filtered by tag: it's balances.")).toBeVisible();
   await expect(page.getByRole("region", { name: "Net worth" })).toHaveCount(0);
 
   await page.getByRole("link", { name: "See them" }).click();
   await expect(page).toHaveURL(/transactions\?tag=kitchen/);
   await expect(page.getByRole("list", { name: "Transactions" }).getByRole("listitem")).toHaveCount(
-    2
+    3
   );
 });

@@ -1,8 +1,8 @@
 /**
- * Tags (M17): Beancount's `#tag`s on transactions. `TagChips` shows a transaction's, read-only;
- * `TagInput` chooses some: the chosen ones as chips with ×, and an input that suggests the
- * book's tags as you type (most used first), adding a suggestion, or what you typed (made a tag
- * by `toTag`), on Enter, Tab or a comma.
+ * Tags (M17), a split's since 2026-11-12. `TagChips` shows a split's or a transaction's (its
+ * splits' together), read-only; `TagInput` chooses some: the chosen ones as chips with ×, and an
+ * input that suggests the book's tags as you type (most used first), adding a suggestion, or what
+ * you typed (made a tag by `toTag`), on Enter, Tab or a comma.
  */
 import { useId, useMemo, useState, type KeyboardEvent } from "react";
 

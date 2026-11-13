@@ -5,11 +5,10 @@ import { filtering, kept, matchesSearch, touchesAny } from "./filters.js";
 const megamart = {
   payee: "Megamart",
   narration: "Weekly shop",
-  tags: ["home"],
   postings: [
     { account: "Liabilities:Card" },
-    { account: "Expenses:Food", meta: { memo: "Oat milk" } },
-    { account: "Expenses:Home:Garden", meta: { memo: "Seed packets" } },
+    { account: "Expenses:Food", meta: { memo: "Oat milk" }, tags: ["home"] },
+    { account: "Expenses:Home:Garden", meta: { memo: "Seed packets" }, tags: ["home", "gift"] },
   ],
 };
 const truck = {
@@ -46,6 +45,10 @@ describe("a filter", () => {
     expect(kept(megamart, { q: "oat", accounts: ["Liabilities:Card"], tags: ["home"] })).toBe(true);
     expect(kept(megamart, { q: "oat", accounts: ["Assets:Bank"] })).toBe(false);
     expect(kept(megamart, { tags: ["home", "work"] })).toBe(false);
+    expect(kept(megamart, { tags: ["home", "gift"] })).toBe(true); // both on the seeds
+    expect(kept({ ...megamart, postings: megamart.postings.slice(0, 2) }, { tags: ["gift"] })).toBe(
+      false
+    );
     expect(kept(truck, { tags: ["home"] })).toBe(false);
     expect(kept(truck, {})).toBe(true);
   });

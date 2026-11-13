@@ -112,12 +112,13 @@ describe("reviewing matches", () => {
 
   it("swap, not a match, and confirm", async () => {
     const { user, book } = await setUp();
+    // Unconfirmed: a match with a confirmed transaction is final at once (below).
     for (const date of ["2024-03-05", "2024-03-07"]) {
       await user.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
         params: { path: { book_id: book } },
         body: {
           date,
-          flag: "*",
+          flag: "!",
           narration: "Coffee",
           postings: [
             { account: "Assets:Bank:Checking", units: { number: "-5.00", currency: "USD" } },
@@ -164,5 +165,29 @@ describe("reviewing matches", () => {
       body: JSON.stringify({ transaction: r7!.transaction_id }),
     });
     assert.equal(refused.status, 409);
+  });
+
+  it("a match with a confirmed transaction is final at once, out of review", async () => {
+    const { user, book } = await setUp();
+    const { data: typed } = await user.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+      params: { path: { book_id: book } },
+      body: {
+        date: "2024-03-05",
+        flag: "*",
+        narration: "Coffee",
+        postings: [
+          { account: "Assets:Bank:Checking", units: { number: "-5.00", currency: "USD" } },
+          { account: "Expenses:Uncategorized" },
+        ],
+      },
+    });
+    const imported = await upload(user, book, "Assets:Bank:Checking", "03/06/2024,CAFE,-5.00\n");
+
+    assert.deepEqual(
+      imported.rows.map((r) => [r.outcome, r.transaction_id, r.match]),
+      [["matched", typed!.id, "confirmed"]]
+    );
+    const proposed = await user.app(`/books/${book}/matches`);
+    assert.deepEqual(await proposed.json(), []);
   });
 });

@@ -2,13 +2,13 @@
  * The journal's filters (`JournalFilter`) for lists held in memory, the review queue's: what the
  * ledger's `/journal` keeps, read the same way. Reconciliation isn't read here.
  */
+import { splitHas } from "../../shared/tags.js";
 import type { JournalFilter } from "./ledger.js";
 
 type Filterable = {
   payee?: string | null;
   narration?: string | null;
-  tags?: string[] | null;
-  postings: { account: string; meta?: Record<string, unknown> | null }[];
+  postings: { account: string; tags?: string[] | null; meta?: Record<string, unknown> | null }[];
 };
 
 /** The words searched for: whitespace apart, ignoring case. */
@@ -35,10 +35,11 @@ export function touchesAny(t: Filterable, accounts: readonly string[] | undefine
   );
 }
 
-/** Whether a transaction is kept by `filter`: every tag, the search and the accounts. */
+/** Whether a transaction is kept by `filter`: a split with every tag, the search and the
+ * accounts. */
 export function kept(t: Filterable, filter: JournalFilter): boolean {
   return (
-    (filter.tags ?? []).every((tag) => t.tags?.includes(tag)) &&
+    splitHas(t.postings, filter.tags ?? []) &&
     matchesSearch(t, filter.q) &&
     touchesAny(t, filter.accounts)
   );

@@ -266,7 +266,6 @@ export async function plan(
     flag: "*",
     payee: null,
     narration: "Opening balance",
-    tags: [],
     links: [],
     meta: { source: "simplefin" },
     postings: [

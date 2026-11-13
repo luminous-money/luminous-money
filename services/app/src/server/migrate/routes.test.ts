@@ -82,7 +82,6 @@ const waiting = (description: string, amount: string) =>
     flag: "!",
     payee: null,
     narration: description,
-    tags: [],
     links: [],
     meta: {},
     postings: [

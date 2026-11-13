@@ -64,7 +64,6 @@ describe("a divided account's imports", () => {
       flag: "*",
       payee: "Corner Cafe",
       narration: "",
-      tags: [],
       links: [],
       meta: {},
       postings: [

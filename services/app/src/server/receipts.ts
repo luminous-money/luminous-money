@@ -38,6 +38,7 @@ import { hasOrder } from "../shared/orders.js";
 import { hasReceipt } from "../shared/receipts.js";
 import { landsIn } from "../shared/divided.js";
 import { addDays } from "../shared/schedule.js";
+import { inheriting } from "../shared/tags.js";
 import type { AiPort } from "./ai.js";
 import { aiCategorizer } from "./categorize/ai.js";
 import type { Seen } from "./migrate/reference.js";
@@ -173,7 +174,6 @@ export function receiptTransaction(
       payee,
       // Not "Receipt" when there's a payee: history learns from the description first.
       narration: hints.note ?? (payee ? "" : facts ? "Receipt" : "Receipt: couldn't read it"),
-      tags: [],
       links: [],
       meta: { source: "receipt" },
       postings,
@@ -412,11 +412,12 @@ async function read({
   const decision =
     request && chain.length ? ((await categorize(chain, request)).get(incoming.id) ?? {}) : {};
   const staged = placed(built.transaction.postings, incoming, decision);
-  // Read into a transaction, its paying side stays as it is (its part, its reconciliation).
+  // Read into a transaction, its paying side stays as it is (its part, its reconciliation), and
+  // the items take the tags of the splits they replace.
   const postings = keeps
     ? target!.postings
     : ownPosting
-      ? [ownPosting, ...staged.slice(1)]
+      ? [ownPosting, ...inheriting(staged.slice(1), others)]
       : staged;
 
   onStep?.("saving");

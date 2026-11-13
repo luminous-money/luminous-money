@@ -54,9 +54,13 @@ export function simple(t: Pick<TransactionIn, "postings">): Simple | null {
 
 /** The writable part of a stored transaction. */
 export function toInput(t: Transaction): TransactionIn {
-  const { date, flag, payee, narration, tags, links, meta, postings } = t;
-  return { date, flag, payee, narration, tags, links, meta, postings };
+  const { date, flag, payee, narration, links, meta, postings } = t;
+  return { date, flag, payee, narration, links, meta, postings };
 }
+
+/** A split's `memo:`, what it is (a receipt's line). */
+export const memoOf = (p: { meta?: Record<string, unknown> | null }) =>
+  typeof p.meta?.["memo"] === "string" ? (p.meta["memo"] as string) : null;
 
 /** A posting moved to the account you chose: it's yours now, so its flag (`!`, a split still to
  * confirm) goes (M16). */

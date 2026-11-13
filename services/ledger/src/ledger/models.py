@@ -66,17 +66,21 @@ MetaValue = str | bool | MetaNumber | MetaDate | Amount
 Meta = dict[str, MetaValue]
 
 
+# A tag, as Beancount allows one, without the `#` (M17)
+Tag = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9\-_/.]+$")]
+
+
 class Posting(Strict):
     account: str
     units: Amount | None = Field(None, description="Omit to let booking fill in the balancing amount.")
     cost: Cost | None = None
     price: Amount | None = Field(None, description="Per-unit price, as in `@`.")
     flag: Flag | None = None
+    tags: list[Tag] = Field(
+        default_factory=list,
+        description="Its tags, sorted: a split's (a transaction's are its splits'). In the books, its `tags:`.",
+    )
     meta: Meta = Field(default_factory=dict)
-
-
-# Beancount's `#tag`, without the `#` (M17)
-Tag = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9\-_/.]+$")]
 
 
 class FundLine(Strict):
@@ -99,7 +103,6 @@ class TransactionIn(Strict):
     flag: Flag = Field("!", description="`!` is staged for review; `*` is confirmed.")
     payee: str | None = None
     narration: str = ""
-    tags: list[Tag] = Field(default_factory=list)
     links: list[str] = Field(default_factory=list)
     funds: list[FundLine] | None = Field(None, description=FUNDS_DESCRIPTION)
     meta: Meta = Field(default_factory=dict)
@@ -144,7 +147,6 @@ class TransactionPatch(Strict):
     flag: Flag | None = None
     payee: str | None = None
     narration: str | None = None
-    tags: list[Tag] | None = None
     links: list[str] | None = None
     funds: list[FundLine] | None = Field(None, description="Replaces all its fund lines (Funds A); [] or null clears them.")
     meta: Meta | None = None
@@ -290,10 +292,17 @@ class Holdings(Api):
     stale: bool
 
 
+PriceFrom = Literal["bank", "fetched"]
+
+
 class PriceIn(Strict):
     date: datetime.date
     commodity: str = Field(pattern=r"^[A-Z][A-Z0-9'._-]{0,22}[A-Z0-9]$")
     price: Amount = Field(description="What one unit was worth, in a currency.")
+    source: PriceFrom | None = Field(
+        None,
+        description='Where it came from: "bank" (a bank feed\'s holdings) or "fetched" (a price source); none when it\'s entered by hand.',
+    )
 
 
 class PriceOut(Api):
@@ -334,6 +343,9 @@ class CommodityOut(Api):
     stale_after: int = Field(description="Days before its price counts as stale.")
     price: Amount | None = Field(description="The latest price, in the operating currency.")
     price_date: datetime.date | None
+    price_from: Literal["bank", "fetched", "hand"] | None = Field(
+        description="Where the latest price came from: a bank feed's holdings, a price source, or entered by hand; null without one."
+    )
     updated_at: str | None = Field(description="Its `commodity` directive's version; send it back to change it.")
 
 
@@ -482,6 +494,7 @@ class CompactPosting(Api):
     reconciled: datetime.date | None = Field(None, description="The statement it was reconciled with (M14).")
     flag: str | None = Field(None, description="`!`: a split still to confirm (M16).")
     memo: str | None = Field(None, description="What the split is, in words (a receipt's line) (M16).")
+    tags: list[str] = Field(default_factory=list, description="Its tags, sorted.")
     outflow_of: str | None = Field(
         None,
         description="In the outflows lens, a split that isn't in the books: spending paid into this account, which "
@@ -498,7 +511,7 @@ class CompactTransaction(Api):
     payee: str | None
     narration: str | None
     budgeted: bool = Field(True, description="False with `budget: FALSE`: kept out of budgets (M11).")
-    tags: list[str] = Field(default_factory=list, description="Its tags, sorted (M17).")
+    tags: list[str] = Field(default_factory=list, description="Every tag its splits have, sorted.")
     funds: list[FundLine] = Field(default_factory=list, description="Its fund lines (Funds A).")
     postings: list[CompactPosting]
 
@@ -526,7 +539,7 @@ class LedgerRow(Api):
     )
     counterpart: str | None = Field(description="The other split's account, for a two-split transaction; None for more.")
     splits: int
-    tags: list[str] = Field(default_factory=list, description="Its tags, sorted (M17).")
+    tags: list[str] = Field(default_factory=list, description="Every tag its splits have, sorted.")
     funds: list[FundLine] = Field(default_factory=list, description="Its fund lines (Funds A).")
     reconciled: datetime.date | None = Field(
         None, description="Once all its postings in the account are reconciled: the (latest) statement's date."
@@ -627,7 +640,7 @@ class JournalRow(Api):
     payee: str | None
     narration: str | None
     budgeted: bool
-    tags: list[str] = Field(default_factory=list, description="Its tags, sorted (M17).")
+    tags: list[str] = Field(default_factory=list, description="Every tag its splits have, sorted.")
     funds: list[FundLine] = Field(default_factory=list, description="Its fund lines (Funds A).")
     postings: list[CompactPosting]
     reconciled: bool | None = Field(
@@ -637,10 +650,10 @@ class JournalRow(Api):
 
 
 class TagUse(Api):
-    """A tag the book's transactions have (M17): a tag exists while one does."""
+    """A tag the book's splits have (M17): a tag exists while one does."""
 
     name: str
-    transactions: int = Field(description="How many transactions have it.")
+    transactions: int = Field(description="How many transactions have a split with it.")
     first: datetime.date = Field(description="The earliest of their dates.")
     last: datetime.date = Field(description="The latest of their dates.")
 

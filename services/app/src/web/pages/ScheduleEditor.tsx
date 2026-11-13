@@ -29,13 +29,13 @@ import {
   useLoans,
   useSaveSchedule,
   useSchedule,
+  useTags,
   useTransaction,
 } from "../lib/queries.js";
 
 const BLANK: TransactionTemplate = {
   payee: null,
   narration: "",
-  tags: [],
   links: [],
   meta: {},
   postings: [
@@ -67,7 +67,6 @@ function fromTransaction(t: Transaction): {
     template: {
       payee: rest.payee ?? null,
       narration: rest.narration,
-      tags: rest.tags ?? [],
       links: rest.links ?? [],
       meta: rest.meta ?? {},
       postings: rest.postings as TransactionTemplate["postings"],
@@ -180,6 +179,7 @@ function Form({
   const currency = postings.find((p) => p.units)?.units?.currency ?? "USD";
   const splits = useSplits(postings, currency);
   const names = accounts.data ? postable(accounts.data, today()) : [];
+  const bookTags = useTags(book);
   // Funds (Funds A): every occurrence carries the template's lines.
   const listing = useFunds(book);
   const funds = useFundRows(
@@ -316,7 +316,13 @@ function Form({
         Description
         <input value={narration} onChange={(e) => setNarration(e.target.value)} />
       </label>
-      <SplitsFieldset splits={splits} accounts={names} create={create} tolerances />
+      <SplitsFieldset
+        splits={splits}
+        accounts={names}
+        create={create}
+        tags={bookTags.data ?? []}
+        tolerances
+      />
       <p className="muted small">
         A match tolerance lets a bank&apos;s amount within it match the split; on confirming the
         match, the bank&apos;s amount replaces the split&apos;s, and the blank split absorbs the

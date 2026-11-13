@@ -66,6 +66,14 @@ const NOTICE = /recommended|may be capped|in the future|deprecat/i;
 
 export const isNotice = (e: SfError) => e.code === "notice";
 
+/**
+ * Whether an error is about one account, so its page says so: only one that names it
+ * (`account_id`). Everything else is the connection's (Kael, 2026-11-12: a plain string isn't
+ * read for what it's about), said on its card on Bank connections and in the bell.
+ */
+export const concerns = (error: SfError, account: { account_id: string }): boolean =>
+  !isNotice(error) && !!error.account_id && error.account_id === account.account_id;
+
 export type SfAccountSet = { accounts: SfAccount[]; errors: SfError[] };
 
 export class SimplefinProblem extends Error {

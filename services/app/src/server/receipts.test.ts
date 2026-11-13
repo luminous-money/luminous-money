@@ -302,6 +302,8 @@ describe("a receipt for a transaction already here", () => {
     const ledger = setUp();
     const bank = bankCopy(ledger);
     bankCopy(ledger, { date: "2026-01-12" }); // too long before
+    // Tagged in review before its receipt came: the items take the tag of the split they replace.
+    ledger.transactions.find((t) => t.id === bank.id)!.postings[1]!.tags = ["trip"];
     const { port } = ai(() => ({ ok: facts() }), groceries);
 
     const captured = await captureReceipt({
@@ -329,6 +331,7 @@ describe("a receipt for a transaction already here", () => {
       ["Expenses:Groceries", "9.99"],
       ["Expenses:Groceries", "3.52"],
     ]);
+    expect(t.postings.map((p) => p.tags ?? [])).toEqual([[], ["trip"], ["trip"], ["trip"]]);
     expect(t.meta?.["receipt-note"]).toBe(
       "It was read into the transaction already here from 2026-01-22."
     );

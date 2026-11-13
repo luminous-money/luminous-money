@@ -61,8 +61,8 @@ export type TransactionChanges = Omit<components["schemas"]["TransactionPatch"],
 export type AccountKind = components["schemas"]["AccountIn"]["kind"];
 /** Where a ledger page is: older than `cursor`, newer than `after`, or from `date` back. */
 export type LedgerPageAt = { cursor?: string; after?: string; date?: string };
-/** Which of the journal's transactions to list: reconciled or not; with every one of `tags`
- * (M17); whose payee, narration or a split's memo has every word of `q`; with a split in any
+/** Which of the journal's transactions to list: reconciled or not; with a split that has every
+ * one of `tags` (M17); whose payee, narration or a split's memo has every word of `q`; with a split in any
  * of `accounts` or under one. */
 export type JournalFilter = {
   reconciled?: boolean;

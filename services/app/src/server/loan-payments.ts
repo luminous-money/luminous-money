@@ -88,7 +88,6 @@ function paymentTransaction(
     flag,
     payee: loan.payee || loan.name,
     narration: p.number ? `Payment ${p.number}` : "Payment",
-    tags: [],
     links: [],
     meta,
     postings: paymentPostings(accountsFor(loan, early), p, loan.currency, {
@@ -287,7 +286,6 @@ export function loanTemplate(loan: StoredLoan, next: Payment | null): Transactio
   return {
     payee: loan.payee || loan.name,
     narration: "Payment",
-    tags: [],
     links: [],
     meta: {},
     postings: postings.map((p, i) =>

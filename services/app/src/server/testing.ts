@@ -12,7 +12,7 @@ import type {
 } from "@luminous-money/ledger-client";
 
 import { add, isZero, negate } from "../shared/decimal.js";
-import { hasTags } from "../shared/tags.js";
+import { splitHas, tagsOf } from "../shared/tags.js";
 import {
   LedgerError,
   type Attachment,
@@ -126,7 +126,6 @@ export class FakeLedger implements LedgerPort {
         flag: "*",
         payee: null,
         narration: "Opening balance",
-        tags: [],
         links: [],
         meta: {},
         postings: [
@@ -276,7 +275,6 @@ export class FakeLedger implements LedgerPort {
         flag: "*",
         payee: null,
         narration: trade.narration ?? "",
-        tags: [],
         links: [],
         meta: {},
         postings: [
@@ -356,7 +354,7 @@ export class FakeLedger implements LedgerPort {
   ): Promise<CompactTransaction[]> {
     this.lenses.push(lens);
     return this.transactions
-      .filter((t) => (!from || t.date >= from) && hasTags(t.tags, tags))
+      .filter((t) => (!from || t.date >= from) && splitHas(t.postings, tags))
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((t) => ({
         id: t.id,
@@ -365,12 +363,13 @@ export class FakeLedger implements LedgerPort {
         payee: t.payee ?? null,
         narration: t.narration ?? null,
         budgeted: t.meta?.budget !== false,
-        tags: [...(t.tags ?? [])].sort(),
+        tags: tagsOf(t.postings),
         postings: t.postings.map((p) => ({
           account: p.account,
           amount: p.units ?? null,
           flag: p.flag ?? null,
           memo: typeof p.meta?.["memo"] === "string" ? (p.meta["memo"] as string) : null,
+          tags: [...(p.tags ?? [])].sort(),
         })),
       }));
   }
@@ -569,7 +568,6 @@ export class FakeLedger implements LedgerPort {
         flag: "*",
         payee: null,
         narration: "Divided",
-        tags: [],
         links: [],
         meta: {},
         postings: [

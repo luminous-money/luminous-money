@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { AppDb } from "../db.js";
 import { bankComparison } from "../reconcile.js";
 import { FakeLedger } from "../testing.js";
-import { claim, parseAccountSet, SimplefinProblem } from "./client.js";
+import { claim, concerns, explainError, parseAccountSet, SimplefinProblem } from "./client.js";
 import { Sealer } from "./crypto.js";
 import { cashOf, positions } from "./holdings.js";
 import { attemptLink, confirmAttempt, idle, resumeAttempts } from "./attempts.js";
@@ -87,7 +87,6 @@ const tx = (date: string, amount: string, flag = "*", narration = "mine") =>
     flag,
     payee: null,
     narration,
-    tags: [],
     links: [],
     meta: {},
     postings: [
@@ -298,7 +297,6 @@ describe("linking", () => {
       flag: "*",
       payee: null,
       narration: "Opening balance",
-      tags: [],
       links: [],
       meta: {},
       postings: [
@@ -485,6 +483,37 @@ describe("Bridge notices", () => {
       accounts: [],
     });
     expect(set.errors.map((e) => e.code)).toEqual(["notice", "gen.", "notice"]);
+  });
+});
+
+describe("whose error it is", () => {
+  const plan = { account_id: "a" };
+  const checking = { account_id: "b" };
+
+  it("is the account it names, and only that; anything else is the connection's", () => {
+    // The Bridge's own words (2026-11-12): a plain string, read for nothing but what it says.
+    const [plain] = parseAccountSet({
+      errors: ["Connection to Fake 529 Plan may need attention. Auth required"],
+      accounts: [],
+    }).errors;
+    const own = { code: "act.failed", message: "", account_id: "b" };
+    const revoked = { code: "gen.auth", message: "access revoked", account_id: null };
+    const notice = { code: "notice", message: "Please update your app", account_id: "a" };
+
+    expect(plain).toEqual({
+      code: "gen.",
+      message: "Connection to Fake 529 Plan may need attention. Auth required",
+      account_id: null,
+    });
+    expect(explainError(plain!)).toBe(plain!.message);
+    expect(
+      [plain!, own, revoked, notice].map((e) => [concerns(e, plan), concerns(e, checking)])
+    ).toEqual([
+      [false, false],
+      [false, true],
+      [false, false],
+      [false, false],
+    ]);
   });
 });
 

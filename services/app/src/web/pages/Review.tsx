@@ -5,7 +5,7 @@ import { Link, useLocation, useSearch } from "wouter";
 import { AccountName, AccountPicker, type AccountCreation } from "../components/AccountPicker.js";
 import { SelectBar } from "../components/SelectBar.js";
 import { BrokerageNote, ReceiptNote } from "../components/ReceiptNote.js";
-import { TagInput } from "../components/Tags.js";
+import { TagChips, TagInput } from "../components/Tags.js";
 import {
   filteredLabel,
   LedgerFilter,
@@ -48,7 +48,15 @@ import {
   useTags,
   writeSkipped,
 } from "../lib/queries.js";
-import { chosen, simple, UNCATEGORIZED, unresolved, withCounterpart } from "../lib/split.js";
+import {
+  chosen,
+  memoOf,
+  simple,
+  UNCATEGORIZED,
+  unresolved,
+  withCounterpart,
+} from "../lib/split.js";
+import { tagsOf, withTags } from "../../shared/tags.js";
 import { aiCostSentence } from "../lib/ai.js";
 import { holdingsOf, suggestedFund } from "../lib/funds.js";
 import { wholeLines } from "../../shared/funds.js";
@@ -271,10 +279,6 @@ type ItemProps = {
   onSkip: () => void;
 };
 
-/** A split's `memo:`, what it is (a receipt's line). */
-const memoOf = (p: { meta?: Record<string, unknown> | null }) =>
-  typeof p.meta?.["memo"] === "string" ? (p.meta["memo"] as string) : null;
-
 function QueueItem({
   book,
   here,
@@ -305,8 +309,10 @@ function QueueItem({
   // Shown as changed right away, like the description, while the edit saves.
   const [meta, setMeta] = useState(t.meta);
   useEffect(() => setMeta(t.meta), [t.meta]);
-  const [tags, setTags] = useState(t.tags ?? []);
-  useEffect(() => setTags(t.tags ?? []), [t.tags]);
+  // Its tags are its splits' together (shown changed right away, while the edit saves).
+  const theirs = useMemo(() => tagsOf(t.postings), [t.postings]);
+  const [tags, setTags] = useState(theirs);
+  useEffect(() => setTags(theirs), [theirs]);
   const bookTags = useTags(book);
 
   const view = useMemo(() => simple(t), [t]);
@@ -496,9 +502,13 @@ function QueueItem({
             <ul className="splits">
               {t.postings.map((p, i) =>
                 // A split still to place (M16): what it is, its amount, and its account to pick.
+                // Each says its tags; they're changed on the transaction's page.
                 i > 0 && (p.flag === "!" || unresolved(p.account)) ? (
                   <li key={i} className={`open-split${unresolved(p.account) ? " needs" : ""}`}>
-                    <span className="split-memo small muted">{memoOf(p) ?? "The rest"}</span>
+                    <span className="split-memo small muted">
+                      {memoOf(p) ?? "The rest"}
+                      <TagChips tags={p.tags} />
+                    </span>
                     <AccountPicker
                       label={memoOf(p) ?? `Split ${i}`}
                       accounts={accounts}
@@ -515,7 +525,10 @@ function QueueItem({
                   </li>
                 ) : (
                   <li key={i}>
-                    <AccountName name={p.account} />
+                    <span>
+                      <AccountName name={p.account} />
+                      <TagChips tags={p.tags} />
+                    </span>
                     <span>{p.units ? formatMoney(p.units.number, p.units.currency) : "auto"}</span>
                   </li>
                 )
@@ -546,7 +559,12 @@ function QueueItem({
               label="Tags"
               value={tags}
               choices={bookTags.data ?? []}
-              onChange={(changed) => (setTags(changed), void save({ tags: changed }))}
+              // A tag added goes on what the money was for, one removed comes off every split:
+              // made from the latest copy, so a category picked a moment before stays.
+              onChange={(changed) => (
+                setTags(changed),
+                void save((current) => ({ postings: withTags(current.postings, changed) }))
+              )}
             />
           </div>
 

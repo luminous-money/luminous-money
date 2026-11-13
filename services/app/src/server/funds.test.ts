@@ -51,7 +51,6 @@ describe("renaming a fund (Funds A)", () => {
       template: {
         payee: null,
         narration: "To savings",
-        tags: [],
         links: [],
         meta: {},
         funds: [{ fund: "Household", amount: { number: "200.00", currency: "USD" } }],

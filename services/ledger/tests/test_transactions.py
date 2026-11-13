@@ -24,7 +24,6 @@ RICH = {
     "flag": "!",
     "payee": "Broker",
     "narration": "Buy with \"quotes\"",
-    "tags": ["invest", "q1"],
     "links": ["trade-42"],
     "meta": {
         "note": "plain text",
@@ -38,6 +37,7 @@ RICH = {
             "account": "Assets:Brokerage",
             "units": {"number": "10", "currency": "VTI"},
             "cost": {"number": "200.00", "currency": "USD", "date": "2024-03-02", "label": "lot-a"},
+            "tags": ["invest", "q1"],
             "meta": {"lot": "first"},
         },
         {
@@ -151,9 +151,10 @@ def test_only_transactions_can_be_updated_as_transactions(book):
 def test_transactions_written_as_text_read_back_as_json(book):
     [groceries] = [t for t in book.transactions("book") if t.narration == "Weekly groceries"]
 
-    assert groceries.tags == ["food", "household"]
+    assert "tags" not in groceries.model_dump()  # its own `#food` and pushed `#household` aren't read
     assert groceries.links == ["receipt-001"]
     assert groceries.meta == {"receipt": "a multi\nline string", "verified": True}
+    assert groceries.postings[0].tags == ["groceries"]
     assert groceries.postings[0].meta == {"category-hint": "Expenses:Food"}
     assert groceries.postings[1].flag == "!"
     assert groceries.postings[1].units is None

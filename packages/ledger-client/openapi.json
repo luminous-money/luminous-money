@@ -1411,6 +1411,23 @@
             ],
             "title": "Price Date"
           },
+          "price_from": {
+            "anyOf": [
+              {
+                "enum": [
+                  "bank",
+                  "fetched",
+                  "hand"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the latest price came from: a bank feed's holdings, a price source, or entered by hand; null without one.",
+            "title": "Price From"
+          },
           "price_source": {
             "anyOf": [
               {
@@ -1449,6 +1466,7 @@
           "stale_after",
           "price",
           "price_date",
+          "price_from",
           "updated_at"
         ],
         "title": "CommodityOut",
@@ -1519,6 +1537,14 @@
             ],
             "description": "The statement it was reconciled with (M14).",
             "title": "Reconciled"
+          },
+          "tags": {
+            "description": "Its tags, sorted.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
           }
         },
         "required": [
@@ -1588,7 +1614,7 @@
             "type": "array"
           },
           "tags": {
-            "description": "Its tags, sorted (M17).",
+            "description": "Every tag its splits have, sorted.",
             "items": {
               "type": "string"
             },
@@ -3162,7 +3188,7 @@
             "title": "Reconciled"
           },
           "tags": {
-            "description": "Its tags, sorted (M17).",
+            "description": "Every tag its splits have, sorted.",
             "items": {
               "type": "string"
             },
@@ -3352,7 +3378,7 @@
             "type": "integer"
           },
           "tags": {
-            "description": "Its tags, sorted (M17).",
+            "description": "Every tag its splits have, sorted.",
             "items": {
               "type": "string"
             },
@@ -3674,6 +3700,15 @@
             ],
             "description": "Per-unit price, as in `@`."
           },
+          "tags": {
+            "description": "Its tags, sorted: a split's (a transaction's are its splits'). In the books, its `tags:`.",
+            "items": {
+              "pattern": "^[A-Za-z0-9\\-_/.]+$",
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "units": {
             "anyOf": [
               {
@@ -3708,6 +3743,22 @@
           "price": {
             "$ref": "#/components/schemas/Amount",
             "description": "What one unit was worth, in a currency."
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "bank",
+                  "fetched"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where it came from: \"bank\" (a bank feed's holdings) or \"fetched\" (a price source); none when it's entered by hand.",
+            "title": "Source"
           }
         },
         "required": [
@@ -4383,7 +4434,7 @@
         "type": "object"
       },
       "TagUse": {
-        "description": "A tag the book's transactions have (M17): a tag exists while one does.",
+        "description": "A tag the book's splits have (M17): a tag exists while one does.",
         "properties": {
           "first": {
             "description": "The earliest of their dates.",
@@ -4402,7 +4453,7 @@
             "type": "string"
           },
           "transactions": {
-            "description": "How many transactions have it.",
+            "description": "How many transactions have a split with it.",
             "title": "Transactions",
             "type": "integer"
           }
@@ -4692,14 +4743,6 @@
             "title": "Postings",
             "type": "array"
           },
-          "tags": {
-            "items": {
-              "pattern": "^[A-Za-z0-9\\-_/.]+$",
-              "type": "string"
-            },
-            "title": "Tags",
-            "type": "array"
-          },
           "updated_at": {
             "description": "Changes on every write; send it back with edits.",
             "title": "Updated At",
@@ -4876,21 +4919,6 @@
             ],
             "title": "Postings"
           },
-          "tags": {
-            "anyOf": [
-              {
-                "items": {
-                  "pattern": "^[A-Za-z0-9\\-_/.]+$",
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tags"
-          },
           "updated_at": {
             "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
             "title": "Updated At",
@@ -4987,14 +5015,6 @@
             },
             "minItems": 1,
             "title": "Postings",
-            "type": "array"
-          },
-          "tags": {
-            "items": {
-              "pattern": "^[A-Za-z0-9\\-_/.]+$",
-              "type": "string"
-            },
-            "title": "Tags",
             "type": "array"
           }
         },
@@ -5130,21 +5150,6 @@
             ],
             "title": "Postings"
           },
-          "tags": {
-            "anyOf": [
-              {
-                "items": {
-                  "pattern": "^[A-Za-z0-9\\-_/.]+$",
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tags"
-          },
           "updated_at": {
             "description": "The `updated_at` this edit was based on. If the stored one differs, the edit is refused with 409 Conflict.",
             "title": "Updated At",
@@ -5241,14 +5246,6 @@
             },
             "minItems": 1,
             "title": "Postings",
-            "type": "array"
-          },
-          "tags": {
-            "items": {
-              "pattern": "^[A-Za-z0-9\\-_/.]+$",
-              "type": "string"
-            },
-            "title": "Tags",
             "type": "array"
           },
           "updated_at": {
@@ -6548,7 +6545,7 @@
             }
           },
           {
-            "description": "Only transactions with every tag given (M17); repeat it for several.",
+            "description": "Only transactions with a split that has every tag given (M17); repeat it for several.",
             "in": "query",
             "name": "tag",
             "required": false,
@@ -6564,7 +6561,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Only transactions with every tag given (M17); repeat it for several.",
+              "description": "Only transactions with a split that has every tag given (M17); repeat it for several.",
               "title": "Tag"
             }
           }
@@ -8952,7 +8949,7 @@
             }
           },
           {
-            "description": "Only transactions with every tag given (M17); repeat it for several.",
+            "description": "Only transactions with a split that has every tag given (M17); repeat it for several.",
             "in": "query",
             "name": "tag",
             "required": false,
@@ -8968,7 +8965,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Only transactions with every tag given (M17); repeat it for several.",
+              "description": "Only transactions with a split that has every tag given (M17); repeat it for several.",
               "title": "Tag"
             }
           },
@@ -9473,7 +9470,7 @@
     },
     "/api/ledger/v1/books/{book_id}/tags": {
       "get": {
-        "description": "The book's tags (M17), alphabetically: each with how many transactions have it, and\nthe first and last of their dates. A tag exists while a transaction has it.",
+        "description": "The book's tags (M17), alphabetically: each with how many transactions have a split with\nit, and the first and last of their dates. A tag exists while a split has it.",
         "operationId": "tags_api_ledger_v1_books__book_id__tags_get",
         "parameters": [
           {
@@ -9836,7 +9833,7 @@
     },
     "/api/ledger/v1/books/{book_id}/transactions/compact": {
       "get": {
-        "description": "Every transaction from a date on, oldest first, with only payee, narration, whether it\ncounts against budgets, its tags, and each posting's account and amount: the context\ncategorizers work from, and reports' posting stream. Not paged.",
+        "description": "Every transaction from a date on, oldest first, with only payee, narration, whether it\ncounts against budgets, and each posting's account, amount and tags: the context\ncategorizers work from, and reports' posting stream. Not paged.",
         "operationId": "compact_transactions_api_ledger_v1_books__book_id__transactions_compact_get",
         "parameters": [
           {
@@ -9868,7 +9865,7 @@
             }
           },
           {
-            "description": "Only transactions with every tag given (M17); repeat it for several.",
+            "description": "Only transactions with a split that has every tag given (M17); repeat it for several.",
             "in": "query",
             "name": "tag",
             "required": false,
@@ -9884,7 +9881,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Only transactions with every tag given (M17); repeat it for several.",
+              "description": "Only transactions with a split that has every tag given (M17); repeat it for several.",
               "title": "Tag"
             }
           },

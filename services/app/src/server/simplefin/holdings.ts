@@ -169,6 +169,7 @@ export async function recordPrices(deps: SimplefinDeps, link: Link): Promise<voi
         date: today,
         commodity,
         price: { number: fixed(price, 6), currency: snapshot.currency },
+        source: "bank",
       });
   }
 }

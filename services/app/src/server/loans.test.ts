@@ -68,7 +68,6 @@ describe("declaring a loan", () => {
       flag: "!",
       payee: "BIG BANK MTG",
       narration: "",
-      tags: [],
       links: [],
       meta: {},
       postings: [

@@ -102,6 +102,22 @@ describe("pairing transfers", () => {
     ]);
   });
 
+  it("keeps each side's tags on its split", async () => {
+    await bring(FIDELITY, [row(1, "2026-10-10", "-500.00", "TRANSFER TO PNC")]);
+    await bring(PNC, [row(1, "2026-10-11", "500.00", "TRANSFER FROM FIDELITY")]);
+    const [out, into] = ledger.transactions;
+    out!.postings[1]!.tags = ["move"];
+    into!.postings[0]!.tags = ["house", "move"];
+
+    await pair();
+
+    const transfer = (await ledger.unconfirmed()).find((t) => t.narration.startsWith("Transfer"))!;
+    expect(transfer.postings.map((p) => [p.account, p.tags])).toEqual([
+      [FIDELITY, ["move"]],
+      [PNC, ["house", "move"]],
+    ]);
+  });
+
   it("pairs a card payment, but not what's too far apart, categorized, or in one account", async () => {
     await bring(PNC, [
       row(1, "2026-10-01", "-500.00", "CHASE PAYMENT"),

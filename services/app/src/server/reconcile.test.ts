@@ -21,7 +21,6 @@ const spend = (date: string, amount: string, other = "Expenses:Food") =>
     flag: "!",
     payee: null,
     narration: "",
-    tags: [],
     links: [],
     meta: {},
     postings: [

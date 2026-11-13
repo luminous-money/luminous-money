@@ -540,17 +540,118 @@ button:focus-visible,
   padding: 0 0.25rem;
 }
 
-.posting {
+/* A transaction's splits, each as it is: its memo and tags, then its account and amount. Tapping
+   one opens the split editor; holding one starts Select mode. */
+.split-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
   display: grid;
-  gap: 0.4rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--line);
 }
 
-.posting-amount {
+.split-list li + li {
+  border-top: 1px solid var(--line);
+}
+
+.split-row {
   display: grid;
-  grid-template-columns: 1fr 5rem auto;
-  gap: 0.4rem;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: stretch;
+  gap: 0.2rem;
+  width: 100%;
+  min-height: 0;
+  padding: 0.6rem 0.25rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.split-row:hover {
+  background: var(--paper);
+}
+
+.split-row.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.split-top,
+.split-bottom {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.split-top {
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+
+/* No memo: a placeholder as faint as an empty field's, keeping every split's spacing. */
+.split-memo.placeholder {
+  color: var(--muted);
+  opacity: 0.45;
+}
+
+/* Long names lose their start, not their leaf: "…nses:Home:Supplies". */
+.split-account {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  color: var(--muted);
+}
+
+.split-account bdi {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.split-row.needs .split-account {
+  color: #9a6b00;
+}
+
+@media (prefers-color-scheme: dark) {
+  .split-row.needs .split-account {
+    color: #f2c35b;
+  }
+}
+
+.split-bottom .amount {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The split editor's amount and its currency, side by side. */
+.split-amount {
+  display: grid;
+  grid-template-columns: 1fr 6rem;
+  gap: 0.5rem;
+}
+
+.split-editor:focus {
+  outline: none;
+}
+
+/* A long account name wraps anywhere rather than widening the editor past a phone's screen. */
+.split-editor .editor {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.split-editor .picker-value {
+  justify-content: flex-start;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
 
 .balance {
@@ -2876,7 +2977,7 @@ details.divide summary {
   margin-bottom: 0.25rem;
 }
 
-/* A review card's tags: quiet, like its description, until they're worked with. */
+/* A review card's tags: quiet, like the card's description, until they're worked with. */
 .review-tags {
   margin: 0.5rem 0 0;
 }

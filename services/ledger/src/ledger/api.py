@@ -35,7 +35,8 @@ ReconciledParam = Annotated[
     bool | None, Query(description="Only reconciled transactions (true), or only those not (false).")
 ]
 TagParam = Annotated[
-    list[str] | None, Query(description="Only transactions with every tag given (M17); repeat it for several.")
+    list[str] | None,
+    Query(description="Only transactions with a split that has every tag given (M17); repeat it for several."),
 ]
 StagingParam = Annotated[
     bool,
@@ -462,8 +463,8 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     @api.get("/books/{book_id}/tags")
     def tags(book_id: MemberBook) -> list[models.TagUse]:
-        """The book's tags (M17), alphabetically: each with how many transactions have it, and
-        the first and last of their dates. A tag exists while a transaction has it."""
+        """The book's tags (M17), alphabetically: each with how many transactions have a split with
+        it, and the first and last of their dates. A tag exists while a split has it."""
         return ledger.tags(book_id)
 
     # Funds (Funds A)
@@ -655,7 +656,7 @@ def create_app(ledger: Ledger) -> FastAPI:
         ] = None,
     ) -> list[models.CompactTransaction]:
         """Every transaction from a date on, oldest first, with only payee, narration, whether it
-        counts against budgets, its tags, and each posting's account and amount: the context
+        counts against budgets, and each posting's account, amount and tags: the context
         categorizers work from, and reports' posting stream. Not paged."""
         return ledger.compact(book_id, date_from, tag, lens)
 

@@ -5,7 +5,7 @@
  */
 import { randomBytes } from "node:crypto";
 
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import {
   createLedgerClient,
   type LedgerClient,
@@ -236,4 +236,28 @@ export async function linkMailedTo(to: string, kind: "reset" | "verify"): Promis
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(`no ${kind} email to ${to}`);
+}
+
+/** A transaction's (or a schedule's) splits, each opening the split editor (a button, or in
+ * Select mode a checkbox). */
+export const splitRows = (page: Page) =>
+  page.getByRole("list", { name: "Splits" }).getByRole("listitem");
+
+/** Open split `index` in the split editor, change its account (searched for, the first found)
+ * and amount, and save it back to the page. */
+export async function editSplit(
+  page: Page,
+  index: number,
+  { account, amount }: { account?: string; amount?: string }
+) {
+  await splitRows(page).nth(index).click();
+  const editor = page.getByRole("dialog", { name: "Split", exact: true });
+  if (account !== undefined) {
+    await editor.getByRole("button", { name: /^Account:/ }).click();
+    await editor.getByRole("combobox", { name: "Account" }).fill(account);
+    await page.keyboard.press("Enter");
+  }
+  if (amount !== undefined) await editor.getByRole("textbox", { name: "Amount" }).fill(amount);
+  await editor.getByRole("button", { name: "Save" }).click();
+  await expect(editor).toBeHidden();
 }

@@ -20,6 +20,7 @@ import type { Transaction, TransactionIn } from "@luminous-money/ledger-client";
 
 import { negate } from "../shared/decimal.js";
 import { mergedLines } from "../shared/funds.js";
+import { tagsOf } from "../shared/tags.js";
 import type { PairedTransfer } from "../shared/transfers.js";
 import type { AppDb, HeldRow, PairedOriginal, TransferPair } from "./db.js";
 import { UNCATEGORIZED } from "./imports.js";
@@ -35,13 +36,12 @@ const shortName = (account: string) => account.split(":").slice(-2).join(":");
 
 /** The writable part of a transaction, to restore it as it was. */
 function asInput(t: Transaction): TransactionIn {
-  const { date, flag, payee, narration, tags, links, funds, meta, postings } = t;
+  const { date, flag, payee, narration, links, funds, meta, postings } = t;
   return {
     date,
     flag,
     payee,
     narration,
-    tags,
     links,
     ...(funds?.length ? { funds } : {}),
     meta,
@@ -86,7 +86,6 @@ function transferOf(out: Side, into: Side): TransactionIn {
     flag: "!",
     payee: out.transaction.payee ?? into.transaction.payee ?? null,
     narration: `Transfer from ${shortName(out.account)} to ${shortName(into.account)}`,
-    tags: [],
     links: [],
     // Either side's fund lines, kept (Funds A): what one said it was for still holds.
     ...fundsOf(out.transaction, into.transaction),
@@ -94,9 +93,10 @@ function transferOf(out: Side, into: Side): TransactionIn {
       second!.transaction.meta?.budget === false || first!.transaction.meta?.budget === false
         ? { budget: false }
         : {},
+    // Each side's tags, on its split: what was said about either still holds.
     postings: [
-      { account: out.account, units: out.amount },
-      { account: into.account, units: into.amount },
+      { account: out.account, units: out.amount, tags: tagsOf(out.transaction.postings) },
+      { account: into.account, units: into.amount, tags: tagsOf(into.transaction.postings) },
     ],
   };
 }

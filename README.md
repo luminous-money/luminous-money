@@ -6,9 +6,50 @@ A self-hostable, database-driven, double-entry accounting system. It uses
 format, and has a mobile-first app built for fast review and categorization. One server hosts many
 books, each independent: switching books is like switching profiles.
 
-> **Status: early.** `v0.1.1` is the first release. Milestones M1 to M16 are built (books,
-> imports, bank feeds, budgets, reports, sharing, reconciliation, receipts): see
-> [RESUME.md](RESUME.md). Expect it to change quickly.
+> **Status: early, and in daily use.** Releases are on
+> [GitHub](https://github.com/luminous-money/luminous-money/releases), and the milestones built
+> so far are in [docs/PLAN.md](docs/PLAN.md). Expect it to change quickly.
+
+## What it does
+
+- **Books:** any number per server, each independent, each shareable with other people who can
+  view, edit or manage it. Every book exports to a Beancount file, and a new book can start from
+  one.
+- **Getting transactions in:**
+  - CSV imports that learn each bank's file format
+  - bank feeds through [SimpleFIN Bridge](https://bridge.simplefin.org/), synced every
+    morning; brokerages bring their holdings, and Fidelity's activity is read into trades,
+    dividends and transfers of shares
+  - receipts photographed or uploaded and read by the AI, itemized into splits
+  - Amazon orders, each charge itemized into the bank's or card's transaction (the server signs
+    in to Amazon for you, its credentials sealed)
+  - scheduled transactions, staged as they come due
+  - all of it matched against what's already in the books, so nothing comes in twice, and
+    transfers between your own accounts paired into one
+- **Review:** a mobile-first queue to confirm, categorize (swipe right to confirm, left to skip),
+  tag and assign to funds, with search and filters. Bulk actions in Select mode work on any
+  ledger as well.
+- **Categorization:** your rules, then what each payee and each item went to before, then
+  optional external categorizers ([their API](docs/categorizer-api.md)), then the book's AI
+  (Claude, with your own API key), split by split. What the AI costs is shown as it goes.
+- **Accounts:** a chart of accounts with balances rolled up (rename, move, archive, merge,
+  delete), imported from a CSV or migrated from GnuCash with its history, rules learned from that
+  history, and suggestions for what's uncategorized. An account at a bank can be divided into
+  parts (padding, general use) that the feed keeps in step with the bank.
+- **Investments:** holdings with lots, cost basis and gains, prices fetched every morning, trades
+  booked by tax-aligned rules, and revalued assets such as a house or a car.
+- **Planning and tracking:**
+  - budgets on any account, for any period
+  - funds for what money is *for*, a ledger beside the accounts, holding dollars or shares
+  - loans managed from their amortization table, with escrow and its bills, and their payments
+    counted as spending if you like
+  - tags on splits (a receipt's one item, say), counted in reports by what's tagged
+  - reconciliation against a statement, and bank-fed accounts that reconcile themselves
+- **Reports:** this month's spending against the budget and a projection, cash flow, breakdowns
+  by account, the largest transactions, net worth, and what an account typically comes to.
+- **Running it:** one command installs, upgrades (backing up first), backs up and restores
+  everything, collects logs and reports health. Optional built-in HTTPS, private instances for a
+  list of emails, and a System page for admins.
 
 ## Run it
 
@@ -27,7 +68,10 @@ health, every setting, and running it behind a proxy you already have:
 ## Work on it
 
 - **[RESUME.md](RESUME.md):** where work stands and what to do next. Start here.
-- **[docs/PLAN.md](docs/PLAN.md):** the roadmap, deferred items and open questions.
+- **[docs/PLAN.md](docs/PLAN.md):** the roadmap: the milestones ahead and those done.
+- **[docs/milestones/](docs/milestones/):** each milestone's plan. Done ones are in
+  `docs/milestones/.archived/`; open questions, polish and loose ends are
+  [M99: Follow-ups](docs/milestones/m99-follow-ups/PLAN.md).
 - **[docs/design.md](docs/design.md):** the decisions behind the system and its architecture.
 
 You need Docker with buildx, plus Node 24 and pnpm 11 (via corepack) for the TypeScript
@@ -48,6 +92,9 @@ account** (anyone can). For demo data, make an API token on "Your account" and r
 | `/ui/` | The PWA: books, then each book's review queue |
 | `/api/auth/v1` | Sign up, log in, sessions and API tokens; every other API needs a session or token |
 | `/api/ledger/v1/docs` | The ledger API's interactive docs |
+| `/api/app/v1` | The PWA's API: imports, bank feeds, rules, schedules, funds, loans, orders |
+| `/api/ai/v1` | Each book's AI settings, and reading receipts |
+| `/api/shops/v1` | Reading shops' orders (Amazon) |
 | `/api/health` | The stack's health, public (for uptime monitors) |
 
 ## Everyday commands
@@ -62,6 +109,8 @@ account** (anyone can). For demo data, make an API token on "Your account" and r
 | `pnpm test:unit` | The TypeScript unit tests on the host (no Docker) |
 | `pnpm seed [book]` | Seed a demo book with recent purchases staged for review (default: `demo`, plus the small `demo-household`) |
 | `pnpm generate` | Regenerate `packages/ledger-client` after changing the ledger's API |
+| `pnpm icons` | Regenerate the PWA's PNG icons from `services/app/public/icon.svg` |
+| `pnpm format` | Format the TypeScript and CSS with Prettier (`pnpm test` checks it) |
 | `pnpm release` | Build `linux/amd64` + `linux/arm64` images and push them (set `REGISTRY`, `VERSION`). Releases normally come from a `v*` tag, through `.github/workflows/release.yml` |
 | `pnpm --filter @luminous-money/app dev` | Vite dev server for the PWA, proxying `/api` to a running stack |
 
@@ -84,6 +133,7 @@ services/
   ledger/             Python: system of record, Beancount engine      → /api/ledger/v1
   app/                TypeScript: PWA, imports, the pipeline           → /ui, /api/app/v1
   ai/                 TypeScript: AI settings, reading receipts         → /api/ai/v1
+  shops/              Python: shops' orders, Amazon first               → /api/shops/v1
 packages/
   ledger-client/      typed client generated from the ledger's OpenAPI schema
   ai-api/             the ai service's types, shared with app and the PWA
@@ -92,8 +142,10 @@ packages/
 tests/
   e2e/                API end-to-end tests through the gateway
   ui/                 browser end-to-end tests (Playwright) through the gateway
+  simplefin-fake/     a stand-in SimpleFIN Bridge for the end-to-end stacks
 scripts/              luminous-money (the deployment command), and the scripts behind pnpm's
-docs/                 design, plans, deploying
+docs/                 design, the roadmap, deploying
+  milestones/         each milestone's plan (.archived/ once done; m99-follow-ups/ for loose ends)
 ```
 
 ## License

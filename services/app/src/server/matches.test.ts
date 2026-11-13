@@ -18,10 +18,11 @@ let ledger: FakeLedger;
 let fifth: string;
 let seventh: string;
 
-const coffee = (date: string) =>
+// Unconfirmed (a schedule's, say): a match with a confirmed transaction is final at once.
+const coffee = (date: string, flag = "!") =>
   ledger.addTransaction({
     date,
-    flag: "*",
+    flag,
     narration: "Coffee",
     postings: [
       { account: ACCOUNT, units: { number: "-5.00", currency: "USD" } },
@@ -129,4 +130,18 @@ it("a staged row swapping with a matched one: the other becomes new", async () =
     flag: "!",
   });
   expect(ledger.transactions.some((t) => t.id === third.transaction_id)).toBe(false);
+});
+
+it("a match with a confirmed transaction is final at once: it stays confirmed, out of review", async () => {
+  const typed = coffee("2024-03-12", "*");
+  const { batch, rows } = await run("03/12/2024,CAFE,-5.00,1\n");
+
+  expect(rows.map((r) => [r.outcome, r.transaction_id, r.match])).toEqual([
+    ["matched", typed, "confirmed"],
+  ]);
+  expect(holding()).toEqual({});
+  expect(ledger.transactions.find((t) => t.id === typed)!.flag).toBe("*");
+  await expect(
+    assignRow({ db, ledger, book: "b", row: { batch: batch.id, line: 2 }, to: null })
+  ).rejects.toMatchObject({ code: "not-proposed" });
 });

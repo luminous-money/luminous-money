@@ -535,6 +535,13 @@ export const appApi = {
   /** What needs attention in the book (Funds B), oldest first: the bell's queue. */
   notifications: async (book: string): Promise<Notification[]> =>
     json(await apiFetch(`${base(book)}/notifications`)),
+  /** Dismiss one, for the caller: the queue left. */
+  dismissNotification: async (book: string, id: string): Promise<Notification[]> =>
+    json(
+      await apiFetch(`${base(book)}/notifications/${encodeURIComponent(id)}/dismissed`, {
+        method: "PUT",
+      })
+    ),
 
   /** A new book in `time_zone`; with `text` (Beancount, e.g. an export), a copy of it. */
   createBook: async (body: { name: string; time_zone: string; text?: string }): Promise<BookInfo> =>

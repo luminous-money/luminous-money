@@ -18,9 +18,13 @@ import type { TransactionIn } from "@luminous-money/ledger-client";
 
 import type { ProposedMatch } from "../shared/imports.js";
 import type { AppDb, HeldRow } from "./db.js";
-import { ensureUncategorized, stagedTransaction, type Stageable } from "./imports.js";
+import {
+  ensureUncategorized,
+  stagedTransaction,
+  takeBankAmount,
+  type Stageable,
+} from "./imports.js";
 import { STAGING, type LedgerPort } from "./ledger.js";
-import { sameNumber } from "./pipeline/matcher.js";
 
 export type RowRef = { batch: string; line: number };
 
@@ -164,22 +168,8 @@ export async function confirmRow(
   if (!row) throw new MatchProblem("not-found", "there's no such import row");
   if (row.match !== "proposed")
     throw new MatchProblem("not-proposed", "this row's match isn't up for review");
-  if (row.outcome === "matched" && row.amount) {
-    const t = await ledger.transaction(book, row.transaction_id!);
-    const split = t.postings.find((p) => p.account === row.account);
-    if (split?.units && !sameNumber(split.units.number, row.amount)) {
-      await ledger.patch(
-        book,
-        t.id,
-        {
-          postings: t.postings.map((p) =>
-            p === split ? { ...p, units: { ...split.units!, number: row.amount! } } : p
-          ),
-        },
-        t.updated_at
-      );
-    }
-  }
+  if (row.outcome === "matched" && row.amount)
+    await takeBankAmount(ledger, book, row.transaction_id!, row.account, row.amount);
   db.setRows([
     {
       ...at,
