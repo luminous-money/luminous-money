@@ -169,6 +169,40 @@ test("what counts as spending shows on its expense account, and in the breakdown
   await expect(housing).not.toContainText("Lender");
 });
 
+test("Reports can leave out what's excluded from budgets", async ({ page }) => {
+  const { book, session, account } = await withHistory(page);
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+    params: { path: { book_id: book } },
+    body: {
+      date: today(),
+      flag: "*",
+      payee: "Roofer",
+      narration: "",
+      meta: { budget: false },
+      postings: [
+        { account, units: { number: "-5000.00", currency: "USD" } },
+        { account: RENT, units: { number: "5000.00", currency: "USD" } },
+      ],
+    },
+  });
+  await page.goto(`/ui/books/${book}/reports`);
+  const breakdown = page.getByRole("region", { name: "Breakdown" });
+  await breakdown.getByLabel("Show").selectOption("month");
+  const categories = breakdown.getByRole("list", { name: "Categories" });
+  await expect(categories).toContainText("$5,000");
+  const largest = page.getByRole("region", { name: "Largest transactions" });
+  await expect(largest).toContainText("Roofer");
+
+  await page.getByLabel("Leave out what's excluded from budgets").check();
+  await expect(page).toHaveURL(/budgeted=only/);
+  await expect(categories).not.toContainText("Housing");
+  await expect(categories).toContainText("Food");
+  await expect(largest).not.toContainText("Roofer");
+  await expect(
+    breakdown.getByRole("list", { name: "Transactions under Expenses" })
+  ).not.toContainText("Roofer");
+});
+
 test("an expense account's page shows what its periods typically come to", async ({ page }) => {
   const { book } = await withHistory(page);
   await page.goto(`/ui/books/${book}/accounts/${encodeURIComponent(GROCERIES)}`);

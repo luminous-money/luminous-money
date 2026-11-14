@@ -1,4 +1,4 @@
-"""The journal's search (payee, narration and split memos) and its filter by accounts."""
+"""The journal's search (payee, narration and split memos), and its filters by accounts and budgets."""
 
 import datetime
 
@@ -110,3 +110,17 @@ def test_search_and_accounts_page_and_combine_over_http(ledger, book, made):
         base, params={"account": ["Expenses:Food", "Expenses:Home"], "limit": 2, "cursor": first["next_cursor"]}
     ).json()
     assert [r["id"] for r in rest["rows"]] == [made["barn"]] and rest["next_cursor"] is None
+
+
+def test_budgeted_keeps_those_counted_in_budgets_or_those_kept_out(ledger, book, made):
+    roof = spend(D(2026, 3, 5), "Roofer", "", [("Expenses:Home:Garden", "9000.00", None)])
+    kept_out = ledger.create_transaction(book, roof.model_copy(update={"meta": {"budget": False}})).id
+
+    def found(budgeted):
+        return [r.id for r in ledger.journal(book, budgeted=budgeted, accounts=["Expenses:Home"]).rows]
+
+    assert found(None) == [kept_out, made["megamart"], made["barn"]]
+    assert found(True) == [made["megamart"], made["barn"]]
+    assert found(False) == [kept_out]
+    rows = http(ledger).get(f"/api/ledger/v1/books/{book}/journal", params={"budgeted": "true"}).json()["rows"]
+    assert kept_out not in [r["id"] for r in rows]

@@ -106,6 +106,27 @@ describe("reports", () => {
     expect(flow.totals.expenses).toBe(25);
   });
 
+  it("count what's kept out of budgets unless asked to leave it out", async () => {
+    spend("2026-10-02", "Expenses:Home", "9000.00", { budget: false }); // a new roof
+    spend("2026-10-03", "Expenses:Food", "40.00");
+
+    const all = await breakdownReport(ledger, "b", "2026-10-15", {
+      side: "expenses",
+      window: "month",
+    });
+    expect(all.total).toBe(9040);
+    const budgeted = await breakdownReport(ledger, "b", "2026-10-15", {
+      side: "expenses",
+      window: "month",
+      budgeted: true,
+    });
+    expect(budgeted.slices.map((s) => [s.label, s.amount])).toEqual([["Food", 40]]);
+    const largest = await largestReport(ledger, "b", "2026-10-15", 8, [], "outflows", true);
+    expect(largest.transactions.map((t) => t.amount)).toEqual([40]);
+    const flow = await cashFlowReport(ledger, "b", "2026-10-15", 6, [], "outflows", true);
+    expect(flow.totals.expenses).toBe(40);
+  });
+
   it("read spending as outflows unless asked for the expenses as booked; net worth as it is", async () => {
     ledger.lenses = [];
     await cashFlowReport(ledger, "b", "2026-10-15");

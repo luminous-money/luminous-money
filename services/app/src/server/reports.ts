@@ -17,6 +17,9 @@
  *   what's paid into an asset or liability that counts as spending is spending, and the expenses
  *   it pays for are masked); `lens: "expenses"` reads the expense accounts as booked, the
  *   traditional P&L view. Net worth and an account's typical periods read the books as they are.
+ * - **Budgeted only** (Kael, 2026-11-14): cash flow, breakdowns and the largest count what's kept
+ *   out of budgets (`budget: FALSE`, a once-in-decades roof) unless `budgeted` asks to leave it
+ *   out, as budgets do.
  */
 import {
   breakdown,
@@ -71,21 +74,25 @@ async function context(ledger: LedgerPort, book: string) {
 export type Lens = "outflows" | "expenses";
 
 /** The posting stream from `from` (or all of it), through the outflows lens unless `lens` says
- * otherwise; with `tags`, only the splits with every one of them. The lens reads whole
- * transactions first (a split it adds has the tags of the one it comes from). */
+ * otherwise; with `tags`, only the splits with every one of them; with `budgeted`, only the
+ * transactions counted in budgets. The lens reads whole transactions first (a split it adds has
+ * the tags of the one it comes from). */
 const stream = async (
   ledger: LedgerPort,
   book: string,
   from: string | undefined,
   tags: string[] = [],
-  lens: Lens | null = null
+  lens: Lens | null = null,
+  budgeted = false
 ): Promise<Posting[]> => {
-  const transactions = await ledger.compact(
-    book,
-    from,
-    tags.length ? tags : undefined,
-    lens === "outflows" ? "outflows" : undefined
-  );
+  const transactions = (
+    await ledger.compact(
+      book,
+      from,
+      tags.length ? tags : undefined,
+      lens === "outflows" ? "outflows" : undefined
+    )
+  ).filter((t) => !budgeted || t.budgeted !== false);
   return fromTransactions(
     tags.length
       ? transactions.map((t) => ({
@@ -124,11 +131,12 @@ export async function cashFlowReport(
   on: string,
   months = 6,
   tags: string[] = [],
-  lens: Lens = "outflows"
+  lens: Lens = "outflows",
+  budgeted = false
 ) {
   const [{ currency, roots }, postings] = await Promise.all([
     context(ledger, book),
-    stream(ledger, book, monthsBefore(on, months - 1), tags, lens),
+    stream(ledger, book, monthsBefore(on, months - 1), tags, lens, budgeted),
   ]);
   return cashFlow({ postings, today: on, currency, months, roots });
 }
@@ -146,14 +154,16 @@ export async function breakdownReport(
     window?: "average" | "month" | "total";
     tags?: string[];
     lens?: Lens;
+    /** Only what's counted in budgets. */
+    budgeted?: boolean;
   }
 ) {
-  const { tags = [], lens = "outflows", ...rest } = options;
+  const { tags = [], lens = "outflows", budgeted = false, ...rest } = options;
   const window = rest.window ?? "average";
   const from = window === "total" ? undefined : monthsBefore(on, window === "average" ? 6 : 0);
   const [{ currency, roots }, postings] = await Promise.all([
     context(ledger, book),
-    stream(ledger, book, from, tags, lens),
+    stream(ledger, book, from, tags, lens, budgeted),
   ]);
   const root = roots[rest.side];
   if (rest.of && !(rest.of === root || rest.of.startsWith(`${root}:`)))
@@ -169,12 +179,13 @@ export async function largestReport(
   on: string,
   limit = 8,
   tags: string[] = [],
-  lens: Lens = "outflows"
+  lens: Lens = "outflows",
+  budgeted = false
 ) {
   const tagged = tags.length > 0;
   const [{ currency, roots }, postings] = await Promise.all([
     context(ledger, book),
-    stream(ledger, book, tagged ? undefined : monthsBefore(on, 0), tags, lens),
+    stream(ledger, book, tagged ? undefined : monthsBefore(on, 0), tags, lens, budgeted),
   ]);
   const from = tagged ? (postings[0]?.date ?? on) : undefined;
   return largestTransactions({ postings, today: on, currency, roots, limit, from });

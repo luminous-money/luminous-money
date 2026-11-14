@@ -74,6 +74,11 @@ Smaller improvements to pick up between milestones (docs/PLAN.md's Polish, the o
 Mobile usability is [M20](../m20-design-polish/PLAN.md)'s.
 
 - [ ] **Type-aware wording when creating accounts** (e.g. "amount owed" for a liability).
+- [ ] **An empty leaf can take sub-accounts** (2026-11-14): New account always makes a leaf, and
+      moving an account under one that has no transactions is refused with "holds transactions,
+      so it can't have sub-accounts", which reads as "it has some" (`checkNewAccount`,
+      `chart.rename`). Kael worked around it (deleted the leaf, then moved); offered, not asked
+      for.
 - [ ] **Order-aware match assignment:** assign an import's rows to candidates over the whole
       network of matches, weighting order, so two identical coffees entered on the 5th and 7th
       pair with CSV rows on the 7th and 8th in order (M2 pairs by proximity, and review swaps).
@@ -82,7 +87,8 @@ Mobile usability is [M20](../m20-design-polish/PLAN.md)'s.
 - [ ] **Review shows the book's ID at the top,** where its name belongs.
 - [ ] **"Select uncategorized"** in Select mode (Select all is built).
 - [ ] **Tapping a report's bar or slice opens its transactions** (that month's, or that
-      category's; M12's answer 10: polish, at the end).
+      category's; M12's answer 10: polish, at the end). The breakdown lists what's under where
+      it is since 2026-11-14; a cash flow bar still opens nothing.
 - [ ] **Editing lots in the transaction editor** (M5, "Out of scope").
 - [ ] **An Assign button for a waiting Amazon charge:** the route is there
       (`…/orders/{shop}/{id}/assign`), the Amazon page has no button

@@ -719,6 +719,7 @@ class Store:
         tags: list[str] | None = None,
         search: str | None = None,
         accounts: list[str] | None = None,
+        budgeted: bool | None = None,
         limit: int,
     ) -> list[sqlite3.Row]:
         """Live transactions, a keyset page: newest first, older than a row's key (date,
@@ -727,9 +728,13 @@ class Store:
         reconcile), only those whose postings under the roots are all reconciled, or those with
         one that isn't; with `tags`, only those with a split that has all of them; with `search`,
         only those whose payee, narration or a split's memo has every word of it (ignoring case);
-        with `accounts`, only those with a split in any of them (or under one). Each row has every
-        tag its splits have (space-separated)."""
+        with `accounts`, only those with a split in any of them (or under one); with `budgeted`,
+        only those counted in budgets (True) or kept out of them (False). Each row has every tag its
+        splits have (space-separated)."""
         where, args = ["book_id = ?", "deleted = 0", "kind = 'transaction'"], [book_id]
+        if budgeted is not None:
+            where.append("budgeted = ?")
+            args.append(int(budgeted))
         if tags:
             clause, more = tagged("directive", tags)
             where.append(clause)

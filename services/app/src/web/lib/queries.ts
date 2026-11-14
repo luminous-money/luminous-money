@@ -44,7 +44,7 @@ import {
   type BookInfo,
   type BookInvite,
   type BreakdownOptions,
-  type Lens,
+  type ReportReading,
   type Role,
   type CsvProfile,
   type CategoryRule,
@@ -446,6 +446,7 @@ export const useJournal = (book: string, date?: string, filter: JournalFilter = 
       filter.tags ?? [],
       filter.q?.trim() ?? "",
       filter.accounts ?? [],
+      filter.budgeted ?? null,
     ],
     (at) => api.journal(book, at, filter),
     date,
@@ -1305,10 +1306,10 @@ export const useSpendingReport = (book: string) =>
     queryFn: () => appApi.reports.spending(book, today()),
   });
 
-export const useCashFlowReport = (book: string, tags: string[] = [], lens: Lens = "outflows") =>
+export const useCashFlowReport = (book: string, reading: ReportReading = {}) =>
   useQuery({
-    queryKey: reportKey(book, "cash-flow", tags, lens),
-    queryFn: () => appApi.reports.cashFlow(book, today(), tags, lens),
+    queryKey: reportKey(book, "cash-flow", reading),
+    queryFn: () => appApi.reports.cashFlow(book, today(), reading),
   });
 
 export const useBreakdownReport = (book: string, options: BreakdownOptions) =>
@@ -1318,10 +1319,10 @@ export const useBreakdownReport = (book: string, options: BreakdownOptions) =>
     placeholderData: (previous) => previous, // keep the donut while the next level loads
   });
 
-export const useLargestReport = (book: string, tags: string[] = [], lens: Lens = "outflows") =>
+export const useLargestReport = (book: string, reading: ReportReading = {}) =>
   useQuery({
-    queryKey: reportKey(book, "largest", tags, lens),
-    queryFn: () => appApi.reports.largest(book, today(), tags, lens),
+    queryKey: reportKey(book, "largest", reading),
+    queryFn: () => appApi.reports.largest(book, today(), reading),
   });
 
 export const useNetWorthReport = (book: string) =>

@@ -32,6 +32,12 @@ export function TagChips({ tags }: { tags?: readonly string[] }) {
   );
 }
 
+/**
+ * Tags as chips, and a combobox to add more: the choices matching what's typed (a part of a
+ * name, `#` or not), most used first. Adding (`allowNew`), what's typed can be a new tag, and
+ * the list waits for typing. Filtering, only the choices can be chosen, so the list opens with
+ * every one as soon as it's focused, narrows as you type, and says when nothing matches.
+ */
 export function TagInput({
   label,
   value,
@@ -58,18 +64,23 @@ export function TagInput({
   const [open, setOpen] = useState(false);
   const listId = useId();
   const typed = toTag(query);
+  const browse = !allowNew;
   const matches = useMemo(() => {
     const words = query.toLowerCase().replace(/^#/, "").trim();
     return [...choices]
       .filter((c) => !value.includes(c.name) && c.name.includes(words))
       .sort((a, b) => (b.transactions ?? 0) - (a.transactions ?? 0) || a.name.localeCompare(b.name))
-      .slice(0, 8)
+      .slice(0, browse ? undefined : 8)
       .map((c) => c.name);
-  }, [choices, query, value]);
+  }, [choices, query, value, browse]);
   const options =
     allowNew && typed && !matches.includes(typed) && !value.includes(typed)
       ? [...matches, typed]
       : matches;
+  // Open: what's typed has options, or filtering, there are choices (or it says none match).
+  const listed = open && (!!query || browse);
+  const none = listed && options.length === 0 && !!query && browse;
+  const shown = listed && (options.length > 0 || none);
 
   const add = (tag: string) => {
     if (!value.includes(tag)) onChange([...value, tag]);
@@ -77,10 +88,12 @@ export function TagInput({
     setActive(0);
   };
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    const choice = open && query ? options[active] : undefined;
+    const choice = listed ? options[active] : undefined;
     if (e.key === "ArrowDown") setActive((i) => Math.min(i + 1, options.length - 1));
     else if (e.key === "ArrowUp") setActive((i) => Math.max(i - 1, 0));
-    else if ((e.key === "Enter" || e.key === "," || e.key === "Tab") && choice) add(choice);
+    // Tab and comma take a choice only for what's typed: tabbing past an empty filter adds nothing.
+    else if ((e.key === "Enter" || ((e.key === "," || e.key === "Tab") && query)) && choice)
+      add(choice);
     else if (e.key === ",") {
       // Commas separate tags; they're never part of one.
     } else if (e.key === "Enter" && query) {
@@ -112,7 +125,7 @@ export function TagInput({
         <input
           role="combobox"
           aria-label={label}
-          aria-expanded={open && !!query && options.length > 0}
+          aria-expanded={shown}
           aria-controls={listId}
           placeholder={placeholder ?? (value.length ? "" : allowNew ? "Add a tag" : "Choose a tag")}
           value={query}
@@ -127,8 +140,9 @@ export function TagInput({
           onBlur={() => setOpen(false)}
           onKeyDown={onKeyDown}
         />
-        {open && query && options.length > 0 && (
+        {shown && (
           <ul id={listId} role="listbox" aria-label={label}>
+            {none && <li className="muted none">No tags match</li>}
             {options.map((tag, i) => (
               <li
                 key={tag}

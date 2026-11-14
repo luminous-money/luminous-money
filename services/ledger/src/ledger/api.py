@@ -444,6 +444,10 @@ def create_app(ledger: Ledger) -> FastAPI:
             list[str] | None,
             Query(description="Only transactions with a split in any account given, or under one; repeat it for several."),
         ] = None,
+        budgeted: Annotated[
+            bool | None,
+            Query(description="Only those counted in budgets (true), or only those kept out of them (false)."),
+        ] = None,
     ) -> models.JournalPage:
         """Every transaction in the book (every account's), newest first, paged as an account's
         ledger is."""
@@ -459,6 +463,7 @@ def create_app(ledger: Ledger) -> FastAPI:
             tags=tag,
             search=q,
             accounts=account,
+            budgeted=budgeted,
         )
 
     @api.get("/books/{book_id}/tags")

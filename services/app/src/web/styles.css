@@ -492,6 +492,10 @@ button:focus-visible,
   cursor: pointer;
 }
 
+.picker li.none {
+  cursor: default;
+}
+
 .picker li[aria-selected="true"] {
   background: color-mix(in srgb, var(--accent-soft) 45%, transparent);
 }

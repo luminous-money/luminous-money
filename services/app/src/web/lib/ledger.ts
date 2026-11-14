@@ -63,12 +63,13 @@ export type AccountKind = components["schemas"]["AccountIn"]["kind"];
 export type LedgerPageAt = { cursor?: string; after?: string; date?: string };
 /** Which of the journal's transactions to list: reconciled or not; with a split that has every
  * one of `tags` (M17); whose payee, narration or a split's memo has every word of `q`; with a split in any
- * of `accounts` or under one. */
+ * of `accounts` or under one; counted in budgets or kept out of them (`budgeted`). */
 export type JournalFilter = {
   reconciled?: boolean;
   tags?: string[];
   q?: string;
   accounts?: string[];
+  budgeted?: boolean;
 };
 
 /** An API error with its status, so callers can tell a conflict (409) from a rejection (422). */
@@ -223,7 +224,7 @@ export const api = {
   journal: (
     book_id: string,
     page: LedgerPageAt = {},
-    { reconciled, tags = [], q, accounts = [] }: JournalFilter = {}
+    { reconciled, tags = [], q, accounts = [], budgeted }: JournalFilter = {}
   ): Promise<JournalPage> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/journal", {
@@ -236,6 +237,7 @@ export const api = {
             tag: tags.length ? tags : undefined,
             q: q?.trim() || undefined,
             account: accounts.length ? accounts : undefined,
+            budgeted,
           },
         },
       })

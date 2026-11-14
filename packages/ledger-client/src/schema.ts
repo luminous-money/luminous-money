@@ -5816,6 +5816,8 @@ export interface operations {
         q?: string | null;
         /** @description Only transactions with a split in any account given, or under one; repeat it for several. */
         account?: string[] | null;
+        /** @description Only those counted in budgets (true), or only those kept out of them (false). */
+        budgeted?: boolean | null;
       };
       header?: never;
       path: {

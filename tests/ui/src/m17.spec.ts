@@ -133,6 +133,11 @@ test("Reports filter by tag: All time, the largest tagged, and net worth set asi
   await page.goto(`/ui/books/${book.id}/reports`);
   await expect(page.getByRole("region", { name: "Net worth" })).toBeVisible();
   const filter = page.getByRole("combobox", { name: "Filter by tag" });
+  // A filter lists the book's tags as soon as it's focused, and says when nothing matches.
+  await filter.click();
+  await expect(page.getByRole("option", { name: "#kitchen" })).toBeVisible();
+  await filter.fill("zzz");
+  await expect(page.getByRole("listbox", { name: "Filter by tag" })).toContainText("No tags match");
   await filter.fill("kit");
   // Enter takes the suggestion, once the book's tags have loaded.
   await expect(page.getByRole("option", { name: "#kitchen" })).toBeVisible();

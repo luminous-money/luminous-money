@@ -9013,6 +9013,24 @@
               "description": "Only transactions with a split in any account given, or under one; repeat it for several.",
               "title": "Account"
             }
+          },
+          {
+            "description": "Only those counted in budgets (true), or only those kept out of them (false).",
+            "in": "query",
+            "name": "budgeted",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only those counted in budgets (true), or only those kept out of them (false).",
+              "title": "Budgeted"
+            }
           }
         ],
         "responses": {

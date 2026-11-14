@@ -4,7 +4,34 @@ Where We Left Off
 _Updated 2026-11-14._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-14): openings aren't spending, counted-as accounts say so, the breakdown's transactions
+## Latest (2026-11-14, later): leave out what's excluded from budgets; tag filters list their tags
+
+Two more from Kael, on Reports (PLAN.md's Polish, under "Kael's changes, 2026-11-14"; design.md
+has the decisions). **Committed, pushed and released as `v0.1.30`** at his asking.
+
+- **"Leave out what's excluded from budgets"** (a checkbox with the Outflows/Expenses switch,
+  `?budgeted=only`): he'd read Housing's average as a double count of the mortgage; it isn't
+  (principal and escrow under Housing, interest under Financing, adding to the payment), and
+  what made it look high was a repair kept out of budgets. Reports still count those by
+  default; checked, cash flow, the breakdown, its transactions and the largest leave them out.
+  `reports.ts`' `stream` drops `budgeted: false` transactions (the API's `budgeted=only`); the
+  ledger's journal takes `budgeted` (true or false) for the breakdown's list. Client
+  regenerated. On the web, Reports' filters are one `ReportReading` (tags, lens, budgeted), and
+  the page's state one `Where` in the address.
+- **A tag filter lists its tags on focus** (`TagInput` with `allowNew={false}`: Reports and the
+  ledgers' funnel): it already searched as you typed, but opened only once something was typed
+  and stayed shut when nothing matched; his book has one tag (0.1.27 dropped the old ones), so
+  it looked like no search. Now it opens with every tag, narrows, and says "No tags match"; Tab
+  and comma take a choice only for what's typed. Adding tags is unchanged.
+- **Tests:** ledger (the journal's `budgeted`), app (reports leave out what's excluded, asked),
+  browser (m12: the checkbox, in the address, the breakdown, its list and the largest; m17: the
+  filter's list on focus and "No tags match"). `pnpm test` passes (ledger 264, app 344);
+  `pnpm e2e` passes (API, browser 140, the command).
+
+**Next:** Kael upgrades Emmer (`upgrade 0.1.30`: brings 0.1.29's ledger migration 15, and
+0.1.27's if not yet).
+
+## Before that (2026-11-14): openings aren't spending, counted-as accounts say so, the breakdown's transactions
 
 Kael asked for three changes (PLAN.md's Polish, "Kael's changes, 2026-11-14"; design.md has the
 decisions). **Committed, pushed and released as `v0.1.29`** at his asking.
@@ -34,13 +61,10 @@ decisions). **Committed, pushed and released as `v0.1.29`** at his asking.
   breakdown's list under Outflows and Expenses). `pnpm test` passes (ledger 263, app 343);
   `pnpm e2e` passes (API, browser 139, the command). Not yet looked at on a phone.
 
-**Asked, not answered:** Kael made `Expenses:Groceries:Beverages` (a leaf: New account always
-makes one) and couldn't move Alcohol under it ("holds transactions, so it can't have
-sub-accounts", from `checkNewAccount`, though it has none). Offered: delete the empty leaf and
-move Alcohol (and maybe `…:Non-Prepared:Beverages`'s children) through the API, and/or let an
-empty leaf take sub-accounts (in `checkNewAccount` and `chart.rename`) with clearer words.
-
-**Next:** Kael upgrades Emmer (`upgrade 0.1.29`: ledger migration 15, and 0.1.27's if not yet).
+**Not built (offered, Kael moved the accounts himself):** New account always makes a leaf, and a
+leaf can't take sub-accounts even when it has no transactions ("holds transactions, so it can't
+have sub-accounts", `checkNewAccount`, read as "it has some"). An empty leaf could take them
+(in `checkNewAccount` and `chart.rename`), with clearer words; in M99 if he wants it.
 
 ## Before that (2026-11-13): "Repeat…" no longer copies where a transaction came from
 

@@ -384,3 +384,8 @@ Smaller improvements picked up between milestones. Those still open are in
   - **The breakdown's transactions:** Reports' breakdown lists every transaction under where
     it is, in a small scrolling window, as Transactions lists them; the drill is in the
     address.
+  - **Leave out what's excluded from budgets** (Reports, `?budgeted=only`): cash flow, the
+    breakdown and its transactions, and the largest without what `budget: FALSE` keeps out of
+    budgets. Off by default.
+  - **A tag filter lists its tags on focus,** narrows as you type, and says when nothing
+    matches (Reports, ledgers).

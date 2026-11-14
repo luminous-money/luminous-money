@@ -8,8 +8,9 @@ import { countingAs } from "../components/Outflow.js";
 import { MoreBelow, usePaging } from "../components/Paged.js";
 import { tagList, TagInput } from "../components/Tags.js";
 import { shortName } from "../lib/accounts.js";
-import type { BreakdownOptions, Lens } from "../lib/appApi.js";
+import type { BreakdownOptions, ReportReading } from "../lib/appApi.js";
 import { useChartTheme } from "../lib/chartTheme.js";
+import type { JournalFilter } from "../lib/ledger.js";
 import { formatAmount } from "../lib/format.js";
 import { useParam, useParams, withBack } from "../lib/navigation.js";
 import {
@@ -38,7 +39,8 @@ const PALETTE = [
 /**
  * Reports: cash flow over 6 months, where the money goes (or comes from) as a donut you can
  * drill into, this month's largest expenses, and net worth over 24 months. Each counts
- * unconfirmed transactions and those kept out of budgets.
+ * unconfirmed transactions, and those kept out of budgets unless asked to leave them out
+ * (`?budgeted=only`: a once-in-decades roof, say, as budgets leave it out).
  *
  * Filtered by tags (M17, `?tag=`, repeated): cash flow, the breakdown and the largest count only
  * the splits with every one (a receipt's tagged item, not the rest of it); the breakdown starts on All time and the largest covers all
@@ -54,26 +56,32 @@ const PALETTE = [
  */
 export function Reports({ book }: { book: string }) {
   const [, navigate] = useLocation();
-  const tags = useParams("tag").filter(Boolean);
-  const lens: Lens = useParam("lens") === "expenses" ? "expenses" : "outflows";
-  const view: BreakdownView = {
+  const where: Where = {
+    tags: useParams("tag").filter(Boolean),
+    lens: useParam("lens") === "expenses" ? "expenses" : "outflows",
+    budgeted: useParam("budgeted") === "only",
     side: useParam("side") === "income" ? "income" : "expenses",
     of: useParam("of") ?? undefined,
   };
+  const { tags, lens, budgeted } = where;
+  const reading = { tags, lens, budgeted };
   const bookTags = useTags(book);
   const base = `/books/${book}/reports`;
-  const query = (chosen: string[], as: Lens = lens, at: BreakdownView = view) =>
-    [
-      ...chosen.map((tag) => `tag=${encodeURIComponent(tag)}`),
-      ...(as === "expenses" ? ["lens=expenses"] : []),
+  const query = (change: Partial<Where> = {}) => {
+    const at = { ...where, ...change };
+    return [
+      ...at.tags.map((tag) => `tag=${encodeURIComponent(tag)}`),
+      ...(at.lens === "expenses" ? ["lens=expenses"] : []),
+      ...(at.budgeted ? ["budgeted=only"] : []),
       ...(at.side === "income" ? ["side=income"] : []),
       ...(at.of ? [`of=${encodeURIComponent(at.of)}`] : []),
     ].join("&");
-  const go = (chosen: string[], as: Lens = lens, at: BreakdownView = view) => {
-    const q = query(chosen, as, at);
+  };
+  const go = (change: Partial<Where>) => {
+    const q = query(change);
     navigate(q ? `${base}?${q}` : base, { replace: true });
   };
-  const here = query(tags) ? `${base}?${query(tags)}` : base;
+  const here = query() ? `${base}?${query()}` : base;
   return (
     <main>
       <header className="page-head">
@@ -95,7 +103,7 @@ export function Reports({ book }: { book: string }) {
                 role="radio"
                 aria-checked={lens === value}
                 className={lens === value ? "on" : ""}
-                onClick={() => go(tags, value)}
+                onClick={() => go({ lens: value })}
               >
                 {label}
               </button>
@@ -106,6 +114,14 @@ export function Reports({ book }: { book: string }) {
               ? "Spending as it leaves your hands: a loan's whole payment and escrow count each month (for accounts that count as spending), and what escrow pays isn't counted again."
               : "Spending as the books have it: only expense accounts, so a loan's principal and escrow aren't spending, and the tax bill is, when it's paid."}
           </p>
+          <label className="check small">
+            <input
+              type="checkbox"
+              checked={budgeted}
+              onChange={(e) => go({ budgeted: e.target.checked })}
+            />
+            Leave out what's excluded from budgets
+          </label>
         </section>
         <section className="card report-filter" aria-label="Filter by tag">
           <TagInput
@@ -114,14 +130,14 @@ export function Reports({ book }: { book: string }) {
             choices={bookTags.data ?? []}
             allowNew={false}
             placeholder={bookTags.data?.length ? "Filter by tag" : "No tags yet"}
-            onChange={(chosen) => go(chosen, lens, { side: view.side })}
+            onChange={(chosen) => go({ tags: chosen, of: undefined })}
           />
           {tags.length > 0 && (
             <p className="small muted">
               Only splits tagged {tagList(tags)}.{" "}
               <Link
                 href={withBack(
-                  `/books/${book}/transactions?${query(tags, "outflows", { side: "expenses" })}`,
+                  `/books/${book}/transactions?${query({ lens: "outflows", budgeted: false, side: "expenses", of: undefined })}`,
                   here
                 )}
               >
@@ -130,17 +146,16 @@ export function Reports({ book }: { book: string }) {
             </p>
           )}
         </section>
-        <CashFlowCard book={book} tags={tags} lens={lens} />
+        <CashFlowCard book={book} reading={reading} />
         <BreakdownCard
           key={tags.join(" ")}
           book={book}
-          tags={tags}
-          lens={lens}
-          view={view}
-          onView={(at) => go(tags, lens, at)}
+          reading={reading}
+          view={where}
+          onView={(at) => go({ side: at.side, of: at.of })}
           here={here}
         />
-        <LargestCard book={book} tags={tags} lens={lens} />
+        <LargestCard book={book} reading={reading} here={here} />
         {tags.length ? (
           <p className="card small muted">Net worth isn't filtered by tag: it's balances.</p>
         ) : (
@@ -151,6 +166,9 @@ export function Reports({ book }: { book: string }) {
   );
 }
 
+/** Where Reports are: how they read the books, and where the breakdown is. */
+type Where = Required<Pick<ReportReading, "tags" | "lens" | "budgeted">> & BreakdownView;
+
 function Pending({ error, height }: { error: unknown; height: number }) {
   return error ? (
     <p className="error">{explain(error)}</p>
@@ -159,8 +177,8 @@ function Pending({ error, height }: { error: unknown; height: number }) {
   );
 }
 
-function CashFlowCard({ book, tags, lens }: { book: string; tags: string[]; lens: Lens }) {
-  const report = useCashFlowReport(book, tags, lens);
+function CashFlowCard({ book, reading }: { book: string; reading: ReportReading }) {
+  const report = useCashFlowReport(book, reading);
   const theme = useChartTheme();
   const d = report.data;
   const money = (n: number) => formatAmount(n, d!.currency);
@@ -209,20 +227,19 @@ type BreakdownView = { side: BreakdownOptions["side"]; of?: string | undefined }
 
 function BreakdownCard({
   book,
-  tags,
-  lens,
+  reading,
   view,
   onView,
   here,
 }: {
   book: string;
-  tags: string[];
-  lens: Lens;
+  reading: ReportReading;
   view: BreakdownView;
   onView: (view: BreakdownView) => void;
   here: string;
 }) {
   const { side, of } = view;
+  const tags = reading.tags ?? [];
   const [depth, setDepth] = useState(1);
   const [window, setWindow] = useState<BreakdownOptions["window"]>(
     tags.length ? "total" : "average"
@@ -231,7 +248,7 @@ function BreakdownCard({
   const parts = of?.split(":") ?? [];
   const path = parts.slice(1).map((_, i) => parts.slice(0, i + 2).join(":"));
   const setPath = (to: string[]) => onView({ side, of: to.at(-1) });
-  const report = useBreakdownReport(book, { side, depth, window, of, tags, lens });
+  const report = useBreakdownReport(book, { side, depth, window, of, ...reading });
   const theme = useChartTheme();
   const d = report.data;
   const drill = (account: string) => onView({ side, of: account });
@@ -317,7 +334,7 @@ function BreakdownCard({
           <BreakdownList data={d} onSelect={drill} />
         </>
       )}
-      {d && <BreakdownTransactions book={book} of={d.of} tags={tags} lens={lens} here={here} />}
+      {d && <BreakdownTransactions book={book} of={d.of} reading={reading} here={here} />}
     </section>
   );
 }
@@ -325,45 +342,52 @@ function BreakdownCard({
 /**
  * Every transaction under what's broken down (the root, or the account drilled into), in a
  * small window at the bottom of the card: the book's journal as Transactions lists it (newest
- * first, older pages as it scrolls), filtered to that account and those under it, and to the
- * tags chosen. Read as outflows, what's paid into an account that counts as spending here is
- * listed too: Rent and mortgage shows the mortgage's payments.
+ * first, older pages as it scrolls), filtered to that account and those under it, as the
+ * report reads: the tags chosen, and without what's kept out of budgets if it's left out. Read
+ * as outflows, what's paid into an account that counts as spending here is listed too: Rent and
+ * mortgage shows the mortgage's payments.
  */
 function BreakdownTransactions({
   book,
   of,
-  tags,
-  lens,
+  reading,
   here,
 }: {
   book: string;
   of: string;
-  tags: string[];
-  lens: Lens;
+  reading: ReportReading;
   here: string;
 }) {
   const accounts = useAccounts(book);
   if (!accounts.data) return null;
-  const counted = lens === "outflows" ? countingAs(accounts.data, of).map((a) => a.name) : [];
+  const counted =
+    reading.lens !== "expenses" ? countingAs(accounts.data, of).map((a) => a.name) : [];
   return (
-    <BreakdownJournal book={book} of={of} accounts={[of, ...counted]} tags={tags} here={here} />
+    <BreakdownJournal
+      book={book}
+      of={of}
+      filter={{
+        accounts: [of, ...counted],
+        tags: reading.tags ?? [],
+        ...(reading.budgeted ? { budgeted: true } : {}),
+      }}
+      here={here}
+    />
   );
 }
 
 function BreakdownJournal({
   book,
   of,
-  accounts,
-  tags,
+  filter,
   here,
 }: {
   book: string;
   of: string;
-  accounts: string[];
-  tags: string[];
+  filter: JournalFilter;
   here: string;
 }) {
-  const pages = useJournal(book, undefined, { accounts, tags });
+  const pages = useJournal(book, undefined, filter);
   const { rows, list, end } = usePaging(pages);
   const name = of.split(":").at(-1)!;
   return (
@@ -443,9 +467,17 @@ function BreakdownList({
   );
 }
 
-function LargestCard({ book, tags, lens }: { book: string; tags: string[]; lens: Lens }) {
-  const report = useLargestReport(book, tags, lens);
-  const here = `/books/${book}/reports`;
+function LargestCard({
+  book,
+  reading,
+  here,
+}: {
+  book: string;
+  reading: ReportReading;
+  here: string;
+}) {
+  const tags = reading.tags ?? [];
+  const report = useLargestReport(book, reading);
   return (
     <section className="card report" aria-label="Largest transactions">
       <h2 className="section-title">

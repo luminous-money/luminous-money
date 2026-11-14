@@ -474,6 +474,8 @@ export function createApi({
   // Spending as outflows (Loans step 2), unless `lens=expenses` asks for the books as booked.
   const lensOf = (c: Context): Lens =>
     c.req.query("lens") === "expenses" ? "expenses" : "outflows";
+  // What's kept out of budgets counts, unless `budgeted=only` leaves it out.
+  const budgetedOf = (c: Context) => c.req.query("budgeted") === "only";
   /** Income and expenses for each of the last `months` (6) months. */
   api.get(
     "/books/:book/reports/cash-flow",
@@ -484,7 +486,8 @@ export function createApi({
         reportOn(c, book),
         count(c.req.query("months"), 1, 24, 6),
         tagsOf(c),
-        lensOf(c)
+        lensOf(c),
+        budgetedOf(c)
       )
     )
   );
@@ -502,6 +505,7 @@ export function createApi({
         window: window === "month" || window === "total" ? window : "average",
         tags: tagsOf(c),
         lens: lensOf(c),
+        budgeted: budgetedOf(c),
       });
     })
   );
@@ -515,7 +519,8 @@ export function createApi({
         reportOn(c, book),
         count(c.req.query("limit"), 1, 50, 8),
         tagsOf(c),
-        lensOf(c)
+        lensOf(c),
+        budgetedOf(c)
       )
     )
   );

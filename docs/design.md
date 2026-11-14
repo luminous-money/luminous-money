@@ -825,6 +825,13 @@ same money in through another's, a day or so later. Both would sit in review, un
   It isn't limited to the donut's window (this month, the 6-month average): it's the list of
   everything there, as an account's ledger is. Where the breakdown is (`?side=`, `?of=`) is in
   the address, so coming back from one of its transactions finds it where it was.
+- **What's kept out of budgets can be left out** (Kael, 2026-11-14): Reports count it by default
+  (`budget: FALSE`, a once-in-decades roof, is still spending), which made a category's average
+  look wrong beside its budget. "Leave out what's excluded from budgets" (`?budgeted=only`, with
+  the Outflows/Expenses switch) drops those transactions from cash flow, the breakdown and its
+  transactions (the journal's `budgeted` filter) and the largest, as budgets do. Net worth is
+  balances, so it isn't affected. Reports' filters travel together as one `ReportReading`
+  (tags, lens, budgeted) rather than one more argument each.
 - **An account's "Typically"** (expense and income accounts): the median week, month and year
   (52 weeks, 12 months, up to 5 years) and what 85% of simulated ones stay under.
 - **The journal** (`GET /books/{b}/journal`): every transaction, newest first, keyset-paged in
@@ -1206,6 +1213,14 @@ pages: a shop's reader hands it charges (`shared/orders.ts`), and `server/orders
   the largest covers all time, since a tag usually marks a trip or a project rather than this
   month's spending. Net worth (balances) isn't filtered and is set aside, saying so; home's
   "Spent this month" and an account's "Typically" aren't filtered.
+- **A filter's tags show as soon as it's focused** (Kael, 2026-11-14: it "should search as you
+  type and present matching options as a dropdown"). It already narrowed as you typed, but only
+  opened once something was typed, and stayed closed when nothing matched, which read as no
+  search at all (his book had one tag left after the move to splits). A filter
+  (`TagInput` with `allowNew={false}`: Reports, ledgers' funnel) now lists every tag on focus,
+  most used first, narrows as you type, and says "No tags match"; Tab and comma take a choice
+  only when something's typed, so tabbing past adds nothing. Adding tags is as it was: the list
+  waits for typing, since what's typed can be new.
 - **Not funds:** a tag overlaps others and adds up to nothing, while setting money aside needs
   something exclusive and conserved. That's what funds are for (Funds A, below).
 - **Funds stay the transaction's** for now; a split's fund is [split-level tags and
