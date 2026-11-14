@@ -10,8 +10,9 @@ expense account, for it and its subtree):
 - what's paid **out of** it masks the spending it pays for: first the transaction's expenses (the
   county's tax bill paid from escrow was spent as escrow went in), then what it pays into another
   account that counts (escrow's surplus applied to principal), each in proportion, in cents;
-- borrowing (the liability going the other way), a refund out of it, and everything else are left
-  as they are: never spending.
+- borrowing (the liability going the other way), a refund out of it, an opening (`opening: TRUE`:
+  a balance stated, like what escrow held when it came into the books, not a payment into it), and
+  everything else are left as they are: never spending.
 
 Only the operating currency is counted. The lens adds and scales splits; it doesn't balance, and
 it's only for reading spending (budgets, reports), never for balances. A split it adds has the
@@ -63,7 +64,7 @@ def lensed(
 ) -> models.CompactTransaction:
     """A transaction as outflows read it: expenses masked by what came out of an account that
     counts as spending, and what went into one added as spending."""
-    if not found:
+    if not found or t.opening:
         return t
 
     def amount(p: models.CompactPosting) -> Decimal | None:

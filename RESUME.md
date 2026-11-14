@@ -1,10 +1,48 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-13._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-14._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-13): "Repeat…" no longer copies where a transaction came from
+## Latest (2026-11-14): openings aren't spending, counted-as accounts say so, the breakdown's transactions
+
+Kael asked for three changes (PLAN.md's Polish, "Kael's changes, 2026-11-14"; design.md has the
+decisions). **Committed, pushed and released as `v0.1.29`** at his asking.
+
+- **An opening is never spending** (`outflows.py`): under Outflows, "What escrow holds" (escrow's
+  balance when a loan came into the books, booked against Opening Balances) counted as that
+  month's Rent-and-Mortgage. A transaction marked `opening: TRUE` states a balance, and the lens
+  leaves it be. The ledger marks an account's opening balance; New loan marks "Borrowed",
+  "What's owed" and "What escrow holds". Ledger migration 15 adds `directive.opening` (from the
+  text, as `budgeted` is); `CompactTransaction.opening` says it. Client regenerated. Payments
+  before the bank's history, also against Opening Balances, aren't marked and still count.
+  What was written before isn't marked: Kael's escrow figure and "Borrowed" were marked through
+  the API (their meta), so the migration's backfill reads them on the upgrade.
+- **"Counted as spending here"** (`CountedHere` in `components/Outflow.tsx`, on an account's
+  page): an expense account that an asset or liability counts as shows which (linked), this
+  month's spending there and the 6-month average as outflows read it (the breakdown report of
+  that account), and a link to what's paid into them. Its $0 balance read as if the payments
+  were missing.
+- **The breakdown's transactions** (`BreakdownTransactions` in `pages/Reports.tsx`): under the
+  donut, a scrolling window lists every transaction under the root or the account drilled into
+  (`JournalList` over the journal filtered by account, paged as it scrolls), with the tag
+  filter; under Outflows, what's paid into accounts that count there too. The drill is in the
+  address now (`?side=income`, `?of=`), so coming back from a transaction keeps it.
+- **Tests:** ledger (an opening isn't spending, a payment from Opening Balances is; an opening
+  balance is marked), app (New loan marks its balances), browser (`m12.spec.ts`: the breakdown's
+  list follows the drill and keeps its place coming back; a counted account's card and the
+  breakdown's list under Outflows and Expenses). `pnpm test` passes (ledger 263, app 343);
+  `pnpm e2e` passes (API, browser 139, the command). Not yet looked at on a phone.
+
+**Asked, not answered:** Kael made `Expenses:Groceries:Beverages` (a leaf: New account always
+makes one) and couldn't move Alcohol under it ("holds transactions, so it can't have
+sub-accounts", from `checkNewAccount`, though it has none). Offered: delete the empty leaf and
+move Alcohol (and maybe `…:Non-Prepared:Beverages`'s children) through the API, and/or let an
+empty leaf take sub-accounts (in `checkNewAccount` and `chart.rename`) with clearer words.
+
+**Next:** Kael upgrades Emmer (`upgrade 0.1.29`: ledger migration 15, and 0.1.27's if not yet).
+
+## Before that (2026-11-13): "Repeat…" no longer copies where a transaction came from
 
 While setting up Kael's paychecks as schedules on his live book (done through the API, not in
 the repo), the schedule he'd made with "Repeat…" from a bank row turned out to carry that row's
@@ -14,9 +52,7 @@ it was wrong provenance. `fromTransaction` (`web/pages/ScheduleEditor.tsx`) now 
 transaction's `budget` choice (design.md's "Scheduled transactions"). m3's "Repeat…" browser test
 repeats a bank row with `budget: false` and checks the template's meta is just that.
 `pnpm test` and `pnpm e2e` pass (browser 137). **Committed, pushed and released as `v0.1.28`**
-at Kael's asking. Emmer isn't upgraded (Kael's to run); no migrations in it.
-
-**Next:** Kael upgrades Emmer (`upgrade 0.1.28`, which brings 0.1.27's too); the rest as below.
+at Kael's asking; no migrations in it.
 
 ## Before that (2026-11-12, later): the split editor, and three fixes, released as `v0.1.27`
 

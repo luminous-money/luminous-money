@@ -1921,6 +1921,12 @@ export interface components {
       id: string;
       /** Narration */
       narration: string | null;
+      /**
+       * Opening
+       * @description True with `opening: TRUE`: it states a balance (an opening) rather than recording an event, so it's never spending.
+       * @default false
+       */
+      opening: boolean;
       /** Payee */
       payee: string | null;
       /** Postings */

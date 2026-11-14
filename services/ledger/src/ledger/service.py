@@ -538,8 +538,8 @@ class Ledger:
         A leaf can come with an opening balance: its balance on a date, from a statement. It's
         recorded as a transaction against `Equity:Opening-Balances` on that date (even when it's
         zero: its date is the account's `as_of`, which says where imports start, and it can be
-        moved like any transaction), and the account opens then and holds that currency. All of
-        it is one write.
+        moved like any transaction), marked `opening: TRUE` (a balance stated, never spending), and
+        the account opens then and holds that currency. All of it is one write.
         """
         directives = self._opened(book_id, a)
         with self.store.transaction():
@@ -589,6 +589,7 @@ class Ledger:
                 date=opening.date,
                 flag="*",
                 narration="Opening balance",
+                meta={engine.OPENING_KEY: True},
                 postings=[
                     models.Posting(account=a.name, units=models.Amount(number=opening.amount, currency=opening.currency)),
                     *investments.opening_lots(self, book_id, a.name, a.opening_holdings, opening),
@@ -693,6 +694,7 @@ class Ledger:
                         payee=r["payee"],
                         narration=r["narration"],
                         budgeted=bool(r["budgeted"]),
+                        opening=bool(r["opening"]),
                         tags=split_tags(r["tags"]),
                         funds=_funds(r["funds"]),
                         postings=[],

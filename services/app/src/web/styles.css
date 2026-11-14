@@ -2332,6 +2332,30 @@ a.budget-link {
   width: auto;
 }
 
+/* Every transaction under what's broken down, in a small window of its own. */
+.breakdown-transactions {
+  margin-top: 1rem;
+}
+
+.breakdown-transactions h3 {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.breakdown-scroll {
+  max-height: 20rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* An expense account's spending as outflows count it. */
+.counted-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.5rem;
+  margin: 0.5rem 0;
+}
+
 main a.largest-row,
 .largest-row {
   display: flex;

@@ -44,7 +44,7 @@ async function withHistory(page: Page) {
       spend(today(), GROCERIES, "42.00", "Corner Grocer"),
     ],
   });
-  return { book: book.id };
+  return { book: book.id, session, account };
 }
 
 test("home shows this month's spending, and recent transactions open the whole journal", async ({
@@ -83,6 +83,90 @@ test("Reports break spending down, and drill into a category", async ({ page }) 
   await expect(page.getByRole("region", { name: "Largest transactions" })).toContainText(
     "Corner Grocer"
   );
+});
+
+test("the breakdown lists every transaction under where it is, and keeps its place", async ({
+  page,
+}) => {
+  const { book } = await withHistory(page);
+  await page.goto(`/ui/books/${book}/reports`);
+
+  const breakdown = page.getByRole("region", { name: "Breakdown" });
+  const all = breakdown.getByRole("list", { name: "Transactions under Expenses" });
+  await expect(all.getByRole("listitem")).toHaveCount(13); // 12, and today's
+  await breakdown
+    .getByRole("list", { name: "Categories" })
+    .getByRole("button", { name: /Food/ })
+    .click();
+  const food = breakdown.getByRole("list", { name: "Transactions under Food" });
+  await expect(food.getByRole("listitem")).toHaveCount(7);
+  await expect(food).not.toContainText("Landlord");
+  await expect(food.getByRole("listitem").first()).toContainText("Corner Grocer"); // newest first
+  await expect(page).toHaveURL(/of=Expenses%3AFood/);
+
+  // Opening one and coming back finds the breakdown where it was.
+  await food.getByRole("button", { name: /Corner Grocer/ }).click();
+  await expect(page.getByRole("heading", { name: "Transaction" })).toBeVisible();
+  await page.getByRole("link", { name: "‹ Back" }).click();
+  await expect(breakdown.getByRole("navigation", { name: "Drilled into" })).toContainText("Food");
+  await expect(food.getByRole("listitem")).toHaveCount(7);
+});
+
+test("what counts as spending shows on its expense account, and in the breakdown's transactions", async ({
+  page,
+}) => {
+  const { book, session, account } = await withHistory(page);
+  const path = { book_id: book };
+  const owing = "Liabilities:Loans:Mortgage";
+  const counted = "Expenses:Housing:Mortgage";
+  for (const name of [owing, counted])
+    await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+      params: { path },
+      body: { name, kind: "leaf" },
+    });
+  const { data: accounts } = await session.ledger.GET("/api/ledger/v1/books/{book_id}/accounts", {
+    params: { path },
+  });
+  await session.ledger.PATCH("/api/ledger/v1/books/{book_id}/accounts/{account}", {
+    params: { path: { ...path, account: owing } },
+    body: { updated_at: accounts!.find((a) => a.name === owing)!.updated_at!, outflow: counted },
+  });
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+    params: { path },
+    body: {
+      date: today(),
+      flag: "*",
+      payee: "Lender",
+      narration: "",
+      postings: [
+        { account, units: { number: "-1200.00", currency: "USD" } },
+        { account: owing, units: { number: "1200.00", currency: "USD" } },
+      ],
+    },
+  });
+
+  // Nothing's booked to the expense account; its page says what counts there, and how much.
+  await page.goto(`/ui/books/${book}/accounts/${counted}`);
+  const card = page.getByRole("region", { name: "Counted as spending here" });
+  await expect(card).toContainText("Loans:Mortgage");
+  await expect(card).toContainText("$1,200.00 this month");
+  await card.getByRole("link", { name: "See what's paid into it" }).click();
+  await expect(page.getByRole("list", { name: "Transactions" })).toContainText("Lender");
+
+  // In the breakdown, read as outflows, the payment is under Housing; as booked, it isn't.
+  await page.goto(`/ui/books/${book}/reports?of=Expenses%3AHousing`);
+  const housing = page
+    .getByRole("region", { name: "Breakdown" })
+    .getByRole("list", { name: "Transactions under Housing" });
+  await expect(housing).toContainText("Lender");
+  await expect(housing).toContainText("Landlord");
+  await page
+    .getByRole("radiogroup", { name: "Spending as" })
+    .getByRole("radio", { name: "Expenses" })
+    .click();
+  await expect(page).toHaveURL(/lens=expenses.*of=Expenses%3AHousing/);
+  await expect(housing).toContainText("Landlord");
+  await expect(housing).not.toContainText("Lender");
 });
 
 test("an expense account's page shows what its periods typically come to", async ({ page }) => {

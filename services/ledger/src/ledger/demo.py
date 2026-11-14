@@ -94,7 +94,7 @@ def household_ledger(today: datetime.date, months: int = 4, staged_days: int = 1
     texts = [engine.parse_one(f'{begin.isoformat()} open {checking} USD\n  {engine.DISPLAY_NAME_KEY}: "Joint Checking"\n').text]
     texts += [engine.parse_one(f"{begin.isoformat()} open {a}\n").text for a in accounts]
     batch = [models.TransactionIn(
-        date=begin, flag="*", payee=None, narration="Opening balance",
+        date=begin, flag="*", payee=None, narration="Opening balance", meta={engine.OPENING_KEY: True},
         postings=[models.Posting(account=checking, units=usd(1200)), models.Posting(account="Equity:Opening-Balances", units=None)],
     )]
     day = begin

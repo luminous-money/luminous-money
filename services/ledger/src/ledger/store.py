@@ -299,13 +299,13 @@ class Store:
             stamp = after(existing["updated_at"] if existing else None)
             self._conn.execute(
                 "INSERT INTO directive"
-                " (id, book_id, date, kind, flag, ordinal, text, deleted, seq, payee, narration, budgeted,"
+                " (id, book_id, date, kind, flag, ordinal, text, deleted, seq, payee, narration, budgeted, opening,"
                 " created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)"
                 " ON CONFLICT (id) DO UPDATE SET date = excluded.date, kind = excluded.kind,"
                 " flag = excluded.flag, text = excluded.text, deleted = 0, seq = excluded.seq,"
                 " payee = excluded.payee, narration = excluded.narration, budgeted = excluded.budgeted,"
-                " updated_at = excluded.updated_at",
+                " opening = excluded.opening, updated_at = excluded.updated_at",
                 (
                     d.id,
                     book_id,
@@ -318,6 +318,7 @@ class Store:
                     d.payee,
                     d.narration,
                     int(d.budgeted),
+                    int(d.opening),
                     stamp,
                     stamp,
                 ),
@@ -524,7 +525,7 @@ class Store:
 
     def compact(self, book_id: str, date_from: str | None, tags: list[str] | None = None) -> list[sqlite3.Row]:
         """Every live transaction dated `date_from` or later (or every one), oldest first, one row
-        per posting: the directive's id, date, flag, payee, narration, `budgeted` and every tag its
+        per posting: the directive's id, date, flag, payee, narration, `budgeted`, `opening` and every tag its
         splits have (space-separated), and the posting's account, amount (NULL where only booking
         could say), mark, flag, memo and tags (`split_tags`). With `tags`, only transactions with a
         split that has all of them. For resolvers' context and reports: plain SQL, no parsing."""
@@ -538,7 +539,7 @@ class Store:
             args += more
         return self._conn.execute(
             f"""
-            SELECT d.id, d.date, d.flag, d.payee, d.narration, d.budgeted, ({TAGS % "d"}) AS tags,
+            SELECT d.id, d.date, d.flag, d.payee, d.narration, d.budgeted, d.opening, ({TAGS % "d"}) AS tags,
                    ({FUNDS % "d"}) AS funds, p.idx,
                    p.account, p.amount, p.amount_currency, p.reconciled, p.flag AS posting_flag, p.memo,
                    ({SPLIT_TAGS % ("p", "p")}) AS split_tags

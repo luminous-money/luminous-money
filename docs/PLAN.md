@@ -373,3 +373,14 @@ Smaller improvements picked up between milestones. Those still open are in
 - [x] **"Repeat…" doesn't copy where a transaction came from** (2026-11-13): a schedule made
       from a bank row carried its import ID into every occurrence; the template now keeps only
       the transaction's `budget` choice (`fromTransaction` in `ScheduleEditor.tsx`).
+- [x] **Kael's changes, 2026-11-14:**
+  - **An opening is never spending:** what escrow held when a loan came into the books counted
+    as that month's spending under Outflows. Balances stated (opening balances, a loan's
+    "Borrowed" or "What's owed", "What escrow holds") are marked `opening: TRUE`, and the lens
+    leaves them be (ledger migration 15).
+  - **"Counted as spending here":** an expense account that a loan or escrow counts as shows
+    what's counted there (this month, the 6-month average) and links to it, rather than only
+    its balance of $0.
+  - **The breakdown's transactions:** Reports' breakdown lists every transaction under where
+    it is, in a small scrolling window, as Transactions lists them; the drill is in the
+    address.

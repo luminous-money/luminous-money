@@ -116,6 +116,56 @@ def test_paid_in_counts_and_what_it_pays_for_is_masked(book):
     ]
 
 
+def test_an_opening_is_never_spending_but_a_payment_from_opening_balances_is(book):
+    """What escrow held when it came into the books is a balance, not a payment into it; a payment
+    from before the bank's history (Opening Balances standing in for the bank) still counts."""
+    count(book, "Assets:Escrow:Mortgage", "Expenses:Housing:Escrow")
+    book.create_account(BOOK, models.AccountIn(name="Equity:Opening-Balances", open=datetime.date(2026, 1, 1)))
+    usd = lambda n: models.Amount(number=n, currency="USD")  # noqa: E731
+    for narration, meta, postings in [
+        (
+            "What escrow holds",
+            {engine.OPENING_KEY: True},
+            [("Assets:Escrow:Mortgage", "2400.00"), ("Equity:Opening-Balances", "-2400.00")],
+        ),
+        (
+            "Payment, before the bank's history",
+            {},
+            [("Assets:Escrow:Mortgage", "450.00"), ("Equity:Opening-Balances", "-450.00")],
+        ),
+    ]:
+        book.create_transaction(
+            BOOK,
+            models.TransactionIn(
+                date=datetime.date(2026, 10, 2),
+                flag="*",
+                narration=narration,
+                meta=meta,
+                postings=[models.Posting(account=a, units=usd(n)) for a, n in postings],
+            ),
+        )
+    lensed = {t.narration: t for t in book.compact(BOOK, datetime.date(2026, 10, 2), lens="outflows")}
+    assert lensed["What escrow holds"].opening
+    assert [p.outflow_of for p in lensed["What escrow holds"].postings] == [None, None]
+    assert not lensed["Payment, before the bank's history"].opening
+    assert [(p.account, p.amount.number) for p in lensed["Payment, before the bank's history"].postings if p.outflow_of] == [
+        ("Expenses:Housing:Escrow", "450.00")
+    ]
+
+
+def test_an_opening_balance_is_marked_an_opening(book):
+    book.create_account(
+        BOOK,
+        models.AccountIn(
+            name="Assets:Bank:Savings",
+            opening_balance=models.OpeningBalance(amount="500.00", date=datetime.date(2026, 2, 1)),
+        ),
+    )
+    opened = next(t for t in book.compact(BOOK, datetime.date(2026, 2, 1)) if t.narration == "Opening balance")
+    assert opened.opening
+    assert "opening: TRUE" in book.export(BOOK)
+
+
 def test_a_setting_covers_the_subtree():
     found = {"Assets:Escrow": "Expenses:Housing:Escrow"}
     assert outflows.target_of("Assets:Escrow:Mortgage", found) == ("Assets:Escrow", "Expenses:Housing:Escrow")

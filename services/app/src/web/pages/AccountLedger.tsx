@@ -8,6 +8,7 @@ import { withBack } from "../lib/navigation.js";
 import { AccountValueNote, headline } from "../components/AccountValue.js";
 import { BankErrors, ReportedLine } from "../components/BankStatus.js";
 import { BudgetGlance } from "../components/Budget.js";
+import { CountedHere } from "../components/Outflow.js";
 import { TypicalPeriods } from "../components/TypicalPeriods.js";
 import { HoldingsPanel } from "../components/Holdings.js";
 import { JumpToDate, MoreBelow, NewerRow, usePaging } from "../components/Paged.js";
@@ -54,6 +55,8 @@ import type { LedgerRow } from "@luminous-money/ledger-client";
  * occurrences coming in the next UPCOMING_DAYS (16) days show above, grayed, with the projected balance.
  * Reconciled ones are marked ✓ (M14); the filter beside "Go to date" shows only those, or only
  * the rest (`?reconciled=`), and Reconcile is in the header for an account reconciled itself.
+ * An expense account that a loan or escrow counts as says what's counted there (Outflow's
+ * CountedHere), since its balance is only what's booked to it.
  */
 /**
  * A node's row (a divided account's, say: M15): which of its accounts it touched. A move between
@@ -204,6 +207,9 @@ export function AccountLedger({ book, account }: { book: string; account: string
         )}
       </header>
 
+      {accounts.data && !selection.selecting && (
+        <CountedHere book={book} account={account} accounts={accounts.data} here={here} />
+      )}
       {info?.divided && wholeInfo && tree.data && !selection.selecting && (
         <PartsCard
           book={book}

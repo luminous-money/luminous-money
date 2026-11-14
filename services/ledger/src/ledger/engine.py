@@ -43,6 +43,7 @@ DESCRIPTION_KEY = "description"
 # A revalued asset (a house, a car): how many days its value stays current (M5).
 REVALUE_EVERY_KEY = "revalue-every"
 BUDGET_KEY = "budget"  # on a transaction: FALSE keeps it out of budgets (M11)
+OPENING_KEY = "opening"  # on a transaction: TRUE when it states a balance (an opening), not an event
 # Reconciliation (M14): on a posting, the statement date it was reconciled with. A statement is a
 # `custom "statement"` directive; `source: "bank"` on one marks an automatic reconciliation.
 RECONCILED_KEY = "reconciled"
@@ -129,6 +130,7 @@ class Directive:
     narration: str | None = None  # transactions only
     price: tuple[str, Decimal, str] | None = None  # price directives only: commodity, number, currency
     budgeted: bool = True  # transactions only: False with `budget: FALSE`, kept out of budgets (M11)
+    opening: bool = False  # transactions only: True with `opening: TRUE`, a balance stated, never spending
     # A transaction's fund lines, or a fund move's two sides (Unallocated's left out): (fund,
     # signed number, commodity), `+` into the fund (Funds A).
     funds: tuple[tuple[str, Decimal, str], ...] = ()
@@ -243,6 +245,7 @@ def to_directive(entry: data.Directive, directive_id: str | None = None) -> Dire
         narration=getattr(entry, "narration", None),
         price=(entry.currency, entry.amount.number, entry.amount.currency) if isinstance(entry, data.Price) else None,
         budgeted=not (isinstance(entry, data.Transaction) and entry.meta.get(BUDGET_KEY) is False),
+        opening=isinstance(entry, data.Transaction) and entry.meta.get(OPENING_KEY) is True,
         funds=_fund_lines_of(entry),
     )
 

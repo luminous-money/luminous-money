@@ -241,6 +241,11 @@ describe("made along with it (New loan's questionnaire)", () => {
     expect(adjustment.postings.find((p) => p.account === HOME_ESCROW)?.units?.number).toBe(
       "-54800.00"
     );
+    // Balances stated, not payments: outflows never count them as spending.
+    expect(adjustment.meta).toEqual({ opening: true });
+    expect(ledger.transactions.find((t) => t.narration === "Borrowed")?.meta).toEqual({
+      opening: true,
+    });
   });
 
   it("escrow's figure counts the bills it has already paid", async () => {

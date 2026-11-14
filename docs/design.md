@@ -817,6 +817,14 @@ same money in through another's, a day or so later. Both would sit in review, un
   (6-month averages or this month, at a depth, 6 slices and Other, drilling in), this month's
   largest expenses, and net worth (24 month ends backed out from today's balances, holdings at
   each month end's price; what has no price is named, not counted).
+- **The breakdown's transactions** (Kael, 2026-11-14): under the donut, a small window of its own
+  lists every transaction under what's broken down (the root, or the account drilled into, and
+  those under it), the journal as Transactions lists it: newest first, paged as it scrolls,
+  the same rows. It follows the tag filter, and read as outflows it also lists what's paid into
+  an account that counts as spending there (Rent and mortgage lists the mortgage's payments).
+  It isn't limited to the donut's window (this month, the 6-month average): it's the list of
+  everything there, as an account's ledger is. Where the breakdown is (`?side=`, `?of=`) is in
+  the address, so coming back from one of its transactions finds it where it was.
 - **An account's "Typically"** (expense and income accounts): the median week, month and year
   (52 weeks, 12 months, up to 5 years) and what 85% of simulated ones stay under.
 - **The journal** (`GET /books/{b}/journal`): every transaction, newest first, keyset-paged in
@@ -1440,6 +1448,22 @@ month's spending in daily life.
   expense accounts as booked; net worth and an account's Typically always read the books.
 - **Set** in an account's editor (Counts as spending), on a loan's page (As spending), or by New
   loan (checked by default).
+- **An opening is never spending** (Kael, 2026-11-14). A transaction with `opening: TRUE` states a
+  balance rather than recording something that happened: an account's opening balance, a
+  loan's "Borrowed" or "What's owed", and "What escrow holds" when a loan comes into the books.
+  The lens leaves it as it is, so what escrow held before the books began isn't that month's
+  spending (Kael's first month counted all of it). A payment before the bank's history,
+  which New loan books against Opening Balances too, is an event, not marked, and still counts.
+  It's a mark, not a rule about Opening Balances, because the two look alike: both come from it,
+  and escrow's figure can be dated after the payments it's reconciled with. The ledger keeps it
+  in a column (migration 15), as `budget: FALSE` is kept, and the compact stream says it
+  (`CompactTransaction.opening`). What was written before it isn't marked; Kael's escrow figure
+  was marked by hand.
+- **An expense account that something counts as says so** (Kael, 2026-11-14): its balance is
+  only what's booked to it, often nothing, which read as if the payments were missing. Its page
+  has a "Counted as spending here" card: the accounts that count as it (linked), this month's
+  spending there and the 6-month average as outflows read it (Reports' breakdown of that
+  account, so booked spending is in it too), and their transactions.
 
 ### Bank feeds: SimpleFIN (M9)
 

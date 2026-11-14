@@ -69,6 +69,18 @@ def _backfill_budgeted(conn: sqlite3.Connection) -> None:
         conn.execute("UPDATE directive SET budgeted = ? WHERE id = ?", (int(directive.budgeted), row[0]))
 
 
+def _backfill_opening(conn: sqlite3.Connection) -> None:
+    """Fill in migration 15's column for transactions written before it."""
+    from . import engine
+
+    rows = conn.execute(
+        "SELECT id, text FROM directive WHERE deleted = 0 AND kind = 'transaction' AND text LIKE '%opening:%'"
+    ).fetchall()
+    for row in rows:
+        directive = engine.parse_one(row[1], row[0])
+        conn.execute("UPDATE directive SET opening = ? WHERE id = ?", (int(directive.opening), row[0]))
+
+
 def _backfill_reconciled(conn: sqlite3.Connection) -> None:
     """Fill in migration 9's column for postings written before it."""
     from . import engine
@@ -350,6 +362,10 @@ MIGRATIONS: list[list[str | Callable[[sqlite3.Connection], None]]] = [
         "DROP TABLE transaction_tag",
         _backfill_split_tags,
     ],
+    # 15: openings (2026-11-14). A transaction with `opening: TRUE` states a balance (an account's
+    # opening balance, what a loan owes or escrow holds when it comes into the books) rather than
+    # recording something that happened, so outflows never count it as spending.
+    ["ALTER TABLE directive ADD COLUMN opening INTEGER NOT NULL DEFAULT 0", _backfill_opening],
 ]
 
 

@@ -3,6 +3,9 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 import { BreakdownChart, CashFlowChart, NetWorthChart } from "../components/Charts.js";
+import { JournalList } from "../components/JournalList.js";
+import { countingAs } from "../components/Outflow.js";
+import { MoreBelow, usePaging } from "../components/Paged.js";
 import { tagList, TagInput } from "../components/Tags.js";
 import { shortName } from "../lib/accounts.js";
 import type { BreakdownOptions, Lens } from "../lib/appApi.js";
@@ -11,8 +14,10 @@ import { formatAmount } from "../lib/format.js";
 import { useParam, useParams, withBack } from "../lib/navigation.js";
 import {
   explain,
+  useAccounts,
   useBreakdownReport,
   useCashFlowReport,
+  useJournal,
   useLargestReport,
   useNetWorthReport,
   useTags,
@@ -43,22 +48,32 @@ const PALETTE = [
  * Spending is read as outflows (Loans step 2: what's paid into a loan or escrow that counts as
  * spending is spending, and what escrow pays for isn't counted again), or as the expense accounts
  * are booked (`?lens=expenses`), the traditional P&L view.
+ *
+ * Where the breakdown is (`?side=income`, `?of=` the account drilled into) is in the address, so
+ * coming back from one of its transactions finds it where it was.
  */
 export function Reports({ book }: { book: string }) {
   const [, navigate] = useLocation();
   const tags = useParams("tag").filter(Boolean);
   const lens: Lens = useParam("lens") === "expenses" ? "expenses" : "outflows";
+  const view: BreakdownView = {
+    side: useParam("side") === "income" ? "income" : "expenses",
+    of: useParam("of") ?? undefined,
+  };
   const bookTags = useTags(book);
   const base = `/books/${book}/reports`;
-  const query = (chosen: string[], as: Lens = lens) =>
+  const query = (chosen: string[], as: Lens = lens, at: BreakdownView = view) =>
     [
       ...chosen.map((tag) => `tag=${encodeURIComponent(tag)}`),
       ...(as === "expenses" ? ["lens=expenses"] : []),
+      ...(at.side === "income" ? ["side=income"] : []),
+      ...(at.of ? [`of=${encodeURIComponent(at.of)}`] : []),
     ].join("&");
-  const go = (chosen: string[], as: Lens = lens) => {
-    const q = query(chosen, as);
+  const go = (chosen: string[], as: Lens = lens, at: BreakdownView = view) => {
+    const q = query(chosen, as, at);
     navigate(q ? `${base}?${q}` : base, { replace: true });
   };
+  const here = query(tags) ? `${base}?${query(tags)}` : base;
   return (
     <main>
       <header className="page-head">
@@ -99,15 +114,15 @@ export function Reports({ book }: { book: string }) {
             choices={bookTags.data ?? []}
             allowNew={false}
             placeholder={bookTags.data?.length ? "Filter by tag" : "No tags yet"}
-            onChange={(chosen) => go(chosen)}
+            onChange={(chosen) => go(chosen, lens, { side: view.side })}
           />
           {tags.length > 0 && (
             <p className="small muted">
               Only splits tagged {tagList(tags)}.{" "}
               <Link
                 href={withBack(
-                  `/books/${book}/transactions?${query(tags, "outflows")}`,
-                  `${base}?${query(tags)}`
+                  `/books/${book}/transactions?${query(tags, "outflows", { side: "expenses" })}`,
+                  here
                 )}
               >
                 See them
@@ -116,7 +131,15 @@ export function Reports({ book }: { book: string }) {
           )}
         </section>
         <CashFlowCard book={book} tags={tags} lens={lens} />
-        <BreakdownCard key={tags.join(" ")} book={book} tags={tags} lens={lens} />
+        <BreakdownCard
+          key={tags.join(" ")}
+          book={book}
+          tags={tags}
+          lens={lens}
+          view={view}
+          onView={(at) => go(tags, lens, at)}
+          here={here}
+        />
         <LargestCard book={book} tags={tags} lens={lens} />
         {tags.length ? (
           <p className="card small muted">Net worth isn't filtered by tag: it's balances.</p>
@@ -181,18 +204,37 @@ const WINDOWS = {
   total: { caption: "in all", nothing: "with these tags" },
 } as const;
 
-function BreakdownCard({ book, tags, lens }: { book: string; tags: string[]; lens: Lens }) {
-  const [side, setSide] = useState<BreakdownOptions["side"]>("expenses");
+/** Where the breakdown is: expenses or income, and the account drilled into, if any. */
+type BreakdownView = { side: BreakdownOptions["side"]; of?: string | undefined };
+
+function BreakdownCard({
+  book,
+  tags,
+  lens,
+  view,
+  onView,
+  here,
+}: {
+  book: string;
+  tags: string[];
+  lens: Lens;
+  view: BreakdownView;
+  onView: (view: BreakdownView) => void;
+  here: string;
+}) {
+  const { side, of } = view;
   const [depth, setDepth] = useState(1);
   const [window, setWindow] = useState<BreakdownOptions["window"]>(
     tags.length ? "total" : "average"
   );
-  // Drilled into: each level's account, outermost first.
-  const [path, setPath] = useState<string[]>([]);
-  const report = useBreakdownReport(book, { side, depth, window, of: path.at(-1), tags, lens });
+  // Drilled into: each level's account under the root, outermost first.
+  const parts = of?.split(":") ?? [];
+  const path = parts.slice(1).map((_, i) => parts.slice(0, i + 2).join(":"));
+  const setPath = (to: string[]) => onView({ side, of: to.at(-1) });
+  const report = useBreakdownReport(book, { side, depth, window, of, tags, lens });
   const theme = useChartTheme();
   const d = report.data;
-  const drill = (account: string) => setPath((p) => [...p, account]);
+  const drill = (account: string) => onView({ side, of: account });
   const { caption } = WINDOWS[window];
 
   return (
@@ -206,7 +248,7 @@ function BreakdownCard({ book, tags, lens }: { book: string; tags: string[]; len
             role="radio"
             aria-checked={side === s}
             className={side === s ? "on" : ""}
-            onClick={() => (setSide(s), setPath([]))}
+            onClick={() => onView({ side: s })}
           >
             {s === "expenses" ? "Expenses" : "Income"}
           </button>
@@ -275,6 +317,76 @@ function BreakdownCard({ book, tags, lens }: { book: string; tags: string[]; len
           <BreakdownList data={d} onSelect={drill} />
         </>
       )}
+      {d && <BreakdownTransactions book={book} of={d.of} tags={tags} lens={lens} here={here} />}
+    </section>
+  );
+}
+
+/**
+ * Every transaction under what's broken down (the root, or the account drilled into), in a
+ * small window at the bottom of the card: the book's journal as Transactions lists it (newest
+ * first, older pages as it scrolls), filtered to that account and those under it, and to the
+ * tags chosen. Read as outflows, what's paid into an account that counts as spending here is
+ * listed too: Rent and mortgage shows the mortgage's payments.
+ */
+function BreakdownTransactions({
+  book,
+  of,
+  tags,
+  lens,
+  here,
+}: {
+  book: string;
+  of: string;
+  tags: string[];
+  lens: Lens;
+  here: string;
+}) {
+  const accounts = useAccounts(book);
+  if (!accounts.data) return null;
+  const counted = lens === "outflows" ? countingAs(accounts.data, of).map((a) => a.name) : [];
+  return (
+    <BreakdownJournal book={book} of={of} accounts={[of, ...counted]} tags={tags} here={here} />
+  );
+}
+
+function BreakdownJournal({
+  book,
+  of,
+  accounts,
+  tags,
+  here,
+}: {
+  book: string;
+  of: string;
+  accounts: string[];
+  tags: string[];
+  here: string;
+}) {
+  const pages = useJournal(book, undefined, { accounts, tags });
+  const { rows, list, end } = usePaging(pages);
+  const name = of.split(":").at(-1)!;
+  return (
+    <section className="breakdown-transactions" aria-label={`Transactions under ${name}`}>
+      <h3 className="small muted">Transactions under {name}</h3>
+      <div className="breakdown-scroll">
+        {pages.error ? (
+          <p className="error small">{explain(pages.error)}</p>
+        ) : !pages.data ? (
+          <p className="muted small">Loading…</p>
+        ) : rows.length === 0 ? (
+          <p className="muted small">None.</p>
+        ) : (
+          <JournalList
+            book={book}
+            rows={rows}
+            here={here}
+            list={list}
+            label={`Transactions under ${name}`}
+          />
+        )}
+        <MoreBelow pages={pages} end={end} />
+      </div>
     </section>
   );
 }

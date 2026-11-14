@@ -344,7 +344,7 @@ export async function createLoan({
         payee: input.payee?.trim() || loan.name,
         narration: history.kind === "start" ? "Borrowed" : "What's owed",
         links: [],
-        meta: {},
+        meta: { opening: true }, // a balance stated, never spending
         postings: [
           { account: loan.accounts.liability, units: { number: `-${opening.owed}`, currency } },
           { account: opening.against, units: { number: opening.owed, currency } },
@@ -413,7 +413,8 @@ export async function createLoan({
           payee: input.payee?.trim() || loan.name,
           narration: "What escrow holds",
           links: [],
-          meta: {},
+          // A balance stated, not a payment into escrow: outflows never count it as spending.
+          meta: { opening: true },
           postings: [
             { account, units: { number: money(difference), currency } },
             { account: OPENING_BALANCES, units: { number: money(-difference), currency } },

@@ -1,12 +1,17 @@
 import type { Account } from "@luminous-money/ledger-client";
 import { useState } from "react";
+import { Link } from "wouter";
 
 import { toSegment } from "../../shared/names.js";
 import type { LoanView } from "../../shared/loans.js";
+import { shortName } from "../lib/accounts.js";
+import { formatAmount } from "../lib/format.js";
+import { withBack } from "../lib/navigation.js";
 import {
   explain,
   useAccountCreation,
   useAccounts,
+  useBreakdownReport,
   useCountAsSpending,
   useCreateAccount,
 } from "../lib/queries.js";
@@ -58,6 +63,85 @@ export function OutflowCard({ book, account }: { book: string; account: Account 
         </button>
       </div>
       {count.error && <p className="error small">{explain(count.error)}</p>}
+    </section>
+  );
+}
+
+/** The accounts that count as spending as `account` or one under it. */
+export function countingAs(accounts: Account[], account: string): Account[] {
+  return accounts.filter(
+    (a) => a.outflow && (a.outflow === account || a.outflow.startsWith(`${account}:`))
+  );
+}
+
+/**
+ * On an expense account that an asset or liability counts as (a loan's principal, escrow): its
+ * balance is only what's booked to it, which is often nothing, so this says what's counted here
+ * and how much, as outflows read it (budgets, home and Reports): this month and the 6-month
+ * average. The accounts it comes from, and their transactions, are a tap away.
+ */
+export function CountedHere({
+  book,
+  account,
+  accounts,
+  here,
+}: {
+  book: string;
+  account: string;
+  accounts: Account[];
+  here: string;
+}) {
+  const counting = countingAs(accounts, account);
+  if (!counting.length) return null;
+  return <CountedCard book={book} account={account} counting={counting} here={here} />;
+}
+
+function CountedCard({
+  book,
+  account,
+  counting,
+  here,
+}: {
+  book: string;
+  account: string;
+  counting: Account[];
+  here: string;
+}) {
+  const options = { side: "expenses", depth: 1, of: account } as const;
+  const month = useBreakdownReport(book, { ...options, window: "month" }).data;
+  const average = useBreakdownReport(book, { ...options, window: "average" }).data;
+  const payments = counting.map((a) => `account=${encodeURIComponent(a.name)}`).join("&");
+  return (
+    <section className="card counted-here" aria-label="Counted as spending here">
+      <h2 className="section-title">Counted as spending here</h2>
+      <p className="small muted">
+        What's paid into{" "}
+        {counting.map((a, i) => (
+          <span key={a.name}>
+            {i > 0 && (i === counting.length - 1 ? " and " : ", ")}
+            <Link href={withBack(`/books/${book}/accounts/${encodeURIComponent(a.name)}`, here)}>
+              {shortName(a.name)}
+            </Link>
+          </span>
+        ))}{" "}
+        counts as spending here, in budgets, home and Reports. Its balance is only what's booked to
+        it.
+      </p>
+      {month && average && (
+        <p className="counted-amounts">
+          <span>
+            <strong>{formatAmount(month.total, month.currency, true)}</strong>{" "}
+            <span className="muted small">this month</span>
+          </span>
+          <span>
+            <strong>{formatAmount(average.total, average.currency, true)}</strong>{" "}
+            <span className="muted small">a month, on average</span>
+          </span>
+        </p>
+      )}
+      <Link href={withBack(`/books/${book}/transactions?${payments}`, here)} className="small">
+        See what's paid into {counting.length === 1 ? "it" : "them"}
+      </Link>
     </section>
   );
 }

@@ -511,6 +511,11 @@ class CompactTransaction(Api):
     payee: str | None
     narration: str | None
     budgeted: bool = Field(True, description="False with `budget: FALSE`: kept out of budgets (M11).")
+    opening: bool = Field(
+        False,
+        description="True with `opening: TRUE`: it states a balance (an opening) rather than recording an event, "
+        "so it's never spending.",
+    )
     tags: list[str] = Field(default_factory=list, description="Every tag its splits have, sorted.")
     funds: list[FundLine] = Field(default_factory=list, description="Its fund lines (Funds A).")
     postings: list[CompactPosting]
