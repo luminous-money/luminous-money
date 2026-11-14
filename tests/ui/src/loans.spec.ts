@@ -134,8 +134,9 @@ test("New loan for a home, step by step, then its page", async ({ page }) => {
   ).toBeVisible();
   await page.getByRole("button", { name: "Confirm" }).click();
 
-  // Its page.
-  await expect(page).toHaveURL(/\/loans\/[0-9a-f]+$/);
+  // Its page: creating it stages its payments, which took longer than the default 5 seconds
+  // once with the whole suite running (2026-11-14).
+  await expect(page).toHaveURL(/\/loans\/[0-9a-f]+$/, { timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "123 Main St mortgage" })).toBeVisible();
   const summary = page.getByRole("region", { name: "What's owed" });
   await expect(summary).toContainText("$296,000.00");

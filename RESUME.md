@@ -28,7 +28,9 @@ drawer, Bank connections grouped by bank, fieldsets, info icons, sticky bars) is
   this only shows in a built app.
 - **Review** shows the book's name (M99 polish item) and "‹ Home".
 - **Tests:** `pnpm test` passed; app (`errors.test.ts`: stale 409's code; `activity.test.ts`;
-  `format.test.ts`), ledger (`test_versions.py`: the code).
+  `format.test.ts`), ledger (`test_versions.py`: the code). `pnpm e2e`: API and command passed,
+  browser 139 of 140: `loans.spec.ts` waited 5 seconds for the new loan's page with the whole
+  suite running, and passed 3 of 3 alone; it waits 15 now.
 - **Preview stack for screenshots** (not the dev stack, which holds real data): the e2e stack
   under project `luminous-money-preview`, Traefik on 127.0.0.1:8091, `LUMINOUS_MONEY_PUBLIC_URL`
   set to the Vite server's origin (else auth refuses writes), seeded with `pnpm seed`
