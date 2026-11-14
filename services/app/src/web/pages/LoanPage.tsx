@@ -22,7 +22,7 @@ import { LoanHowTo } from "../components/LoanConfirm.js";
 import { LoanTableSource } from "../components/LoanTableSource.js";
 import { LoanSpending } from "../components/Outflow.js";
 import { formatDay, today } from "../lib/format.js";
-import { useBack, withBack } from "../lib/navigation.js";
+import { withBack } from "../lib/navigation.js";
 import {
   explain,
   useAccountCreation,
@@ -35,6 +35,7 @@ import {
   useSummary,
 } from "../lib/queries.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 const accountPath = (book: string, account: string) => `/books/${book}/accounts/${account}`;
 
@@ -42,14 +43,11 @@ const accountPath = (book: string, account: string) => `/books/${book}/accounts/
  * dated changes, escrow and what's paid from it, the payments ahead, and its settings. */
 export function LoanPage({ book, id }: { book: string; id: string }) {
   const loan = useLoan(book, id);
-  const back = useBack(`/books/${book}/loans`);
   const here = `/books/${book}/loans/${id}`;
   return (
     <main>
       <header className="page-head">
-        <Link href={back} className="back">
-          ‹ Back
-        </Link>
+        <Crumbs />
         <h1>{loan.data?.name ?? "Loan"}</h1>
       </header>
       {loan.isPending && <Loading />}

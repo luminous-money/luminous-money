@@ -9,6 +9,7 @@ import { today } from "../lib/format.js";
 import { api } from "../lib/ledger.js";
 import { useBack } from "../lib/navigation.js";
 import { explain, useFunds, useHoldings, useSummary, useTrade } from "../lib/queries.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 type Kind = TradeIn["kind"];
 
@@ -107,9 +108,7 @@ export function TradePage({ book, account }: { book: string; account: string }) 
   return (
     <main>
       <header className="page-head">
-        <Link href={back} className="back">
-          ‹ Back
-        </Link>
+        <Crumbs />
         <h1>Trade</h1>
         <p className="muted">{displayName(summary.data?.[0] ?? { name: account })}</p>
       </header>

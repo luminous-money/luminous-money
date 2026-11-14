@@ -12,6 +12,7 @@ import { add, formatMoney, isMoney, isNegative, negate } from "../lib/decimal.js
 import { formatDay } from "../lib/format.js";
 import { explain, useCanManage, useCanWrite, useFunds, useFundStars } from "../lib/queries.js";
 import { Loading } from "../components/Loading.js";
+import { Info } from "../components/Info.js";
 
 const money = (a: { number: string; currency: string }) => formatMoney(a.number, a.currency);
 
@@ -43,7 +44,14 @@ export function FundsPage({ book }: { book: string }) {
     <main>
       <header className="page-head home-head">
         <div>
-          <h1>Funds</h1>
+          <h1 className="with-info">
+            Funds
+            {active.length > 0 && (
+              <Info label="About funds">
+                Starred funds (★ on a fund&apos;s page) are on your home page.
+              </Info>
+            )}
+          </h1>
           <p className="muted">What your money is for</p>
         </div>
         <div className="actions">
@@ -100,17 +108,24 @@ export function FundsPage({ book }: { book: string }) {
               </dd>
             </div>
             <div>
-              <dt>{UNALLOCATED}</dt>
+              <dt className="with-info">
+                {UNALLOCATED}
+                <Info label={`About ${UNALLOCATED}`}>
+                  <p>
+                    {UNALLOCATED} is everything that isn&apos;t in a fund, your house and retirement
+                    accounts included.
+                  </p>
+                  {data.unpriced && data.unpriced.length > 0 && (
+                    <p>Left out of net worth, with no price yet: {data.unpriced.join(", ")}.</p>
+                  )}
+                </Info>
+              </dt>
               <dd className={`num${isNegative(data.unallocated.number) ? " negative" : ""}`}>
                 {money(data.unallocated)}
               </dd>
             </div>
           </dl>
           <HoldingsLine holdings={data.unallocated_holdings} currency={data.currency} />
-          <p className="small muted">
-            {UNALLOCATED} is everything that isn&apos;t in a fund, your house and retirement
-            accounts included.
-          </p>
           {over.length > 0 && (
             <p className="small warning" role="alert">
               Your funds hold{" "}
@@ -119,11 +134,6 @@ export function FundsPage({ book }: { book: string }) {
                 .join(" and ")}{" "}
               more than your accounts do.{" "}
               <Link href={`/books/${book}/notifications`}>See what needs a fund ›</Link>
-            </p>
-          )}
-          {data.unpriced && data.unpriced.length > 0 && (
-            <p className="small muted">
-              Left out of net worth, with no price yet: {data.unpriced.join(", ")}.
             </p>
           )}
         </section>
@@ -152,9 +162,6 @@ export function FundsPage({ book }: { book: string }) {
               <TargetProgress fund={f} />
             </Link>
           ))}
-          <p className="small muted center">
-            Starred funds (★ on a fund&apos;s page) are on your home page.
-          </p>
         </section>
       )}
 

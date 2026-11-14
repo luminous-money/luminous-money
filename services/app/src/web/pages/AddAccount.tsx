@@ -1,9 +1,10 @@
 import type { Book } from "@luminous-money/ledger-client";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 
 import { AddAccountForm } from "../components/AddAccountForm.js";
 import { bookHome } from "../lib/books.js";
 import { useParam } from "../lib/navigation.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 export function AddAccount({ book }: { book: Book }) {
   const [, navigate] = useLocation();
@@ -11,16 +12,19 @@ export function AddAccount({ book }: { book: Book }) {
   return (
     <main>
       <header className="page-head">
-        <Link href={bookHome(book.id)} className="back">
-          ‹ Home
-        </Link>
+        <Crumbs />
         <h1>Add an account</h1>
       </header>
       <section className="card">
         <AddAccountForm
           book={book.id}
           under={under ?? undefined}
-          onAdded={() => navigate(under ? `${bookHome(book.id)}/accounts` : bookHome(book.id))}
+          // Added under an account, it's that account's business, not the home page's.
+          star={!under}
+          // Its page, to set it up (Kael, 2026-11-14), under its parents.
+          onAdded={(added) =>
+            navigate(`${bookHome(book.id)}/accounts/${encodeURIComponent(added.name)}/edit`)
+          }
         />
       </section>
     </main>

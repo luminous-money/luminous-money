@@ -39,7 +39,7 @@ test("switching books shows the other book's data everywhere, and / returns to i
   await expect(homeCards(page)).toContainText("Joint Checking");
   await expect(homeCards(page)).not.toContainText("PNC Checking");
 
-  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page
     .getByRole("navigation", { name: "Main" })
     .getByRole("link", { name: "Review" })

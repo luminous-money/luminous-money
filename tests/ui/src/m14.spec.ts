@@ -1,7 +1,7 @@
 /** M14: reconciling a statement, the ledger filter, and divided accounts. */
 import { expect, test } from "@playwright/test";
 
-import { addTransactions, editSplit, setUpUser } from "./support.js";
+import { accountAction, addTransactions, editSplit, setUpUser } from "./support.js";
 
 test("a statement is ticked off, saved for later, and finished; ledgers show and filter it", async ({
   page,
@@ -11,7 +11,7 @@ test("a statement is ticked off, saved for later, and finished; ledgers show and
   await addTransactions(book.id, account, 3);
   const ledgerUrl = `/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`;
   await page.goto(ledgerUrl);
-  await page.getByRole("link", { name: "Reconcile" }).click();
+  await accountAction(page, "Reconcile");
 
   await page.getByLabel("Statement date").fill("2024-02-29");
   await page.getByLabel("Ending balance").fill("998.00");
@@ -86,5 +86,7 @@ test("a divided account is reconciled as one; its parts point to it", async ({ p
 
   await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent("Assets:PNC:General")}`);
   await expect(page.getByText("a divided account: it's reconciled with it")).toBeVisible();
+  await page.getByRole("button", { name: "Account actions" }).click();
+  await expect(page.getByRole("link", { name: "Edit" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Reconcile" })).toHaveCount(0);
 });

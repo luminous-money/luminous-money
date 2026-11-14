@@ -25,7 +25,7 @@ async function signUp(page: Page, email = newEmail()) {
 }
 
 const menu = async (page: Page, item: string) => {
-  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page
     .getByRole("navigation", { name: "Main" })
     .getByRole(item === "Log out" ? "button" : "link", { name: item })

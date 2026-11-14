@@ -4226,6 +4226,8 @@ export interface operations {
         reconciled?: boolean | null;
         /** @description Only transactions with a split that has every tag given (M17); repeat it for several. */
         tag?: string[] | null;
+        /** @description Only transactions whose payee, narration or a split's memo has every word of it. */
+        q?: string | null;
       };
       header?: never;
       path: {

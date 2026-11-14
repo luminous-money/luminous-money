@@ -1,7 +1,7 @@
 /** M11: budgets, on their page, an account's ledger and editor, and home. */
 import { expect, test, type Page } from "@playwright/test";
 
-import { setUpUser, stored } from "./support.js";
+import { openMore, setUpUser, stored } from "./support.js";
 
 const GROCERIES = "Expenses:Food:Groceries";
 const today = () => new Date().toLocaleDateString("en-CA");
@@ -109,6 +109,7 @@ test("a transaction excluded from budgets still counts, but not against them", a
     .getByRole("list", { name: "Transactions" })
     .getByRole("button", { name: /Grocer/ })
     .click();
+  await openMore(page);
   await page.getByRole("checkbox", { name: "Exclude from budget" }).check();
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Saved")).toBeVisible();
@@ -120,6 +121,7 @@ test("a transaction excluded from budgets still counts, but not against them", a
   // In review, straight from the card.
   const { data } = await spend("30.00", "!");
   await page.goto(`/ui/books/${book}/review`);
+  await openMore(page.getByRole("article"));
   await page.getByRole("article").getByRole("checkbox", { name: "Exclude from budget" }).check();
   await expect.poll(async () => (await stored(book, data!.id)).meta?.budget).toBe(false);
 });

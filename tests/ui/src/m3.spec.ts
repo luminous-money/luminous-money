@@ -30,6 +30,7 @@ test("Repeat… makes a monthly schedule that stages what's due, marked ↻ in t
   });
 
   await page.goto(`/ui/books/${book.id}/transactions/${paid!.id}`);
+  await page.getByRole("button", { name: "More actions" }).click(); // Repeat… is in ⋯
   await page.getByRole("link", { name: "Repeat…" }).click();
 
   await expect(page.getByRole("heading", { name: "New schedule" })).toBeVisible();

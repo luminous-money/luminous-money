@@ -6,7 +6,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 
-import { importText, logIn, stored } from "./support.js";
+import { importText, logIn, openMore, stored } from "./support.js";
 
 const CASH = "Assets:Brokerage:Fidelity:Cash";
 const VTI = "Assets:Brokerage:Fidelity:VTI";
@@ -117,6 +117,7 @@ test("a trade's From fund and To fund: one choice gives a fund the whole trade",
     },
   });
   await page.goto(`/ui/books/${book}/transactions/${t!.id}`);
+  await openMore(page);
   const funds = page.getByRole("group", { name: "Funds" });
   await expect(funds).toContainText("Bought 10 VTI for $3,000.00.");
   await funds.getByRole("combobox", { name: "From fund" }).selectOption("Emergency");

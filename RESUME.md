@@ -4,13 +4,43 @@ Where We Left Off
 _Updated 2026-11-14._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-14, evening): errors, loading, offline and new versions (design pass, part 1)
+## Latest (2026-11-14, night): the design pass (M20), with Kael's round, released as `v0.1.31`
+
+Kael tried the design pass on the dev server, chose Geist, sent a round of nits, and asked for it
+all to be committed and released. **Committed, pushed and released as `v0.1.31`.** Everything is
+listed in [M20's plan](docs/milestones/m20-design-polish/PLAN.md); design.md has "The design
+pass: how it looks and moves".
+
+- **New pieces:** `components/Nav.tsx` (the grouped menu: the phone's full-screen drawer in
+  `Menu.tsx`, and the wide screen's sidebar), `Crumbs.tsx` and `lib/crumbs.ts` (breadcrumbs;
+  pure, unit-tested), `Info.tsx` ((i) notes), `More.tsx` (funds and Exclude from budget folded
+  away), `Overflow.tsx` (⋯), `FindBar.tsx` (find on page), `ChartTree.tsx` (the chart's tree,
+  also a node's Subaccounts), `ListTools` in `LedgerFilter.tsx` (lists' one-row header and its
+  pills). New devDependencies of `app`: `lucide-react`, `@fontsource-variable/geist`.
+- **Ledger API:** an account's ledger takes `q` (search, as the journal's); client
+  regenerated.
+- **Every "‹ Back" is breadcrumbs now.** A page that sends you somewhere and expects you back
+  still passes `?back=` (`withBack`); the crumb is built from it.
+- **Tests:** ledger (`test_journal_filters.py`: the ledger's search), app (`crumbs.test.ts`;
+  `accounts.test.ts`'s message), browser (updated throughout: `openMore` and `crumb` in
+  `tests/ui/src/support.ts`; ⋯ "More actions" and "Account actions"; filter pills; the date in
+  the filter; adding an account lands on its page; m12: a leaf in the breakdown opens).
+  `pnpm test` and `pnpm e2e` passed (API, browser 140 of 140, the command). A ledger's ⋯ is
+  opened and used as one retried step in tests (`accountAction`): under a full run the header
+  can still be filling in when it's first tapped.
+- **Preview stack for screenshots** (not the dev stack, which holds real data): the e2e stack
+  under project `luminous-money-preview`, Traefik on 127.0.0.1:8091, `LUMINOUS_MONEY_PUBLIC_URL`
+  set to the Vite server's origin (else auth refuses writes), seeded with `pnpm seed`
+  (`LUMINOUS_MONEY_URL=http://localhost:8091`), Vite on 5174 proxying to it
+  (`LUMINOUS_MONEY_URL=http://localhost:8091 npx vite --port 5174` in `services/app`). Log in
+  as `preview@example.test` / `preview-luminous-2026`. Don't use project `luminous-money-e2e`
+  for this: `pnpm e2e` takes it down.
+
+## Before that (2026-11-14, evening): errors, loading, offline and new versions (design pass, part 1)
 
 Kael asked for a design pass over the whole app ("it feels like open source software"; reports,
-home and the split editor stay as they are). The functional half is **committed, not
-released**; the design half (font, buttons, menu, the transaction editor, funds in a "More"
-drawer, Bank connections grouped by bank, fieldsets, info icons, sticky bars) is being built
-**uncommitted** for him to try on a dev server first.
+home and the split editor stay as they are). This was the functional half, committed
+first; the design half is the entry above, released with it as `v0.1.31`.
 
 - **Errors:** every refusal reads as a sentence (`sentence`, `explain`), and a response with no
   detail gets words for its status (`statusMessage`). A stale edit's 409 carries `code:
@@ -31,12 +61,6 @@ drawer, Bank connections grouped by bank, fieldsets, info icons, sticky bars) is
   `format.test.ts`), ledger (`test_versions.py`: the code). `pnpm e2e`: API and command passed,
   browser 139 of 140: `loans.spec.ts` waited 5 seconds for the new loan's page with the whole
   suite running, and passed 3 of 3 alone; it waits 15 now.
-- **Preview stack for screenshots** (not the dev stack, which holds real data): the e2e stack
-  under project `luminous-money-preview`, Traefik on 127.0.0.1:8091, `LUMINOUS_MONEY_PUBLIC_URL`
-  set to the Vite server's origin (else auth refuses writes), seeded with `pnpm seed`
-  (`LUMINOUS_MONEY_URL=http://localhost:8091`), Vite on 5174 proxying to it. Don't use project
-  `luminous-money-e2e` for this: `pnpm e2e` takes it down.
-
 ## Before that (2026-11-14, later): leave out what's excluded from budgets; tag filters list their tags
 
 Two more from Kael, on Reports (PLAN.md's Polish, under "Kael's changes, 2026-11-14"; design.md

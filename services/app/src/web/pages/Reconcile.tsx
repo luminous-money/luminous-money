@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "wouter";
 
 import { displayName, shortName, shown } from "../lib/accounts.js";
 import type { ReconcileItem, ReconcileView } from "../lib/appApi.js";
 import { add, formatMoney, isDecimal, isNegative, isZero, negate } from "../lib/decimal.js";
 import { formatDay } from "../lib/format.js";
-import { useBack } from "../lib/navigation.js";
 import {
   explain,
   useAccounts,
@@ -18,6 +16,7 @@ import {
   useUndoReconciliation,
 } from "../lib/queries.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -30,8 +29,6 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
  * Past statements are listed after, with Undo on the latest.
  */
 export function Reconcile({ book, account }: { book: string; account: string }) {
-  const ledgerHref = `/books/${book}/accounts/${encodeURIComponent(account)}`;
-  const back = useBack(ledgerHref);
   const accounts = useAccounts(book);
   const info = accounts.data?.find((a) => a.name === account);
   const [through, setThrough] = useState<string | undefined>();
@@ -43,9 +40,7 @@ export function Reconcile({ book, account }: { book: string; account: string }) 
   return (
     <main className="stack">
       <header className="page-head">
-        <Link href={back} className="back">
-          ‹ Back
-        </Link>
+        <Crumbs />
         <h1>Reconcile {displayName(info ?? { name: account })}</h1>
         <p className="muted">Tick off what's on the statement until the difference is zero.</p>
       </header>

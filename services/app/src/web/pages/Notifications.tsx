@@ -9,23 +9,20 @@ import { Link } from "wouter";
 
 import { displayName } from "../lib/accounts.js";
 import { formatDay } from "../lib/format.js";
-import { useBack, withBack } from "../lib/navigation.js";
+import { withBack } from "../lib/navigation.js";
 import { explain, useAccounts, useDismissNotification, useNotifications } from "../lib/queries.js";
-import { bookHome } from "../lib/books.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 export function NotificationsPage({ book }: { book: string }) {
   const queue = useNotifications(book);
   const dismiss = useDismissNotification(book);
-  const back = useBack(bookHome(book));
   const here = `/books/${book}/notifications`;
   const items = queue.data ?? [];
   return (
     <main>
       <header className="page-head">
-        <Link href={back} className="back">
-          ‹ Back
-        </Link>
+        <Crumbs />
         <h1>Notifications</h1>
         <p className="muted">What needs you, oldest first</p>
       </header>

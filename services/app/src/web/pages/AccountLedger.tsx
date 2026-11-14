@@ -3,16 +3,16 @@ import { Link, useLocation } from "wouter";
 
 import { displayName, shortName, shown } from "../lib/accounts.js";
 import { formatMoney, isNegative } from "../lib/decimal.js";
-import { bookHome } from "../lib/books.js";
 import { withBack } from "../lib/navigation.js";
 import { AccountValueNote, headline } from "../components/AccountValue.js";
 import { BankErrors, ReportedLine } from "../components/BankStatus.js";
 import { BudgetGlance } from "../components/Budget.js";
 import { CountedHere } from "../components/Outflow.js";
+import { Overflow } from "../components/Overflow.js";
 import { TypicalPeriods } from "../components/TypicalPeriods.js";
 import { HoldingsPanel } from "../components/Holdings.js";
-import { JumpToDate, MoreBelow, NewerRow, usePaging } from "../components/Paged.js";
-import { filteredLabel, LedgerFilter, useLedgerView } from "../components/LedgerFilter.js";
+import { MoreBelow, NewerRow, usePaging } from "../components/Paged.js";
+import { filteredLabel, ListTools, useLedgerView } from "../components/LedgerFilter.js";
 import { FundChips } from "../components/Funds.js";
 import { TagChips } from "../components/Tags.js";
 import { ReconcileStatus } from "../components/ReconcileStatus.js";
@@ -22,7 +22,7 @@ import { SelectBar } from "../components/SelectBar.js";
 import { useBulkActions } from "../lib/bulk.js";
 import { postable } from "../lib/accounts.js";
 import { today } from "../lib/format.js";
-import { useSelection } from "../lib/selection.js";
+import { selectClick, useSelection } from "../lib/selection.js";
 import { unresolved, withOtherSide } from "../lib/split.js";
 import {
   explain,
@@ -43,6 +43,7 @@ import {
 import { upcomingFor } from "../lib/upcoming.js";
 import type { LedgerRow } from "@luminous-money/ledger-client";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 /**
  * One account's ledger: every transaction, newest first, 200 at a time, more loading as you
@@ -79,8 +80,8 @@ function partsLabel(row: LedgerRow, account: string): string | null {
 export function AccountLedger({ book, account }: { book: string; account: string }) {
   const [, navigate] = useLocation();
   const base = `/books/${book}/accounts/${encodeURIComponent(account)}`;
-  const { date, reconciled, tags, here, href } = useLedgerView(base);
-  const ledger = useAccountLedger(book, account, date, reconciled, tags);
+  const { date, reconciled, tags, q, here, href } = useLedgerView(base);
+  const ledger = useAccountLedger(book, account, date, reconciled, tags, q);
   const summary = useSummary(book, [account]);
   const info = summary.data?.[0];
   const stars = useStars(book);
@@ -121,15 +122,13 @@ export function AccountLedger({ book, account }: { book: string; account: string
     confirmBlocked:
       (unresolved(account) || chosen.some((r) => !!r.counterpart && unresolved(r.counterpart))) &&
       "choose their accounts first",
-    onConfirmed: selection.clear,
   });
 
+  const importable = (info?.kind === "leaf" || info?.divided) && !info.implicit && !info.close;
   return (
     <main>
       <header className="page-head">
-        <Link href={bookHome(book)} className="back">
-          ‹ Home
-        </Link>
+        <Crumbs />
         <div className="home-head">
           <div>
             <h1>
@@ -154,20 +153,6 @@ export function AccountLedger({ book, account }: { book: string; account: string
               <ReconcileStatus book={book} account={account} accounts={accounts.data} />
             )}
           </div>
-          {canWrite &&
-            (info?.kind === "leaf" || info?.divided) &&
-            !info.implicit &&
-            !info.close && (
-              <Link
-                href={withBack(
-                  `/books/${book}/import?account=${encodeURIComponent(account)}`,
-                  here
-                )}
-                className="button"
-              >
-                Import transactions
-              </Link>
-            )}
         </div>
         {budget && (
           <Link href={`/books/${book}/budgets`} className="budget-link" aria-label="Budget">
@@ -176,34 +161,65 @@ export function AccountLedger({ book, account }: { book: string; account: string
         )}
         {canWrite && !selection.selecting && (
           <div className="actions">
-            <button type="button" onClick={selection.start}>
-              Select
-            </button>
-            {reconcilable && (
-              <Link href={withBack(`${base}/reconcile`, here)} className="button">
-                Reconcile
-              </Link>
-            )}
-            {whole && whole !== account && (
-              <button type="button" onClick={() => setMoving(!moving)} aria-expanded={moving}>
-                Move money
-              </button>
-            )}
-            <Link
-              href={`/books/${book}/accounts/${encodeURIComponent(account)}/edit`}
-              className="button"
+            <button
+              type="button"
+              className="primary"
+              onClick={() =>
+                navigate(
+                  withBack(
+                    // A divided account's own postings are its parts': the main part, to start.
+                    `/books/${book}/transactions/new?account=${encodeURIComponent(info?.divided && info.main_part ? info.main_part : account)}`,
+                    here
+                  )
+                )
+              }
             >
-              Edit
-            </Link>
-            {linked && (
-              <button
-                type="button"
-                disabled={syncBank.isPending}
-                onClick={() => syncBank.mutate(linked.connection_id)}
+              + Add transaction
+            </button>
+            <Overflow label="Account actions">
+              {reconcilable && (
+                <Link href={withBack(`${base}/reconcile`, here)} className="menu-item">
+                  Reconcile
+                </Link>
+              )}
+              {whole && whole !== account && (
+                <button
+                  type="button"
+                  className="menu-item"
+                  onClick={() => setMoving(!moving)}
+                  aria-expanded={moving}
+                >
+                  Move money
+                </button>
+              )}
+              {importable && (
+                <Link
+                  href={withBack(
+                    `/books/${book}/import?account=${encodeURIComponent(account)}`,
+                    here
+                  )}
+                  className="menu-item"
+                >
+                  Import transactions…
+                </Link>
+              )}
+              <Link
+                href={`/books/${book}/accounts/${encodeURIComponent(account)}/edit`}
+                className="menu-item"
               >
-                {syncBank.isPending ? "Syncing…" : "Sync now"}
-              </button>
-            )}
+                Edit
+              </Link>
+              {linked && (
+                <button
+                  type="button"
+                  className="menu-item"
+                  disabled={syncBank.isPending}
+                  onClick={() => syncBank.mutate(linked.connection_id)}
+                >
+                  {syncBank.isPending ? "Syncing…" : "Sync now"}
+                </button>
+              )}
+            </Overflow>
           </div>
         )}
       </header>
@@ -234,55 +250,33 @@ export function AccountLedger({ book, account }: { book: string; account: string
       )}
       {info && !selection.selecting && <TypicalPeriods book={book} account={info} />}
 
-      {selection.selecting ? (
-        <SelectBar
-          count={chosen.length}
-          shown={rows.length}
-          onSelectAll={() => selection.selectAll(rows.map((r) => r.id))}
-          actions={bulkActions.actions}
-          busy={bulkActions.busy}
-          note={bulkActions.note}
-          onDone={selection.stop}
-        />
-      ) : canWrite ? (
-        <div className="ledger-add">
-          <button
-            type="button"
-            className="primary"
-            onClick={() =>
-              navigate(
-                withBack(
-                  // A divided account's own postings are its parts': the main part, to start.
-                  `/books/${book}/transactions/new?account=${encodeURIComponent(info?.divided && info.main_part ? info.main_part : account)}`,
-                  here
-                )
-              )
-            }
-          >
-            + Add transaction
-          </button>
-        </div>
-      ) : null}
-
-      <div className="ledger-tools">
-        <JumpToDate
-          key={date ?? ""}
-          date={date}
-          onGo={(to) => navigate(href({ date: to, reconciled, tags }))}
-        />
-        <LedgerFilter
-          book={book}
-          filter={{ reconciled, tags }}
-          onChange={(view) => navigate(href({ date, ...view }))}
-        />
-      </div>
+      <ListTools
+        book={book}
+        view={{ date, reconciled, tags, q }}
+        onChange={(view, options) => navigate(href(view), options)}
+        reconciliation
+        onSelect={canWrite ? selection.start : undefined}
+        selecting={
+          selection.selecting ? (
+            <SelectBar
+              count={chosen.length}
+              shown={rows.length}
+              onSelectAll={() => selection.selectAll(rows.map((r) => r.id))}
+              actions={bulkActions.actions}
+              busy={bulkActions.busy}
+              note={bulkActions.note}
+              onDone={selection.stop}
+            />
+          ) : null
+        }
+      />
 
       {ledger.isPending && <Loading />}
       {ledger.error && <p className="card error">{explain(ledger.error)}</p>}
       {ledger.data && rows.length === 0 && (
         <p className="card muted">
-          {reconciled !== undefined || tags.length
-            ? `No ${filteredLabel({ reconciled, tags })}${date ? ` on or before ${date}` : ""}.`
+          {reconciled !== undefined || tags.length || q.trim()
+            ? `No ${filteredLabel({ reconciled, tags, q })}${date ? ` on or before ${date}` : ""}.`
             : date
               ? `Nothing on or before ${date}.`
               : "No transactions yet."}
@@ -293,7 +287,8 @@ export function AccountLedger({ book, account }: { book: string; account: string
         !selection.selecting &&
         !ledger.hasPreviousPage &&
         reconciled === undefined &&
-        !tags.length && (
+        !tags.length &&
+        !q.trim() && (
           <ol className="ledger upcoming-rows" aria-label="Upcoming">
             {ahead.map((row) => (
               <li key={row.key}>
@@ -334,7 +329,13 @@ export function AccountLedger({ book, account }: { book: string; account: string
             <button
               type="button"
               className={`ledger-row${row.flag === "!" ? " unconfirmed" : ""}${selection.has(row.id) ? " selected" : ""}`}
-              onClick={() => (selection.selecting ? selection.toggle(row.id) : open(row.id))}
+              onClick={(e) =>
+                selection.selecting
+                  ? selection.toggle(row.id)
+                  : canWrite && selectClick(e)
+                    ? selection.startWith(row.id)
+                    : open(row.id)
+              }
               {...(selection.selecting
                 ? { role: "checkbox", "aria-checked": selection.has(row.id) }
                 : {})}

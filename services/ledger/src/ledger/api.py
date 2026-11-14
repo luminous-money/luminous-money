@@ -422,11 +422,23 @@ def create_app(ledger: Ledger) -> FastAPI:
         limit: Annotated[int, Query(ge=1, le=1000)] = 200,
         reconciled: ReconciledParam = None,
         tag: TagParam = None,
+        q: Annotated[
+            str | None,
+            Query(description="Only transactions whose payee, narration or a split's memo has every word of it."),
+        ] = None,
     ) -> models.LedgerPage:
         if sum(x is not None for x in (cursor, after, date)) > 1:
             raise HTTPException(422, "pass one of cursor, after and date")
         return ledger.account_ledger(
-            book_id, account, cursor=cursor, after=after, date=date, limit=limit, reconciled=reconciled, tags=tag
+            book_id,
+            account,
+            cursor=cursor,
+            after=after,
+            date=date,
+            limit=limit,
+            reconciled=reconciled,
+            tags=tag,
+            search=q,
         )
 
     @api.get("/books/{book_id}/journal")

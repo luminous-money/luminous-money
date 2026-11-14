@@ -19,6 +19,7 @@ import {
   useAccountTree,
   useArchiveAccount,
   useBudgetStatus,
+  useCanWrite,
   usePurgeAccount,
   usePurgePreview,
   useRemoveAccount,
@@ -30,6 +31,9 @@ import {
   useUnarchiveAccount,
 } from "../lib/queries.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
+import { ChartTree } from "../components/ChartTree.js";
+import { withBack } from "../lib/navigation.js";
 
 const TYPE_NAMES: Record<string, string> = {
   asset: "an asset",
@@ -48,7 +52,7 @@ const TYPE_NAMES: Record<string, string> = {
 export function AccountEditor({ book, account }: { book: string; account: string }) {
   const tree = useAccountTree(book);
   const found = tree.data?.find((a) => a.name === account);
-  const ledgerHref = `/books/${book}/accounts/${encodeURIComponent(account)}`;
+  const canWrite = useCanWrite(book);
   if (tree.isPending)
     return (
       <main>
@@ -70,12 +74,7 @@ export function AccountEditor({ book, account }: { book: string; account: string
   return (
     <main className="stack">
       <header className="page-head">
-        <Link
-          href={found.kind === "leaf" ? ledgerHref : `/books/${book}/accounts`}
-          className="back"
-        >
-          ‹ Back
-        </Link>
+        <Crumbs />
         <h1>{displayName(found)}</h1>
         <p className="muted">
           {found.name}
@@ -84,18 +83,32 @@ export function AccountEditor({ book, account }: { book: string; account: string
         </p>
         {found.description && <p className="account-description">{found.description}</p>}
       </header>
-      {found.kind === "node" && !found.close && (
-        <Link
-          href={`/books/${book}/accounts/new?under=${encodeURIComponent(found.name)}`}
-          className="button"
-        >
-          + Add an account under {displayName(found)}
-        </Link>
-      )}
       {isRoot ? (
         <p className="card small muted">A top-level account: its name can't be changed.</p>
       ) : (
         <Names book={book} account={found} accounts={tree.data!} />
+      )}
+      {found.kind === "node" && (
+        // Its part of the chart, in a window of its own height (as home's recent transactions).
+        <section className="card subaccounts" aria-label="Subaccounts">
+          <div className="row-between">
+            <h2 className="section-title">Subaccounts</h2>
+            {canWrite && !found.close && (
+              <Link
+                href={withBack(
+                  `/books/${book}/accounts/new?under=${encodeURIComponent(found.name)}`,
+                  `/books/${book}/accounts/${encodeURIComponent(found.name)}/edit`
+                )}
+                className="button small-button"
+              >
+                + Add
+              </Link>
+            )}
+          </div>
+          <div className="subaccounts-window chart">
+            <ChartTree book={book} accounts={tree.data!} under={found.name} />
+          </div>
+        </section>
       )}
       {settings && <Settings book={book} account={account} />}
       {!isRoot &&

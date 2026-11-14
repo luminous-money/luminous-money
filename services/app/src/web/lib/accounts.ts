@@ -158,7 +158,10 @@ export function checkNewAccount(name: string, accounts: Account[]): NewAccountCh
   if (!root || !roots.includes(root.name))
     return { ok: false, message: `Start with one of ${roots.join(", ")}` };
   if (parts.length < 2 || !parts.at(-1))
-    return { ok: false, message: `Name an account under ${root.name}` };
+    return {
+      ok: false,
+      message: `Name an account under ${parts.slice(0, -1).filter(Boolean).join(":") || root.name}`,
+    };
   const bad = parts.slice(1).find((p) => !isSegment(p));
   if (bad !== undefined) {
     return {

@@ -107,9 +107,24 @@ test("the breakdown lists every transaction under where it is, and keeps its pla
   // Opening one and coming back finds the breakdown where it was.
   await food.getByRole("button", { name: /Corner Grocer/ }).click();
   await expect(page.getByRole("heading", { name: "Transaction" })).toBeVisible();
-  await page.getByRole("link", { name: "‹ Back" }).click();
+  await page
+    .getByRole("navigation", { name: "Breadcrumbs" })
+    .getByRole("link", { name: "Reports" })
+    .click();
   await expect(breakdown.getByRole("navigation", { name: "Drilled into" })).toContainText("Food");
   await expect(food.getByRole("listitem")).toHaveCount(7);
+
+  // A leaf opens too: its own transactions, and nothing else's (2026-11-14).
+  await breakdown
+    .getByRole("list", { name: "Categories" })
+    .getByRole("button", { name: /Groceries/ })
+    .click();
+  await expect(breakdown.getByRole("navigation", { name: "Drilled into" })).toContainText(
+    "Groceries"
+  );
+  const groceries = breakdown.getByRole("list", { name: "Transactions under Groceries" });
+  await expect(groceries).toContainText("Corner Grocer");
+  await expect(page).toHaveURL(/of=Expenses%3AFood%3AGroceries/);
 });
 
 test("what counts as spending shows on its expense account, and in the breakdown's transactions", async ({

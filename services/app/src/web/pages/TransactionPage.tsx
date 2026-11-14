@@ -4,12 +4,15 @@ import { Link, useLocation } from "wouter";
 
 import { Attachments, type Pending } from "../components/Attachments.js";
 import { BrokerageNote, ReceiptNote } from "../components/ReceiptNote.js";
-import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
+import { ExcludeFromBudget, excludedFromBudget } from "../components/ExcludeFromBudget.js";
+import { More, moreSummary } from "../components/More.js";
+import { Overflow } from "../components/Overflow.js";
 import { FundsFieldset, fundsShown, useFundRows } from "../components/Funds.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
 import { PartChoice } from "../components/PartChoice.js";
 import { SplitsFieldset, useSplits } from "../components/Splits.js";
 import { displayName, postable } from "../lib/accounts.js";
+import { formatMoney, isNegative } from "../lib/decimal.js";
 import { formatDay, today } from "../lib/format.js";
 import { useBack, useParam, withBack } from "../lib/navigation.js";
 import {
@@ -27,6 +30,7 @@ import {
 import { attachments } from "../lib/appApi.js";
 import { simple } from "../lib/split.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 /** Its postings' reconciliations (M14): which account's statement, of which day. */
 function reconciliations(t: Transaction): { account: string; date: string }[] {
@@ -62,9 +66,7 @@ export function TransactionPage({ book, id }: { book: string; id: string }) {
   return (
     <main>
       <header className="page-head">
-        <Link href={back} className="back">
-          ‹ Back
-        </Link>
+        <Crumbs />
         <h1>Transaction</h1>
       </header>
       {(loaded.isPending || accounts.isPending) && <Loading />}
@@ -104,9 +106,7 @@ export function NewTransactionPage({ book }: { book: string }) {
   return (
     <main>
       <header className="page-head">
-        <Link href={back} className="back">
-          ‹ Back
-        </Link>
+        <Crumbs />
         <h1>New transaction</h1>
       </header>
       {accounts.isPending ? (
@@ -211,31 +211,64 @@ function Editor({
     }
   };
 
+  const headline = simple({ postings });
+  const anchor = headline && accounts.data?.find((a) => a.name === headline.anchor.account);
   return (
-    <form className="editor" onSubmit={(e) => (e.preventDefault(), void submit(t.flag))}>
+    <form className="editor txn-editor" onSubmit={(e) => (e.preventDefault(), void submit(t.flag))}>
       {!isNew && (
-        <p className="status-line">
-          <span className={`pill ${staged ? "staged" : "confirmed"}`}>
-            {staged ? "Unconfirmed" : "Confirmed"}
-          </span>
-          <Link
-            href={withBack(
-              `/books/${book}/schedules/new?from=${t.id}`,
-              `/books/${book}/transactions/${t.id}`
+        // What it is at a glance: who, how much, from where; its status; and what's done to it
+        // now and then (Repeat…, Delete), in ⋯.
+        <section className="card txn-summary" aria-label="Summary">
+          <div className="txn-summary-top">
+            <span className={`pill ${staged ? "staged" : "confirmed"}`}>
+              {staged ? "Unconfirmed" : "Confirmed"}
+            </span>
+            {reconciled.length > 0 && (
+              <span className="pill reconciled-pill">
+                <span aria-hidden="true">✓</span> Reconciled
+              </span>
             )}
-          >
-            Repeat…
-          </Link>
-        </p>
+            <Overflow>
+              <Link
+                className="menu-item"
+                href={withBack(
+                  `/books/${book}/schedules/new?from=${t.id}`,
+                  `/books/${book}/transactions/${t.id}`
+                )}
+              >
+                Repeat…
+              </Link>
+              {canWrite && (
+                <button
+                  type="button"
+                  className="menu-item danger"
+                  disabled={busy}
+                  onClick={() => void deleteIt()}
+                >
+                  Delete
+                </button>
+              )}
+            </Overflow>
+          </div>
+          <div className="txn-headline">
+            <h2>{payee.trim() || narration.trim() || "No payee"}</h2>
+            {headline && (
+              <span className={`amount ${isNegative(headline.amount) ? "out" : "in"}`}>
+                {formatMoney(headline.amount, headline.currency)}
+              </span>
+            )}
+          </div>
+          <p className="small muted">
+            {formatDay(date)}
+            {headline && ` · ${displayName(anchor ?? { name: headline.anchor.account })}`}
+          </p>
+        </section>
       )}
 
       {!isNew && <PairedTransfer book={book} transaction={t} onRejected={() => navigate(back)} />}
 
       {reconciled.length > 0 && (
         <p className="card small reconciled-note">
-          <span className="reconciled-mark" aria-hidden="true">
-            ✓
-          </span>{" "}
           Reconciled with{" "}
           {reconciled
             .map((r) => {
@@ -247,18 +280,20 @@ function Editor({
         </p>
       )}
 
-      <label>
-        Date
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-      </label>
-      <label>
-        Payee
-        <input value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="Optional" />
-      </label>
-      <label>
-        Description
-        <input value={narration} onChange={(e) => setNarration(e.target.value)} />
-      </label>
+      <section className="card txn-fields" aria-label="Details">
+        <label>
+          Date
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+        </label>
+        <label>
+          Payee
+          <input value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="Optional" />
+        </label>
+        <label>
+          Description
+          <input value={narration} onChange={(e) => setNarration(e.target.value)} />
+        </label>
+      </section>
 
       <PartChoice book={book} postings={splits.rows} onChange={(rows) => splits.setRows(rows)} />
       <SplitsFieldset
@@ -268,16 +303,6 @@ function Editor({
         tags={bookTags.data ?? []}
         disabled={!canWrite}
       />
-      {funds.ready && fundsShown(listing.data, t.funds) && (
-        <FundsFieldset
-          book={book}
-          funds={funds}
-          balanced={balance.state !== "invalid"}
-          readOnly={!canWrite}
-        />
-      )}
-      <ExcludeFromBudget meta={meta} onChange={setMeta} />
-
       <ReceiptNote meta={t.meta} />
       <BrokerageNote meta={t.meta} />
 
@@ -288,6 +313,23 @@ function Editor({
         pending={pending}
         onPending={setPending}
       />
+
+      {/* Used now and then: folded away, saying what's set (Kael, 2026-11-14: funds were too
+          prominent). Funds that block saving open it. */}
+      <More
+        summary={moreSummary(funds.ready ? funds.lines : t.funds, excludedFromBudget(meta))}
+        open={fundsBlocked}
+      >
+        {funds.ready && fundsShown(listing.data, t.funds) && (
+          <FundsFieldset
+            book={book}
+            funds={funds}
+            balanced={balance.state !== "invalid"}
+            readOnly={!canWrite}
+          />
+        )}
+        <ExcludeFromBudget meta={meta} onChange={setMeta} />
+      </More>
 
       {message && <p className={message.kind === "error" ? "error" : "ok"}>{message.text}</p>}
       {confirming && (
@@ -307,13 +349,10 @@ function Editor({
       )}
 
       <div className="actions pinned">
-        <Link href={back} className="button">
-          Back
-        </Link>
-        {!isNew && canWrite && (
-          <button type="button" disabled={busy} onClick={() => void deleteIt()}>
-            Delete
-          </button>
+        {isNew && (
+          <Link href={back} className="button">
+            Cancel
+          </Link>
         )}
         <button
           type="submit"

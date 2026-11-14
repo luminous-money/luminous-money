@@ -71,14 +71,20 @@ test("a brokerage says whether its activity is read; a linked one says what it d
   const { book } = await setUpUser(page);
   await page.goto(`/ui/books/${book.id}/connections`);
   await page.getByRole("textbox", { name: "Setup token" }).fill(await brokerages());
-  await page.getByRole("button", { name: "Connect" }).click();
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
   const connection = page.getByRole("region", { name: /Connection to/ });
-  await expect(connection).toContainText("Fidelity's activity is read");
+  // Said once over each bank's accounts (2026-11-14), how it's read in its (i).
+  const fidelity = connection.getByRole("region", { name: "Fidelity Investments" });
+  await fidelity
+    .getByRole("button", { name: "How Fidelity Investments' activity is read" })
+    .click();
+  await expect(page.getByRole("note")).toContainText("Fidelity's activity is read");
+  await page.keyboard.press("Escape");
   // Another brokerage: its rows come in as cash, and how to get it read.
-  await expect(connection.getByRole("note")).toContainText(
-    "can't read Elsewhere Securities's activity yet"
-  );
-  await expect(connection.getByRole("link", { name: "Open an issue" })).toHaveAttribute(
+  const elsewhere = connection.getByRole("region", { name: "Elsewhere Securities" });
+  await expect(elsewhere).toContainText("Can't read Elsewhere Securities' activity yet");
+  await elsewhere.getByRole("button", { name: "Getting it read" }).click();
+  await expect(page.getByRole("link", { name: "Open an issue" })).toHaveAttribute(
     "href",
     /github\.com\/luminous-money\/luminous-money\/issues\/new\?title=Read%20Elsewhere/
   );

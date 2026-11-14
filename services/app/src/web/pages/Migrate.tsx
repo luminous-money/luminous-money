@@ -32,6 +32,7 @@ import {
 import { AiSettingsPanel } from "./AiSettings.js";
 import { BankConnectionsPanel } from "./BankConnections.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 type Files = { chart?: { name: string; text: string }; history?: { name: string; text: string } };
 type Change = Parameters<typeof appApi.migration.change>[1];
@@ -115,9 +116,7 @@ export function Migrate({ book }: { book: Book }) {
   return (
     <main className="stack">
       <header className="page-head">
-        <Link href={`/books/${book.id}/accounts`} className="back">
-          ‹ Accounts
-        </Link>
+        <Crumbs />
         <h1>Migrate from another system</h1>
         <p className="muted">
           Bring {book.name}&apos;s accounts and history from the books you kept before, then let

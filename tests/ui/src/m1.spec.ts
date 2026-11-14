@@ -3,10 +3,19 @@ import { readFileSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { addAccount, addTransactions, editSplit, logIn, setUpUser, splitRows } from "./support.js";
+import {
+  accountAction,
+  addAccount,
+  addTransactions,
+  crumb,
+  editSplit,
+  logIn,
+  setUpUser,
+  splitRows,
+} from "./support.js";
 
 const menu = async (page: Page, item: string) => {
-  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page
     .getByRole("navigation", { name: "Main" })
     .getByRole(item === "Log out" ? "button" : "link", { name: item })
@@ -61,6 +70,9 @@ test("an account is added by its full name, starred onto the home page, a card s
   await page.getByRole("textbox", { name: "Balance" }).fill("250.00");
   await page.getByLabel("Balance as of").fill("2024-01-01");
   await page.getByRole("button", { name: "Add account" }).click();
+  // Its page, then home, where it's starred.
+  await expect(page.getByRole("heading", { name: "Chase Sapphire" })).toBeVisible();
+  await page.goto(`/ui/books/${book.id}`);
 
   const card = page.getByRole("link", { name: /Chase Sapphire/ });
   await expect(card).toContainText("$250.00");
@@ -192,7 +204,7 @@ test.describe("an account's ledger", () => {
 
     await costco.click();
     await expect(page.getByRole("heading", { name: "Transaction" })).toBeVisible();
-    await page.getByRole("link", { name: "‹ Back" }).click();
+    await crumb(page, "PNC Checking").click();
     await expect(page.getByRole("heading", { name: "PNC Checking" })).toBeVisible();
   });
 
@@ -227,11 +239,13 @@ test.describe("an account's ledger", () => {
     // Saying no keeps it.
     const asked: string[] = [];
     page.once("dialog", (dialog) => (asked.push(dialog.message()), void dialog.dismiss()));
+    await page.getByRole("button", { name: "More actions" }).click(); // Delete is in ⋯
     await page.getByRole("button", { name: "Delete" }).click();
     expect(asked).toEqual(["Delete this transaction? It's for good."]);
     await expect(page.getByRole("heading", { name: "Transaction" })).toBeVisible();
 
     page.once("dialog", (dialog) => void dialog.accept());
+    await page.getByRole("button", { name: "More actions" }).click(); // Delete is in ⋯
     await page.getByRole("button", { name: "Delete" }).click();
     await expect(page.getByRole("heading", { name: "PNC Checking" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Opening balance/ })).toBeVisible();
@@ -302,16 +316,16 @@ test.describe("an account's ledger", () => {
     const savings = { name: await addAccount(book.id, "Assets:Bank:PNC-Savings", "0") };
     await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(savings!.name)}`);
 
-    await page.getByRole("link", { name: "Import transactions" }).click();
+    await accountAction(page, "Import transactions…");
     await expect(page.getByRole("heading", { name: "Import transactions" })).toBeVisible();
     await expect(page.getByRole("combobox", { name: "Account" })).toHaveValue(savings!.name);
 
-    await page.getByRole("link", { name: "‹ Back" }).click();
+    await crumb(page, "PNC Savings").click();
     await expect(page.getByRole("heading", { name: "PNC Savings" })).toBeVisible();
   });
 });
 
-test("a transaction's Back and Save stay on screen, and settle into place at the end", async ({
+test("a transaction's Save stays on screen, and settles into place at the end", async ({
   page,
 }) => {
   const { session, book, account } = await setUpUser(page);
@@ -343,7 +357,6 @@ test("a transaction's Back and Save stay on screen, and settle into place at the
     640 - (await save.boundingBox())!.y - (await save.boundingBox())!.height;
   await expect(splitRows(page)).toHaveCount(13);
   await expect(save).toBeInViewport();
-  await expect(page.getByRole("link", { name: "Back", exact: true })).toBeInViewport();
   expect(await gapBelow()).toBeLessThan(30); // pinned to the bottom of the screen
 
   const footer = page.getByRole("contentinfo");

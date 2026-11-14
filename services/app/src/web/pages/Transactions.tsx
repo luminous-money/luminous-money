@@ -1,15 +1,9 @@
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 
 import { JournalList } from "../components/JournalList.js";
-import {
-  filteredLabel,
-  LedgerFilter,
-  SearchBox,
-  useLedgerView,
-} from "../components/LedgerFilter.js";
-import { JumpToDate, MoreBelow, NewerRow, usePaging } from "../components/Paged.js";
+import { filteredLabel, ListTools, useLedgerView } from "../components/LedgerFilter.js";
+import { MoreBelow, NewerRow, usePaging } from "../components/Paged.js";
 import { SelectBar } from "../components/SelectBar.js";
-import { bookHome } from "../lib/books.js";
 import { withBack } from "../lib/navigation.js";
 import { useBulkActions } from "../lib/bulk.js";
 import { postable } from "../lib/accounts.js";
@@ -25,6 +19,7 @@ import {
 import { simple, unresolved, withCounterpart } from "../lib/split.js";
 import { useSelection } from "../lib/selection.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 /**
  * Every account's transactions together, newest first, paged as an account's ledger is: 200 at
@@ -54,64 +49,48 @@ export function Transactions({ book }: { book: string }) {
     confirmBlocked:
       chosen.some((r) => r.postings.some((p) => unresolved(p.account))) &&
       "choose their accounts first",
-    onConfirmed: selection.clear,
   });
   return (
     <main>
       <header className="page-head">
-        <Link href={bookHome(book)} className="back">
-          ‹ Home
-        </Link>
-        <h1>Transactions</h1>
-        <p className="muted">Every account's, newest first.</p>
-        {canWrite && !selection.selecting && (
-          <div className="actions">
-            <button type="button" onClick={selection.start}>
-              Select
-            </button>
+        <Crumbs />
+        <div className="home-head">
+          <div>
+            <h1>Transactions</h1>
+            <p className="muted">Every account's, newest first.</p>
           </div>
-        )}
-      </header>
-      {selection.selecting ? (
-        <SelectBar
-          count={chosen.length}
-          shown={rows.length}
-          onSelectAll={() => selection.selectAll(rows.map((r) => r.id))}
-          actions={bulkActions.actions}
-          busy={bulkActions.busy}
-          note={bulkActions.note}
-          onDone={selection.stop}
-        />
-      ) : (
-        canWrite && (
-          <div className="ledger-add">
+          {canWrite && (
             <button
               type="button"
               className="primary"
               onClick={() => navigate(withBack(`${base}/new`, here))}
             >
-              + Add transaction
+              + Add
             </button>
-          </div>
-        )
-      )}
-      <div className="ledger-tools">
-        <SearchBox
-          value={filter.q ?? ""}
-          onChange={(q) => navigate(href({ date, ...filter, q }), { replace: true })}
-        />
-        <JumpToDate
-          key={date ?? ""}
-          date={date}
-          onGo={(to) => navigate(href({ ...filter, date: to }))}
-        />
-        <LedgerFilter
-          book={book}
-          filter={filter}
-          byAccount
-          onChange={(view) => navigate(href({ date, ...view }))}
-        />
-      </div>
+          )}
+        </div>
+      </header>
+      <ListTools
+        book={book}
+        view={{ date, ...filter }}
+        onChange={(view, options) => navigate(href(view), options)}
+        byAccount
+        reconciliation
+        onSelect={canWrite ? selection.start : undefined}
+        selecting={
+          selection.selecting ? (
+            <SelectBar
+              count={chosen.length}
+              shown={rows.length}
+              onSelectAll={() => selection.selectAll(rows.map((r) => r.id))}
+              actions={bulkActions.actions}
+              busy={bulkActions.busy}
+              note={bulkActions.note}
+              onDone={selection.stop}
+            />
+          ) : null
+        }
+      />
       {pages.isPending && <Loading />}
       {pages.error && <p className="card error">{explain(pages.error)}</p>}
       {pages.data && rows.length === 0 && (

@@ -436,7 +436,9 @@ function BreakdownList({
     <ul className="breakdown-list" aria-label="Categories">
       {data.slices.map((s, i) => (
         <li key={s.account}>
-          {s.more ? (
+          {/* A leaf opens too (Kael, 2026-11-14): its own transactions, below. Not the one
+              that's what's open now ("Groceries (itself)"). */}
+          {s.account !== data.of ? (
             <button type="button" className="breakdown-row" onClick={() => onSelect(s.account)}>
               {row(s.label, s.amount, s.share, PALETTE[i % PALETTE.length]!)}
               <span className="chart-open" aria-hidden>

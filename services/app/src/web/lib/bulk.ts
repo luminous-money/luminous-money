@@ -54,7 +54,7 @@ export function useBulkActions({
   confirmBlocked?: string | false;
   /** More to do once they're confirmed (review: their proposed matches). */
   afterConfirm?: () => Promise<void>;
-  onConfirmed: () => void;
+  onConfirmed?: () => void;
 }) {
   const client = useQueryClient();
   const bulk = useBulkEdit(book);
@@ -180,7 +180,7 @@ export function useBulkActions({
                 );
                 return;
               }
-              onConfirmed();
+              onConfirmed?.();
             },
             onError: (e) => setNote(explain(e)),
           }

@@ -37,6 +37,7 @@ import {
   useStars,
   useSummary,
 } from "../lib/queries.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 const TITLES: Record<Step, string> = {
   for: "What it's for",
@@ -57,9 +58,7 @@ export function LoanSetup({ book }: { book: string }) {
   return (
     <main>
       <header className="page-head">
-        <Link href={back} className="back">
-          ‹ Back
-        </Link>
+        <Crumbs />
         <h1>New loan</h1>
       </header>
       <Questionnaire book={book} back={back} />

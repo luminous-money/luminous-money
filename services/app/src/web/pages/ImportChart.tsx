@@ -6,6 +6,7 @@ import { batchOrder, planChart } from "../../shared/chart.js";
 import { ChartPreview, plural } from "../components/ChartPreview.js";
 import { FileDrop } from "../components/FileDrop.js";
 import { explain, useAccounts, useCreateAccounts } from "../lib/queries.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 const EXAMPLE = `Account,Display name,Description,Opening balance,As of
 Assets:Bank:PNC checking,Checking,Joint,2450.00,2026-01-31
@@ -49,9 +50,7 @@ export function ImportChart({ book }: { book: Book }) {
   return (
     <main className="stack">
       <header className="page-head">
-        <Link href={chart} className="back">
-          ‹ Accounts
-        </Link>
+        <Crumbs />
         <h1>Import a chart of accounts</h1>
       </header>
 

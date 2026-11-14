@@ -6,14 +6,10 @@ import { AccountName, AccountPicker, type AccountCreation } from "../components/
 import { SelectBar } from "../components/SelectBar.js";
 import { BrokerageNote, ReceiptNote } from "../components/ReceiptNote.js";
 import { TagChips, TagInput } from "../components/Tags.js";
-import {
-  filteredLabel,
-  LedgerFilter,
-  SearchBox,
-  useLedgerView,
-} from "../components/LedgerFilter.js";
+import { filteredLabel, ListTools, useLedgerView } from "../components/LedgerFilter.js";
 import { useBulkActions } from "../lib/bulk.js";
-import { ExcludeFromBudget } from "../components/ExcludeFromBudget.js";
+import { ExcludeFromBudget, excludedFromBudget } from "../components/ExcludeFromBudget.js";
+import { More, moreSummary } from "../components/More.js";
 import { FundChoice, shapesFor } from "../components/Funds.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
 import { BaseChoice } from "../components/BaseChoice.js";
@@ -22,12 +18,11 @@ import { Swipeable, type SwipeHandle } from "../components/Swipeable.js";
 import { postable, preferredRoots, shortName } from "../lib/accounts.js";
 import { add, formatMoney, isNegative, isZero, negate } from "../lib/decimal.js";
 import { appApi, type ProposalSummary, type ProposedMatch } from "../lib/appApi.js";
-import { bookHome } from "../lib/books.js";
-import { today } from "../lib/format.js";
+import { formatDay, today } from "../lib/format.js";
 import { filtering, kept } from "../lib/filters.js";
 import { useBack, useParam, withBack } from "../lib/navigation.js";
 import { rememberPlace, useReturnToPlace } from "../lib/place.js";
-import { useSelection } from "../lib/selection.js";
+import { selectClick, useSelection } from "../lib/selection.js";
 import { similarUnconfirmed } from "../lib/similar.js";
 import {
   explain,
@@ -63,6 +58,7 @@ import { holdingsOf, suggestedFund } from "../lib/funds.js";
 import { wholeLines } from "../../shared/funds.js";
 import type { ShortTransaction } from "../lib/ledger.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 /**
  * The review queue: unconfirmed transactions to categorize and confirm, and imported rows matched
@@ -141,15 +137,24 @@ export function Review({ book }: { book: string }) {
     afterConfirm: async () => {
       for (const m of chosen.flatMap((i) => i.matches)) await appApi.confirmMatch(book, m);
     },
-    onConfirmed: selection.clear,
   });
+
+  const selectBar = (
+    <SelectBar
+      count={chosen.length}
+      shown={shown.length}
+      onSelectAll={() => selection.selectAll(shown.map((i) => i.transaction.id))}
+      actions={bulkActions.actions}
+      busy={bulkActions.busy}
+      note={bulkActions.note}
+      onDone={selection.stop}
+    />
+  );
 
   return (
     <main>
       <header className="page-head">
-        <Link href={only ? back : bookHome(book)} className="back">
-          {only ? "‹ Back" : "‹ Home"}
-        </Link>
+        <Crumbs />
         <h1>Review</h1>
         <p className="muted">
           {bookName}
@@ -163,41 +168,20 @@ export function Review({ book }: { book: string }) {
             {aiCostSentence(Number(aiCost))}
           </p>
         )}
-        <div className="actions">
-          {!selection.selecting && (
-            <button type="button" onClick={selection.start}>
-              Select
-            </button>
-          )}
-        </div>
       </header>
 
-      {!only && (
-        <div className="ledger-tools review-tools">
-          <SearchBox
-            value={view.q}
-            onChange={(q) => navigate(view.href({ ...view.filter, q }), { replace: true })}
-          />
-          <LedgerFilter
-            book={book}
-            filter={view.filter}
-            reconciliation={false}
-            byAccount
-            onChange={(filter) => navigate(view.href(filter))}
-          />
-        </div>
-      )}
-
-      {selection.selecting && (
-        <SelectBar
-          count={chosen.length}
-          shown={shown.length}
-          onSelectAll={() => selection.selectAll(shown.map((i) => i.transaction.id))}
-          actions={bulkActions.actions}
-          busy={bulkActions.busy}
-          note={bulkActions.note}
-          onDone={selection.stop}
+      {!only ? (
+        <ListTools
+          book={book}
+          view={view.filter}
+          onChange={(filter, options) => navigate(view.href(filter), options)}
+          byAccount
+          byDate={false}
+          onSelect={selection.start}
+          selecting={selection.selecting ? selectBar : null}
         />
+      ) : (
+        selection.selecting && selectBar
       )}
 
       {!ready && !queue.error && <Loading />}
@@ -216,6 +200,13 @@ export function Review({ book }: { book: string }) {
             data-place={t.id}
             // Opening anything from the card (its page, a rule, a fund) comes back to it.
             onClickCapture={(e) => {
+              // Ctrl or ⌘: Select mode, with this one (not whatever on the card was clicked).
+              if (!selection.selecting && selectClick(e)) {
+                e.preventDefault();
+                e.stopPropagation();
+                selection.startWith(t.id);
+                return;
+              }
               if (!(e.target as Element).closest("a[href]")) return;
               const ids = shown.map((i) => i.transaction.id);
               rememberPlace(
@@ -413,7 +404,7 @@ function QueueItem({
         <div inert={selecting}>
           <div className="item-top">
             <span className="muted">
-              {t.date}
+              {formatDay(t.date)}
               {view && ` · ${shortName(view.anchor.account)}`}
             </span>
             {view && (
@@ -553,15 +544,6 @@ function QueueItem({
             onChange={(postings) => void save({ postings })}
           />
 
-          <FundChoice
-            book={book}
-            transaction={t}
-            here={here}
-            disabled={busy}
-            suggested={suggested}
-            onChange={(funds) => void save({ funds })}
-          />
-
           <div className="review-tags">
             <TagInput
               label="Tags"
@@ -576,10 +558,22 @@ function QueueItem({
             />
           </div>
 
-          <ExcludeFromBudget
-            meta={meta}
-            onChange={(changed) => (setMeta(changed), void save({ meta: changed }))}
-          />
+          {/* Used now and then: folded away, saying what's set (Kael, 2026-11-14: funds were
+              too prominent). A sale that needs a fund opens it. */}
+          <More summary={moreSummary(t.funds, excludedFromBudget(meta))} open={!!short}>
+            <FundChoice
+              book={book}
+              transaction={t}
+              here={here}
+              disabled={busy}
+              suggested={suggested}
+              onChange={(funds) => void save({ funds })}
+            />
+            <ExcludeFromBudget
+              meta={meta}
+              onChange={(changed) => (setMeta(changed), void save({ meta: changed }))}
+            />
+          </More>
 
           {notAtBank && !scheduled && matches.length === 0 && (
             <p className="small">

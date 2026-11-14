@@ -80,6 +80,8 @@ test("a house is revalued with Update value", async ({ page }) => {
   await page.getByLabel("Balance as of").fill(day(-400));
   await page.getByRole("checkbox", { name: /Revalued periodically/ }).check();
   await page.getByRole("button", { name: "Add account" }).click();
+  await expect(page.getByRole("heading", { name: "House" })).toBeVisible(); // its page
+  await page.goto(`/ui/books/${book.id}`);
 
   const card = page.getByRole("link", { name: /^House/ });
   await expect(card).toContainText("Needs a new value");

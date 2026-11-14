@@ -32,6 +32,7 @@ import {
 } from "../lib/queries.js";
 import { ApiError } from "../lib/ledger.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 const money = (a: { number: string; currency: string }) => formatMoney(a.number, a.currency);
 
@@ -104,9 +105,7 @@ export function FundPage({ book, name }: { book: string; name: string }) {
   return (
     <main>
       <header className="page-head">
-        <Link href={list} className="back">
-          ‹ Funds
-        </Link>
+        <Crumbs />
         <h1>
           {fund?.name ?? name}{" "}
           {fund && !fund.archived && (

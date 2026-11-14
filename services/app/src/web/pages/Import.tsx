@@ -8,7 +8,7 @@ import { ProfileEditor } from "../components/ProfileEditor.js";
 import { displayName, sortedBy } from "../lib/accounts.js";
 import { ImportError, type ImportResult } from "../lib/appApi.js";
 import { bookHome } from "../lib/books.js";
-import { useBack, useParam } from "../lib/navigation.js";
+import { useParam } from "../lib/navigation.js";
 import {
   explain,
   useImport,
@@ -18,6 +18,7 @@ import {
   useSaveProfile,
 } from "../lib/queries.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 /** A new profile replaces the account's saved ones, or is added alongside them. */
 type Mode = "replace" | "add";
@@ -56,7 +57,6 @@ export function Import({ book }: { book: string }) {
     open.filter((a) => !stars.data?.includes(a.name)),
     (a) => a.name
   );
-  const back = useBack("/");
   const preset = useParam("account");
   const [account, setAccount] = useState(preset ?? "");
   const chosen = account || starred[0]?.name || others[0]?.name || "";
@@ -111,9 +111,7 @@ export function Import({ book }: { book: string }) {
   return (
     <main>
       <header className="page-head">
-        <Link href={back} className="back">
-          {back === "/" ? "‹ Home" : "‹ Back"}
-        </Link>
+        <Crumbs />
         <h1>Import transactions</h1>
       </header>
 

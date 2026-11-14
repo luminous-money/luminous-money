@@ -1,7 +1,7 @@
 /** M10: the chart of accounts, and editing accounts from it. */
 import { expect, test, type Page } from "@playwright/test";
 
-import { addAccount, addTransactions, setUpUser } from "./support.js";
+import { accountAction, addAccount, addTransactions, setUpUser } from "./support.js";
 
 async function chart(page: Page) {
   const { book, account } = await setUpUser(page);
@@ -115,7 +115,8 @@ test("an asset's settings are in its editor, not on its ledger", async ({ page }
   await expect(page.getByRole("heading", { name: /PNC Checking/ })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Sales draw on" })).toHaveCount(0);
 
-  await page.getByRole("link", { name: "Edit" }).click();
+  // Edit is in the ledger's ⋯ (2026-11-14's design pass).
+  await accountAction(page, "Edit");
   const settings = page.getByRole("region", { name: "Settings" });
   await settings.getByRole("combobox", { name: "Sales draw on" }).selectOption("FIFO");
   await page.reload();

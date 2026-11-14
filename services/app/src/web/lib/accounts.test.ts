@@ -192,9 +192,10 @@ describe("a new account's full name", () => {
       ok: false,
       message: "Name an account under Expenses",
     });
+    // Under what's typed so far, not just its root (2026-11-14).
     expect(check("Expenses:Utilities:")).toMatchObject({
       ok: false,
-      message: "Name an account under Expenses",
+      message: "Name an account under Expenses:Utilities",
     });
     expect(check("Expenses:coffee")).toMatchObject({
       ok: false,

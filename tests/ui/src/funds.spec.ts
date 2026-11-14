@@ -6,7 +6,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 
-import { addAccount, app, logIn, stored } from "./support.js";
+import { addAccount, app, crumb, logIn, openMore, stored } from "./support.js";
 
 const PNC = "Assets:Bank:PNC";
 const FIDELITY = "Assets:Fidelity:Cash";
@@ -72,6 +72,7 @@ test("a transfer for Emergency: choosing the fund puts all of it there", async (
   const { book, add, lines } = await fundsBook(page, [{ name: "Emergency" }]);
   const id = await add(PNC, FIDELITY, "2000.00", { payee: "To the brokerage" });
   await page.goto(`/ui/books/${book}/transactions/${id}`);
+  await openMore(page);
 
   const funds = fundsSection(page);
   await expect(funds).toContainText("$2,000.00 moving between accounts.");
@@ -97,6 +98,7 @@ test("spending from Emergency, and a note when that takes it below zero", async 
   await add(PNC, FIDELITY, "300.00", { funds: [{ fund: "Emergency", amount: usd("300.00") }] });
   const id = await add(PNC, REPAIRS, "500.00", { payee: "Plumber" });
   await page.goto(`/ui/books/${book}/transactions/${id}`);
+  await openMore(page);
 
   const funds = fundsSection(page);
   await expect(funds).toContainText("$500.00 going out.");
@@ -120,6 +122,7 @@ test("a paycheck split $500 and $500, and no more than came in", async ({ page }
   const { book, add, lines } = await fundsBook(page, [{ name: "Emergency" }, { name: LONG }]);
   const id = await add(SALARY, PNC, "1000.00", { payee: "Acme" });
   await page.goto(`/ui/books/${book}/transactions/${id}`);
+  await openMore(page);
 
   const funds = fundsSection(page);
   await expect(funds).toContainText("$1,000.00 coming in.");
@@ -230,6 +233,7 @@ test("a review card's fund: the whole amount, and Unallocated clears it", async 
   const id = await add(PNC, REPAIRS, "80.00", { flag: "!", payee: "Hardware" });
   await page.goto(`/ui/books/${book}/review`);
   const card = page.getByRole("article").filter({ hasText: "Hardware" });
+  await openMore(card);
   const fund = card.getByRole("combobox", { name: "From fund" });
   await expect(fund).toHaveValue("");
   await fund.selectOption("Emergency");
@@ -250,10 +254,12 @@ test("a review card with split lines shows them, and Edit… opens the page", as
   });
   await page.goto(`/ui/books/${book}/review`);
   const card = page.getByRole("article").filter({ hasText: "Acme" });
+  await openMore(card);
   await expect(card.getByRole("combobox", { name: "To fund" })).toHaveCount(0);
   await expect(card.getByLabel("to Emergency")).toBeVisible();
   await expect(card.getByLabel(`to ${LONG}`)).toHaveAttribute("title", `${LONG} +$600.00`);
   await card.getByRole("link", { name: "Edit…" }).click();
+  await openMore(page);
   await expect(
     fundsSection(page).getByRole("textbox", { name: "Amount to Emergency" })
   ).toHaveValue("400.00");
@@ -290,6 +296,7 @@ test("More options on a transfer: from one fund, for another", async ({ page }) 
   const { book, add, lines } = await fundsBook(page, [{ name: "Emergency" }, { name: "Vacation" }]);
   const id = await add(PNC, FIDELITY, "2000.00");
   await page.goto(`/ui/books/${book}/transactions/${id}`);
+  await openMore(page);
 
   const funds = fundsSection(page);
   await expect(funds.getByRole("group", { name: "Take from" })).toHaveCount(0);
@@ -310,6 +317,7 @@ test("More options on a transfer: from one fund, for another", async ({ page }) 
 
   // Open on its own when the transaction takes from a fund.
   await page.reload();
+  await openMore(page);
   await expect(fundsSection(page).getByRole("group", { name: "Take from" })).toBeVisible();
 });
 
@@ -324,12 +332,13 @@ test("archiving a fund moves what's left, and folds it away", async ({ page }) =
   await expect(page.getByRole("region", { name: "Balance" })).toContainText("Archived");
   await expect(page.getByRole("button", { name: "Unarchive" })).toBeVisible();
 
-  await page.getByRole("link", { name: "‹ Funds" }).click();
+  await crumb(page, "Funds").click();
   await expect(page.getByRole("link", { name: /Emergency/ })).toContainText("$400.00");
   await expect(page.getByText("Archived (1)")).toBeVisible();
   // It's gone from the pickers.
   const id = await add(PNC, REPAIRS, "5.00");
   await page.goto(`/ui/books/${book}/transactions/${id}`);
+  await openMore(page);
   await expect(
     fundsSection(page)
       .getByRole("combobox", { name: "From fund" })
@@ -388,6 +397,7 @@ test("a rule's fund: what it imports comes from the fund", async ({ page }) => {
 
   await page.goto(`/ui/books/${book}/review`);
   const card = page.getByRole("article", { name: /ACE PLUMBING/ });
+  await openMore(card);
   await expect(card.getByRole("combobox", { name: "From fund" })).toHaveValue("Emergency");
 });
 
@@ -424,6 +434,7 @@ test("a schedule's funds: the editor has them, and its occurrence carries them",
 
   await page.goto(`/ui/books/${book}/review`);
   const card = page.getByRole("article").filter({ hasText: "From a schedule" });
+  await openMore(card);
   await expect(card.getByRole("combobox", { name: "For fund" })).toHaveValue("Emergency");
 });
 
@@ -450,6 +461,7 @@ test("a writer chooses funds and moves money, but doesn't set funds up", async (
   await expect(writer.getByRole("button", { name: "Move money" })).toBeVisible();
   await expect(writer.getByRole("button", { name: "New fund" })).toHaveCount(0);
   await writer.goto(`/ui/books/${book}/transactions/${id}`);
+  await openMore(writer);
   const from = fundsSection(writer).getByRole("combobox", { name: "From fund" });
   await expect(from.getByRole("option", { name: "New fund…" })).toHaveCount(0);
   await from.selectOption("Emergency");
@@ -465,6 +477,7 @@ test("a manager makes a fund from the transaction's picker", async ({ page }) =>
   const { book, add, lines } = await fundsBook(page, [{ name: "Emergency" }]);
   const id = await add(SALARY, PNC, "300.00", { payee: "Bonus" });
   await page.goto(`/ui/books/${book}/transactions/${id}`);
+  await openMore(page);
   await fundsSection(page).getByRole("combobox", { name: "To fund" }).selectOption("New fund…");
   const dialog = page.getByRole("dialog", { name: "New fund" });
   await dialog.getByRole("textbox", { name: "Name" }).fill("unallocated");

@@ -8,6 +8,7 @@ import {
   stageMany,
   stored,
   type Seeded,
+  crumb,
 } from "./support.js";
 
 let seeded: Seeded;
@@ -153,7 +154,7 @@ test("Back or Confirm on a transaction opened from the queue comes back to where
   const before = await topOf(page, "Shop 8");
   await item(page, "Shop 8").getByRole("link", { name: "Split…" }).click();
   await expect(page.getByRole("heading", { name: "Transaction" })).toBeVisible();
-  await page.getByRole("link", { name: "‹ Back" }).click();
+  await crumb(page, "Review").click();
   await expect(item(page, "Shop 8")).toBeInViewport();
   expect(Math.abs((await topOf(page, "Shop 8")) - before)).toBeLessThan(4);
 
@@ -202,11 +203,11 @@ test("a search and a filter by accounts narrow the queue, and Back keeps them", 
 
   // Back from a transaction keeps the filter.
   await item(page, "Grocer").getByRole("link", { name: "Split…" }).click();
-  await page.getByRole("link", { name: "‹ Back" }).click();
+  await crumb(page, "Review").click();
   await expect(page).toHaveURL(/account=Expenses(%3A|:)Food/);
   await expect(queue(page)).toHaveCount(1);
-  await expect(page.getByText("In Expenses:Food only.")).toBeVisible();
-  await page.getByRole("button", { name: "Show all" }).click();
+  // What's on, as a pill that takes it off.
+  await page.getByRole("button", { name: "Remove account: Expenses:Food" }).click();
   await expect(queue(page)).toHaveCount(3);
 });
 

@@ -33,6 +33,7 @@ import {
   useTransaction,
 } from "../lib/queries.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 const BLANK: TransactionTemplate = {
   payee: null,
@@ -119,9 +120,7 @@ export function ScheduleEditor({ book, id }: { book: string; id?: string }) {
   return (
     <main>
       <header className="page-head">
-        <Link href={back} className="back">
-          ‹ Back
-        </Link>
+        <Crumbs />
         <h1>{id ? "Edit schedule" : "New schedule"}</h1>
       </header>
       {loading && <Loading />}

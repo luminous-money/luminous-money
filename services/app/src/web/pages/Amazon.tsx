@@ -12,7 +12,6 @@ import type { StoredCharge } from "../../shared/orders.js";
 import { AccountPicker } from "../components/AccountPicker.js";
 import { postable } from "../lib/accounts.js";
 import { appApi } from "../lib/appApi.js";
-import { bookHome } from "../lib/books.js";
 import { formatAmount, formatFullDay, formatWhen, today } from "../lib/format.js";
 import { explain, useAccountCreation, useAccounts, useRole } from "../lib/queries.js";
 import {
@@ -23,6 +22,7 @@ import {
   type AmazonPatch,
 } from "../lib/shops.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 type Choice = "include" | "exclude" | "";
 
@@ -63,9 +63,7 @@ export function AmazonPage({ book }: { book: string }) {
   return (
     <main className="stack">
       <header className="page-head">
-        <Link href={bookHome(book)} className="back">
-          ‹ Home
-        </Link>
+        <Crumbs />
         <h1>Amazon</h1>
         <p className="muted">
           Your Amazon charges and the orders behind them, read from Amazon. A first version: it

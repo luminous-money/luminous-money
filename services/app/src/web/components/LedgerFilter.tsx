@@ -1,11 +1,12 @@
 /**
- * A list's view, as its URL has it (so Back keeps it), and its filter (M14, M17): a funnel
- * button beside "Go to date" opening the options: Reconciliation (all, reconciled, or not), Tags
- * (only transactions with every tag chosen) and, where asked, Accounts (only transactions with a
- * split in any account chosen, or under one). `SearchBox` searches payees, descriptions and
- * splits' items. Ledgers filter at the server, so pages stay full and running balances stay the
- * account's; review filters what it holds (lib/filters).
+ * A list's view, as its URL has it (so Back keeps it), and its header (`ListTools`): the search
+ * (payees, descriptions and splits' items), Select, and the filter: Accounts (only transactions
+ * with a split in any account chosen, or under one), Tags (only those with every tag chosen), a
+ * date to go to (a ledger's), and Reconciliation (M14, M17). Ledgers filter at the server, so
+ * pages stay full and running balances stay the account's; review filters what it holds
+ * (lib/filters).
  */
+import { Filter, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { shortName } from "../lib/accounts.js";
@@ -13,6 +14,8 @@ import type { JournalFilter } from "../lib/ledger.js";
 import { useParam, useParams } from "../lib/navigation.js";
 import { useAccounts, useTags } from "../lib/queries.js";
 import { AccountName, AccountPicker } from "./AccountPicker.js";
+import { formatFullDay } from "../lib/format.js";
+import { JumpToDate } from "./Paged.js";
 import { tagList, TagInput } from "./Tags.js";
 
 export type LedgerView = { date?: string } & JournalFilter;
@@ -63,56 +66,117 @@ const CHOICES = [
   ["Not reconciled", false],
 ] as const;
 
-export function LedgerFilter({
+/** A list's view, without its search: what the filter panel changes. */
+type Change = (view: LedgerView, options?: { replace?: boolean }) => void;
+
+/**
+ * A list's header (Transactions, review, an account's ledger): one row of the search, Select and
+ * the filter button. The filter button opens the panel (Accounts, Tags, a date to go to, and on
+ * a ledger Reconciliation) and closes it again; closed, what's on is said as pills ("tag:
+ * trip"), each taken off by a tap. In Select mode its bar (`selecting`) takes the row's place,
+ * and the pills stay: the filter still holds, so a filtered set can be selected (Select all is
+ * what's shown).
+ */
+export function ListTools({
   book,
-  filter,
+  view,
   onChange,
-  reconciliation = true,
+  onSelect,
+  selecting,
+  reconciliation = false,
   byAccount = false,
+  byDate = true,
 }: {
   book: string;
-  filter: JournalFilter;
-  /** The filter changed (the search, which isn't here, kept). */
-  onChange: (filter: JournalFilter) => void;
-  /** Whether to offer Reconciliation. */
+  view: LedgerView;
+  onChange: Change;
+  /** Start Select mode; Select is offered only with it. */
+  onSelect?: () => void;
+  /** Select mode's bar, in place of the row while selecting. */
+  selecting?: React.ReactNode;
   reconciliation?: boolean;
-  /** Whether to offer Accounts. */
   byAccount?: boolean;
+  /** Whether to offer "Go to date" (a ledger's, paged by date). */
+  byDate?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const bookTags = useTags(book);
-  const { reconciled, tags = [], accounts = [] } = filter;
-  const active = reconciled !== undefined || tags.length > 0 || accounts.length > 0;
-  const shown = [
-    reconciled === undefined ? null : reconciled ? "Reconciled" : "Not reconciled",
-    tags.length ? `tagged ${tagList(tags)}` : null,
-    accounts.length ? `in ${inWords(accounts.map(shortName), "or")}` : null,
-  ]
-    .filter(Boolean)
-    .join(", ");
-  const change = (changed: JournalFilter) => onChange({ ...filter, ...changed });
+  const { reconciled, tags = [], accounts = [], q = "", date } = view;
+  const set = (changed: LedgerView, options?: { replace?: boolean }) =>
+    onChange({ ...view, ...changed }, options);
+  const pills: { label: string; clear: () => void }[] = [
+    ...(q.trim() ? [{ label: `search: ${q.trim()}`, clear: () => set({ q: "" }) }] : []),
+    ...(date
+      ? [{ label: `date: ${formatFullDay(date)}`, clear: () => set({ date: undefined }) }]
+      : []),
+    ...tags.map((tag) => ({
+      label: `tag: ${tag}`,
+      clear: () => set({ tags: tags.filter((t) => t !== tag) }),
+    })),
+    ...accounts.map((account) => ({
+      label: `account: ${shortName(account)}`,
+      clear: () => set({ accounts: accounts.filter((a) => a !== account) }),
+    })),
+    ...(reconciled === undefined
+      ? []
+      : [
+          {
+            label: reconciled ? "reconciled" : "not reconciled",
+            clear: () => set({ reconciled: undefined }),
+          },
+        ]),
+  ];
+  const filtered = pills.length > 0;
+
   return (
-    <div className="ledger-filter">
-      <button
-        type="button"
-        className={`filter-button${active ? " on" : ""}`}
-        aria-label={active ? "Filter (on)" : "Filter"}
-        title="Filter"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-          <path
-            d="M3 5h18l-7 8.5V19l-4 2v-7.5z"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
-      {open && (
+    <div className="list-tools">
+      {selecting || (
+        <div className="list-tools-row">
+          <SearchBox value={q} onChange={(text) => set({ q: text }, { replace: true })} />
+          {onSelect && (
+            <button type="button" onClick={onSelect}>
+              Select
+            </button>
+          )}
+          <button
+            type="button"
+            className={`filter-button${filtered ? " on" : ""}`}
+            aria-label={filtered ? "Filter (on)" : "Filter"}
+            title="Filter"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+          >
+            <Filter aria-hidden="true" />
+          </button>
+        </div>
+      )}
+      {open && !selecting ? (
         <div className="filter-panel" role="group" aria-label="Filters">
+          {byAccount && (
+            <>
+              <span className="small muted">Accounts (any of them)</span>
+              <AccountChoices
+                book={book}
+                value={accounts}
+                onChange={(chosen) => set({ accounts: chosen })}
+              />
+            </>
+          )}
+          <span className="small muted">Tags (all of them)</span>
+          <TagInput
+            label="Filter by tag"
+            value={tags}
+            choices={bookTags.data ?? []}
+            allowNew={false}
+            placeholder={bookTags.data?.length ? undefined : "No tags yet"}
+            onChange={(chosen) => set({ tags: chosen })}
+          />
+          {byDate && (
+            <>
+              <span className="small muted">From a date back</span>
+              <JumpToDate key={date ?? ""} date={date} onGo={(to) => set({ date: to })} />
+            </>
+          )}
           {reconciliation && (
             <>
               <span className="small muted">Reconciliation</span>
@@ -124,7 +188,7 @@ export function LedgerFilter({
                     role="radio"
                     aria-checked={reconciled === value}
                     className={reconciled === value ? "on" : ""}
-                    onClick={() => change({ reconciled: value })}
+                    onClick={() => set({ reconciled: value })}
                   >
                     {label}
                   </button>
@@ -132,38 +196,25 @@ export function LedgerFilter({
               </div>
             </>
           )}
-          {byAccount && (
-            <>
-              <span className="small muted">Accounts (any of them)</span>
-              <AccountChoices
-                book={book}
-                value={accounts}
-                onChange={(chosen) => change({ accounts: chosen })}
-              />
-            </>
-          )}
-          <span className="small muted">Tags (all of them)</span>
-          <TagInput
-            label="Filter by tag"
-            value={tags}
-            choices={bookTags.data ?? []}
-            allowNew={false}
-            placeholder={bookTags.data?.length ? undefined : "No tags yet"}
-            onChange={(chosen) => change({ tags: chosen })}
-          />
         </div>
-      )}
-      {active && !open && (
-        <p className="small muted filter-note">
-          {shown.charAt(0).toUpperCase() + shown.slice(1)} only.{" "}
-          <button
-            type="button"
-            className="plain"
-            onClick={() => onChange({ q: filter.q, reconciled: undefined, tags: [], accounts: [] })}
-          >
-            Show all
-          </button>
-        </p>
+      ) : (
+        filtered && (
+          <ul className="filter-pills" aria-label="Filters on">
+            {pills.map((pill) => (
+              <li key={pill.label}>
+                <button
+                  type="button"
+                  className="filter-pill"
+                  aria-label={`Remove ${pill.label}`}
+                  onClick={pill.clear}
+                >
+                  {pill.label}
+                  <X aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
       )}
     </div>
   );
@@ -228,7 +279,8 @@ export function SearchBox({ value, onChange }: { value: string; onChange: (q: st
       type="search"
       className="ledger-search"
       aria-label="Search"
-      placeholder="Search payees, descriptions, items"
+      placeholder="Search"
+      title="Search payees, descriptions and items"
       value={text}
       onChange={(e) => setText(e.target.value)}
       onKeyDown={(e) => {

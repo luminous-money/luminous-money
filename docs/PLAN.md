@@ -73,7 +73,8 @@ Roughly in order; each is elaborated with Kael when it starts.
       recurring and are not already captured by an existing recurring transaction, to suggest
       as schedules (M3) or for matching rules. Don't re-ask. (Moved after tagging, 2026-10-17;
       [its brief](milestones/m18-suggested-recurring-transactions/PLAN.md).)
-- [ ] **M20: Design polish** ([noted](milestones/m20-design-polish/PLAN.md)): mobile usability
+- [ ] **M20: Design polish** ([its plan](milestones/m20-design-polish/PLAN.md); the first pass is
+      built and released, 2026-11-14): mobile usability
       across the app, so far.
 - [ ] **M99: Follow-ups** ([the list](milestones/m99-follow-ups/PLAN.md)): open questions, polish,
       calls made without asking still to review, and what done milestones left over.
@@ -395,3 +396,8 @@ Smaller improvements picked up between milestones. Those still open are in
       cards come in at once; offline and an unanswering server said at the top; a new version
       reloads itself when nobody's working, else a banner asks. Review shows the book's name,
       not its ID, and "‹ Home" back.
+- [x] **The design pass** (M20, 2026-11-14, `v0.1.31`): Geist, depth and buttons, the grouped
+      menu (a sidebar on wide screens), (i) notes, More for funds, ⋯ for occasional actions,
+      Bank connections by bank, breadcrumbs for Back, one-row list headers with filter pills,
+      subaccounts on a node's page, find on page. [M20's plan](milestones/m20-design-polish/PLAN.md)
+      has the list.

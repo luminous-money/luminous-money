@@ -84,11 +84,19 @@ export function Swipeable({
     []
   );
 
-  const move = (x: number, animate: boolean) => {
+  /** Where the card is: `x` across, tilting with it (as a card held at its foot would); leaving
+   * (`fly`), it drops as it goes, down and to the right for Confirm, to the left for Skip. */
+  const move = (x: number, animate: boolean, fly = false) => {
     const el = surface.current;
     if (!el) return;
-    el.style.transition = animate && !reducedMotion() ? `transform ${FLY_MS}ms ease-out` : "none";
-    el.style.transform = x ? `translateX(${x}px)` : "";
+    const width = el.offsetWidth || 1;
+    const tilt = Math.max(-1, Math.min(1, x / width)) * (fly ? 14 : 5);
+    const drop = fly ? width * 0.35 : 0;
+    el.style.transition =
+      animate && !reducedMotion()
+        ? `transform ${FLY_MS}ms ${fly ? "ease-in" : "ease-out"}`
+        : "none";
+    el.style.transform = x ? `translate(${x}px, ${drop}px) rotate(${tilt}deg)` : "";
   };
 
   /** Shrink the card's slot to nothing, so the cards below slide up into it. */
@@ -126,7 +134,7 @@ export function Swipeable({
   const commit = async (action: SwipeAction) => {
     const width = surface.current?.offsetWidth ?? 0;
     setDirection(action === "confirm" ? "right" : "left");
-    move(action === "confirm" ? width * 1.1 : -width * 1.1, true);
+    move(action === "confirm" ? width * 1.1 : -width * 1.1, true, true);
     await pause(FLY_MS);
     await collapse();
     try {

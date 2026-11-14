@@ -124,3 +124,17 @@ def test_budgeted_keeps_those_counted_in_budgets_or_those_kept_out(ledger, book,
     assert found(False) == [kept_out]
     rows = http(ledger).get(f"/api/ledger/v1/books/{book}/journal", params={"budgeted": "true"}).json()["rows"]
     assert kept_out not in [r["id"] for r in rows]
+
+
+def test_an_account_ledger_searches_as_the_journal_does_and_keeps_its_balances(ledger, book, made):
+    """Its list's header has the search too (2026-11-14): the rows that match, with the
+    account's running balances, as a tag filter keeps them."""
+    page = ledger.account_ledger(book, "Assets:Bank:Checking", search="juice")
+    assert [(r.id, r.balance.number) for r in page.rows] == [(made["juice"], "-25.00")]
+    assert [r.id for r in ledger.account_ledger(book, "Liabilities:Card", search="seed").rows] == [made["megamart"]]
+    assert len(ledger.account_ledger(book, "Assets:Bank:Checking", search=" ").rows) == 3
+
+    over_http = http(ledger).get(
+        f"/api/ledger/v1/books/{book}/accounts/Assets:Bank:Checking/ledger", params={"q": "hose"}
+    )
+    assert [r["id"] for r in over_http.json()["rows"]] == [made["barn"]]

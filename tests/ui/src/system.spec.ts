@@ -20,7 +20,7 @@ test("an admin finds System in the menu: what's running, and whether it's health
   await expect(page.getByText("Your email address is confirmed.")).toBeVisible();
 
   await page.goto("/ui/");
-  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("link", { name: "System" }).click();
 
   await expect(page.getByRole("heading", { name: "System" })).toBeVisible();
@@ -37,7 +37,7 @@ test("an admin finds System in the menu: what's running, and whether it's health
 test("no one else sees it", async ({ page }) => {
   const { book } = await setUpUser(page);
   await page.goto(`/ui/books/${book.id}`);
-  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await expect(page.getByRole("link", { name: "Your account" })).toBeVisible();
   await expect(page.getByRole("link", { name: "System" })).toHaveCount(0);
 

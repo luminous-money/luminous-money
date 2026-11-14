@@ -51,6 +51,7 @@ export function Setup({ book, onDone }: { book: Book | undefined; onDone: () => 
           <section className="card">
             <h2 className="section-title">Add an account to {book.name}</h2>
             <AddAccountForm
+              kinds={false}
               book={book.id}
               submitLabel="Finish setup"
               onAdded={() => {

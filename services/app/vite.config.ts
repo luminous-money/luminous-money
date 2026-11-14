@@ -35,6 +35,8 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: "/ui/index.html",
+        // The typeface's files too, so the installed app keeps its look offline.
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
       },
     }),
   ],

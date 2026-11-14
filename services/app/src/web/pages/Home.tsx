@@ -36,15 +36,16 @@ export function Home({ book }: { book: Book }) {
           <h1>{book.name}</h1>
           <p className="muted">Your accounts</p>
         </div>
-        {book.role !== "read" && (
-          <Link href={`${bookHome(book.id)}/import`} className="button primary-link">
-            Import transactions
-          </Link>
-        )}
       </header>
 
       <SpendingThisMonth book={book.id} />
       <RecentTransactions book={book.id} />
+      {/* Rare now that banks sync: a small link, not the page's button (Kael, 2026-11-14). */}
+      {book.role !== "read" && (
+        <p className="home-import small">
+          <Link href={`${bookHome(book.id)}/import`}>Import transactions from a file ›</Link>
+        </p>
+      )}
 
       {accounts.isPending && <Loading />}
       {accounts.error && <p className="card error">{explain(accounts.error)}</p>}

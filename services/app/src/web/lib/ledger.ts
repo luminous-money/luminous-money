@@ -217,13 +217,20 @@ export const api = {
     account: string,
     page: LedgerPageAt = {},
     reconciled?: boolean,
-    tags: string[] = []
+    tags: string[] = [],
+    q?: string
   ): Promise<LedgerPage> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/ledger", {
         params: {
           path: { book_id, account },
-          query: { ...page, limit: 200, reconciled, tag: tags.length ? tags : undefined },
+          query: {
+            ...page,
+            limit: 200,
+            reconciled,
+            tag: tags.length ? tags : undefined,
+            q: q?.trim() || undefined,
+          },
         },
       })
     ),

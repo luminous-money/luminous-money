@@ -5,7 +5,7 @@
  */
 import { randomBytes } from "node:crypto";
 
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import {
   createLedgerClient,
   type LedgerClient,
@@ -260,4 +260,29 @@ export async function editSplit(
   if (amount !== undefined) await editor.getByRole("textbox", { name: "Amount" }).fill(amount);
   await editor.getByRole("button", { name: "Save" }).click();
   await expect(editor).toBeHidden();
+}
+
+/** Open a transaction's or a review card's "More" (funds, Exclude from budget), folded away
+ * since 2026-11-14's design pass; left open if it already is (it opens itself when a fund is
+ * needed). */
+export async function openMore(scope: Page | Locator) {
+  const more = scope.locator("details.more").first();
+  await more.waitFor();
+  if ((await more.getAttribute("open")) === null) await more.locator("summary").click();
+}
+
+/** A breadcrumb above the page's title (2026-11-14: they took "‹ Back"'s place). */
+export const crumb = (page: Page, name: string) =>
+  page.getByRole("navigation", { name: "Breadcrumbs" }).getByRole("link", { name, exact: true });
+
+/** Open an account ledger's ⋯ and take one of its actions (`role`: a link or a button), as one
+ * step retried until it lands: under a loaded suite the header may still be filling in when ⋯
+ * is first tapped. */
+export async function accountAction(page: Page, name: string, role: "link" | "button" = "link") {
+  await expect(async () => {
+    const item = page.getByRole(role, { name, exact: true });
+    if (!(await item.isVisible()))
+      await page.getByRole("button", { name: "Account actions" }).click();
+    await item.click({ timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
 }

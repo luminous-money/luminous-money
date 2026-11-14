@@ -773,6 +773,7 @@ class Ledger:
         limit: int = 200,
         reconciled: bool | None = None,
         tags: list[str] | None = None,
+        search: str | None = None,
     ) -> models.LedgerPage:
         """One account's ledger: its transactions newest first, with running balances.
 
@@ -783,8 +784,9 @@ class Ledger:
         outward from any one until the whole ledger is. Running balances accumulate from the
         oldest transaction, unconfirmed ones included; after an amount only booking could work
         out, they're unknown (None). With `reconciled`, only the rows that are (or aren't); with
-        `tags`, only those with a split (in any account) that has all of them (M17): either way,
-        the balances stay the account's.
+        `tags`, only those with a split (in any account) that has all of them (M17); with
+        `search`, only those whose payee, narration or a split's memo has every word of it (as
+        the journal's): any way, the balances stay the account's.
         """
         rows = []
         totals: dict[str, Decimal] | None = {}
@@ -836,6 +838,9 @@ class Ledger:
         if tags:
             kept = self.store.with_tags(book_id, tags)
             rows = [r for r in rows if r[1].id in kept]
+        if search and search.strip():
+            found = self.store.matching(book_id, search.strip())
+            rows = [r for r in rows if r[1].id in found]
         if after:  # the `limit` rows just newer, so up to the row it names
             end = sum(1 for r in rows if r[0] > _ledger_key(after))
             top = max(end - limit, 0)

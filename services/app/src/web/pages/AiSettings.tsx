@@ -5,10 +5,8 @@
  * down, it says so: nothing AI is offered until it's back.
  */
 import { useState } from "react";
-import { Link } from "wouter";
 
 import { formatUsd, type AiSettings as Settings, type Eagerness } from "../lib/ai.js";
-import { bookHome } from "../lib/books.js";
 import {
   explain,
   useAiHealth,
@@ -20,6 +18,7 @@ import {
   useSetAiKey,
 } from "../lib/queries.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 const EAGERNESS: [Eagerness, string][] = [
   ["reluctant", "Reluctant: only when nothing fits"],
@@ -31,9 +30,7 @@ export function AiSettings({ book }: { book: string }) {
   return (
     <main className="stack">
       <header className="page-head">
-        <Link href={bookHome(book)} className="back">
-          ‹ Home
-        </Link>
+        <Crumbs />
         <h1>AI</h1>
         <p className="muted">Reading receipts into transactions, for this book.</p>
       </header>

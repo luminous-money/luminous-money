@@ -3,26 +3,39 @@
    red keep their meaning (money in, money out), brightened a little on the blue. */
 :root {
   --accent: #0062a8;
-  --accent-soft: #c8e4f8;
+  --accent-soft: #d7eafa;
   /* Text on the accent. */
   --on-accent: #ffffff;
-  --paper: #efefef;
+  --paper: #f3f4f6;
   --card: #ffffff;
-  --ink: #333333;
-  --muted: #666666;
-  --line: #dcdcdc;
-  --good: #3c9a4a;
-  --bad: #c2453a;
+  --ink: #1f2937;
+  /* Text colors meet WCAG AA (4.5:1) on the paper and the cards. */
+  --muted: #5f6774;
+  --line: #e5e7eb;
+  /* A control's edge: firmer than a card's, though short of WCAG's 3:1 for a boundary (that
+     reads heavy); a field's label above it says it's a field too. */
+  --edge: #bfc4cc;
+  --good: #2a8040;
+  --bad: #b83c32;
+  --warn: #d9a441;
+  /* Raised: a card sits on the paper; a control on the card; a menu over everything. */
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.04);
+  --shadow-control: 0 1px 2px rgb(16 24 40 / 0.06);
+  --shadow-pop: 0 12px 32px rgb(16 24 40 / 0.14), 0 2px 6px rgb(16 24 40 / 0.06);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  --radius: 0.65rem;
+  --radius-card: 0.9rem;
+  --font-sans: "Geist Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color-scheme: light dark;
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
+  font-family: var(--font-sans);
+  /* Figures in columns, so money lines up. */
+  font-feature-settings: "tnum";
   line-height: 1.5;
   color: var(--ink);
   background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -30,18 +43,30 @@
     --accent: #00ffff;
     --accent-soft: #11647f;
     --on-accent: #00263f;
-    --paper: #003052;
-    --card: #1a4563;
+    --paper: #002a48;
+    --card: #0f3d5c;
     --ink: #f4f8fb;
     --muted: #a6b8c6;
-    --line: #2e5a7c;
+    --line: #22506f;
+    --edge: #2f6286;
     --good: #5fd07a;
     --bad: #ff7b6e;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.2);
+    --shadow-control: 0 1px 2px rgb(0 0 0 / 0.25);
+    --shadow-pop: 0 14px 36px rgb(0 0 0 / 0.45);
   }
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* The masthead and an editor's bar stay on screen: what's scrolled to (a link to a connection,
+   the next field, a match found) lands clear of them. */
+html {
+  --masthead-height: 3.7rem;
+  scroll-padding-top: calc(var(--masthead-height) + 0.5rem);
+  scroll-padding-bottom: 5rem;
 }
 
 body {
@@ -54,12 +79,20 @@ body {
   padding: max(1rem, env(safe-area-inset-top)) 1rem max(1.5rem, env(safe-area-inset-bottom));
 }
 
+/* The masthead stays at the top as the page scrolls under it, frosted. */
 .masthead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
-  padding: 0.25rem 0 1.5rem;
+  margin: calc(-1 * max(1rem, env(safe-area-inset-top))) -1rem 1rem;
+  padding: max(0.6rem, env(safe-area-inset-top)) 1rem 0.6rem;
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
 }
 
 .brand {
@@ -76,9 +109,9 @@ body {
 }
 
 .wordmark {
-  font-weight: 700;
-  font-size: 1.15rem;
-  letter-spacing: -0.01em;
+  font-weight: 650;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
@@ -105,8 +138,9 @@ body {
 .card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   padding: 1rem 1.1rem;
+  box-shadow: var(--shadow-card);
 }
 
 .card h2,
@@ -238,7 +272,9 @@ button.danger {
 .page-head h1 {
   margin: 0.25rem 0 0;
   font-size: 1.6rem;
-  letter-spacing: -0.02em;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
 }
 
 .page-head p {
@@ -250,45 +286,120 @@ button.danger {
 }
 
 .back {
-  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  color: var(--muted);
   text-decoration: none;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 550;
+}
+
+.back:hover {
+  color: var(--accent);
 }
 
 /* Controls */
 
+/* Buttons: raised white with a firm edge (secondary); the accent, filled (primary); and quiet
+   ones with no edge until hovered (icons, menus). Touch screens get the 44px a finger needs. */
 button,
 .button {
   font: inherit;
+  font-size: 0.9375rem;
   font-weight: 600;
-  min-height: 2.75rem;
+  letter-spacing: -0.005em;
+  min-height: 2.5rem;
   padding: 0 1rem;
-  border-radius: 0.7rem;
-  border: 1px solid var(--line);
+  gap: 0.4rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--edge);
   background: var(--card);
   color: var(--ink);
+  box-shadow: var(--shadow-control);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s,
+    transform 0.05s;
+}
+
+@media (pointer: coarse) {
+  button,
+  .button {
+    min-height: 2.75rem;
+  }
+
+  html {
+    --masthead-height: 3.95rem;
+  }
+}
+
+/* Hover only where there is one: on a touch screen a tapped thing keeps "hover" a while after,
+   which would tint whatever was tapped (Select mode's cards went gray, 2026-11-14). */
+@media (hover: hover) {
+  button:hover:not(:disabled),
+  .button:hover {
+    background: color-mix(in srgb, var(--ink) 4%, var(--card));
+  }
+}
+
+button.select-overlay,
+button.select-overlay:hover {
+  background: transparent;
+  box-shadow: none;
+}
+
+button:active:not(:disabled),
+.button:active {
+  transform: translateY(0.5px);
 }
 
 button:disabled {
   opacity: 0.45;
   cursor: default;
+  box-shadow: none;
 }
 
-button.primary {
+button.primary,
+.button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
+  box-shadow:
+    var(--shadow-control),
+    inset 0 1px 0 rgb(255 255 255 / 0.12);
+}
+
+button.primary:hover:not(:disabled),
+.button.primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, black);
 }
 
 button.icon {
-  min-width: 2.75rem;
+  min-width: 2.5rem;
   padding: 0;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+}
+
+button.icon:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+}
+
+button.icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 input,
@@ -297,10 +408,18 @@ textarea {
   color: inherit;
   min-height: 2.75rem;
   padding: 0 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 0.7rem;
-  background: var(--paper);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background: var(--card);
   width: 100%;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
 }
 
 textarea {
@@ -308,13 +427,23 @@ textarea {
   resize: vertical;
 }
 
+/* Focus: a soft ring, and a transparent outline that forced colors (Windows' high contrast)
+   draws in its own color, where the ring is dropped. */
 input:focus,
 textarea:focus,
-select:focus-visible,
+select:focus-visible {
+  outline: 2px solid transparent;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
 button:focus-visible,
-.button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+.button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: var(--ring);
 }
 
 .actions {
@@ -329,13 +458,17 @@ button:focus-visible,
 }
 
 /* Actions that stay on screen while the page runs on below them, and settle back into place
-   once it's scrolled past where they belong. */
+   once it's scrolled past where they belong: a bar across the bottom, frosted. */
 .actions.pinned {
   position: sticky;
   bottom: 0;
-  z-index: 1;
-  padding: 0.75rem 0 max(0.75rem, env(safe-area-inset-bottom));
-  background: linear-gradient(to top, var(--paper) 75%, transparent);
+  z-index: 5;
+  margin: 0.5rem -1rem 0;
+  padding: 0.75rem 1rem max(0.75rem, env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  border-top: 1px solid var(--line);
 }
 
 .error {
@@ -528,20 +661,13 @@ button:focus-visible,
 .postings,
 .rule {
   border: 1px solid var(--line);
-  border-radius: 1rem;
-  padding: 0.75rem;
+  border-radius: var(--radius-card);
+  padding: 0.9rem 1rem 1rem;
   margin: 0;
   display: grid;
   gap: 0.75rem;
   background: var(--card);
-}
-
-.postings legend,
-.rule legend {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--muted);
-  padding: 0 0.25rem;
+  box-shadow: var(--shadow-card);
 }
 
 /* A transaction's splits, each as it is: its memo and tags, then its account and amount. Tapping
@@ -672,15 +798,20 @@ button:focus-visible,
 }
 
 .pill {
-  display: inline-block;
-  padding: 0.1rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
 }
 
 .pill.staged {
-  background: color-mix(in srgb, #d9a441 25%, transparent);
+  background: color-mix(in srgb, var(--warn) 22%, transparent);
+  color: color-mix(in srgb, var(--warn) 45%, var(--ink));
 }
 
 .pill.confirmed {
@@ -699,6 +830,7 @@ button:focus-visible,
 
 .swipe-surface {
   position: relative;
+  transform-origin: 50% 100%; /* tilts like a card held at its foot */
   touch-action: pan-y; /* vertical scrolling stays the browser's; horizontal drags are ours */
   user-select: none;
   -webkit-user-select: none;
@@ -991,9 +1123,9 @@ select {
   color: inherit;
   min-height: 2.75rem;
   padding: 0 0.6rem;
-  border: 1px solid var(--line);
-  border-radius: 0.7rem;
-  background: var(--paper);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background: var(--card);
   width: 100%;
 }
 
@@ -1083,8 +1215,10 @@ a.primary-link {
   font-weight: 400;
 }
 
-.ledger-row:hover {
-  background: color-mix(in srgb, var(--accent-soft) 18%, transparent);
+@media (hover: hover) {
+  .ledger-row:hover {
+    background: color-mix(in srgb, var(--accent-soft) 18%, transparent);
+  }
 }
 
 .ledger-row.unconfirmed {
@@ -1251,11 +1385,18 @@ a.primary-link {
 /* Plain links */
 
 main
-  a:not(.button):not(.card):not(.back):not(.menu-item):not(.chart-leaf):not(.budget-link):not(
-    .largest-row
-  ):not(.fund-row) {
+  a:not(.button):not(.card):not(.back):not(.crumb):not(.menu-item):not(.chart-leaf):not(
+    .budget-link
+  ):not(.largest-row):not(.fund-row) {
   color: var(--accent);
   font-weight: 600;
+  text-decoration: none;
+}
+
+/* Underlined only when pointed at: a page of underlines reads as a document, not an app. */
+main a:not(.button):not(.card):hover {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
 }
 
 /* Starring an account (its ledger's header) */
@@ -1419,8 +1560,8 @@ button.plain {
 
 .select-bar {
   position: sticky;
-  top: 0;
-  z-index: 3;
+  top: var(--masthead-height);
+  z-index: 9;
   margin: 0 -0.25rem 0.75rem;
   padding: 0.5rem 0.25rem;
   background: var(--paper);
@@ -1573,27 +1714,57 @@ button.plain {
   flex: 1 1 8rem;
 }
 
+/* A choice of a few: one joined control, its options divided by a line, the chosen one filled. */
 .segmented {
   display: flex;
-  border: 1px solid var(--line);
-  border-radius: 0.7rem;
+  flex-wrap: wrap;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
   overflow: hidden;
+  background: var(--card);
+  box-shadow: var(--shadow-control);
 }
 
 .segmented button {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   font: inherit;
+  font-size: 0.9rem;
   font-weight: 600;
-  padding: 0.6rem;
+  padding: 0.55rem 0.75rem;
   border: 0;
+  border-radius: 0;
+  box-shadow: none;
   background: var(--card);
   color: inherit;
   cursor: pointer;
+  white-space: normal;
+  line-height: 1.25;
 }
 
-.segmented button.on {
+.segmented button + button {
+  border-left: 1px solid var(--line);
+}
+
+.segmented button.on,
+.segmented button[aria-checked="true"] {
   background: var(--accent);
   color: var(--on-accent);
+}
+
+/* On a phone, three or more options stack: side by side, they'd be squeezed past reading. */
+@media (max-width: 34rem) {
+  .segmented > button:nth-last-child(n + 3),
+  .segmented > button:nth-last-child(n + 3) ~ button {
+    flex-basis: 100%;
+    text-align: left;
+    justify-content: flex-start;
+  }
+
+  .segmented > button:nth-last-child(n + 3) ~ button {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
 }
 
 .holding-fields {
@@ -1773,11 +1944,20 @@ code.secret {
 }
 
 .migrate-card {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-right: 2.75rem;
+}
+
+.migrate-card .migrate-dismiss {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
 }
 
 .chart {
@@ -2560,9 +2740,15 @@ main a.largest-row,
 .filter-button {
   display: grid;
   place-items: center;
-  width: 2.75rem;
-  min-height: 2.75rem;
+  width: 2.5rem;
   padding: 0;
+  flex: none;
+}
+
+@media (pointer: coarse) {
+  .filter-button {
+    width: 2.75rem;
+  }
 }
 
 .filter-button.on {
@@ -2579,7 +2765,21 @@ main a.largest-row,
 
 .filter-panel {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.filter-panel > .small.muted:not(:first-child) {
+  margin-top: 0.4rem;
+}
+
+.filter-button svg {
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 .reconcile-row {
@@ -3006,7 +3206,12 @@ details.divide summary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
+}
+
+/* After its tags, the field keeps clear of them. */
+.tag-input .tag + .picker {
+  margin-left: 0.4rem;
 }
 
 .tag-input .picker {
@@ -3033,6 +3238,10 @@ details.divide summary {
   background: transparent;
   padding: 0 0.4rem;
   margin-left: -0.4rem;
+}
+
+.review-tags .tag-input .tag + .picker input {
+  margin-left: 0;
 }
 
 .review-tags .tag-input input:hover,
@@ -3926,9 +4135,12 @@ select.fund-pick {
 /* The app's own news, at the top of the window and staying there: offline, or the server not
    answering; a new version waiting for a reload. */
 .banners {
-  position: sticky;
-  top: 0;
-  z-index: 20;
+  position: fixed;
+  top: max(0.5rem, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(38rem, calc(100vw - 1rem));
+  z-index: 60;
   display: grid;
   gap: 0.4rem;
 }
@@ -3964,4 +4176,820 @@ select.fund-pick {
   padding: 0 0.8rem;
   font-size: 0.85rem;
   flex: none;
+}
+
+/* Fieldsets: a group's name is a heading inside it, not a label cut into its border. Floated, a
+   legend leaves the border whole and takes a line of its own (the browser's only way). */
+fieldset {
+  min-width: 0;
+}
+
+legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin: 0 0 0.1rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+legend + * {
+  clear: both;
+}
+
+/* The frame, signed in: on a wide screen, the navigation down the left beside the page; on a
+   phone, the page alone, and the navigation in the menu's drawer. */
+.sidebar {
+  display: none;
+}
+
+/* The sidebar's column runs the page's whole length, the footer's row included, so it stays at
+   the top of the window to the very end (the frame is "contents": its parts are the shell's). */
+@media (min-width: 64rem) {
+  .shell:has(.app-frame) {
+    max-width: 70rem;
+    display: grid;
+    grid-template-columns: 14.5rem minmax(0, 42rem);
+    grid-template-rows: auto auto;
+    justify-content: center;
+    column-gap: 3rem;
+  }
+
+  .app-frame {
+    display: contents;
+  }
+
+  .app-main {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .shell:has(.app-frame) > .footer {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .sidebar {
+    display: block;
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+  }
+
+  .sidebar-inner {
+    display: grid;
+    align-content: start;
+    gap: 1.25rem;
+    position: sticky;
+    top: 0;
+    /* Short of the window by the page's bottom padding, so it never has to move up at the end;
+       a long menu scrolls inside it. */
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    padding: 0.6rem 0 1rem;
+  }
+
+  .app-main .masthead .brand,
+  .app-main .main-menu {
+    display: none;
+  }
+
+  .app-main .masthead {
+    justify-content: flex-end;
+  }
+}
+
+.nav {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.nav-section {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.nav-items {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: 2.4rem;
+  padding: 0 0.7rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: none;
+  box-shadow: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  justify-content: flex-start;
+}
+
+.nav-item:hover,
+button.nav-item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+.nav-item[aria-current="page"] {
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.nav-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: none;
+  color: var(--muted);
+}
+
+.nav-item[aria-current="page"] .nav-icon {
+  color: var(--accent);
+}
+
+.nav-heading {
+  margin: 0;
+  align-items: center;
+}
+
+.nav-heading,
+button.nav-heading {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 2rem;
+  padding: 0 0.7rem;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+button.nav-heading:hover:not(:disabled) {
+  background: none;
+  color: var(--ink);
+}
+
+.nav-chevron {
+  width: 0.9rem;
+  height: 0.9rem;
+  transition: transform 0.15s;
+}
+
+.nav-heading[aria-expanded="false"] .nav-chevron {
+  transform: rotate(-90deg);
+}
+
+.nav-end {
+  border-top: 1px solid var(--line);
+  padding-top: 0.6rem;
+}
+
+/* The phone's menu: the whole screen, sliding in from the right and back out. */
+.nav-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  overflow-y: auto;
+  padding: max(0.6rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+  background: var(--paper);
+  animation: nav-drawer-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: grid;
+  align-content: start;
+  gap: 0.9rem;
+}
+
+.nav-drawer.closing {
+  animation: nav-drawer-out 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Where the masthead was: its logo in the same place, × where the menu button was. */
+.nav-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.nav-drawer-head .logo {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.nav-drawer-head .icon {
+  margin-left: auto;
+}
+
+body.nav-drawer-open {
+  overflow: hidden;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes nav-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes nav-drawer-out {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* (i): more about something, on request (components/Info.tsx). */
+button.info-button {
+  display: inline-flex;
+  min-height: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  margin: 0 0.15rem;
+  vertical-align: middle;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+}
+
+button.info-button:hover:not(:disabled),
+button.info-button[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+button.info-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Small to see, but 44px to a finger (WCAG 2.5.5). */
+button.info-button {
+  position: relative;
+}
+
+button.info-button::after {
+  content: "";
+  position: absolute;
+  inset: -0.6rem;
+}
+
+.info-note {
+  position: fixed;
+  z-index: 90;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-pop);
+  animation: fade-in 0.12s ease-out;
+}
+
+.info-note p {
+  margin: 0;
+}
+
+.info-note p + p {
+  margin-top: 0.5rem;
+}
+
+/* A heading with an (i) beside it. */
+.with-info {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Bank connections: a connection's banks, each over its accounts. */
+.connection {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.connection-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.connection-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.connection-head p {
+  display: flex;
+  align-items: center;
+}
+
+.button-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+.spinning {
+  animation: spin 0.9s linear infinite;
+}
+
+/* Something about a connection or a bank: an icon, then what it is. */
+.connection-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+}
+
+.connection-note > svg {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  margin-top: 0.15rem;
+  color: color-mix(in srgb, var(--warn) 70%, var(--ink));
+}
+
+.connection-note.problem {
+  background: color-mix(in srgb, var(--bad) 9%, transparent);
+  color: var(--bad);
+}
+
+.connection-note.problem > svg {
+  color: var(--bad);
+}
+
+.institution {
+  display: grid;
+  gap: 0.4rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.card .institution-name {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.institution-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  margin-right: 0.2rem;
+}
+
+.connection-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+button.plain.danger {
+  color: var(--bad);
+}
+
+/* "More": what's used now and then, folded away (components/More.tsx). */
+/* min-width 0: a grid item is otherwise as wide as its widest content (a long fund's name),
+   and would widen the page past a phone's screen. */
+details.more {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  margin-top: 0.25rem;
+}
+
+details.more > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+details.more > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.more > summary:hover {
+  color: var(--ink);
+}
+
+.more-label {
+  font-weight: 600;
+}
+
+.more-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent);
+  font-weight: 550;
+}
+
+.more-chevron {
+  width: 1rem;
+  height: 1rem;
+  margin-left: auto;
+  flex: none;
+  transition: transform 0.15s;
+}
+
+details.more[open] .more-chevron {
+  transform: rotate(180deg);
+}
+
+.more-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.6rem;
+  padding: 0.25rem 0 0.5rem;
+}
+
+/* A transaction's page: what it is at a glance, then its fields, splits and the rest. */
+.txn-summary {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.txn-summary-top {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: -0.35rem -0.5rem 0.2rem 0;
+}
+
+.txn-summary-top .overflow {
+  margin-left: auto;
+}
+
+.txn-headline {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.card .txn-headline h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.txn-headline .amount {
+  font-size: 1.25rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.pill.reconciled-pill {
+  background: color-mix(in srgb, var(--good) 14%, transparent);
+  color: color-mix(in srgb, var(--good) 70%, var(--ink));
+}
+
+.txn-fields {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.menu-item.danger {
+  color: var(--bad);
+}
+
+/* Less motion for those who ask for it: things appear rather than slide or fade. */
+@media (prefers-reduced-motion: reduce) {
+  .nav-drawer,
+  .info-note,
+  .loading,
+  .chart-placeholder::after {
+    animation-duration: 0.01ms;
+    animation-delay: 0s;
+  }
+
+  .nav-chevron,
+  .more-chevron,
+  button,
+  .button {
+    transition: none;
+  }
+}
+
+/* Buttons that read as text, rows or marks, not as buttons: no raised shadow. (Their own rules
+   say how they look; this only takes back what every button got above.) */
+button.plain,
+button.link-button,
+button.star,
+button.select-overlay,
+button.shutter,
+button.drawer-handle,
+.segmented button,
+.menu-item,
+.nav-item,
+.split-row,
+.ledger-row,
+.holding-row,
+.breakdown-row,
+.chart-main,
+.budget-toggle {
+  box-shadow: none;
+}
+
+button.plain:hover:not(:disabled),
+button.link-button:hover:not(:disabled),
+button.star:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+button.link-button {
+  text-decoration: none;
+}
+
+/* A ⋯ opens toward the page's middle (Overflow.tsx says which side). */
+.overflow .menu-panel.from-left {
+  left: 0;
+  right: auto;
+}
+
+.overflow .menu-panel.from-right {
+  right: 0;
+  left: auto;
+}
+
+/* Find on page (components/FindBar.tsx): a bar at the top of the window; what matches marked,
+   the current match stronger. */
+.find-bar {
+  position: fixed;
+  top: max(0.5rem, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  width: min(30rem, calc(100vw - 1rem));
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.35rem 0.35rem 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  box-shadow: var(--shadow-pop);
+}
+
+.find-bar input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.5rem;
+}
+
+.find-count {
+  min-width: 3.5rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+::highlight(find) {
+  background-color: color-mix(in srgb, #ffd54a 55%, transparent);
+  color: inherit;
+}
+
+::highlight(find-current) {
+  background-color: #ff9f1c;
+  color: #1f2937;
+}
+
+[data-find] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, #ffd54a 80%, transparent);
+}
+
+[data-find="current"] {
+  box-shadow: 0 0 0 3px #ff9f1c;
+}
+
+/* A problem, said in a tinted box with a mark, so it reads as one at a glance rather than as a
+   line of red. (Inline ones, a table cell's, stay text.) */
+p.error,
+div.error {
+  position: relative;
+  margin: 0;
+  padding: 0.6rem 0.8rem 0.6rem 2.1rem;
+  border-radius: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--bad) 25%, transparent);
+  background: color-mix(in srgb, var(--bad) 8%, var(--card));
+  color: var(--bad);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+p.error::before,
+div.error::before {
+  content: "";
+  position: absolute;
+  left: 0.75rem;
+  top: calc(0.6rem + 0.15em);
+  width: 1rem;
+  height: 1rem;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='12' y1='8' x2='12' y2='12'/%3E%3Cline x1='12' y1='16' x2='12.01' y2='16'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='12' y1='8' x2='12' y2='12'/%3E%3Cline x1='12' y1='16' x2='12.01' y2='16'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+p.error.small {
+  font-size: 0.8rem;
+}
+
+/* A menu's items wrap rather than run off a phone's screen (buttons don't wrap elsewhere). */
+.menu-panel {
+  max-width: min(20rem, calc(100vw - 2rem));
+}
+
+.menu-item {
+  white-space: normal;
+  justify-content: flex-start;
+}
+
+/* Home's import link: quiet, between recent transactions and the accounts. */
+.home-import {
+  margin: 0.25rem 0 0.9rem;
+  text-align: right;
+}
+
+/* Breadcrumbs (components/Crumbs.tsx): the pages above this one, small, over its title. A long
+   trail wraps. */
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.1rem 0.15rem;
+  margin-bottom: 0.15rem;
+  font-size: 0.85rem;
+}
+
+main .crumbs a.crumb {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.2rem 0;
+}
+
+main .crumbs a.crumb:hover {
+  color: var(--accent);
+}
+
+.crumb-sep {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: none;
+  color: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+
+/* A node's page: the accounts under it, in a window of its own height that scrolls. */
+.subaccounts {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.subaccounts-window {
+  max-height: 22rem;
+  overflow-y: auto;
+  margin: 0 -1.1rem -1rem;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+
+.subaccounts-window.chart {
+  border: 0;
+  border-top: 1px solid var(--line);
+  box-shadow: none;
+  padding: 0;
+}
+
+.subaccounts .chart-empty {
+  padding: 0.75rem 1.1rem;
+}
+
+a.button.small-button,
+button.small-button {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  font-size: 0.85rem;
+}
+
+/* A field's own hint that something's amiss: a line in red, not a box (that's for what failed). */
+p.error.small {
+  padding: 0 0 0 1.35rem;
+  border: 0;
+  background: none;
+}
+
+p.error.small::before {
+  left: 0;
+  top: 0.2em;
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.with-info > .segmented {
+  flex: 1;
+}
+
+/* A list's header (ListTools): search, Select and the filter in a row; under it, the filter's
+   panel, or what it has on as pills. */
+.list-tools {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+
+.list-tools-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.list-tools-row .ledger-search {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.list-tools .select-bar {
+  margin-bottom: 0;
+}
+
+.list-tools .filter-panel {
+  margin: 0;
+}
+
+.filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+button.filter-pill {
+  min-height: 1.9rem;
+  padding: 0 0.45rem 0 0.7rem;
+  gap: 0.3rem;
+  border-radius: 999px;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  background: color-mix(in srgb, var(--accent) 9%, var(--card));
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 550;
+  box-shadow: none;
+  max-width: 100%;
+}
+
+button.filter-pill svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--muted);
+  flex: none;
+}
+
+@media (pointer: coarse) {
+  button.filter-pill {
+    min-height: 2.25rem;
+  }
 }

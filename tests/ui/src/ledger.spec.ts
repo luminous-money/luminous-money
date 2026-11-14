@@ -19,6 +19,7 @@ test("going to a date loads from there, then newer above and older below, to all
   const rows = await longLedger(page);
   await expect(rows).toHaveCount(200);
 
+  await page.getByRole("button", { name: "Filter" }).click(); // the date is in the filter
   await page.getByLabel("Go to date").fill("2024-10-01");
   await page.getByRole("button", { name: "Go", exact: true }).click();
   await expect(page).toHaveURL(/\?date=2024-10-01$/);

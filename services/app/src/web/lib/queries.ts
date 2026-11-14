@@ -403,9 +403,10 @@ export function useAddAccount(book: string) {
   const star = useSetStar(book);
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (account: AccountIn) => {
+    /** `star`: on the home page too. */
+    mutationFn: async ({ star: starred, ...account }: AccountIn & { star: boolean }) => {
       const created = await create.mutateAsync(account);
-      await star.mutateAsync({ account: created.name, starred: true });
+      if (starred) await star.mutateAsync({ account: created.name, starred: true });
       return created;
     },
     onSuccess: () => client.invalidateQueries({ queryKey: keys.book(book) }),
@@ -431,11 +432,12 @@ export const useAccountLedger = (
   account: string,
   date?: string,
   reconciled?: boolean,
-  tags: string[] = []
+  tags: string[] = [],
+  q = ""
 ) =>
   usePages(
-    [...keys.ledger(book, account), reconciled ?? null, ...tags],
-    (at) => api.accountLedger(book, account, at, reconciled, tags),
+    [...keys.ledger(book, account), reconciled ?? null, q.trim(), ...tags],
+    (at) => api.accountLedger(book, account, at, reconciled, tags, q),
     date
   );
 
@@ -631,8 +633,8 @@ export function useImport(book: string) {
   });
 }
 
-export function useAccounts(book: string) {
-  return useQuery({ queryKey: keys.accounts(book), queryFn: () => api.accounts(book) });
+export function useAccounts(book: string, enabled = true) {
+  return useQuery({ queryKey: keys.accounts(book), queryFn: () => api.accounts(book), enabled });
 }
 
 export function useQueue(book: string) {

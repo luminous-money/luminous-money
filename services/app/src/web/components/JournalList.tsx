@@ -5,7 +5,7 @@ import { formatMoney } from "../lib/decimal.js";
 import { accountsLabel, movement } from "../lib/journal.js";
 import type { JournalRow } from "../lib/ledger.js";
 import { withBack } from "../lib/navigation.js";
-import type { Selection } from "../lib/selection.js";
+import { selectClick, type Selection } from "../lib/selection.js";
 import { FundChips } from "./Funds.js";
 import { TagChips } from "./Tags.js";
 
@@ -43,10 +43,12 @@ export function JournalList({
             <button
               type="button"
               className={`ledger-row${row.flag === "!" ? " unconfirmed" : ""}${selection?.has(row.id) ? " selected" : ""}`}
-              onClick={() =>
+              onClick={(e) =>
                 selection?.selecting
                   ? selection.toggle(row.id)
-                  : navigate(withBack(`/books/${book}/transactions/${row.id}`, here))
+                  : selection && selectClick(e)
+                    ? selection.startWith(row.id)
+                    : navigate(withBack(`/books/${book}/transactions/${row.id}`, here))
               }
               {...(selection?.selecting
                 ? { role: "checkbox", "aria-checked": selection.has(row.id) }

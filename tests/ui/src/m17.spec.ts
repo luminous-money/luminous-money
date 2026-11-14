@@ -44,8 +44,7 @@ test("a split is tagged on its page; rows show it and the ledger filters by it",
   await expect(transactions.getByRole("listitem")).toHaveCount(1);
   await expect(transactions).toContainText("Shop 1");
   await page.getByRole("button", { name: "Filter (on)" }).click();
-  await expect(page.getByText("Tagged #trip-to-italy only.")).toBeVisible();
-  await page.getByRole("button", { name: "Show all" }).click();
+  await page.getByRole("button", { name: "Remove tag: trip-to-italy" }).click();
   await expect(transactions.getByRole("button", { name: /Shop 3/ })).toBeVisible();
 });
 

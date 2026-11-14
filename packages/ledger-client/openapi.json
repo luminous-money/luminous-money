@@ -6570,6 +6570,24 @@
               "description": "Only transactions with a split that has every tag given (M17); repeat it for several.",
               "title": "Tag"
             }
+          },
+          {
+            "description": "Only transactions whose payee, narration or a split's memo has every word of it.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only transactions whose payee, narration or a split's memo has every word of it.",
+              "title": "Q"
+            }
           }
         ],
         "responses": {

@@ -3,8 +3,10 @@ import { Link, Redirect, Route, Router, Switch, useLocation } from "wouter";
 
 import { Banners } from "./components/Banners.js";
 import { BookSwitcher } from "./components/BookSwitcher.js";
+import { FindBar } from "./components/FindBar.js";
 import { Loading } from "./components/Loading.js";
 import { Menu } from "./components/Menu.js";
+import { Nav } from "./components/Nav.js";
 import type { BookInfo } from "./lib/appApi.js";
 import { bookHome, rememberBook, startingBook, useBookInPath } from "./lib/books.js";
 import {
@@ -60,6 +62,7 @@ export function App() {
     <Router base="/ui">
       <div className="shell">
         <Banners />
+        <FindBar />
         <Gate />
         <footer className="footer">
           <img src="/ui/icon.svg" alt="" className="footer-logo" />
@@ -147,147 +150,164 @@ function Gate() {
 
   const start = startingBook(user, books.data)!;
   return (
-    <>
-      <Masthead books={books.data} book={book ?? (inPath ? undefined : start)} />
-      {book?.role === "read" && (
-        <p className="readonly-note small" role="status">
-          You can see {book.name}, but not change it.
-        </p>
-      )}
-      {inPath && !book ? (
-        <NotFound />
-      ) : (
-        <Switch>
-          <Route path="/">
-            <Redirect to={bookHome(start.id)} replace />
-          </Route>
-          <Route path="/books">
-            <Books />
-          </Route>
-          <Route path="/account">
-            <Account />
-          </Route>
-          <Route path="/system">
-            <System />
-          </Route>
-          <Route path="/verify/:token">{({ token }) => <VerifyEmail token={token} />}</Route>
-          <Route path="/invite/:token">
-            {({ token }) => <InvitationPage key={token} token={token} />}
-          </Route>
-          <Route path="/books/:book/sharing">
-            {({ book: id }) => <Sharing key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book">{() => <Home key={book!.id} book={book!} />}</Route>
-          <Route path="/books/:book/accounts">
-            {({ book: id }) => <ChartOfAccounts key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/budgets">
-            {({ book: id }) => <Budgets key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/funds">
-            {({ book: id }) => <FundsPage key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/notifications">
-            {({ book: id }) => <NotificationsPage key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/funds/:fund">
-            {({ book: id, fund }) => (
-              <FundPage key={fund} book={id} name={decodeURIComponent(fund)} />
-            )}
-          </Route>
-          <Route path="/books/:book/transactions">
-            {({ book: id }) => <Transactions key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/reports">
-            {({ book: id }) => <Reports key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/accounts/:account/edit">
-            {({ book: id, account }) => (
-              <AccountEditor key={account} book={id} account={decodeURIComponent(account)} />
-            )}
-          </Route>
-          <Route path="/books/:book/accounts/new">
-            {() => <AddAccount key={book!.id} book={book!} />}
-          </Route>
-          <Route path="/books/:book/accounts/import">
-            {() => <ImportChart key={book!.id} book={book!} />}
-          </Route>
-          <Route path="/books/:book/migrate">{() => <Migrate key={book!.id} book={book!} />}</Route>
-          <Route path="/books/:book/accounts/:account/trade">
-            {({ book: id, account }) => (
-              <TradePage key={account} book={id} account={decodeURIComponent(account)} />
-            )}
-          </Route>
-          <Route path="/books/:book/receipt">
-            {({ book: id }) => <CaptureReceipt key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/ai">
-            {({ book: id }) => <AiSettings key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/amazon">
-            {({ book: id }) => <AmazonPage key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/accounts/:account/reconcile">
-            {({ book: id, account }) => (
-              <Reconcile key={account} book={id} account={decodeURIComponent(account)} />
-            )}
-          </Route>
-          <Route path="/books/:book/accounts/:account">
-            {({ book: id, account }) => (
-              <AccountLedger key={account} book={id} account={decodeURIComponent(account)} />
-            )}
-          </Route>
-          <Route path="/books/:book/import">
-            {({ book: id }) => <Import key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/commodities">
-            {({ book: id }) => <Commodities key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/rules">{({ book: id }) => <Rules key={id} book={id} />}</Route>
-          <Route path="/books/:book/rules/new">
-            {({ book: id }) => <RuleEditor key="new" book={id} />}
-          </Route>
-          <Route path="/books/:book/rules/:id">
-            {({ book: id, id: rule }) => <RuleEditor key={rule} book={id} id={rule} />}
-          </Route>
-          <Route path="/books/:book/schedules">
-            {({ book: id }) => <Schedules key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/schedules/new">
-            {({ book: id }) => <ScheduleEditor key="new" book={id} />}
-          </Route>
-          <Route path="/books/:book/schedules/:id">
-            {({ book: id, id: schedule }) => (
-              <ScheduleEditor key={schedule} book={id} id={schedule} />
-            )}
-          </Route>
-          <Route path="/books/:book/loans">{({ book: id }) => <Loans key={id} book={id} />}</Route>
-          <Route path="/books/:book/loans/new">
-            {({ book: id }) => <LoanSetup key="new" book={id} />}
-          </Route>
-          <Route path="/books/:book/loans/:id">
-            {({ book: id, id: loan }) => <LoanPage key={loan} book={id} id={loan} />}
-          </Route>
-          <Route path="/books/:book/connections">
-            {({ book: id }) => <BankConnections key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/review">
-            {({ book: id }) => <Review key={id} book={id} />}
-          </Route>
-          <Route path="/books/:book/transactions/new">
-            {({ book: id }) => <NewTransactionPage book={id} />}
-          </Route>
-          <Route path="/books/:book/transactions/:id">
-            {({ book: id, id: transaction }) => (
-              <TransactionPage key={transaction} book={id} id={transaction} />
-            )}
-          </Route>
-          <Route>
-            <NotFound />
-          </Route>
-        </Switch>
-      )}
-    </>
+    <div className="app-frame">
+      <aside className="sidebar">
+        <div className="sidebar-inner">
+          <Link href="/" className="brand" aria-label="Luminous Money">
+            <img src="/ui/icon.svg" alt="" className="logo" />
+            <span className="wordmark">Luminous Money</span>
+          </Link>
+          <Nav />
+        </div>
+      </aside>
+      <div className="app-main">
+        <Masthead books={books.data} book={book ?? (inPath ? undefined : start)} />
+        {book?.role === "read" && (
+          <p className="readonly-note small" role="status">
+            You can see {book.name}, but not change it.
+          </p>
+        )}
+        {inPath && !book ? (
+          <NotFound />
+        ) : (
+          <Switch>
+            <Route path="/">
+              <Redirect to={bookHome(start.id)} replace />
+            </Route>
+            <Route path="/books">
+              <Books />
+            </Route>
+            <Route path="/account">
+              <Account />
+            </Route>
+            <Route path="/system">
+              <System />
+            </Route>
+            <Route path="/verify/:token">{({ token }) => <VerifyEmail token={token} />}</Route>
+            <Route path="/invite/:token">
+              {({ token }) => <InvitationPage key={token} token={token} />}
+            </Route>
+            <Route path="/books/:book/sharing">
+              {({ book: id }) => <Sharing key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book">{() => <Home key={book!.id} book={book!} />}</Route>
+            <Route path="/books/:book/accounts">
+              {({ book: id }) => <ChartOfAccounts key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/budgets">
+              {({ book: id }) => <Budgets key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/funds">
+              {({ book: id }) => <FundsPage key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/notifications">
+              {({ book: id }) => <NotificationsPage key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/funds/:fund">
+              {({ book: id, fund }) => (
+                <FundPage key={fund} book={id} name={decodeURIComponent(fund)} />
+              )}
+            </Route>
+            <Route path="/books/:book/transactions">
+              {({ book: id }) => <Transactions key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/reports">
+              {({ book: id }) => <Reports key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/accounts/:account/edit">
+              {({ book: id, account }) => (
+                <AccountEditor key={account} book={id} account={decodeURIComponent(account)} />
+              )}
+            </Route>
+            <Route path="/books/:book/accounts/new">
+              {() => <AddAccount key={book!.id} book={book!} />}
+            </Route>
+            <Route path="/books/:book/accounts/import">
+              {() => <ImportChart key={book!.id} book={book!} />}
+            </Route>
+            <Route path="/books/:book/migrate">
+              {() => <Migrate key={book!.id} book={book!} />}
+            </Route>
+            <Route path="/books/:book/accounts/:account/trade">
+              {({ book: id, account }) => (
+                <TradePage key={account} book={id} account={decodeURIComponent(account)} />
+              )}
+            </Route>
+            <Route path="/books/:book/receipt">
+              {({ book: id }) => <CaptureReceipt key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/ai">
+              {({ book: id }) => <AiSettings key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/amazon">
+              {({ book: id }) => <AmazonPage key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/accounts/:account/reconcile">
+              {({ book: id, account }) => (
+                <Reconcile key={account} book={id} account={decodeURIComponent(account)} />
+              )}
+            </Route>
+            <Route path="/books/:book/accounts/:account">
+              {({ book: id, account }) => (
+                <AccountLedger key={account} book={id} account={decodeURIComponent(account)} />
+              )}
+            </Route>
+            <Route path="/books/:book/import">
+              {({ book: id }) => <Import key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/commodities">
+              {({ book: id }) => <Commodities key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/rules">
+              {({ book: id }) => <Rules key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/rules/new">
+              {({ book: id }) => <RuleEditor key="new" book={id} />}
+            </Route>
+            <Route path="/books/:book/rules/:id">
+              {({ book: id, id: rule }) => <RuleEditor key={rule} book={id} id={rule} />}
+            </Route>
+            <Route path="/books/:book/schedules">
+              {({ book: id }) => <Schedules key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/schedules/new">
+              {({ book: id }) => <ScheduleEditor key="new" book={id} />}
+            </Route>
+            <Route path="/books/:book/schedules/:id">
+              {({ book: id, id: schedule }) => (
+                <ScheduleEditor key={schedule} book={id} id={schedule} />
+              )}
+            </Route>
+            <Route path="/books/:book/loans">
+              {({ book: id }) => <Loans key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/loans/new">
+              {({ book: id }) => <LoanSetup key="new" book={id} />}
+            </Route>
+            <Route path="/books/:book/loans/:id">
+              {({ book: id, id: loan }) => <LoanPage key={loan} book={id} id={loan} />}
+            </Route>
+            <Route path="/books/:book/connections">
+              {({ book: id }) => <BankConnections key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/review">
+              {({ book: id }) => <Review key={id} book={id} />}
+            </Route>
+            <Route path="/books/:book/transactions/new">
+              {({ book: id }) => <NewTransactionPage book={id} />}
+            </Route>
+            <Route path="/books/:book/transactions/:id">
+              {({ book: id, id: transaction }) => (
+                <TransactionPage key={transaction} book={id} id={transaction} />
+              )}
+            </Route>
+            <Route>
+              <NotFound />
+            </Route>
+          </Switch>
+        )}
+      </div>
+    </div>
   );
 }
 

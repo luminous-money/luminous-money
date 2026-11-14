@@ -1881,8 +1881,9 @@ It also needs a book switcher (M6).
 Reskinned from the original Luminous Money app (2026-10-23; its files are in
 `../.archive/system`): its palette and its Lu logo, on our own layout, in light and dark.
 
-- **Light:** its light gray (`#efefef`) behind white cards, its text gray (`#333`), and its
-  blue (`#0062a8`) as the accent. **Dark:** its deep blue (`#003052`), cards a tenth lighter (as
+- **Light:** a light gray behind white cards, a dark gray text, and its blue (`#0062a8`) as
+  the accent. (The original's `#efefef` and `#333` became cooler grays in the design pass,
+  2026-11-14.) **Dark:** its deep blue (`#003052`), cards a tenth lighter (as
   its panels were), white text, and its cyan (`#0ff`) as the accent, with dark text on it
   (`--on-accent`). Green and red keep their meaning (money in and out), brighter on the blue.
   The accent is `--accent`, not a color's name, so the next reskin is a change of values.
@@ -1930,6 +1931,52 @@ offline; picking up a new version).
   banner says a new version is ready, with Reload. "Typed in" is read from the document
   (`input` events), so no form has to declare it. The first release with this still waits for
   the old worker's tabs to close: the old one never listened.
+
+### The design pass: how it looks and moves (M20, 2026-11-14)
+
+"It feels like open source software" (Kael). What made it so, and what replaced it; the list is
+[M20's plan](milestones/m20-design-polish/PLAN.md).
+
+- **One typeface, self-hosted:** Geist (Kael's choice; Fontsource's variable files, served with
+  the app and precached, so no font CDN sees who uses it and it works offline), with figures in
+  columns so money lines up. The system's font differed by device and had no tabular figures
+  to rely on.
+- **Depth over outlines:** cards on the paper with a faint shadow; controls raised white with a
+  firm edge; primary filled. Quiet things (icons, menu items, text buttons) have no edge.
+  Neutrals are cooler grays, every text color AA (4.5:1) on paper and cards; field edges stay
+  short of 3:1, which reads heavy, and fields have labels.
+- **Nothing depends on hover** (phone first): hover only adds emphasis. Explanations open on a
+  tap (`Info`), folded parts on a tap (`More`, ⋯, the menu's sections). Touch targets are 44px
+  (small marks get an invisible larger hit area).
+- **Navigation is grouped and shared:** one `Nav` for the phone's drawer and the wide screen's
+  sidebar; the everyday places always shown, the rest in sections that fold, the one holding
+  the page you're on always open. The drawer is a modal dialog (focus inside, the page inert).
+- **Fold away the occasional, but say what's set:** "More" on a transaction and a review card
+  holds funds and Exclude from budget, and its summary line names what's set, so folded isn't
+  hidden; it opens itself when something there blocks saving. ⋯ holds actions taken now and
+  then (Repeat…, Delete; an account's Reconcile, Edit, Sync now), as a disclosure of plain links
+  and buttons rather than an ARIA menu (simpler for screen readers, and Tab works).
+- **Sticky where it saves a scroll:** the masthead, frosted; an editor's Save and Confirm, a
+  frosted bar. `scroll-padding` keeps what's scrolled to clear of both.
+- **Fieldsets keep their semantics, lose the look:** the legend floats, so it's a heading inside
+  the group rather than a label cut into its border.
+- **Find on page** for the installed app (no browser chrome, so no browser find, and no page can
+  open it): the CSS Custom Highlight API marks matches without touching the page.
+- **Back is breadcrumbs, made from where you came from** (Kael's round, 2026-11-14): a lone "‹
+  Home" on an account opened from the Accounts page was never where he wanted to go. A page's
+  trail is the page it was opened from (`?back=`, kept with its query so review comes back to
+  the same card) with that page's own trail above it, or, opened directly, its structure: an
+  account under its parents under Accounts, an item under its list, everything under home.
+  `lib/crumbs.ts` is pure (unit-tested); the menu's highlight follows the same `?back=` chain.
+- **A list's header is one row** (`ListTools`): Search, Select, the filter. Filters live in the
+  filter's panel and show, when it's closed, as pills that remove themselves; the search is a
+  filter too, only more prominent. Select mode replaces the row but not the filter, so a
+  filtered set can be selected, and an action leaves the selection as it was.
+- **A choice of three or more stacks on a phone** (`.segmented`), by the viewport: side by side
+  they squeezed past reading. (A container query was tried first; it made the control
+  size-contained, which collapses it in a flex row.)
+- **Hover is for devices with it** (`@media (hover: hover)`): a touch screen keeps "hover" on
+  what was tapped, which tinted Select mode's cards gray.
 
 ### How the review queue works
 

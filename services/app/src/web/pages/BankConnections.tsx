@@ -1,8 +1,10 @@
+import { AlertTriangle, Building2, Plus, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 
 import { AccountPicker } from "../components/AccountPicker.js";
 import { DefaultFundCard } from "../components/DefaultFund.js";
+import { Info } from "../components/Info.js";
 import { NewAccountField } from "../components/NewAccountField.js";
 import { displayName } from "../lib/accounts.js";
 import type {
@@ -48,14 +50,19 @@ export function BankConnections({ book }: { book: string }) {
   return (
     <main className="stack">
       <header className="page-head">
-        <h1>Bank connections</h1>
-        <p className="muted">
-          Bank accounts, cards and brokerages, kept up to date through{" "}
-          <a href="https://bridge.simplefin.org/" target="_blank" rel="noreferrer">
-            SimpleFIN Bridge
-          </a>
-          . Transactions arrive every morning and go through review, like an import.
-        </p>
+        <h1 className="with-info">
+          Bank connections
+          <Info label="About bank connections">
+            <p>
+              Bank accounts, cards and brokerages, kept up to date through{" "}
+              <a href="https://bridge.simplefin.org/" target="_blank" rel="noreferrer">
+                SimpleFIN Bridge
+              </a>
+              . Transactions arrive every morning and go through review, like an import.
+            </p>
+            <p>Connections are yours, across your books; links are this book's.</p>
+          </Info>
+        </h1>
       </header>
       <BankConnectionsPanel book={book} />
     </main>
@@ -81,14 +88,24 @@ export function BankConnectionsPanel({ book }: { book: string }) {
           shown={c.id === shown}
         />
       ))}
-      <Connect />
+      {connections.data && <Connect folded={connections.data.length > 0} />}
     </>
   );
 }
 
-function Connect() {
+/** Connect: open for the first connection; then a button that opens it, for another. */
+function Connect({ folded }: { folded: boolean }) {
   const connect = useConnectBank();
   const [token, setToken] = useState("");
+  const [open, setOpen] = useState(!folded);
+  if (!open)
+    return (
+      <div>
+        <button type="button" onClick={() => setOpen(true)}>
+          <Plus aria-hidden="true" className="button-icon" /> Connect another bank
+        </button>
+      </div>
+    );
   return (
     <form
       className="card editor"
@@ -98,11 +115,13 @@ function Connect() {
         connect.mutate(token.trim(), { onSuccess: () => setToken("") });
       }}
     >
-      <h2 className="section-title">Connect</h2>
-      <p className="small muted">
-        At SimpleFIN Bridge, connect your banks, then make a setup token for luminous-money and
-        paste it here. It works once.
-      </p>
+      <h2 className="section-title with-info">
+        Connect a bank
+        <Info label="How to connect">
+          At SimpleFIN Bridge, connect your banks, then make a setup token for luminous-money and
+          paste it here. It works once.
+        </Info>
+      </h2>
       <label>
         Setup token
         <textarea
@@ -144,22 +163,42 @@ function ConnectionCard({
     if (shown) card.current?.scrollIntoView({ block: "start" });
   }, [shown]);
   return (
-    <section ref={card} className="card" aria-label={`Connection to ${connection.host}`}>
-      <div className="row-between">
-        {/* Named by its id: its banks are its accounts', and a connection can hold many. */}
-        <h2 className="section-title">SimpleFIN {connection.id.slice(0, 8)}</h2>
-        <span className="small muted">{connection.host}</span>
+    <section ref={card} className="card connection" aria-label={`Connection to ${connection.host}`}>
+      <div className="connection-head">
+        <div>
+          {/* Named by its id: its banks are its accounts', and a connection can hold many. */}
+          <h2 className="connection-name">SimpleFIN {connection.id.slice(0, 8)}</h2>
+          <p className="small muted">
+            {connection.last_sync_at
+              ? `Synced ${formatWhen(connection.last_sync_at)}`
+              : "Not synced yet"}
+            <Info label="About this connection">
+              <p>
+                Through {connection.host}. {connection.requests_left} of{" "}
+                {connection.requests_per_day} requests left today (SimpleFIN's limit; linking a long
+                history takes several, Sync now one or two).
+              </p>
+            </Info>
+          </p>
+        </div>
+        <button type="button" disabled={sync.isPending} onClick={() => sync.mutate(connection.id)}>
+          <RefreshCw
+            aria-hidden="true"
+            className={`button-icon${sync.isPending ? " spinning" : ""}`}
+          />
+          {sync.isPending ? "Syncing…" : "Sync now"}
+        </button>
       </div>
-      <p className="small muted">
-        {connection.last_sync_at
-          ? `Last synced ${formatWhen(connection.last_sync_at)}`
-          : "Not synced yet"}
-        {" · "}
-        {connection.requests_left} of {connection.requests_per_day} requests left today
-      </p>
+      {/* The Bridge's errors are plain strings about the connection as a whole: they say which
+          bank in words, not in a field to file them under. */}
       {connection.errors.map((e, i) => (
-        <p key={i} className={`small ${e.notice ? "muted" : "error"}`} title={e.code}>
-          {e.explained}
+        <p key={i} className={`connection-note small${e.notice ? "" : " problem"}`} title={e.code}>
+          {e.notice ? (
+            <Info label="Notice">{e.explained}</Info>
+          ) : (
+            <AlertTriangle aria-hidden="true" />
+          )}
+          {e.notice ? <span className="muted">A notice from SimpleFIN</span> : e.explained}
         </p>
       ))}
       {sync.data && (
@@ -168,28 +207,30 @@ function ConnectionCard({
         </p>
       )}
       {sync.error && <p className="small error">{explain(sync.error)}</p>}
-      <ul className="plain-list bank-accounts" aria-label="Bank accounts">
-        {connection.accounts.map((a) => (
-          <li key={a.account_id}>
-            <BankAccountRow
-              book={book}
-              connection={connection}
-              account={a}
-              attempt={attempts.find((x) => x.account_id === a.account_id)}
-              linking={linking === a.account_id}
-              onLink={() => setLinking(linking === a.account_id ? null : a.account_id)}
-              onDone={() => setLinking(null)}
-            />
-          </li>
-        ))}
-      </ul>
-      <div className="actions">
-        <button type="button" disabled={sync.isPending} onClick={() => sync.mutate(connection.id)}>
-          {sync.isPending ? "Syncing…" : "Sync now"}
-        </button>
+      {institutions(connection.accounts).map(([institution, accounts]) => (
+        <section key={institution} className="institution" aria-label={institution || "Accounts"}>
+          <InstitutionHead institution={institution} accounts={accounts} />
+          <ul className="plain-list bank-accounts" aria-label="Bank accounts">
+            {accounts.map((a) => (
+              <li key={a.account_id}>
+                <BankAccountRow
+                  book={book}
+                  connection={connection}
+                  account={a}
+                  attempt={attempts.find((x) => x.account_id === a.account_id)}
+                  linking={linking === a.account_id}
+                  onLink={() => setLinking(linking === a.account_id ? null : a.account_id)}
+                  onDone={() => setLinking(null)}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      <div className="connection-foot">
         <button
           type="button"
-          className="danger"
+          className="plain danger"
           disabled={disconnect.isPending}
           onClick={() => {
             if (
@@ -204,6 +245,55 @@ function ConnectionCard({
         </button>
       </div>
     </section>
+  );
+}
+
+/** "Fidelity's", "Elsewhere Securities'". */
+const possessive = (name: string) => (name.endsWith("s") ? `${name}'` : `${name}'s`);
+
+/** A connection's accounts by the bank they're at, in the order the bank feed lists them. */
+function institutions(accounts: BankAccount[]): [string, BankAccount[]][] {
+  const by = new Map<string, BankAccount[]>();
+  for (const a of accounts) by.set(a.institution, [...(by.get(a.institution) ?? []), a]);
+  return [...by];
+}
+
+/** A bank's name over its accounts, and what's true of all of them: whether its brokerage
+ * activity can be read (said once here, not on every account). */
+function InstitutionHead({
+  institution,
+  accounts,
+}: {
+  institution: string;
+  accounts: BankAccount[];
+}) {
+  const brokerages = accounts.filter((a) => a.kind === "brokerage");
+  const read = brokerages.find((a) => a.reader);
+  const unread = brokerages.find((a) => !a.reader);
+  return (
+    <>
+      <h3 className="institution-name with-info">
+        <Building2 aria-hidden="true" className="institution-icon" />
+        {institution || "Other accounts"}
+        {read && (
+          <Info label={`How ${possessive(institution)} activity is read`}>
+            <ReaderNote account={read} />
+          </Info>
+        )}
+      </h3>
+      {unread && (
+        <p className="connection-note small">
+          <AlertTriangle aria-hidden="true" />
+          <span>
+            Can&apos;t read {possessive(institution || "this brokerage")} activity yet: its rows
+            come in as cash, for review.
+            <Info label="Getting it read">
+              <ReaderNote account={unread} />
+            </Info>
+          </span>
+        </p>
+      )}
+    </>
   );
 }
 
@@ -228,13 +318,13 @@ function BankAccountRow({
   const link = account.link;
   return (
     <>
-      <div className="row-between">
+      <div className="row-between bank-account">
         <span>
           {account.name}
-          {account.kind === "brokerage" && <span className="pill"> brokerage</span>}
           <span className="muted small block">
-            {account.institution} · {formatMoney(account.balance, account.currency)}, reported{" "}
+            {formatMoney(account.balance, account.currency)} · reported{" "}
             {formatReported(account.balance_date)}
+            {account.kind === "brokerage" && " · brokerage"}
           </span>
           {link && link.book_id === book && (
             <span className="small block">
@@ -264,7 +354,6 @@ function BankAccountRow({
           </button>
         )}
       </div>
-      {account.kind === "brokerage" && !link && <ReaderNote account={account} />}
       {link && link.book_id === book && account.kind === "brokerage" && (
         <BrokerageLink book={book} account={account} linkId={link.id} name={link.account} />
       )}
@@ -284,14 +373,14 @@ const REPO = "https://github.com/luminous-money/luminous-money";
 function ReaderNote({ account }: { account: Pick<BankAccount, "reader" | "institution"> }) {
   if (account.reader)
     return (
-      <p className="small muted">
+      <p>
         {account.reader}'s activity is read: sweeps into and out of its core money market are left
         out, dividends are confirmed by themselves, and trades come in with their shares.
       </p>
     );
   const title = encodeURIComponent(`Read ${account.institution || "a brokerage"}'s activity`);
   return (
-    <p className="small" role="note">
+    <p>
       Luminous Money can't read {account.institution || "this brokerage"}'s activity yet: its rows
       come in as cash, for review.{" "}
       <a href={`${REPO}/issues/new?title=${title}`} target="_blank" rel="noreferrer">
@@ -323,8 +412,8 @@ function BrokerageLink({
   name: string;
 }) {
   const status = useBankStatus(book).data?.[name];
-  if (!status) return null;
-  if (!status.reader) return <ReaderNote account={account} />;
+  // Whether it's read at all is said once, over its bank's accounts.
+  if (!status?.reader) return null;
   const a = status.activity;
   const parts = a
     ? [
@@ -336,7 +425,6 @@ function BrokerageLink({
     : [];
   return (
     <div className="small">
-      <ReaderNote account={account} />
       {parts.length > 0 && <p className="muted">From the bank's rows: {parts.join(", ")}.</p>}
       <DividendsChoice book={book} linkId={linkId} status={status} />
       <Reread book={book} linkId={linkId} />
@@ -365,11 +453,13 @@ function DividendsChoice({
   return (
     <details className="linked-default">
       <summary>Dividends go to {status.dividends}</summary>
-      <p className="muted">
-        One income account for this brokerage's dividends. By default, <code>Income:Dividends</code>{" "}
-        for a taxable account (the year's is the 1099-DIV's), and{" "}
-        <code>Income:Retirement:Dividends</code> for a retirement account, whose dividends aren't
-        taxed.
+      <p className="muted with-info">
+        One income account for this brokerage&apos;s dividends.
+        <Info label="Which account">
+          By default, <code>Income:Dividends</code> for a taxable account (the year&apos;s is the
+          1099-DIV&apos;s), and <code>Income:Retirement:Dividends</code> for a retirement account,
+          whose dividends aren&apos;t taxed.
+        </Info>
       </p>
       <AccountPicker
         label="Dividends account"

@@ -52,8 +52,8 @@ test("the coffee example: both rows matched, swapped in review, confirmed, and o
 
   await page.goto(`/ui/books/${book.id}/review`);
   const cards = page.getByRole("article");
-  const fifth = cards.filter({ hasText: /^2024-03-05 · Bank/ });
-  const seventh = cards.filter({ hasText: /^2024-03-07 · Bank/ });
+  const fifth = cards.filter({ hasText: /^Mar 5, 2024 · Bank/ });
+  const seventh = cards.filter({ hasText: /^Mar 7, 2024 · Bank/ });
   await expect(cards).toHaveCount(2);
   // Proximity pairs the 7th's row with the 7th's coffee: the accepted miss.
   await expect(seventh.getByRole("region", { name: "Match" })).toContainText(

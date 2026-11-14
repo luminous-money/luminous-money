@@ -15,11 +15,16 @@ export function useSelection() {
     /** Select exactly these: what's shown (a filtered list's rows, not the whole set's). */
     selectAll: (ids: string[]) => setSelected(ids),
     start: () => (setSelecting(true), setSelected([])),
+    /** Select mode, with this one selected (a Ctrl or ⌘ click on it). */
+    startWith: (id: string) => (setSelecting(true), setSelected([id])),
     stop: () => (setSelecting(false), setSelected([])),
   };
 }
 
 export type Selection = ReturnType<typeof useSelection>;
+
+/** Whether a click asks to select (Ctrl, or ⌘ on a Mac), as a desktop list does. */
+export const selectClick = (e: { metaKey: boolean; ctrlKey: boolean }) => e.metaKey || e.ctrlKey;
 
 /** How long a press is held to start Select mode, as a long press. */
 const LONG_PRESS_MS = 500;

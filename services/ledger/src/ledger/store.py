@@ -574,6 +574,17 @@ class Store:
             )
         }
 
+    def matching(self, book_id: str, search: str) -> set[str]:
+        """The live transactions whose payee, narration or a split's memo has every word of
+        `search`."""
+        clause, args = searched("d", search)
+        return {
+            row[0]
+            for row in self._conn.execute(
+                f"SELECT d.id FROM directive d WHERE d.book_id = ? AND d.deleted = 0 AND {clause}", (book_id, *args)
+            )
+        }
+
     def fund_lines(self, book_id: str, on: str | None = None) -> list[sqlite3.Row]:
         """Every live fund line and move side dated `on` or earlier (or every one): fund, amount,
         currency (Funds A)."""

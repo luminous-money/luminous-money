@@ -24,6 +24,7 @@ import {
 } from "../lib/queries.js";
 import { simple } from "../lib/split.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 const BLANK: CategoryRuleIn = {
   name: "",
@@ -70,9 +71,7 @@ export function RuleEditor({ book, id }: { book: string; id?: string }) {
   return (
     <main>
       <header className="page-head">
-        <Link href={back} className="back">
-          ‹ Back
-        </Link>
+        <Crumbs />
         <h1>{id ? "Edit rule" : "New rule"}</h1>
       </header>
       {loading && <Loading />}

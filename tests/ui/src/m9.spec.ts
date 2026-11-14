@@ -48,7 +48,7 @@ async function bank() {
 async function connect(page: Page, book: string) {
   await page.goto(`/ui/books/${book}/connections`);
   await page.getByRole("textbox", { name: "Setup token" }).fill(await bank());
-  await page.getByRole("button", { name: "Connect" }).click();
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(page.getByRole("region", { name: /Connection to/ })).toContainText(
     "Everyday Checking"
   );
@@ -76,6 +76,7 @@ test("connect a bank, link a new account, and see what the bank reports", async 
   await page.getByRole("link", { name: "Fake Bank Everyday Checking" }).click();
   await expect(page.getByRole("heading", { name: /Fake Bank Everyday Checking/ })).toBeVisible();
   await expect(page.getByText(/^Reported today \d+:\d\d[ap]m: \$1,234\.56$/)).toBeVisible();
+  await page.getByRole("button", { name: "Account actions" }).click(); // Sync now is in ⋯
   await expect(page.getByRole("button", { name: "Sync now" })).toBeVisible();
 });
 
@@ -178,6 +179,7 @@ test("a bank feed's problem is its connection's, unless it names an account; the
     page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
   for (const account of ["Assets:College:Plan", "Assets:Bank:Checking"]) {
     await accountPage(account);
+    await page.getByRole("button", { name: "Account actions" }).click(); // Sync now is in ⋯
     await expect(page.getByRole("button", { name: "Sync now" })).toBeVisible();
     await expect(page.getByText(plain)).toHaveCount(0);
   }
@@ -205,6 +207,7 @@ test("a bank feed's problem is its connection's, unless it names an account; the
   await accountPage("Assets:College:Plan");
   await expect(page.getByRole("list", { name: "Bank feed problems" })).toContainText(said);
   await accountPage("Assets:Bank:Checking");
+  await page.getByRole("button", { name: "Account actions" }).click(); // Sync now is in ⋯
   await expect(page.getByRole("button", { name: "Sync now" })).toBeVisible();
   await expect(page.getByText(said)).toHaveCount(0);
   await page.getByRole("link", { name: "Notifications: 1 needs attention" }).click();

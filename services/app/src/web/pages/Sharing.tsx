@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 
 import type { BookInvite, BookMember, Role } from "../lib/appApi.js";
 import {
@@ -13,6 +13,7 @@ import {
   useSetRole,
 } from "../lib/queries.js";
 import { Loading } from "../components/Loading.js";
+import { Crumbs } from "../components/Crumbs.js";
 
 export const ROLE_NAMES: Record<Role, string> = {
   owner: "Owner",
@@ -92,9 +93,7 @@ export function Sharing({ book }: { book: string }) {
   return (
     <main className="stack">
       <header className="page-head">
-        <Link href="/books" className="back">
-          ‹ Books
-        </Link>
+        <Crumbs />
         <h1>Sharing</h1>
         <p className="muted">{info?.name}</p>
       </header>

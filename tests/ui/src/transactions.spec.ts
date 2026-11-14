@@ -1,7 +1,7 @@
 /** The Transactions page (every account's): its search and its filter by accounts. */
 import { expect, test } from "@playwright/test";
 
-import { importText, setUpUser } from "./support.js";
+import { crumb, importText, setUpUser } from "./support.js";
 
 test("Transactions searches payees, descriptions and items, and filters by any of some accounts", async ({
   page,
@@ -69,7 +69,7 @@ test("Transactions searches payees, descriptions and items, and filters by any o
   await search.fill("weekly");
   await expect(rows).toHaveCount(1);
   await rows.getByRole("button", { name: /Megamart/ }).click();
-  await page.getByRole("link", { name: "‹ Back" }).click();
+  await crumb(page, "Transactions").click();
   await expect(page).toHaveURL(/q=weekly/);
   await expect(page).toHaveURL(/account=Expenses(%3A|:)Home/);
   await expect(search).toHaveValue("weekly");
