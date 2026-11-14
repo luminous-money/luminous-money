@@ -12,6 +12,7 @@ import {
   useRevokeInvite,
   useSetRole,
 } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 export const ROLE_NAMES: Record<Role, string> = {
   owner: "Owner",
@@ -97,7 +98,7 @@ export function Sharing({ book }: { book: string }) {
         <h1>Sharing</h1>
         <p className="muted">{info?.name}</p>
       </header>
-      {sharing.isPending && <p className="muted">Loading…</p>}
+      {sharing.isPending && <Loading />}
       {sharing.error && <p className="card error">{explain(sharing.error)}</p>}
       {sharing.data && (
         <section className="card" aria-label="People">

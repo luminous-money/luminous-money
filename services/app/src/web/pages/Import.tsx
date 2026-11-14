@@ -17,6 +17,7 @@ import {
   useProfiles,
   useSaveProfile,
 } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 /** A new profile replaces the account's saved ones, or is added alongside them. */
 type Mode = "replace" | "add";
@@ -221,7 +222,7 @@ export function Import({ book }: { book: string }) {
               </span>
             </label>
           ) : (
-            (!all.data || open.length > 0) && <p className="muted">Loading…</p>
+            (!all.data || open.length > 0) && <Loading />
           )}
           {error && <p className="error">{error}</p>}
           {all.data && open.length === 0 && (

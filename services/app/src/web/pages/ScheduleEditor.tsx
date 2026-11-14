@@ -32,6 +32,7 @@ import {
   useTags,
   useTransaction,
 } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 const BLANK: TransactionTemplate = {
   payee: null,
@@ -123,7 +124,7 @@ export function ScheduleEditor({ book, id }: { book: string; id?: string }) {
         </Link>
         <h1>{id ? "Edit schedule" : "New schedule"}</h1>
       </header>
-      {loading && <p className="muted">Loading…</p>}
+      {loading && <Loading />}
       {existing.error && <p className="card error">{explain(existing.error)}</p>}
       {loan && (
         <p className="card">

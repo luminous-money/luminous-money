@@ -148,7 +148,7 @@ export function migrationRoutes(api: Hono<Env>, deps: MigrationDeps) {
       );
     } catch (error) {
       if (error instanceof StaleMigration)
-        return c.json({ detail: "This changed somewhere else; it's been reloaded." }, 409);
+        return c.json({ detail: "the migration changed since it was read", code: "stale" }, 409);
       throw error;
     }
   });

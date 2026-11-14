@@ -43,6 +43,7 @@ import {
   useProposals,
   useScheduled,
   useBankStatus,
+  useBooks,
   useReviewQueue,
   useShort,
   useTags,
@@ -61,6 +62,7 @@ import { aiCostSentence } from "../lib/ai.js";
 import { holdingsOf, suggestedFund } from "../lib/funds.js";
 import { wholeLines } from "../../shared/funds.js";
 import type { ShortTransaction } from "../lib/ledger.js";
+import { Loading } from "../components/Loading.js";
 
 /**
  * The review queue: unconfirmed transactions to categorize and confirm, and imported rows matched
@@ -86,7 +88,13 @@ export function Review({ book }: { book: string }) {
   // Where links from a card come back to: here, as filtered (or the one transaction).
   const here = only ? `/books/${book}/review?${search}` : view.here;
   const queue = useReviewQueue(book);
+  const bookName = useBooks().data?.find((b) => b.id === book)?.name ?? book;
   const accounts = useAccounts(book);
+  // The cards wait for what every one of them shows (the chart for their pickers, the funds and
+  // tags), so they come in at once rather than each filling in as its parts arrive.
+  const funds = useFunds(book);
+  const tags = useTags(book);
+  const ready = !!queue.items && !accounts.isPending && !funds.isPending && !tags.isPending;
   const create = useAccountCreation(book);
   const scheduled = useScheduled(book);
   const bank = useBankStatus(book);
@@ -140,11 +148,11 @@ export function Review({ book }: { book: string }) {
     <main>
       <header className="page-head">
         <Link href={only ? back : bookHome(book)} className="back">
-          {only ? "‹ Back" : "‹ Books"}
+          {only ? "‹ Back" : "‹ Home"}
         </Link>
         <h1>Review</h1>
         <p className="muted">
-          {book}
+          {bookName}
           {queue.items &&
             (filtered
               ? ` · ${shown.length} of ${ordered.length} left`
@@ -192,7 +200,7 @@ export function Review({ book }: { book: string }) {
         />
       )}
 
-      {!queue.items && !queue.error && <p className="muted">Loading…</p>}
+      {!ready && !queue.error && <Loading />}
       {queue.error && <p className="card error">{explain(queue.error)}</p>}
       {queue.items && ordered.length === 0 && (
         <p className="card done">All caught up. Nothing is waiting for review.</p>
@@ -202,7 +210,7 @@ export function Review({ book }: { book: string }) {
       )}
 
       <ol className="queue">
-        {shown.map(({ transaction: t, matches }, index) => (
+        {(ready ? shown : []).map(({ transaction: t, matches }, index) => (
           <li
             key={t.id}
             data-place={t.id}

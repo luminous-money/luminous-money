@@ -4,6 +4,7 @@ import { describe, UPCOMING_DAYS, type TransactionTemplate } from "../../shared/
 import { FundChips } from "../components/Funds.js";
 import { formatMoney } from "../lib/decimal.js";
 import { explain, useLoans, useSchedules, useUpcoming } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 /** A template's headline amount: its first split with one. */
 function amount(template: TransactionTemplate): string {
@@ -33,7 +34,7 @@ export function Schedules({ book }: { book: string }) {
         </Link>
       </header>
 
-      {schedules.isPending && <p className="muted">Loading…</p>}
+      {schedules.isPending && <Loading />}
       {schedules.error && <p className="card error">{explain(schedules.error)}</p>}
       {schedules.data?.length === 0 && (
         <p className="card done">

@@ -55,7 +55,7 @@ import {
   type ScheduleIn,
   type SchedulePatch,
 } from "./appApi.js";
-import { today } from "./format.js";
+import { sentence, today } from "./format.js";
 import type { Migration } from "../../shared/migration.js";
 import type { LoanIn, LoanPatch, LoanRebaseIn, LoanView } from "../../shared/loans.js";
 import type { CategoryRulePatch } from "../../shared/rules.js";
@@ -86,9 +86,12 @@ import {
   type User,
 } from "./session.js";
 
-/** A 401 from anywhere means the session is over: forget the user, and the app shows login. */
+/** A 401 from anywhere means the session is over: forget the user, and the app shows login. A
+ * stale edit (409) means what's on screen is out of date: read it all again (`explain` says it's
+ * been reloaded). */
 const onError = (error: unknown) => {
   if (error instanceof ApiError && error.status === 401) queryClient.setQueryData(keys.me, null);
+  if (error instanceof ApiError && error.stale) void queryClient.invalidateQueries();
 };
 
 export const queryClient = new QueryClient({
@@ -1118,11 +1121,13 @@ export function useAccountCreation(book: string): AccountCreation | undefined {
   };
 }
 
-/** What went wrong, for display. Conflicts get a hint that the data has been refreshed. */
+/** What went wrong, for display, as a sentence. An edit against a version that moved on says
+ * so (what it was made against has been read again: every stale 409 reloads the book's data);
+ * any other refusal says the server's own reason. */
 export function explain(error: unknown): string {
-  if (error instanceof ApiError && error.conflict)
-    return "This changed somewhere else; it's been reloaded.";
-  return (error as Error).message;
+  if (error instanceof ApiError && error.stale)
+    return "This changed somewhere else since you opened it, and has been reloaded: look it over, then try again.";
+  return sentence((error as Error).message ?? String(error));
 }
 
 const skippedKey = (book: string) => `luminous-money:skipped:${book}`;

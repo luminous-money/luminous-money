@@ -84,13 +84,39 @@ export class Unreachable extends Error {
   }
 }
 
+/** Whether the server answered the last request: the app says so while it doesn't. */
+let reachable = true;
+const reachability = new Set<() => void>();
+
+function setReachable(now: boolean) {
+  if (now === reachable) return;
+  reachable = now;
+  reachability.forEach((listener) => listener());
+}
+
+/** For `useSyncExternalStore`: whether the server answered the last request. */
+export const serverReachable = {
+  subscribe(listener: () => void) {
+    reachability.add(listener);
+    return () => void reachability.delete(listener);
+  },
+  get: () => reachable,
+};
+
 /** `fetch`, saying so in words when the server can't be reached (the browser's own error is a
  * bare "Failed to fetch" or "Load failed"). A cancelled request stays as it is. */
 async function reach(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   try {
-    return await fetch(input, init);
+    const response = await fetch(input, init);
+    // A proxy's 502 or 503 is the server not answering, as much as no connection is.
+    setReachable(response.status !== 502 && response.status !== 503);
+    return response;
   } catch (error) {
-    throw error instanceof TypeError ? new Unreachable() : error;
+    if (error instanceof TypeError) {
+      setReachable(false);
+      throw new Unreachable();
+    }
+    throw error;
   }
 }
 
@@ -129,10 +155,11 @@ async function call<T>(
     body: json === undefined ? rest.body : JSON.stringify(json),
   });
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { detail?: string };
+    const body = (await response.json().catch(() => ({}))) as { detail?: string; code?: string };
     throw new ApiError(
       response.status,
-      body.detail ?? statusMessage(response.status, response.statusText)
+      body.detail ?? statusMessage(response.status, response.statusText),
+      body.code
     );
   }
   return (

@@ -79,6 +79,15 @@ export function formatAmount(n: number, currency: string, cents = false): string
   }).format(n);
 }
 
+/** A server's detail as a sentence: they're written as fragments ("the loan changed since it was
+ * read"), for an API's caller; shown to a person, they start with a capital and end with a stop. */
+export function sentence(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return trimmed;
+  const capital = trimmed[0]!.toUpperCase() + trimmed.slice(1);
+  return /[.!?)…:]$/.test(capital) ? capital : `${capital}.`;
+}
+
 /**
  * What a failed response means, when its body doesn't say (a proxy's error page, say: Emmer's
  * nginx answered a long receipt read with a bare "504 Gateway Time-out", 2026-11-02).
@@ -92,6 +101,13 @@ export function statusMessage(status: number, statusText = ""): string {
   if (status === 504)
     return `The server stopped waiting for an answer (${code}). What you asked for may still finish: look before trying again.`;
   if (status === 413) return `That's more than the server takes in one request (${code}).`;
-  if (status >= 500) return `Something went wrong on the server (${code}).`;
-  return `The server refused that (${code}).`;
+  if (status === 429)
+    return `That's too many requests at once (${code}): wait a moment, then try again.`;
+  if (status >= 500) return `Something went wrong on the server (${code}). Try again in a moment.`;
+  if (status === 401) return `You've been logged out (${code}): log in again.`;
+  if (status === 403) return `You don't have permission to do that (${code}).`;
+  if (status === 404) return `That isn't there any more: it may have been deleted (${code}).`;
+  if (status === 409)
+    return `That clashes with something already saved (${code}): reload the page, then try again.`;
+  return `The server couldn't accept that (${code}).`;
 }

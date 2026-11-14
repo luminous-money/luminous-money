@@ -9,6 +9,7 @@ import {
   useLastPriceFetch,
   useSetCommodity,
 } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 /**
  * Commodities: everything held or priced (shares, funds), each with its latest price and where
@@ -39,7 +40,7 @@ export function Commodities({ book }: { book: string }) {
       </header>
       {fetchNow.error && <p className="card error">{explain(fetchNow.error)}</p>}
       {errors["*"] && <p className="card error">The last run failed: {errors["*"]}</p>}
-      {commodities.isPending && <p className="muted">Loading…</p>}
+      {commodities.isPending && <Loading />}
       {commodities.data?.length === 0 && <p className="card done">Nothing but cash yet.</p>}
       <section className="stack" aria-label="Commodities">
         {commodities.data?.map((c) => (

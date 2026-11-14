@@ -23,6 +23,7 @@ import {
   useTransaction,
 } from "../lib/queries.js";
 import { simple } from "../lib/split.js";
+import { Loading } from "../components/Loading.js";
 
 const BLANK: CategoryRuleIn = {
   name: "",
@@ -74,7 +75,7 @@ export function RuleEditor({ book, id }: { book: string; id?: string }) {
         </Link>
         <h1>{id ? "Edit rule" : "New rule"}</h1>
       </header>
-      {loading && <p className="muted">Loading…</p>}
+      {loading && <Loading />}
       {existing.error && <p className="card error">{explain(existing.error)}</p>}
       {!loading && (
         <Form

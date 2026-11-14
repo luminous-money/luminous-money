@@ -42,6 +42,7 @@ import {
 } from "../lib/queries.js";
 import { upcomingFor } from "../lib/upcoming.js";
 import type { LedgerRow } from "@luminous-money/ledger-client";
+import { Loading } from "../components/Loading.js";
 
 /**
  * One account's ledger: every transaction, newest first, 200 at a time, more loading as you
@@ -276,7 +277,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
         />
       </div>
 
-      {ledger.isPending && <p className="muted">Loading…</p>}
+      {ledger.isPending && <Loading />}
       {ledger.error && <p className="card error">{explain(ledger.error)}</p>}
       {ledger.data && rows.length === 0 && (
         <p className="card muted">

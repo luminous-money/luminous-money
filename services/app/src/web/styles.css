@@ -2193,6 +2193,23 @@ a.budget-link {
 .chart-placeholder {
   border-radius: 0.75rem;
   background: color-mix(in srgb, var(--line) 35%, transparent);
+  display: grid;
+  place-items: center;
+}
+
+/* A box whose content is on its way says so, rather than sitting blank: the spinner, after a
+   moment (as .loading). */
+.chart-placeholder::after {
+  content: "";
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-top-color: var(--accent);
+  opacity: 0;
+  animation:
+    loading-in 0.2s ease-out 0.25s forwards,
+    spin 0.8s linear infinite;
 }
 
 .spending-card,
@@ -3858,4 +3875,93 @@ select.fund-pick {
 .amazon-card-add input {
   flex: 1;
   min-width: 0;
+}
+
+/* Loading: a spinner and a word, faded in after a moment so a quick load never flashes it. A
+   page's sits in the room the page will take. */
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  opacity: 0;
+  animation: loading-in 0.2s ease-out 0.25s forwards;
+}
+
+.loading-page {
+  justify-content: center;
+  min-height: 40vh;
+}
+
+.spinner {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loading-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* The app's own news, at the top of the window and staying there: offline, or the server not
+   answering; a new version waiting for a reload. */
+.banners {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.banners:empty {
+  display: none;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.5rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
+}
+
+.banner-offline {
+  background: color-mix(in srgb, #d9a441 18%, var(--card));
+  border: 1px solid color-mix(in srgb, #d9a441 55%, var(--line));
+}
+
+.banner-update {
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+
+.banner .small-button {
+  min-height: 2rem;
+  padding: 0 0.8rem;
+  font-size: 0.85rem;
+  flex: none;
 }

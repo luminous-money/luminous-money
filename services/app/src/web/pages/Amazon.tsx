@@ -22,6 +22,7 @@ import {
   type AmazonConnection,
   type AmazonPatch,
 } from "../lib/shops.js";
+import { Loading } from "../components/Loading.js";
 
 type Choice = "include" | "exclude" | "";
 
@@ -71,7 +72,7 @@ export function AmazonPage({ book }: { book: string }) {
           reads them, and doesn&apos;t write anything to the books yet.
         </p>
       </header>
-      {health.isPending && <p className="muted">Loading…</p>}
+      {health.isPending && <Loading />}
       {health.data === null && (
         <p className="card">The shops service isn&apos;t running, so Amazon can&apos;t be read.</p>
       )}

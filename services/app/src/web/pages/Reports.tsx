@@ -23,6 +23,7 @@ import {
   useNetWorthReport,
   useTags,
 } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 // The same order as the charts' palette (lib/chartTheme.ts), so a row's dot matches its slice.
 const PALETTE = [
@@ -397,7 +398,7 @@ function BreakdownJournal({
         {pages.error ? (
           <p className="error small">{explain(pages.error)}</p>
         ) : !pages.data ? (
-          <p className="muted small">Loading…</p>
+          <Loading />
         ) : rows.length === 0 ? (
           <p className="muted small">None.</p>
         ) : (

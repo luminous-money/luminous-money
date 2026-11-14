@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { bookHome } from "../lib/books.js";
 import { explain, useAcceptInvitation, useInvitation } from "../lib/queries.js";
 import { ROLE_NAMES } from "./Sharing.js";
+import { Loading } from "../components/Loading.js";
 
 const VERBS = {
   read: "see it",
@@ -21,7 +22,7 @@ export function InvitationPage({ token }: { token: string }) {
       <header className="page-head">
         <h1>An invitation</h1>
       </header>
-      {invitation.isPending && <p className="muted">Loading…</p>}
+      {invitation.isPending && <Loading />}
       {invitation.error && <p className="card error">{explain(invitation.error)}</p>}
       {i && (
         <section className="card editor" aria-label="Invitation">

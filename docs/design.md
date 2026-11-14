@@ -1897,6 +1897,40 @@ Reskinned from the original Luminous Money app (2026-10-23; its files are in
 - **The footer is the brand,** the Lu logo small beside "Luminous Money" (Kael, 2026-11-06). It
   said "Early build · nothing here touches real money yet" until real books were kept here.
 
+### Errors, loading, connection and new versions (2026-11-14)
+
+From Kael's design pass ("a red 409 with no explanation"; pages and boxes blank while loading;
+offline; picking up a new version).
+
+- **Every refusal says what it means.** The services' details are fragments written for an API
+  caller ("the loan changed since it was read"); the PWA shows them as sentences (`sentence` in
+  `format.ts`, through `explain`). A response with no detail (a proxy's page) gets words for its
+  status as well as its number (`statusMessage`), for every status, not just 5xx.
+- **A stale edit is told apart from the other 409s.** A 409 can be a version that moved on, or a
+  conflict with what's saved (a name already taken, the owner's role): the ledger and `app` mark
+  the first with `code: "stale"` (`errorBody` in `api.ts`; the ledger's `StaleVersion` handler).
+  Only that one reads "This changed somewhere else since you opened it, and has been reloaded",
+  and the PWA reads everything again on one, so that's true; the others say their own reason.
+  The code rather than matching the message, so wording can change freely.
+- **Loading says so.** One `Loading` (a spinner and a word) everywhere a page or a part of one
+  waits, fading in after a quarter second so a quick load never flashes it; a placeholder box
+  (a chart's) carries the spinner too, and the app's start (the session, then the books) shows
+  it rather than a blank page. Review's cards wait for what all of them show (the chart, funds
+  and tags) and come in at once, rather than each filling in.
+- **Offline, or the server not answering, is said at the top** (`Banners`): React Query already
+  pauses while offline and sends held saves once back, and reads again on refocus and
+  reconnect; the banner says so. A server that doesn't answer (no response, or a proxy's 502 or
+  503: `serverReachable` in `session.ts`) is asked again every 15 seconds, and everything is read
+  again once it answers.
+- **A new version comes in without losing work** (`lib/updates.ts`). The service worker is
+  `registerType: "prompt"`: a new release installs and waits. The app asks for one every 15
+  minutes and on coming back into view, and reloads into it at the first quiet moment: no field
+  typed in since the page was opened, none focused, no dialog open, no save on its way; and the
+  app out of view, or moving to another page, or 30 seconds without a tap or key. Until then a
+  banner says a new version is ready, with Reload. "Typed in" is read from the document
+  (`input` events), so no form has to declare it. The first release with this still waits for
+  the old worker's tabs to close: the old one never listened.
+
 ### How the review queue works
 
 The queue is every staged (`!`) transaction in a book, oldest first. It's built for the common

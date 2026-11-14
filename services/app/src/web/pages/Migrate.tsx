@@ -31,6 +31,7 @@ import {
 } from "../lib/queries.js";
 import { AiSettingsPanel } from "./AiSettings.js";
 import { BankConnectionsPanel } from "./BankConnections.js";
+import { Loading } from "../components/Loading.js";
 
 type Files = { chart?: { name: string; text: string }; history?: { name: string; text: string } };
 type Change = Parameters<typeof appApi.migration.change>[1];
@@ -123,7 +124,7 @@ export function Migrate({ book }: { book: Book }) {
           rules, history and the AI categorize what&apos;s waiting.
         </p>
       </header>
-      {migration.isPending && <p className="muted">Loading…</p>}
+      {migration.isPending && <Loading />}
       {migration.error && <p className="card error">{explain(migration.error)}</p>}
       {!manage && role && <p className="card">Only the book&apos;s managers can migrate it.</p>}
       {migration.isSuccess && !m && manage && (

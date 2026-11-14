@@ -72,17 +72,25 @@ export type JournalFilter = {
   budgeted?: boolean;
 };
 
-/** An API error with its status, so callers can tell a conflict (409) from a rejection (422). */
+/** An API error with its status, so callers can tell a conflict (409) from a rejection (422),
+ * and the server's code for it, if it gave one. */
 export class ApiError extends Error {
   constructor(
     readonly status: number,
-    message: string
+    message: string,
+    readonly code?: string
   ) {
     super(message);
   }
 
   get conflict() {
     return this.status === 409;
+  }
+
+  /** An edit made against a version that has since moved on (a 409 the server marks "stale"),
+   * as opposed to the other conflicts (a name already taken, say). */
+  get stale() {
+    return this.conflict && this.code === "stale";
   }
 }
 
@@ -94,7 +102,8 @@ export async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
   if (response.ok && data !== undefined) return data;
   throw new ApiError(
     response.status,
-    describe(error) ?? statusMessage(response.status, response.statusText)
+    describe(error) ?? statusMessage(response.status, response.statusText),
+    (error as { code?: string } | undefined)?.code
   );
 }
 

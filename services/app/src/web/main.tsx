@@ -4,7 +4,10 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./App.js";
 import { queryClient } from "./lib/queries.js";
+import { watchForUpdates } from "./lib/updates.js";
 import "./styles.css";
+
+void watchForUpdates();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

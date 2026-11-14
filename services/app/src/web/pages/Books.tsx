@@ -18,6 +18,7 @@ import {
   useSetTimeZone,
   useTimeZone,
 } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 /** Manage books: create them (empty, or from a Beancount file such as an export), open them,
  * rename them, set their time zone (which decides "today" for their schedules and price runs),
@@ -30,7 +31,7 @@ export function Books() {
       <header className="page-head">
         <h1>Manage books</h1>
       </header>
-      {books.isPending && <p className="muted">Loading…</p>}
+      {books.isPending && <Loading />}
       <section className="stack" aria-label="Books">
         {books.data?.map((book) => (
           <BookCard key={book.id} book={book} />

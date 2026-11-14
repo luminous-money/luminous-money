@@ -4,7 +4,38 @@ Where We Left Off
 _Updated 2026-11-14._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-14, later): leave out what's excluded from budgets; tag filters list their tags
+## Latest (2026-11-14, evening): errors, loading, offline and new versions (design pass, part 1)
+
+Kael asked for a design pass over the whole app ("it feels like open source software"; reports,
+home and the split editor stay as they are). The functional half is **committed, not
+released**; the design half (font, buttons, menu, the transaction editor, funds in a "More"
+drawer, Bank connections grouped by bank, fieldsets, info icons, sticky bars) is being built
+**uncommitted** for him to try on a dev server first.
+
+- **Errors:** every refusal reads as a sentence (`sentence`, `explain`), and a response with no
+  detail gets words for its status (`statusMessage`). A stale edit's 409 carries `code:
+  "stale"` (ledger's `StaleVersion` handler; `errorBody` in `app`'s `api.ts`, which also passes
+  the ledger's code through `LedgerError`), so only that one says "changed somewhere else… has
+  been reloaded" (and every one reloads); "already exists" and the like say their own reason.
+- **Loading:** `components/Loading.tsx` everywhere a page waited with "Loading…"; placeholder
+  boxes (`.chart-placeholder`) spin; the app's start isn't blank; review's cards wait for the
+  chart, funds and tags and come in together.
+- **Offline / unreachable:** `components/Banners.tsx` at the top of the shell; `session.ts`
+  tracks whether the server answered (`serverReachable`).
+- **New versions:** `lib/updates.ts` (the decision is `lib/activity.ts`, unit-tested): the
+  service worker is `registerType: "prompt"` now (needs `workbox-window`, added); it reloads by
+  itself when nobody's working, else a banner with Reload. Dev (Vite) has no service worker, so
+  this only shows in a built app.
+- **Review** shows the book's name (M99 polish item) and "‹ Home".
+- **Tests:** `pnpm test` passed; app (`errors.test.ts`: stale 409's code; `activity.test.ts`;
+  `format.test.ts`), ledger (`test_versions.py`: the code).
+- **Preview stack for screenshots** (not the dev stack, which holds real data): the e2e stack
+  under project `luminous-money-preview`, Traefik on 127.0.0.1:8091, `LUMINOUS_MONEY_PUBLIC_URL`
+  set to the Vite server's origin (else auth refuses writes), seeded with `pnpm seed`
+  (`LUMINOUS_MONEY_URL=http://localhost:8091`), Vite on 5174 proxying to it. Don't use project
+  `luminous-money-e2e` for this: `pnpm e2e` takes it down.
+
+## Before that (2026-11-14, later): leave out what's excluded from budgets; tag filters list their tags
 
 Two more from Kael, on Reports (PLAN.md's Polish, under "Kael's changes, 2026-11-14"; design.md
 has the decisions). **Committed, pushed and released as `v0.1.30`** at his asking.

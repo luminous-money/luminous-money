@@ -19,6 +19,7 @@ import {
   useRole,
   useSetAiKey,
 } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 const EAGERNESS: [Eagerness, string][] = [
   ["reluctant", "Reluctant: only when nothing fits"],
@@ -49,7 +50,7 @@ export function AiSettingsPanel({ book }: { book: string }) {
   const manage = role === "owner" || role === "manage";
   return (
     <>
-      {health.isPending && <p className="muted">Loading…</p>}
+      {health.isPending && <Loading />}
       {health.data === null && (
         <p className="card">
           The AI service isn't running, so nothing AI is offered. Everything else works as usual.

@@ -31,6 +31,7 @@ import {
   useUnarchiveFund,
 } from "../lib/queries.js";
 import { ApiError } from "../lib/ledger.js";
+import { Loading } from "../components/Loading.js";
 
 const money = (a: { number: string; currency: string }) => formatMoney(a.number, a.currency);
 
@@ -119,7 +120,7 @@ export function FundPage({ book, name }: { book: string; name: string }) {
         {fund?.description && <p className="muted">{fund.description}</p>}
       </header>
 
-      {history.isPending && <p className="muted">Loading…</p>}
+      {history.isPending && <Loading />}
       {missing && (
         <p className="card">
           There&apos;s no fund called {name}. <Link href={list}>All funds</Link>

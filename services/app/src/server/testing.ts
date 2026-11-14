@@ -99,7 +99,7 @@ export class FakeLedger implements LedgerPort {
   async deleteBook(book: string, updated_at: string) {
     const found = this.books.get(book);
     if (!found) throw new LedgerError(404, `not found: ${book}`);
-    if (found.updated_at !== updated_at) throw new LedgerError(409, "stale");
+    if (found.updated_at !== updated_at) throw new LedgerError(409, "stale", "stale");
     this.books.delete(book);
   }
 
@@ -716,7 +716,7 @@ export class FakeLedger implements LedgerPort {
     this.noteStaging("applyChanges", options);
     for (const d of [...(changes.update ?? []), ...changes.delete]) {
       const found = await this.transaction(_book, d.id); // must exist
-      if (found.updated_at !== d.updated_at) throw new LedgerError(409, "stale");
+      if (found.updated_at !== d.updated_at) throw new LedgerError(409, "stale", "stale");
     }
     for (const { id, updated_at: _v, ...patch } of changes.update ?? []) {
       const found = await this.transaction(_book, id);

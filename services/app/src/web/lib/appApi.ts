@@ -158,15 +158,7 @@ export type PriceFetch = {
 };
 
 /** An import the app couldn't run, with a code for the ones the user can fix. */
-export class ImportError extends ApiError {
-  constructor(
-    status: number,
-    message: string,
-    readonly code: string | undefined
-  ) {
-    super(status, message);
-  }
-}
+export class ImportError extends ApiError {}
 
 async function json<T>(response: Response): Promise<T> {
   if (response.ok) return (await response.json()) as T;

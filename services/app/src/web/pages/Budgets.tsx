@@ -9,6 +9,7 @@ import { formatMoney } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
 import type { BudgetBasis, BudgetLine } from "../lib/ledger.js";
 import { explain, useAccountTree, useBudgetStatus, useCanWrite } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 // Spending first: it's what most budgets are about.
 const ROOTS = ["Expenses", "Income", "Assets", "Liabilities", "Equity"];
@@ -227,7 +228,7 @@ export function Budgets({ book }: { book: string }) {
           </button>
         ))}
       </div>
-      {status.isPending && <p className="muted">Loading…</p>}
+      {status.isPending && <Loading />}
       {status.error && <p className="card error">{explain(status.error)}</p>}
       {status.data && roots.length === 0 && (
         <p className="card muted">

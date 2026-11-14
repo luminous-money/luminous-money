@@ -77,6 +77,17 @@ export type SimplefinServices = Pick<
   "store" | "sealer" | "policy" | "fetcher" | "clock" | "synced"
 >;
 
+/** A refused request's body: what's wrong, and `code: "stale"` when it's an edit made against a
+ * version that has moved on, so the PWA can say so ("changed since you opened it") rather than
+ * the detail; other 409s (a name already taken, say) say their own. */
+function errorBody(error: Error): { detail: string; code?: "stale" } {
+  const stale =
+    error instanceof StaleVersion ||
+    (error instanceof LedgerError && error.code === "stale") ||
+    ((error instanceof LoanProblem || error instanceof ReconcileProblem) && error.status === 409);
+  return stale ? { detail: error.message, code: "stale" } : { detail: error.message };
+}
+
 export function createApi({
   db,
   ledgerFor,
@@ -377,8 +388,8 @@ export function createApi({
     try {
       return c.json(await work(() => {}), status);
     } catch (error) {
-      if (error instanceof ReceiptProblem) return c.json({ detail: error.message }, error.status);
-      if (error instanceof LoanProblem) return c.json({ detail: error.message }, error.status);
+      if (error instanceof ReceiptProblem) return c.json(errorBody(error), error.status);
+      if (error instanceof LoanProblem) return c.json(errorBody(error), error.status);
       return c.json(...ledgerStatus(error));
     }
   };
@@ -458,7 +469,7 @@ export function createApi({
       try {
         return c.json(await run(c, book, ledgerFor(c.get("user"))));
       } catch (error) {
-        if (error instanceof ReportProblem) return c.json({ detail: error.message }, error.status);
+        if (error instanceof ReportProblem) return c.json(errorBody(error), error.status);
         throw error;
       }
     };
@@ -565,7 +576,7 @@ export function createApi({
       });
       return c.json({ restored });
     } catch (error) {
-      if (error instanceof TransferProblem) return c.json({ detail: error.message }, error.status);
+      if (error instanceof TransferProblem) return c.json(errorBody(error), error.status);
       throw error;
     }
   });
@@ -727,7 +738,7 @@ export function createApi({
         auto_confirm: merged.auto_confirm,
       });
     } catch (error) {
-      if (error instanceof StaleVersion) return c.json({ detail: error.message }, 409);
+      if (error instanceof StaleVersion) return c.json(errorBody(error), 409);
       throw error;
     }
     const rule = db.rule(book, id)!;
@@ -742,7 +753,7 @@ export function createApi({
     try {
       db.deleteRule(book, id, c.req.query("updated_at") ?? "");
     } catch (error) {
-      if (error instanceof StaleVersion) return c.json({ detail: error.message }, 409);
+      if (error instanceof StaleVersion) return c.json(errorBody(error), 409);
       throw error;
     }
     return c.body(null, 204);
@@ -841,7 +852,7 @@ export function createApi({
   const withSettings = (book: Book) => ({ ...book, time_zone: db.timeZone(book.id) ?? null });
   const ledgerStatus = (error: unknown) => {
     if (error instanceof LedgerError && [403, 404, 409, 422].includes(error.status))
-      return [{ detail: error.message }, error.status as 403 | 404 | 409 | 422] as const;
+      return [errorBody(error), error.status as 403 | 404 | 409 | 422] as const;
     throw error;
   };
 
@@ -1085,7 +1096,7 @@ export function createApi({
     book,
   });
   const reconcileError = (c: Context<Env>, error: unknown) => {
-    if (error instanceof ReconcileProblem) return c.json({ detail: error.message }, error.status);
+    if (error instanceof ReconcileProblem) return c.json(errorBody(error), error.status);
     return c.json(...ledgerStatus(error));
   };
 
@@ -1203,7 +1214,7 @@ export function createApi({
     try {
       return c.json(db.patchSettings(book, body.updated_at, changes));
     } catch (error) {
-      if (error instanceof StaleVersion) return c.json({ detail: error.message }, 409);
+      if (error instanceof StaleVersion) return c.json(errorBody(error), 409);
       throw error;
     }
   });
@@ -1250,7 +1261,7 @@ export function createApi({
     db.userProfiles([user]).get(user)?.email.toLowerCase() === invite.email.toLowerCase();
   const ledgerProblem = (error: unknown) => {
     if (error instanceof LedgerError && [403, 404, 409, 422].includes(error.status))
-      return [{ detail: error.message }, error.status as 403 | 404 | 409 | 422] as const;
+      return [errorBody(error), error.status as 403 | 404 | 409 | 422] as const;
     throw error;
   };
 
@@ -1401,8 +1412,8 @@ export function createApi({
   // Schedules
 
   const scheduleError = (error: unknown): readonly [{ detail: string }, 404 | 409 | 422] => {
-    if (error instanceof ScheduleProblem) return [{ detail: error.message }, error.status];
-    if (error instanceof StaleVersion) return [{ detail: error.message }, 409];
+    if (error instanceof ScheduleProblem) return [errorBody(error), error.status];
+    if (error instanceof StaleVersion) return [errorBody(error), 409];
     throw error;
   };
 
@@ -1476,7 +1487,7 @@ export function createApi({
     try {
       db.deleteSchedule(book, id, c.req.query("updated_at") ?? "");
     } catch (error) {
-      if (error instanceof StaleVersion) return c.json({ detail: error.message }, 409);
+      if (error instanceof StaleVersion) return c.json(errorBody(error), 409);
       throw error;
     }
     return c.body(null, 204);
@@ -1484,10 +1495,10 @@ export function createApi({
 
   // Loans: a loan's payments are a schedule's, worked out by the loan.
   const loanError = (error: unknown): readonly [{ detail: string }, 404 | 409 | 422] => {
-    if (error instanceof LoanProblem) return [{ detail: error.message }, error.status];
-    if (error instanceof StaleVersion) return [{ detail: error.message }, 409];
+    if (error instanceof LoanProblem) return [errorBody(error), error.status];
+    if (error instanceof StaleVersion) return [errorBody(error), 409];
     if (error instanceof LedgerError && [404, 409, 422].includes(error.status))
-      return [{ detail: error.message }, error.status as 404 | 409 | 422];
+      return [errorBody(error), error.status as 404 | 409 | 422];
     throw error;
   };
 
@@ -1590,7 +1601,7 @@ export function createApi({
     try {
       db.deleteLoan(book, id, c.req.query("updated_at") ?? "");
     } catch (error) {
-      if (error instanceof StaleVersion) return c.json({ detail: error.message }, 409);
+      if (error instanceof StaleVersion) return c.json(errorBody(error), 409);
       throw error;
     }
     return c.body(null, 204);

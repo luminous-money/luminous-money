@@ -18,6 +18,7 @@ import {
   useStarredFunds,
 } from "../lib/queries.js";
 import { ReportedLine } from "../components/BankStatus.js";
+import { Loading } from "../components/Loading.js";
 
 /** This month's spending against the budget, recent transactions, the user's starred
  * accounts, with their balances (as shown: a card's is what's owed) and when each was last
@@ -45,7 +46,7 @@ export function Home({ book }: { book: Book }) {
       <SpendingThisMonth book={book.id} />
       <RecentTransactions book={book.id} />
 
-      {accounts.isPending && <p className="muted">Loading…</p>}
+      {accounts.isPending && <Loading />}
       {accounts.error && <p className="card error">{explain(accounts.error)}</p>}
       {accounts.data?.length === 0 && (
         <p className="card done">

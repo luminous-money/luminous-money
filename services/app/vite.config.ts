@@ -14,7 +14,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      // A new version waits for the app to take it in (src/web/lib/updates.ts): by itself when
+      // nobody's working on anything, or at a reload.
+      registerType: "prompt",
       includeAssets: ["icon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "Luminous Money",

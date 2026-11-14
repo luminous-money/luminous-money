@@ -3,6 +3,7 @@ import { useId, useState, type SyntheticEvent } from "react";
 import { createPortal } from "react-dom";
 
 import { checkNewAccount } from "../lib/accounts.js";
+import { explain } from "../lib/queries.js";
 import { NewAccountField } from "./NewAccountField.js";
 
 type Props = {
@@ -37,7 +38,7 @@ export function CreateAccountDialog({ initialName, accounts, submit, onCreated, 
     try {
       onCreated(await submit(name));
     } catch (e) {
-      setError((e as Error).message);
+      setError(explain(e));
       setBusy(false);
     }
   };

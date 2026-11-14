@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link, Redirect, Route, Router, Switch, useLocation } from "wouter";
 
+import { Banners } from "./components/Banners.js";
 import { BookSwitcher } from "./components/BookSwitcher.js";
+import { Loading } from "./components/Loading.js";
 import { Menu } from "./components/Menu.js";
 import type { BookInfo } from "./lib/appApi.js";
 import { bookHome, rememberBook, startingBook, useBookInPath } from "./lib/books.js";
-import { useBooks, useMe, useSessionLifecycle, useTimeZoneBackfill } from "./lib/queries.js";
+import {
+  explain,
+  useBooks,
+  useMe,
+  useSessionLifecycle,
+  useTimeZoneBackfill,
+} from "./lib/queries.js";
 import { Account } from "./pages/Account.js";
 import { System } from "./pages/System.js";
 import { AccountEditor } from "./pages/AccountEditor.js";
@@ -51,6 +59,7 @@ export function App() {
   return (
     <Router base="/ui">
       <div className="shell">
+        <Banners />
         <Gate />
         <footer className="footer">
           <img src="/ui/icon.svg" alt="" className="footer-logo" />
@@ -84,7 +93,14 @@ function Gate() {
     if (user && book) rememberBook(user, book.id);
   }, [user, book]);
 
-  if (me.isPending) return <Masthead />;
+  // Before the session and the books are known, the page says it's on its way, not blank.
+  if (me.isPending)
+    return (
+      <>
+        <Masthead />
+        <Loading page />
+      </>
+    );
   if (!me.data) {
     return (
       <>
@@ -99,7 +115,19 @@ function Gate() {
       </>
     );
   }
-  if (!books.data) return <Masthead />;
+  if (!books.data)
+    return (
+      <>
+        <Masthead />
+        {books.error ? (
+          <main>
+            <p className="card error">{explain(books.error)}</p>
+          </main>
+        ) : (
+          <Loading page />
+        )}
+      </>
+    );
   if (invitation && empty) {
     return (
       <>

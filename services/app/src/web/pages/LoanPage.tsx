@@ -34,6 +34,7 @@ import {
   useSaveLoan,
   useSummary,
 } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 const accountPath = (book: string, account: string) => `/books/${book}/accounts/${account}`;
 
@@ -51,7 +52,7 @@ export function LoanPage({ book, id }: { book: string; id: string }) {
         </Link>
         <h1>{loan.data?.name ?? "Loan"}</h1>
       </header>
-      {loan.isPending && <p className="muted">Loading…</p>}
+      {loan.isPending && <Loading />}
       {loan.error && <p className="card error">{explain(loan.error)}</p>}
       {loan.data && <Loan key={loan.data.updated_at} book={book} loan={loan.data} here={here} />}
     </main>

@@ -6,6 +6,7 @@ import { formatMoney, isDecimal, isNegative } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
 import { withBack } from "../lib/navigation.js";
 import { explain, useAddPrice, useHoldings, useRevalue } from "../lib/queries.js";
+import { Loading } from "./Loading.js";
 
 /**
  * An account's holdings, above its ledger: per commodity, units, the latest price and its date
@@ -41,7 +42,7 @@ export function HoldingsPanel({
           Trade
         </Link>
       </div>
-      {holdings.isPending && <p className="muted">Loading…</p>}
+      {holdings.isPending && <Loading />}
       {holdings.error && <p className="error">{explain(holdings.error)}</p>}
       <ul className="holding-list">
         {holdings.data?.holdings.map((h) => (

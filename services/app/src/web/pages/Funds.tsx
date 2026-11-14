@@ -11,6 +11,7 @@ import {
 import { add, formatMoney, isMoney, isNegative, negate } from "../lib/decimal.js";
 import { formatDay } from "../lib/format.js";
 import { explain, useCanManage, useCanWrite, useFunds, useFundStars } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 const money = (a: { number: string; currency: string }) => formatMoney(a.number, a.currency);
 
@@ -59,7 +60,7 @@ export function FundsPage({ book }: { book: string }) {
         </div>
       </header>
 
-      {listing.isPending && <p className="muted">Loading…</p>}
+      {listing.isPending && <Loading />}
       {listing.error && <p className="card error">{explain(listing.error)}</p>}
 
       {data && data.funds.length === 0 && (

@@ -8,6 +8,7 @@
 import { formatWhen } from "../lib/format.js";
 import { explain, useCheckUpdates, useSystemInfo } from "../lib/queries.js";
 import type { SystemInfo } from "../../shared/system.js";
+import { Loading } from "../components/Loading.js";
 
 /** Bytes for people: "1.4 MB". */
 export function formatBytes(bytes: number): string {
@@ -29,7 +30,7 @@ export function System() {
         <h1>System</h1>
         <p className="muted">What's running here, for this server's admins alone.</p>
       </header>
-      {info.isPending && <p className="muted">Loading…</p>}
+      {info.isPending && <Loading />}
       {info.error && <p className="card error">{explain(info.error)}</p>}
       {info.data && (
         <>

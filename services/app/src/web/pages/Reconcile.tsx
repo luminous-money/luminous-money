@@ -17,6 +17,7 @@ import {
   useSaveReconcileDraft,
   useUndoReconciliation,
 } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -48,7 +49,7 @@ export function Reconcile({ book, account }: { book: string; account: string }) 
         <h1>Reconcile {displayName(info ?? { name: account })}</h1>
         <p className="muted">Tick off what's on the statement until the difference is zero.</p>
       </header>
-      {view.isPending && <p className="muted">Loading…</p>}
+      {view.isPending && <Loading />}
       {view.error && <p className="card error">{explain(view.error)}</p>}
       {view.data && (
         <Statement

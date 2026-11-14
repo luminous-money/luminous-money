@@ -62,6 +62,7 @@ def test_the_review_race_can_no_longer_restage_a_confirmed_transaction(client, s
 
     assert confirmed.status_code == 200
     assert late.status_code == 409
+    assert late.json()["code"] == "stale"  # told from the other conflicts (a name taken)
     assert late.json()["updated_at"] == confirmed.json()["updated_at"]
     assert client.get(f"{BASE}/transactions/{staged.id}").json()["flag"] == "*"
 

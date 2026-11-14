@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { usd } from "../components/Loans.js";
 import { formatDay } from "../lib/format.js";
 import { explain, useLoans } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 /** Loans: each one's balance, its next payment, and when it's paid off. */
 export function Loans({ book }: { book: string }) {
@@ -19,7 +20,7 @@ export function Loans({ book }: { book: string }) {
         </Link>
       </header>
 
-      {loans.isPending && <p className="muted">Loading…</p>}
+      {loans.isPending && <Loading />}
       {loans.error && <p className="card error">{explain(loans.error)}</p>}
       {loans.data?.length === 0 && (
         <p className="card done">

@@ -48,7 +48,9 @@ export type DivideIn = components["schemas"]["DivideIn"];
 export class LedgerError extends Error {
   constructor(
     readonly status: number,
-    message: string
+    message: string,
+    /** The ledger's code for it, if it gave one ("stale": a version that has moved on). */
+    readonly code?: string
   ) {
     super(message);
   }
@@ -205,10 +207,11 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
   ): Promise<T> => {
     const { data, error, response } = await call;
     if (response.ok && data !== undefined) return data;
-    const detail = (error as { detail?: unknown } | undefined)?.detail;
+    const { detail, code } = (error ?? {}) as { detail?: unknown; code?: string };
     throw new LedgerError(
       response.status,
-      typeof detail === "string" ? detail : JSON.stringify(detail ?? response.statusText)
+      typeof detail === "string" ? detail : JSON.stringify(detail ?? response.statusText),
+      code
     );
   };
 

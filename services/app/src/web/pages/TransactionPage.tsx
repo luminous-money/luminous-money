@@ -26,6 +26,7 @@ import {
 } from "../lib/queries.js";
 import { attachments } from "../lib/appApi.js";
 import { simple } from "../lib/split.js";
+import { Loading } from "../components/Loading.js";
 
 /** Its postings' reconciliations (M14): which account's statement, of which day. */
 function reconciliations(t: Transaction): { account: string; date: string }[] {
@@ -66,7 +67,7 @@ export function TransactionPage({ book, id }: { book: string; id: string }) {
         </Link>
         <h1>Transaction</h1>
       </header>
-      {(loaded.isPending || accounts.isPending) && <p className="muted">Loading…</p>}
+      {(loaded.isPending || accounts.isPending) && <Loading />}
       {loaded.error && <p className="card error">{explain(loaded.error)}</p>}
       {loaded.data && !accounts.isPending && (
         <Editor book={book} transaction={loaded.data} back={back} />
@@ -109,7 +110,7 @@ export function NewTransactionPage({ book }: { book: string }) {
         <h1>New transaction</h1>
       </header>
       {accounts.isPending ? (
-        <p className="muted">Loading…</p>
+        <Loading />
       ) : (
         <Editor book={book} transaction={draft} back={back} isNew />
       )}

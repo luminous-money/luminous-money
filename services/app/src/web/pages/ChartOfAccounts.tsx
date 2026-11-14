@@ -6,6 +6,7 @@ import { displayName, shown } from "../lib/accounts.js";
 import { formatMoney } from "../lib/decimal.js";
 import type { TreeAccount } from "../lib/ledger.js";
 import { explain, useAccountTree, useCanWrite, useBankStatus, useStars } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 const ROOTS = ["Assets", "Liabilities", "Equity", "Income", "Expenses"];
 
@@ -194,7 +195,7 @@ export function ChartOfAccounts({ book }: { book: string }) {
         placeholder="Find an account"
         aria-label="Find an account"
       />
-      {tree.isPending && <p className="muted">Loading…</p>}
+      {tree.isPending && <Loading />}
       {tree.error && <p className="card error">{explain(tree.error)}</p>}
       {tree.data && (
         <div className="card chart">

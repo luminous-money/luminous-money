@@ -389,3 +389,9 @@ Smaller improvements picked up between milestones. Those still open are in
     budgets. Off by default.
   - **A tag filter lists its tags on focus,** narrows as you type, and says when nothing
     matches (Reports, ledgers).
+- [x] **Errors, loading, connection and new versions** (Kael's design pass, 2026-11-14;
+      design.md has the decisions): every refusal says what it means, a stale edit's 409 is
+      told from the others (`code: "stale"`); a spinner wherever something loads, and review's
+      cards come in at once; offline and an unanswering server said at the top; a new version
+      reloads itself when nobody's working, else a banner asks. Review shows the book's name,
+      not its ID, and "‹ Home" back.

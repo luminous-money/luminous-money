@@ -12,6 +12,7 @@ import { formatDay } from "../lib/format.js";
 import { useBack, withBack } from "../lib/navigation.js";
 import { explain, useAccounts, useDismissNotification, useNotifications } from "../lib/queries.js";
 import { bookHome } from "../lib/books.js";
+import { Loading } from "../components/Loading.js";
 
 export function NotificationsPage({ book }: { book: string }) {
   const queue = useNotifications(book);
@@ -28,7 +29,7 @@ export function NotificationsPage({ book }: { book: string }) {
         <h1>Notifications</h1>
         <p className="muted">What needs you, oldest first</p>
       </header>
-      {queue.isPending && <p className="muted">Loading…</p>}
+      {queue.isPending && <Loading />}
       {queue.error && <p className="card error">{explain(queue.error)}</p>}
       {queue.data && items.length === 0 && (
         <p className="card done">Nothing needs you right now.</p>

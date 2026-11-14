@@ -84,7 +84,6 @@ Mobile usability is [M20](../m20-design-polish/PLAN.md)'s.
       pair with CSV rows on the 7th and 8th in order (M2 pairs by proximity, and review swaps).
 - [ ] **Import file format management:** see, edit, rename and delete an account's saved CSV
       formats directly, rather than only replacing or adding to them when a file doesn't match.
-- [ ] **Review shows the book's ID at the top,** where its name belongs.
 - [ ] **"Select uncategorized"** in Select mode (Select all is built).
 - [ ] **Tapping a report's bar or slice opens its transactions** (that month's, or that
       category's; M12's answer 10: polish, at the end). The breakdown lists what's under where

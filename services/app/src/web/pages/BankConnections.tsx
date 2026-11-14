@@ -37,6 +37,7 @@ import {
   useUnlinkBank,
   useFunds,
 } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 /**
  * Bank connections (SimpleFIN): connect with a setup token from SimpleFIN Bridge, then link each
@@ -69,7 +70,7 @@ export function BankConnectionsPanel({ book }: { book: string }) {
   const shown = useParam("connection");
   return (
     <>
-      {connections.isPending && <p className="muted">Loading…</p>}
+      {connections.isPending && <Loading />}
       {connections.error && <p className="card error">{explain(connections.error)}</p>}
       {connections.data?.map((c) => (
         <ConnectionCard

@@ -129,7 +129,9 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     @app.exception_handler(StaleVersion)
     async def stale(_, exc: StaleVersion):
-        return JSONResponse({"detail": str(exc), "updated_at": exc.current}, status_code=409)
+        # `code` tells a stale version from the other conflicts (a name taken, say), so a client
+        # can say "it changed since you read it" for this one and the detail for the rest.
+        return JSONResponse({"detail": str(exc), "code": "stale", "updated_at": exc.current}, status_code=409)
 
     @app.exception_handler(chart.AccountRefused)
     async def account_refused(_, exc: chart.AccountRefused):

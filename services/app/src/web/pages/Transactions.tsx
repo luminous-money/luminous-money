@@ -24,6 +24,7 @@ import {
 } from "../lib/queries.js";
 import { simple, unresolved, withCounterpart } from "../lib/split.js";
 import { useSelection } from "../lib/selection.js";
+import { Loading } from "../components/Loading.js";
 
 /**
  * Every account's transactions together, newest first, paged as an account's ledger is: 200 at
@@ -111,7 +112,7 @@ export function Transactions({ book }: { book: string }) {
           onChange={(view) => navigate(href({ date, ...view }))}
         />
       </div>
-      {pages.isPending && <p className="muted">Loading…</p>}
+      {pages.isPending && <Loading />}
       {pages.error && <p className="card error">{explain(pages.error)}</p>}
       {pages.data && rows.length === 0 && (
         <p className="card muted">

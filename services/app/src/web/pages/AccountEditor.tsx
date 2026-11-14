@@ -29,6 +29,7 @@ import {
   useSummary,
   useUnarchiveAccount,
 } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 const TYPE_NAMES: Record<string, string> = {
   asset: "an asset",
@@ -48,7 +49,12 @@ export function AccountEditor({ book, account }: { book: string; account: string
   const tree = useAccountTree(book);
   const found = tree.data?.find((a) => a.name === account);
   const ledgerHref = `/books/${book}/accounts/${encodeURIComponent(account)}`;
-  if (tree.isPending) return <main className="muted">Loading…</main>;
+  if (tree.isPending)
+    return (
+      <main>
+        <Loading page />
+      </main>
+    );
   if (!found)
     return (
       <main>

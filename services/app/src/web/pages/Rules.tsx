@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import type { CategoryRule } from "../lib/appApi.js";
 import { shortName } from "../lib/accounts.js";
 import { explain, useCategorizers, useRules } from "../lib/queries.js";
+import { Loading } from "../components/Loading.js";
 
 /** A rule's conditions in words: "contains "cafe", in Checking, at most -1.00". */
 export function conditionsInWords(rule: Pick<CategoryRule, "conditions">): string {
@@ -38,7 +39,7 @@ export function Rules({ book }: { book: string }) {
         </Link>
       </header>
 
-      {rules.isPending && <p className="muted">Loading…</p>}
+      {rules.isPending && <Loading />}
       {rules.error && <p className="card error">{explain(rules.error)}</p>}
       {rules.data?.length === 0 && (
         <p className="card done">
