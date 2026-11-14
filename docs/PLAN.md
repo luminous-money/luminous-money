@@ -370,3 +370,6 @@ Smaller improvements picked up between milestones. Those still open are in
     receipt, typed by hand) is final at once, out of review.
   - **Where a price came from:** a bank feed's prices said "entered by hand"; each price now
     keeps its source (bank, fetched, by hand) and Commodities says it.
+- [x] **"Repeat…" doesn't copy where a transaction came from** (2026-11-13): a schedule made
+      from a bank row carried its import ID into every occurrence; the template now keeps only
+      the transaction's `budget` choice (`fromTransaction` in `ScheduleEditor.tsx`).

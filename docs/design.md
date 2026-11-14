@@ -1668,6 +1668,13 @@ As built in M3:
 - **Upcoming occurrences** (16 days) show in account ledgers as grayed rows with a projected
   balance, and on the Schedules page.
 - **Failures are per schedule:** the error is kept and shown, and retried on the next run.
+- **"Repeat…" keeps none of the transaction's own meta but `budget`** (Kael, 2026-11-13). The
+  rest says where that one transaction came from (a bank row's `source`, `import-batch` and
+  `import-id`, a receipt's, an order's, a schedule's), and copied into the template every
+  occurrence claimed it too: a payroll schedule made from a bank row staged each paycheck with
+  that row's import ID. Being left out of budgets is a person's choice about the payment, so it
+  repeats. What's kept is a list of what to keep, not of what to drop, since new sources add new
+  keys. Splits' meta (a memo) is kept.
 
 ### The resolver pipeline: matching and categorization
 

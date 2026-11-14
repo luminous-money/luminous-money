@@ -53,6 +53,11 @@ const monthly = (start: string): Rule => ({
   weekend: "keep",
 });
 
+/** What a repeat keeps of a transaction's meta: what a person chose (Exclude from budget), not
+ * where this one came from (a bank feed's import, a receipt, an order, a schedule), which every
+ * occurrence would otherwise claim too. */
+const REPEATED_META = ["budget"];
+
 /** A transaction as a template to repeat: monthly, from a month after its date. */
 function fromTransaction(t: Transaction): {
   name: string;
@@ -68,7 +73,9 @@ function fromTransaction(t: Transaction): {
       payee: rest.payee ?? null,
       narration: rest.narration,
       links: rest.links ?? [],
-      meta: rest.meta ?? {},
+      meta: Object.fromEntries(
+        Object.entries(rest.meta ?? {}).filter(([key]) => REPEATED_META.includes(key))
+      ),
       postings: rest.postings as TransactionTemplate["postings"],
       ...(rest.funds?.length ? { funds: rest.funds } : {}),
     },

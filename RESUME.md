@@ -1,10 +1,24 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-12._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-13._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-12, later): the split editor, and three fixes, released as `v0.1.27`
+## Latest (2026-11-13): "Repeat…" no longer copies where a transaction came from
+
+While setting up Kael's paychecks as schedules on his live book (done through the API, not in
+the repo), the schedule he'd made with "Repeat…" from a bank row turned out to carry that row's
+`source`, `import-batch` and `import-id` in its template, so every paycheck it staged claimed the
+same bank row. The matcher goes by `app`'s import records, not this meta, so nothing mis-matched;
+it was wrong provenance. `fromTransaction` (`web/pages/ScheduleEditor.tsx`) now keeps only the
+transaction's `budget` choice (design.md's "Scheduled transactions"). m3's "Repeat…" browser test
+repeats a bank row with `budget: false` and checks the template's meta is just that.
+`pnpm test` and `pnpm e2e` pass (browser 137). **Committed, pushed and released as `v0.1.28`**
+at Kael's asking. Emmer isn't upgraded (Kael's to run); no migrations in it.
+
+**Next:** Kael upgrades Emmer (`upgrade 0.1.28`, which brings 0.1.27's too); the rest as below.
+
+## Before that (2026-11-12, later): the split editor, and three fixes, released as `v0.1.27`
 
 Kael asked for four changes; all are built, on top of the split tags below, then adjusted after
 his comments (a faint "Memo" on a split without one; no string matching of SimpleFIN errors).

@@ -20,6 +20,8 @@ test("Repeat… makes a monthly schedule that stages what's due, marked ↻ in t
       flag: "*",
       payee: "Landlord",
       narration: "Rent",
+      // A bank row's: where it came from doesn't repeat, being left out of budgets does.
+      meta: { source: "simplefin", "import-batch": "b1", "import-id": "id:1", budget: false },
       postings: [
         { account, units: { number: "-1500.00", currency: "USD" } },
         { account: "Expenses:Rent" },
@@ -41,6 +43,10 @@ test("Repeat… makes a monthly schedule that stages what's due, marked ↻ in t
   await expect(card).toContainText("1,500.00");
   await expect(card).toContainText("Next:");
   await expect(page.getByRole("region", { name: "Upcoming" })).toContainText("Landlord");
+  const [schedule] = (await (await app(`/books/${book.id}/schedules`)).json()) as {
+    template: { meta: Record<string, unknown> };
+  }[];
+  expect(schedule!.template.meta).toEqual({ budget: false });
 
   await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
   await expect(page.getByRole("img", { name: "Scheduled" })).toHaveCount(1);
