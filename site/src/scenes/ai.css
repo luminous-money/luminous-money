@@ -1,0 +1,139 @@
+/* The AI page, then Review, in one browser window: pinned, a gutter from the top and both
+   sides, off the bottom. The page swap crossfades the body with a small rise; the chrome stays. */
+
+.lm-ai {
+  .ai-win {
+    position: absolute;
+    top: 40px;
+    left: 40px;
+    width: 560px;
+    height: 640px;
+  }
+
+  .ai-page { min-height: 100%; }
+
+  .ai-pages { position: relative; }
+  .ai-body {
+    position: absolute;
+    inset: 0 0 auto;
+    padding: 4px 20px 0;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 200ms ease, transform 200ms ease;
+    pointer-events: none;
+    will-change: transform;
+  }
+  .ai-body[data-on] { opacity: 1; transform: none; }
+  .ss-stage[data-layout='compact'] .ai-body { padding: 4px 14px 0; }
+
+  .lm-h1 { margin-top: 2px; }
+
+  .ai-card { margin-top: 16px; padding: 16px; }
+  .ai-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .ss-stage[data-layout='compact'] .ai-row { flex-direction: column; align-items: stretch; }
+  .ai-key { flex: 1; min-width: 0; }
+  .ai-save { height: 44px; min-width: 104px; }
+
+  .ai-uses {
+    margin: 16px 0 0;
+    padding: 14px 0 0 18px;
+    border-top: 1px solid var(--lm-line);
+    color: #374151;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  .ai-uses li + li { margin-top: 4px; }
+
+  .ai-month { margin-top: 12px; padding: 16px; }
+  .ai-month__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    margin-top: 4px;
+    color: var(--lm-muted);
+    font-size: 15px;
+    line-height: 1.3;
+  }
+  .ai-month__row b { color: var(--lm-ink); font-weight: 700; }
+
+  .ai-select {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 14px 0 12px;
+  }
+  .ss-stage[data-layout='compact'] .ai-select { flex-wrap: wrap; row-gap: 8px; }
+  .ai-select__count { color: var(--lm-muted); font-size: 15px; font-weight: 600; }
+
+  .ai-list { padding: 0 16px; }
+  .ai-item {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    grid-template-areas: 'tick text amount' '. pick pick';
+    column-gap: 12px;
+    row-gap: 8px;
+    align-items: center;
+    padding: 14px 0;
+  }
+  .ai-item + .ai-item { border-top: 1px solid var(--lm-line); }
+  .ai-tick {
+    grid-area: tick;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: var(--lm-accent);
+    color: #fff;
+  }
+  .ai-item__text { grid-area: text; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .ai-item__payee { font-size: 15px; font-weight: 600; line-height: 1.3; }
+  .ai-item__when { color: var(--lm-muted); font-size: 13px; line-height: 1.3; }
+  .ai-item__amount { grid-area: amount; font-size: 15px; }
+
+  .ai-pick {
+    grid-area: pick;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--lm-warn-edge);
+    border-radius: 10px;
+    background: var(--lm-warn-soft);
+    font-size: 14px;
+    transition: background-color 200ms ease, border-color 200ms ease;
+  }
+  .ai-pick[data-set] { border-color: var(--lm-edge); background: var(--lm-card); font-weight: 500; }
+  .ai-pick svg { color: var(--lm-muted); flex: none; }
+
+  /* Thinking: three dots in the button's icon slot */
+  .ai-dots { display: inline-flex; gap: 3px; }
+  .ai-dots i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: ai-dot 900ms ease-in-out infinite;
+  }
+  .ai-dots i:nth-child(2) { animation-delay: 150ms; }
+  .ai-dots i:nth-child(3) { animation-delay: 300ms; }
+
+  .ai-cost {
+    padding: 12px 4px 0;
+    color: var(--lm-muted);
+    font-size: 14px;
+    line-height: 1.3;
+  }
+}
+
+@keyframes ai-dot {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}

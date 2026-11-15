@@ -1818,6 +1818,32 @@ didn't lose signal.
 The context also carries the chart of accounts and, later, **artifacts** such as Amazon invoices
 and grocery receipts that let a resolver split a single charge into several categories.
 
+### The site and its demo video (2026-11-14)
+
+Kael asked for a video of the features, made with the Stageshow skill, and a landing page for it
+on GitHub Pages: https://luminous-money.github.io/luminous-money/. All of it is in `site/`
+([its README](../site/README.md)).
+
+- **Scenes, not screen recordings:** each feature is a short faux-UI scene in the app's own look
+  (`site/src/look.css`), built with the Stageshow kit. A recording of the real app would need a
+  book of plausible data, go stale with every design change, and couldn't play live on the page
+  or reflow for a phone; a scene does both, and every name and figure in it is made up, so no
+  real financial data can leak into it.
+- **One set of scenes for the page and the video:** `site/src/scenes/index.ts` holds their order
+  and copy. The page plays each as it scrolls into view; the video is recorded from the reel
+  (`reel.html`), a scene at a time.
+- **Recorded frame by frame on a virtual clock** (`site/scripts/record.mjs`): a real-time screen
+  capture drops frames under load; stepping the kit's clock and screenshotting each frame makes
+  the video the same every time.
+- **A standalone npm project,** outside the pnpm workspace and the Docker builds
+  (`node.Dockerfile.dockerignore`): its tools (Playwright, ffmpeg, the kit) have nothing to do
+  with the app, and shouldn't touch its lockfile or images.
+- **Published from a `gh-pages` branch** (`site/scripts/publish.sh`), the built `dist/` only. The
+  video (about 5 MB) and its poster live there and not on main, so main's history doesn't carry
+  every re-recording; `publish.sh` takes the published ones when none were recorded locally.
+- **A relative base** (`base: './'`), so the build works under Pages' `/luminous-money/` and
+  anywhere else.
+
 ## Architecture
 
 The design separates four things:

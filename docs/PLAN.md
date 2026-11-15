@@ -401,3 +401,7 @@ Smaller improvements picked up between milestones. Those still open are in
       Bank connections by bank, breadcrumbs for Back, one-row list headers with filter pills,
       subaccounts on a node's page, find on page. [M20's plan](milestones/m20-design-polish/PLAN.md)
       has the list.
+- [x] **The site and its demo video** (Kael, 2026-11-14; design.md has the decisions): a landing
+      page on GitHub Pages (https://luminous-money.github.io/luminous-money/) with an 83-second
+      video of the features, both made from nine Stageshow scenes in the app's look
+      ([site/README.md](../site/README.md)).

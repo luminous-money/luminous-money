@@ -6,6 +6,8 @@ A self-hostable, database-driven, double-entry accounting system. It uses
 format, and has a mobile-first app built for fast review and categorization. One server hosts many
 books, each independent: switching books is like switching profiles.
 
+**See it:** [the demo video and a tour of the features](https://luminous-money.github.io/luminous-money/).
+
 > **Status: early, and in daily use.** Releases are on
 > [GitHub](https://github.com/luminous-money/luminous-money/releases), and the milestones built
 > so far are in [docs/PLAN.md](docs/PLAN.md). Expect it to change quickly.

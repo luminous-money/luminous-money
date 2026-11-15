@@ -1,0 +1,8 @@
+node_modules/
+dist/
+shots/
+out/
+# The video and its poster live on gh-pages (scripts/record.mjs makes them; publish.sh takes
+# them from gh-pages when they're not here)
+public/luminous-money.mp4
+public/poster.jpg

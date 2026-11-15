@@ -1,0 +1,225 @@
+/* Luminous Money's look, as the kit's tokens: the app's light palette (services/app's
+   styles.css), Geist, its radii and its shadows. Every scene's Stage carries the class `lm`.
+   The scenes sit on a tile in the product's blue, so the white app reads against it. */
+
+@import '@fontsource-variable/geist';
+
+.lm .ss-stage {
+  --lm-accent: #0062a8;
+  --lm-accent-soft: #d7eafa;
+  --lm-paper: #f3f4f6;
+  --lm-card: #ffffff;
+  --lm-ink: #1f2937;
+  --lm-muted: #5f6774;
+  --lm-line: #e5e7eb;
+  --lm-edge: #bfc4cc;
+  --lm-good: #2a8040;
+  --lm-good-soft: #e3f1e6;
+  --lm-bad: #b83c32;
+  --lm-warn-soft: #fbf3e2;
+  --lm-warn-edge: #e8c77f;
+  --lm-shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.04);
+  --lm-shadow-control: 0 1px 2px rgb(16 24 40 / 0.06);
+
+  --ss-accent: var(--lm-accent);
+  --ss-accent-soft: var(--lm-accent-soft);
+  --ss-accent-text: var(--lm-accent);
+  --ss-canvas: var(--lm-paper);
+  --ss-surface: var(--lm-card);
+  --ss-text-strong: var(--lm-ink);
+  --ss-text: #374151;
+  --ss-text-faint: var(--lm-muted);
+  --ss-line: var(--lm-line);
+  --ss-success: var(--lm-good);
+  --ss-danger: var(--lm-bad);
+  --ss-font: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ss-radius-sm: 8px;
+  --ss-radius-md: 10px;
+  --ss-radius-lg: 14px;
+
+  overflow: hidden;
+  border-radius: 22px;
+  /* The tile: the product's blue, a touch lighter at the top */
+  background: linear-gradient(180deg, #0b6fb8 0%, #0062a8 55%, #00579a 100%);
+  font-family: var(--ss-font);
+  font-feature-settings: 'tnum';
+  color: var(--lm-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- The app's own pieces, shared by the scenes ---- */
+
+/* A page inside a window or phone: the app's paper */
+.lm .lm-page {
+  height: 100%;
+  background: var(--lm-paper);
+  color: var(--lm-ink);
+}
+
+/* The masthead: logo, then the bell, the book switcher and the menu */
+.lm .lm-mast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 16px;
+}
+.lm .lm-mast__logo { width: 36px; height: 36px; flex: none; }
+.lm .ss-stage[data-layout='compact'] .lm-mast { gap: 4px; padding: 0 12px; }
+.lm .lm-mast__word { font-weight: 650; font-size: 17px; letter-spacing: -0.02em; }
+.lm .lm-mast__space { flex: 1; }
+.lm .lm-mast__icon { display: grid; place-items: center; width: 36px; height: 36px; color: var(--lm-ink); flex: none; }
+.lm .lm-mast__icon svg { width: 20px; height: 20px; }
+.lm .lm-book {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--lm-edge);
+  border-radius: 999px;
+  background: var(--lm-card);
+  font-size: 15px;
+  font-weight: 600;
+  flex: none;
+}
+.lm .lm-book svg { width: 14px; height: 14px; }
+
+.lm .lm-h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.lm .lm-sub {
+  margin-top: 2px;
+  color: var(--lm-muted);
+  font-size: 15px;
+  line-height: 1.4;
+}
+.lm .lm-crumb {
+  color: var(--lm-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.lm .lm-card {
+  background: var(--lm-card);
+  border: 1px solid var(--lm-line);
+  border-radius: 14px;
+  box-shadow: var(--lm-shadow-card);
+}
+
+.lm .lm-section {
+  margin: 0;
+  color: var(--lm-muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+/* Money: tabular figures; money in is green */
+.lm .lm-amt { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lm .lm-amt[data-in] { color: var(--lm-good); }
+.lm .lm-amt[data-over] { color: var(--lm-bad); }
+
+/* The app's buttons, on the kit's Button: 40px, a firm edge, white, 10px corners, 15px
+   semibold; primary in the blue */
+.lm .ss-button.lm-btn {
+  --ss-button-height: 40px;
+  --ss-button-pad: 16px;
+  --ss-button-pad-icon: 13px;
+  --ss-button-icon: 16px;
+  --ss-button-gap: 7px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--lm-edge), var(--lm-shadow-control);
+}
+.lm .ss-button.lm-btn[data-variant='primary'] {
+  box-shadow: inset 0 0 0 1px var(--lm-accent), var(--lm-shadow-control);
+}
+.lm .ss-button.lm-btn[data-size='small'] {
+  --ss-button-height: 32px;
+  --ss-button-pad: 12px;
+  --ss-button-pad-icon: 10px;
+  --ss-button-icon: 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+/* Fields: the app's 44px box with a firm edge and 10px corners; the label above in 13px */
+.lm .ss-stage {
+  --ss-control: 44px;
+  --ss-success-soft: var(--lm-good-soft);
+  --ss-success-text: var(--lm-good);
+}
+.lm .ss-field { gap: 6px; }
+.lm .ss-field__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lm-ink);
+}
+.lm .ss-field__box {
+  padding: 0 12px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--lm-edge), 0 0 0 0 transparent;
+  font-size: 15px;
+}
+.lm .ss-field[data-focused] .ss-field__box,
+.lm .ss-field__box[data-focused] {
+  box-shadow: inset 0 0 0 1px var(--lm-accent), 0 0 0 3px color-mix(in srgb, var(--lm-accent) 22%, transparent);
+}
+
+/* Badges: the app's quiet pills */
+.lm .ss-badge {
+  height: 24px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* The app in a browser window: the window's body is the app's paper */
+.lm .lm-browser .ss-window__body,
+.lm .lm-browser { background: var(--lm-paper); }
+.lm .lm-browser {
+  box-shadow: 0 30px 60px -20px rgb(0 20 50 / 0.55), 0 0 0 1px rgb(0 0 0 / 0.06);
+}
+
+/* Lists: the kit's Row at the app's sizes */
+.lm .lm-rows .ss-row {
+  --ss-row-title: 15px;
+  --ss-row-subtitle: 13px;
+  --ss-row-meta: 15px;
+  --ss-row-line: 20px;
+  --ss-row-line-2: 18px;
+  --ss-row-gap: 2px;
+  column-gap: 12px;
+}
+.lm .lm-rows .ss-row__subtitle { color: var(--lm-muted); }
+.lm .lm-rows .ss-row__meta { color: var(--lm-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.lm .lm-rows > * + * { border-top: 1px solid var(--lm-line); }
+
+/* A row's lead: a glyph on a soft tile */
+.lm .lm-tile {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--lm-accent-soft);
+  color: var(--lm-accent);
+}
+.lm .lm-tile svg { width: 18px; height: 18px; }
+
+/* The phone's bare screen, for compact designs: a gutter from the top and sides, off the bottom */
+.lm .ss-phone.lm-bare {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  box-shadow: 0 30px 60px -20px rgb(0 20 50 / 0.55);
+}

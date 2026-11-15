@@ -1,10 +1,36 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-14._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-15._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-14, late night): the roadmap reordered
+## Latest (2026-11-15): the demo video and the landing page, published
+
+Kael asked for a video of Luminous Money's features made with the stageshow skill
+(`~/.agents/skills/stageshow`), published with a landing page on GitHub Pages. **Published:**
+https://luminous-money.github.io/luminous-money/ (Pages serves the `gh-pages` branch, root,
+HTTPS enforced; the README links it). All of it is in `site/` (read
+[site/README.md](site/README.md) and [site/REHEARSAL.md](site/REHEARSAL.md)): a standalone npm
+project, outside the pnpm workspace and left out of the Docker builds (`site` in
+`node.Dockerfile.dockerignore`). design.md has "The site and its demo video"; PLAN.md's Done
+lists it. No code changes, so no release.
+
+- **Nine scenes** (`site/src/scenes/`): review swipe, SimpleFIN, receipts, Amazon, bring-your-own
+  AI, reports, budgets and funds, loans, install. Every one passes the kit's rehearsal gate wide
+  and at 390.
+- **The video:** 82.7s, 1920 × 1080, 30 fps, about 5 MB, recorded by `site/scripts/record.mjs`,
+  with a poster. Both live on gh-pages only (gitignored on main); `publish.sh` takes them from
+  there unless new ones were recorded.
+- **The landing page:** `site/index.html` / `src/landing.tsx`: hero with the video, the nine
+  features with their live scenes, the rest of the system, Get started (install commands), footer.
+- **To change it:** edit, re-record if a scene changed (`site/README.md`), then
+  `site/scripts/publish.sh` (builds, commits `dist/` to gh-pages, pushes; Pages rebuilds in about
+  a minute).
+- The preview stack and the site's Vite servers are down.
+
+**Next:** MCP Server, elaborated with Kael (its plan's questions first).
+
+## Before that (2026-11-14, late night): the roadmap reordered
 
 Kael reordered what's ahead in [docs/PLAN.md](docs/PLAN.md): **MCP Server** is new and next
 ([noted](docs/milestones/mcp-server/PLAN.md), with questions for when it starts), **HSA

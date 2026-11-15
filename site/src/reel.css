@@ -1,0 +1,126 @@
+/* The reel's frame: the app's deep blue (its dark palette's paper), the copy on the left and the
+   scene's tile on the right. */
+
+html, body {
+  margin: 0;
+  background: #002a48;
+}
+
+.reel {
+  position: relative;
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+  background:
+    radial-gradient(900px 600px at 85% 20%, rgb(0 98 168 / 0.35), transparent 70%),
+    radial-gradient(700px 500px at 0% 100%, rgb(0 255 255 / 0.06), transparent 70%),
+    #002a48;
+  color: #f4f8fb;
+  font-family: 'Geist Variable', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.reel-copy {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 80px;
+  width: 440px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.reel-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #a6b8c6;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.reel-title {
+  margin-top: 22px;
+  font-size: 48px;
+  font-weight: 650;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.reel-line {
+  margin-top: 18px;
+  color: #c3d2dd;
+  font-size: 21px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.reel-steps {
+  display: flex;
+  gap: 6px;
+  margin-top: 40px;
+}
+.reel-steps span {
+  width: 28px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(166 184 198 / 0.25);
+}
+.reel-steps span[data-done] { background: rgb(166 184 198 / 0.6); }
+.reel-steps span[data-on] { background: #00ffff; }
+
+.reel-stage {
+  position: absolute;
+  top: 60px;
+  left: 580px;
+  width: 640px;
+  height: 600px;
+}
+
+/* Title cards */
+.reel-card {
+  display: grid;
+  place-items: center;
+}
+.reel-card__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: reel-rise 1100ms cubic-bezier(0.25, 0.8, 0.25, 1) both 200ms;
+}
+.reel-card__logo {
+  border-radius: 18px;
+  box-shadow: 0 20px 50px -10px rgb(0 0 0 / 0.5);
+}
+.reel-card__name {
+  margin-top: 28px;
+  font-size: 56px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+.reel-card__line {
+  margin-top: 14px;
+  color: #c3d2dd;
+  font-size: 24px;
+}
+.reel-card__code {
+  margin-top: 26px;
+  padding: 14px 22px;
+  border: 1px solid rgb(0 255 255 / 0.35);
+  border-radius: 12px;
+  background: rgb(0 0 0 / 0.25);
+  color: #00ffff;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 24px;
+}
+
+@keyframes reel-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+.reel-bare { padding: 16px; }

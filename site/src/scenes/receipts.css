@@ -1,0 +1,101 @@
+/* Receipts. Wide: the phone right of center, off the bottom, and the paper receipt straddling
+   its left edge over the bezel and margin. Compact: the bare screen. */
+
+.lm-receipts {
+  .rc-phone {
+    position: absolute;
+    top: 40px;
+    left: 262px;
+    border-radius: 56px;
+    box-shadow: 0 30px 60px -20px rgb(0 20 50 / 0.55);
+  }
+
+  .rc-app { min-height: 100%; }
+  .rc-body { padding: 4px 16px 0; }
+  .lm-h1 { margin: 2px 0 14px; }
+
+  .rc-card { padding: 14px 16px 6px; }
+
+  .rc-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .rc-when { color: var(--lm-muted); font-size: 13px; line-height: 1.3; }
+  .rc-amount { font-size: 18px; }
+  .rc-payee {
+    margin: 2px 0 10px;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .rc-account {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 42px;
+    margin-bottom: 10px;
+    padding: 0 12px;
+    border: 1px solid var(--lm-warn-edge);
+    border-radius: 10px;
+    background: var(--lm-warn-soft);
+    font-size: 15px;
+  }
+
+  .rc-split {
+    will-change: transform;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--lm-line);
+  }
+  .rc-split__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .rc-split__name { font-size: 15px; font-weight: 600; line-height: 1.3; }
+  .rc-split__account { color: var(--lm-muted); font-size: 13px; line-height: 1.3; }
+  .rc-split__amount { font-size: 15px; }
+
+  .rc-next { margin-top: 12px; padding-bottom: 14px; will-change: transform; }
+  .rc-account--set { margin-bottom: 0; border-color: var(--lm-edge); background: var(--lm-card); }
+  .rc-account--set svg { color: var(--lm-muted); }
+
+  .rc-matched {
+    padding: 10px 0 8px;
+    border-top: 1px solid var(--lm-line);
+  }
+
+  /* The paper receipt: a slip of thermal paper, lit line by line as it's read */
+  /* A long slip: it runs off the bottom of the tile, as a receipt does */
+  .rc-paper {
+    position: absolute;
+    top: 120px;
+    left: 40px;
+    width: 230px;
+    height: 560px;
+    padding: 20px 18px 22px;
+    border-radius: 4px;
+    background: #fdfdfb;
+    box-shadow: 0 18px 40px -12px rgb(0 20 50 / 0.5), 0 0 0 1px rgb(0 0 0 / 0.04);
+    color: #2b2b2b;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .rc-paper__shop { font-weight: 700; text-align: center; font-size: 13px; }
+  .rc-paper__faint { color: #6b6b6b; text-align: center; font-size: 11px; }
+  .rc-paper__rule { margin: 10px 0; border-top: 1px dashed #b9b9b9; }
+  .rc-paper__line {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 -6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+  .rc-paper__line[data-lit] { background: var(--lm-accent-soft); color: var(--lm-accent); }
+  .rc-paper__total { font-weight: 700; margin-bottom: 8px; }
+  .rc-paper__total[data-lit] { background: var(--lm-good-soft); color: var(--lm-good); }
+}
