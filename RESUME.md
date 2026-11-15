@@ -4,7 +4,19 @@ Where We Left Off
 _Updated 2026-11-14._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-14, night): the design pass (M20), with Kael's round, released as `v0.1.31`
+## Latest (2026-11-14, late night): the roadmap reordered
+
+Kael reordered what's ahead in [docs/PLAN.md](docs/PLAN.md): **MCP Server** is new and next
+([noted](docs/milestones/mcp-server/PLAN.md), with questions for when it starts), **HSA
+tracking** second, then the rest of Funds B, Tags more, split-level tags and funds, M20 and
+M99. **M18 is parked in [M99's Deferred](docs/milestones/m99-follow-ups/PLAN.md#deferred)**
+(Kael isn't sure it's worth doing): its brief moved there, and its folder is gone. HSA
+tracking built on Tags, more's chain proposing tags; ahead of it now, it brings the part it
+needs (its plan says so). Docs only.
+
+**Next:** MCP Server, elaborated with Kael (its plan's questions first).
+
+## Before that (2026-11-14, night): the design pass (M20), with Kael's round, released as `v0.1.31`
 
 Kael tried the design pass on the dev server, chose Geist, sent a round of nits, and asked for it
 all to be committed and released. **Committed, pushed and released as `v0.1.31`.** Everything is
@@ -718,8 +730,8 @@ accounts import** and **migrating from another system**, slipped in before M17 (
 **M19 (AI categorization) was built within M16** and is live; its PLAN.md entry was found
 unchecked and corrected on 2026-10-26 (what's left is a question: whether imports and bank feeds
 ask the AI by themselves). Their plans are in `docs/milestones/.archived/`. The milestones ahead
-(the rest of Funds B, Tags more, split-level tags and funds, HSA tracking, M18, M20, and M99's
-follow-ups) are in [docs/PLAN.md](docs/PLAN.md).
+(MCP Server, next; HSA tracking; the rest of Funds B, Tags more, split-level tags and funds, M20,
+and M99's follow-ups, where M18 is parked) are in [docs/PLAN.md](docs/PLAN.md).
 
 What an operator can do now (production readiness, phase 1; [docs/deploying.md](docs/deploying.md)):
 `luminous-money install` sets a deployment up (a laptop, or a public server with built-in HTTPS),
@@ -1041,9 +1053,10 @@ How it's put together:
    proposal: a by-payee view in review (categorize a payee's group at once).
 3. **Loans is out** (`v0.1.16` to `v0.1.18`, [its plan](docs/milestones/.archived/loans/PLAN.md)); Kael
    declares his mortgage on Emmer. **Funds B's step 1 is out** (`v0.1.15`); Kael sets his
-   Fidelity accounts up in funds. Then the rest of B (where a loan is grouped with its asset) or
-   M18 (suggested recurring transactions and matching rules).
-4. Later, not pressing: [M99: Follow-ups](docs/milestones/m99-follow-ups/PLAN.md) (email,
+   Fidelity accounts up in funds.
+4. **Next to build: MCP Server** ([noted](docs/milestones/mcp-server/PLAN.md)), then HSA
+   tracking; the rest of the order is [docs/PLAN.md](docs/PLAN.md)'s "Ahead".
+5. Later, not pressing: [M99: Follow-ups](docs/milestones/m99-follow-ups/PLAN.md) (email,
    ownership transfer, the rest of M8's auth questions, and the rest of what's left over).
 
 ## The ledger-graphs libraries

@@ -25,7 +25,14 @@ Two principles set the order:
 
 Roughly in order; each is elaborated with Kael when it starts.
 
-- [ ] **Funds B: Complex Fund Functionality** (next; Kael, 2026-11-02;
+- [ ] **MCP Server** (next; Kael, 2026-11-14; [noted](milestones/mcp-server/PLAN.md), not
+      planned): an MCP server for the ledger, so an AI assistant can work with a book.
+- [ ] **HSA tracking** (Kael, 2026-11-07; [noted](milestones/hsa-tracking/PLAN.md), not planned):
+      the AI tags every split that appears to pay for something HSA-eligible. Amazon says so on
+      its items, so its charges need no guess. Builds on Tags, more (the chain proposing tags) and
+      split-level tags (built); moved ahead of Tags, more (2026-11-14), so it brings the part of
+      that chain it needs.
+- [ ] **Funds B: Complex Fund Functionality** (Kael, 2026-11-02;
       [its plan](milestones/funds-b/PLAN.md)): everything else designed for funds, built in
       steps.
   - [x] **Step 1: shares in funds** (Kael, 2026-11-03; [built](milestones/funds-b/PLAN.md)
@@ -63,21 +70,14 @@ Roughly in order; each is elaborated with Kael when it starts.
   - [ ] **Step 2, funds per split** (noted, not planned): fund lines are the transaction's
         (amounts, not tied to a split); until then a review card's fund choice is quieter, and
         the split editor has no fund (Kael asked for one there, 2026-11-12).
-- [ ] **HSA tracking** (Kael, 2026-11-07; [noted](milestones/hsa-tracking/PLAN.md), not planned):
-      the AI tags every split that appears to pay for something HSA-eligible. Amazon says so on
-      its items, so its charges need no guess. Builds on Tags, more (the chain proposing tags) and
-      split-level tags (built).
-- [ ] **M18: Suggested recurring transactions and matching rules.** Bi-weekly or on-demand via
-      a button in the schedules section (recurring transactions) or somewhere TBD for matching
-      rules. Analyze each account's last 14 months of transactions and identify ones that look
-      recurring and are not already captured by an existing recurring transaction, to suggest
-      as schedules (M3) or for matching rules. Don't re-ask. (Moved after tagging, 2026-10-17;
-      [its brief](milestones/m18-suggested-recurring-transactions/PLAN.md).)
 - [ ] **M20: Design polish** ([its plan](milestones/m20-design-polish/PLAN.md); the first pass is
       built and released, 2026-11-14): mobile usability
       across the app, so far.
 - [ ] **M99: Follow-ups** ([the list](milestones/m99-follow-ups/PLAN.md)): open questions, polish,
-      calls made without asking still to review, and what done milestones left over.
+      calls made without asking still to review, and what done milestones left over. **M18**
+      (suggested recurring transactions and matching rules) is parked in its
+      [Deferred](milestones/m99-follow-ups/PLAN.md#deferred) since 2026-11-14 (Kael: not sure
+      it's worth doing).
 
 ## Done
 

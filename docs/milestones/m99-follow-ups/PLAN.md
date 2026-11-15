@@ -13,8 +13,7 @@ M99: Follow-ups
 > an active milestone lives in that milestone instead: [Funds B](../funds-b/PLAN.md), [Tags,
 > more](../tags-more/PLAN.md), [split-level tags and
 > funds](../split-level-tags-and-funds/PLAN.md), [HSA tracking](../hsa-tracking/PLAN.md),
-> [M18](../m18-suggested-recurring-transactions/PLAN.md) and
-> [M20](../m20-design-polish/PLAN.md).
+> [MCP Server](../mcp-server/PLAN.md) and [M20](../m20-design-polish/PLAN.md).
 
 ## Open questions
 
@@ -190,6 +189,13 @@ Mobile usability is [M20](../m20-design-polish/PLAN.md)'s.
 - **Archiving closed periods,** only if the Pi benchmark calls for it.
 - **A native mobile app.**
 - **Holiday calendars** for schedules (M3, "Out of scope"; M3 answered no new recurrence rules).
+- **M18: Suggested recurring transactions and matching rules** (parked here 2026-11-14; Kael:
+  not sure it's worth doing). Bi-weekly or on demand (a button in the schedules section for
+  recurring transactions; somewhere to decide for matching rules), analyze each account's last
+  14 months of transactions, find ones that look recurring and aren't already captured by a
+  schedule, and suggest them as schedules (M3) or as matching rules. Don't ask again about one
+  that's been declined. It can reuse categorization's payee keys and context (the 14-month
+  window; M4's plan, "Out of scope", which still called this M15).
 
 ## Early notes not built as written
 
