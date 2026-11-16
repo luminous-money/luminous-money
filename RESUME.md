@@ -28,7 +28,7 @@ worker to be active"; the design pass: "Kael's nits, 2026-11-16"; the site: "The
   the second line), the new lede, "Managing loans, made easy"; the reel's intro card, `<title>`
   and `og:description` follow. **The published video still has the old intro card and loans
   title** until it's recorded again (`site/README.md`); then `./scripts/publish.sh`. Kael
-  hasn't asked for that yet.
+  doesn't mind it stale (2026-11-16): re-record only when he asks.
 - **Tests:** `tests/ui/src/updates.spec.ts`, the suite's first with a service worker (full
   Chromium with `http://traefik` treated as secure, which the default headless shell ignores;
   its route stays in place, since taking it away mid-load left a request hanging, 2 in 285 runs).
