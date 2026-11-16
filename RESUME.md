@@ -4,9 +4,10 @@ Where We Left Off
 _Updated 2026-11-16._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-16): Reload works, review keeps itemized picks, memos wrap, the site's words
+## Latest (2026-11-16): `v1.0.0`: Reload works, review keeps itemized picks, memos wrap, the site's words
 
-Four things from Kael, one change set. **Not committed, released or published yet.** design.md
+Four things from Kael, one change set. **Committed, pushed and released as `v1.0.0`** (Kael's
+call: the first 1.x), **and the site published** (with the old video: see below). design.md
 has the decisions (Errors, loading, connection and new versions: "Reload waits for the new
 worker to be active"; the design pass: "Kael's nits, 2026-11-16"; the site: "The pitch").
 
@@ -26,7 +27,8 @@ worker to be active"; the design pass: "Kael's nits, 2026-11-16"; the site: "The
 - **The site** (`site/`): headline "Household accounting / for modern life." (the glow kept on
   the second line), the new lede, "Managing loans, made easy"; the reel's intro card, `<title>`
   and `og:description` follow. **The published video still has the old intro card and loans
-  title** until it's recorded again (`site/README.md`); then `./scripts/publish.sh`.
+  title** until it's recorded again (`site/README.md`); then `./scripts/publish.sh`. Kael
+  hasn't asked for that yet.
 - **Tests:** `tests/ui/src/updates.spec.ts`, the suite's first with a service worker (full
   Chromium with `http://traefik` treated as secure, which the default headless shell ignores;
   its route stays in place, since taking it away mid-load left a request hanging, 2 in 285 runs).
