@@ -113,6 +113,7 @@ export const keys = {
   summary: (book: string, accounts: string[]) => ["book", book, "summary", ...accounts] as const,
   stars: (book: string) => ["book", book, "stars"] as const,
   fundStars: (book: string) => ["book", book, "fund-stars"] as const,
+  budgetStars: (book: string) => ["book", book, "budget-stars"] as const,
   lastImports: (book: string) => ["book", book, "last-imports"] as const,
   ledger: (book: string, account: string) => ["book", book, "ledger", account] as const,
   profiles: (book: string, account: string) => ["book", book, "profiles", account] as const,
@@ -384,6 +385,31 @@ export function useStarredFunds(book: string) {
         ? listing.data.funds.filter((f) => !f.archived && starred.has(f.name.toLowerCase()))
         : undefined,
   };
+}
+
+/** The user's starred budgets, by account: home's Budgets card. */
+export function useBudgetStars(book: string) {
+  return useQuery({ queryKey: keys.budgetStars(book), queryFn: () => appApi.budgetStars(book) });
+}
+
+export function useSetBudgetStar(book: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ account, starred }: { account: string; starred: boolean }) =>
+      appApi.setBudgetStar(book, account, starred),
+    onSuccess: (stars) => client.setQueryData(keys.budgetStars(book), stars),
+  });
+}
+
+/** The budgets the user starred, each over its own period, in the order they were starred. A
+ * star whose budget has ended (or whose account is archived) shows nothing. */
+export function useStarredBudgets(book: string) {
+  const status = useBudgetStatus(book);
+  const stars = useBudgetStars(book);
+  const lines = new Map(status.data?.lines.map((l) => [l.account, l]));
+  return status.data && stars.data
+    ? stars.data.flatMap((account) => lines.get(account) ?? [])
+    : undefined;
 }
 
 /** The user's starred accounts, summarized: the home page. */

@@ -4,7 +4,42 @@ Where We Left Off
 _Updated 2026-11-15._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-15): the demo video and the landing page, published
+## Latest (2026-11-15, evening): starred budgets on home, and Kael's nits, released as `v0.1.32`
+
+Kael expected a budget to show on home once started; it never had (home only ever summed the
+top-level expense budgets, now "Spent this month"). He asked for budget stars that work as fund
+stars do, and three nits, all released. **Committed, pushed and released as `v0.1.32`.**
+design.md has the decisions (Budgets (M11): "Starred budgets are home's Budgets card"; the
+design pass: "Kael's nits, 2026-11-15"); M20's plan and PLAN.md's Done list them.
+
+- **Budget stars:** `app` migration 25 (`budget_star`: user, book, account), followed by
+  `followAccounts` (renamed with the account, dropped when it's deleted or merged);
+  `GET/PUT/DELETE /books/:book/budget-stars[/:account]`; `useBudgetStars`,
+  `useSetBudgetStar`, `useStarredBudgets` (the starred ones' status lines, in starred order).
+  ☆ on each budgeted row of the Budgets page; `BudgetForm` stars a budget it sets where there
+  was none. Home's `BudgetsCard` (components/Budget.tsx) sits between the accounts and Funds,
+  under the same rule, only when something starred has a budget in force. `forgetBook` now
+  also clears `fund_star`, `budget_star` and `notification_dismissal` (the first and last were
+  missed before).
+- **Shared pieces:** `components/Star.tsx` (`StarButton`, for accounts, funds and budgets);
+  home's card rows are `.home-card` / `.home-list` / `.home-row` (were `.fund-*`).
+- **An account's ledger:** ⋮ (`Overflow`'s new `vertical`) on the title's row; "+ Add
+  transaction" is a dim italic link (`.add-line`) under the list's search.
+- **Account pickers:** the closed field (`.picker-text`) cuts a long name at its start, keeping
+  the leaf, on one line (the split editor still wraps it). Review's `.splits` grid is
+  `minmax(0, 1fr)`, which is what let a long account (or memo) push a card off a phone.
+- **Tests:** app (`funds.test.ts`: budget stars; `accounts.test.ts`: renamed and dropped with
+  their account), browser (m11: a new budget is starred, home's card comes and goes with
+  stars; m1: the add link's place and style, ⋮ beside the title; m16: a long account at 390px
+  stays on the card, cut at its start; m5 reads the value from the page's header, not the
+  title's parent). `pnpm test` and `pnpm e2e` passed (browser 142 of 142).
+- **Not decided, defaulted:** short names in a picker stay left-aligned (as the split list's
+  are); only too-long ones are cut, from the left. Kael said "right-justified"; if he meant
+  short names too, it's `.picker-text`'s `text-align`.
+
+**Next:** MCP Server, elaborated with Kael (its plan's questions first).
+
+## Before that (2026-11-15): the demo video and the landing page, published
 
 Kael asked for a video of Luminous Money's features made with the stageshow skill
 (`~/.agents/skills/stageshow`), published with a landing page on GitHub Pages. **Published:**

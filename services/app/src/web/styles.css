@@ -285,6 +285,28 @@ button.danger {
   margin-top: 0.35rem;
 }
 
+/* A title with its ⋮ beside it (an account's ledger). */
+.title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.title-row h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A quiet way to do what's rarely needed by hand: "+ Add transaction" under a ledger's search. */
+.add-line {
+  display: inline-block;
+  margin: 0 0 0.5rem 0.25rem;
+  color: var(--muted);
+  font-style: italic;
+  text-decoration: none;
+}
+
 .back {
   display: inline-flex;
   align-items: center;
@@ -548,6 +570,7 @@ summary:focus-visible {
   padding: 0;
   margin: 0.25rem 0 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.25rem;
   font-size: 0.9rem;
 }
@@ -562,7 +585,7 @@ summary:focus-visible {
    it. */
 .splits .open-split {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 0.5rem;
   margin-top: 0.25rem;
@@ -570,6 +593,7 @@ summary:focus-visible {
 
 .splits .open-split .split-memo {
   grid-column: 1 / -1;
+  overflow-wrap: anywhere;
 }
 
 .card-list {
@@ -596,8 +620,24 @@ summary:focus-visible {
 
 .picker-value {
   width: 100%;
+  min-width: 0;
   justify-content: flex-start;
   font-weight: 400;
+}
+
+/* A chosen account too long for its field loses its start, not its leaf: "…Braces-and-Supports". */
+.picker-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.picker-text bdi {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .picker {
@@ -782,6 +822,11 @@ summary:focus-visible {
   justify-content: flex-start;
   text-align: left;
   overflow-wrap: anywhere;
+}
+
+.split-editor .picker-text {
+  white-space: normal;
+  direction: ltr;
 }
 
 .balance {
@@ -1387,7 +1432,7 @@ a.primary-link {
 main
   a:not(.button):not(.card):not(.back):not(.crumb):not(.menu-item):not(.chart-leaf):not(
     .budget-link
-  ):not(.largest-row):not(.fund-row) {
+  ):not(.largest-row):not(.home-row):not(.add-line) {
   color: var(--accent);
   font-weight: 600;
   text-decoration: none;
@@ -2253,6 +2298,15 @@ button.chart-more {
   min-height: 3rem;
   padding: 0.55rem 0 0.55rem calc(0.8rem + var(--depth, 0) * 1rem);
   cursor: pointer;
+}
+
+/* A budget's star, between its figures and its ›; a blank of the same width on other rows. */
+.budget-star {
+  flex: none;
+  width: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .budget-row.other .budget-main {
@@ -3482,14 +3536,14 @@ select.fund-pick {
   opacity: 1;
 }
 
-/* Home's card */
+/* Home's cards: starred budgets and starred funds, a row each, then All … ›. */
 
-.funds-home {
+.home-card {
   display: grid;
   gap: 0.25rem;
 }
 
-/* Home: a short rule between the starred accounts and the starred funds. */
+/* Home: a short rule between the starred accounts and the starred budgets and funds. */
 .home-rule {
   width: 40%;
   margin: 1.5rem auto;
@@ -3497,17 +3551,17 @@ select.fund-pick {
   border-top: 1px solid var(--line);
 }
 
-.fund-list {
+.home-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.fund-list li + li {
+.home-list li + li {
   border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
 }
 
-.fund-row {
+.home-row {
   display: grid;
   gap: 0.3rem;
   padding: 0.55rem 0;
@@ -3515,30 +3569,26 @@ select.fund-pick {
   text-decoration: none;
 }
 
-.fund-row-top {
+.home-row-top {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 0.75rem;
 }
 
-.fund-name {
+.home-row-name {
   min-width: 0;
   overflow-wrap: anywhere;
   font-weight: 600;
 }
 
-.fund-row.unallocated .fund-name {
-  color: var(--muted);
-}
-
-.fund-row .num {
+.home-row .num {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 
-.fund-all {
+.home-all {
   margin: 0.25rem 0 0;
   text-align: right;
 }

@@ -57,6 +57,49 @@ test("a budget is added on Budgets, and its bar moves as money's spent", async (
   await page.reload();
   await expect(bar).toHaveAttribute("aria-valuetext", "$150.00 of $400.00");
   await expect(page.getByRole("region", { name: "Expenses" })).toContainText("$250.00 left");
+
+  // A new budget is starred for whoever set it: it's on their home page.
+  await expect(page.getByRole("button", { name: `Star ${GROCERIES}'s budget` })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  await page.goto(`/ui/books/${book}`);
+  await expect(page.getByRole("region", { name: "Budgets" })).toContainText("Groceries");
+});
+
+test("starred budgets are on home, in a card of their own; with none starred, there's none", async ({
+  page,
+}) => {
+  const { book, budget } = await withGroceries(page, "100.00");
+  await budget(GROCERIES, "400"); // set elsewhere (the API): not starred
+  await page.goto(`/ui/books/${book}`);
+  const card = page.getByRole("region", { name: "Budgets" });
+  await expect(page.getByRole("region", { name: "Accounts" })).toBeVisible();
+  await expect(card).toHaveCount(0);
+
+  await page.goto(`/ui/books/${book}/budgets`);
+  const star = page.getByRole("button", { name: `Star ${GROCERIES}'s budget` });
+  await expect(star).toHaveAttribute("aria-pressed", "false");
+  await star.click();
+  await expect(star).toHaveAttribute("aria-pressed", "true");
+
+  await page.goto(`/ui/books/${book}`);
+  await expect(card.getByRole("heading", { name: "Budgets" })).toBeVisible();
+  await expect(card.getByRole("meter", { name: "Groceries's budget" })).toHaveAttribute(
+    "aria-valuetext",
+    "$100.00 of $400.00"
+  );
+  await expect(card).toContainText("$300.00 left");
+  // A row opens its account, where its budget is.
+  await card.getByRole("link", { name: /^Groceries/ }).click();
+  await expect(page.getByRole("heading", { name: /^Groceries/ })).toBeVisible();
+
+  await page.goto(`/ui/books/${book}/budgets`);
+  await star.click();
+  await expect(star).toHaveAttribute("aria-pressed", "false");
+  await page.goto(`/ui/books/${book}`);
+  await expect(page.getByRole("region", { name: "Accounts" })).toBeVisible();
+  await expect(card).toHaveCount(0);
 });
 
 test("a node's budget keeps what's not under its accounts' as Other, and restates per month", async ({

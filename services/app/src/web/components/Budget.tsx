@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 
 import {
   daysLeft,
@@ -13,7 +14,15 @@ import {
 import { formatMoney, isDecimal, isNegative, isZero, negate } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
 import type { BudgetLine } from "../lib/ledger.js";
-import { explain, useBookSettings, useSetBudget } from "../lib/queries.js";
+import { displayName } from "../lib/accounts.js";
+import {
+  explain,
+  useAccountTree,
+  useBookSettings,
+  useSetBudget,
+  useSetBudgetStar,
+  useStarredBudgets,
+} from "../lib/queries.js";
 
 type Amount = { number: string; currency: string };
 const money = (a: Amount) => formatMoney(a.number, a.currency);
@@ -95,12 +104,65 @@ export function BudgetGlance({ line, name }: { line: BudgetLine; name: string })
   );
 }
 
+/** Home's Budgets card: the budgets the user starred (only when there are any), each over its
+ * own period with what's left, opening its account; and All budgets ›. */
+export function BudgetsCard({ book }: { book: string }) {
+  const lines = useStarredBudgets(book);
+  const tree = useAccountTree(book);
+  if (!lines?.length) return null;
+  const accounts = new Map((tree.data ?? []).map((a) => [a.name, a]));
+  const on = today();
+  return (
+    <section className="card home-card" aria-label="Budgets">
+      <h2 className="section-title">Budgets</h2>
+      <ul className="home-list">
+        {lines.map((line) => {
+          const found = accounts.get(line.account);
+          const name = displayName(found ?? { name: line.account });
+          const href = `/books/${book}/accounts/${encodeURIComponent(line.account)}`;
+          return (
+            <li key={line.account}>
+              {/* A node's budget is in its editor; a leaf's, on its ledger. */}
+              <Link href={found?.kind === "node" ? `${href}/edit` : href} className="home-row">
+                <span className="home-row-top">
+                  <span className="home-row-name">{name}</span>
+                  <span className="num">
+                    {money(line.spent)}{" "}
+                    <span className="muted">
+                      of {money(line.budget)} {thisPeriod(line.version)}
+                    </span>
+                  </span>
+                </span>
+                <BudgetBar
+                  kind={line.kind}
+                  budget={line.budget}
+                  spent={line.spent}
+                  label={`${name}'s budget`}
+                />
+                <span className="small muted">
+                  {leftWords(line.kind, line.left, {
+                    days: daysLeft(line, on),
+                    unconfirmed: line.unconfirmed,
+                  })}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="small home-all">
+        <Link href={`/books/${book}/budgets`}>All budgets ›</Link>
+      </p>
+    </section>
+  );
+}
+
 /**
  * Set an account's budget: an amount per period, applying from a day (by default, the start of
  * the period today is in: of the budget's own periods if it keeps them, else of the calendar's,
  * with weeks starting on the book's day). Saving in the same period replaces that change.
  * Remove ends it from this period; earlier periods keep theirs. `line` is the budget in force,
- * measured over its own period.
+ * measured over its own period. A new budget is starred for whoever set it, as a new fund is.
  */
 export function BudgetForm({
   book,
@@ -115,6 +177,7 @@ export function BudgetForm({
 }) {
   const settings = useBookSettings(book);
   const set = useSetBudget(book, account);
+  const star = useSetBudgetStar(book);
   const version = line?.version;
   const [amount, setAmount] = useState(version?.amount.number ?? "");
   const [period, setPeriod] = useState<Period>(
@@ -141,7 +204,11 @@ export function BudgetForm({
         ...body,
         updated_at: version?.start === body.start ? version.updated_at : null,
       })
-      .then(() => onDone?.())
+      .then(async () => {
+        if (!line && !isZero(body.amount))
+          await star.mutateAsync({ account, starred: true }).catch(() => undefined);
+        onDone?.();
+      })
       .catch(() => undefined); // shown from set.error
 
   return (

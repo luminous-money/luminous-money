@@ -2,6 +2,7 @@ import type { Book } from "@luminous-money/ledger-client";
 import { Link } from "wouter";
 
 import { AccountValueNote, headline } from "../components/AccountValue.js";
+import { BudgetsCard } from "../components/Budget.js";
 import { FundsCard } from "../components/Funds.js";
 import { JournalList } from "../components/JournalList.js";
 import { PartsLine } from "../components/Parts.js";
@@ -15,6 +16,7 @@ import {
   useJournal,
   useLastImports,
   useStarredAccounts,
+  useStarredBudgets,
   useStarredFunds,
 } from "../lib/queries.js";
 import { ReportedLine } from "../components/BankStatus.js";
@@ -22,11 +24,13 @@ import { Loading } from "../components/Loading.js";
 
 /** This month's spending against the budget, recent transactions, the user's starred
  * accounts, with their balances (as shown: a card's is what's owed) and when each was last
- * updated by an import, and (a rule apart) their starred funds, when they've starred any. */
+ * updated by an import, and (a rule apart) their starred budgets and funds, when they've starred
+ * any. */
 export function Home({ book }: { book: Book }) {
   const accounts = useStarredAccounts(book.id);
   const imports = useLastImports(book.id);
   const bank = useBankStatus(book.id);
+  const starredBudgets = useStarredBudgets(book.id);
   const starredFunds = useStarredFunds(book.id).funds;
 
   return (
@@ -84,10 +88,11 @@ export function Home({ book }: { book: Book }) {
           })}
       </section>
 
-      {accounts.data && accounts.data.length > 0 && !!starredFunds?.length && (
-        <hr className="home-rule" />
-      )}
+      {accounts.data &&
+        accounts.data.length > 0 &&
+        (!!starredBudgets?.length || !!starredFunds?.length) && <hr className="home-rule" />}
 
+      <BudgetsCard book={book.id} />
       <FundsCard book={book.id} />
     </main>
   );

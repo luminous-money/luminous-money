@@ -274,6 +274,27 @@ export function createApi({
     return c.json(db.fundStars(c.get("user"), book));
   });
 
+  /** The caller's starred budgets in the book, by account: what home's Budgets card shows. */
+  api.get("/books/:book/budget-stars", async (c) => {
+    const { book } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    return c.json(db.budgetStars(c.get("user"), book));
+  });
+
+  api.put("/books/:book/budget-stars/:account", async (c) => {
+    const { book, account } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    db.starBudget(c.get("user"), book, account);
+    return c.json(db.budgetStars(c.get("user"), book));
+  });
+
+  api.delete("/books/:book/budget-stars/:account", async (c) => {
+    const { book, account } = c.req.param();
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    db.unstarBudget(c.get("user"), book, account);
+    return c.json(db.budgetStars(c.get("user"), book));
+  });
+
   /** Import a file: multipart form data with `account` and `file`. */
   api.post("/books/:book/imports", async (c) => {
     const { book } = c.req.param();

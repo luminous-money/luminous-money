@@ -15,6 +15,8 @@ beforeEach(() => {
   db = new AppDb(join(mkdtempSync(join(tmpdir(), "app-")), "app.sqlite"));
   db.star("u", "b", "Expenses:Food:Coffee");
   db.star("u", "b", "Assets:Bank:Checking");
+  db.starBudget("u", "b", "Expenses:Food:Coffee");
+  db.starBudget("u", "b", "Expenses:Food");
   db.addProfile("b", "Assets:Bank:Checking", guessProfile("Date,Amount\n2024-01-02,-1.00\n")!);
   db.addRule("b", {
     name: "Coffee",
@@ -38,6 +40,7 @@ describe("what app keeps by account name", () => {
     db.renameAccount("b", "Expenses:Food", "Expenses:Eating");
 
     expect(db.stars("u", "b")).toContain("Expenses:Eating:Coffee");
+    expect(db.budgetStars("u", "b")).toEqual(["Expenses:Eating:Coffee", "Expenses:Eating"]);
     expect(rule().account).toBe("Expenses:Eating:Coffee");
     expect(rule().conditions).toMatchObject({ account: "Assets:Bank:Checking" });
 
@@ -50,6 +53,8 @@ describe("what app keeps by account name", () => {
     db.mergeAccounts("b", ["Expenses:Food:Coffee"], "Expenses:Fun");
 
     expect(db.stars("u", "b")).toEqual(["Assets:Bank:Checking"]);
+    // Its budget went with it (they don't move to the substitute), so its star does too.
+    expect(db.budgetStars("u", "b")).toEqual(["Expenses:Food"]);
     expect(rule().account).toBe("Expenses:Fun");
 
     db.mergeAccounts("b", ["Assets:Bank:Checking"], "Assets:Bank:Savings");

@@ -179,6 +179,56 @@ test("an itemized receipt's splits are each placed in review", async ({ page }) 
   await expect(page).toHaveURL((url) => url.pathname.endsWith(`/books/${book.id}`));
 });
 
+test("a long account fits its split's field on a phone: its start gives way, not its leaf", async ({
+  page,
+}) => {
+  const LONG = "Expenses:Healthcare:Medical-Supplies:Braces-and-Supports";
+  const { session, book, account } = await setUpUser(page);
+  const path = { book_id: book.id };
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+    params: { path },
+    body: { name: LONG, kind: "leaf" },
+  });
+  // Two lines of a receipt, both still to place, one of them long-winded.
+  const memo = "Bauerfeind - EpiPoint - Elbow Strap - Stabilizing Supports for Elbow Injury";
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+    params: { path },
+    body: {
+      date: yesterday(),
+      flag: "!",
+      payee: "Amazon",
+      narration: "",
+      postings: [
+        { account, units: { number: "-31.40", currency: "USD" } },
+        { account: LONG, units: { number: "29.99", currency: "USD" }, flag: "!", meta: { memo } },
+        {
+          account: LONG,
+          units: { number: "1.41", currency: "USD" },
+          flag: "!",
+          meta: { memo: "Tax" },
+        },
+      ],
+    },
+  });
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto(`/ui/books/${book.id}/review`);
+
+  const item = page.getByRole("article").filter({ hasText: "Amazon" });
+  const card = (await item.boundingBox())!;
+  for (const name of [/^Bauerfeind/, /^Tax/]) {
+    const field = item.getByRole("button", { name });
+    const box = (await field.boundingBox())!;
+    expect(box.x + box.width).toBeLessThanOrEqual(card.x + card.width);
+    // Cut at its start, with its leaf in view.
+    const text = field.locator(".picker-text");
+    await expect(text).toHaveCSS("direction", "rtl");
+    expect(await text.evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true);
+  }
+  // Its amount is still on the card.
+  const amount = (await item.getByText("$29.99").boundingBox())!;
+  expect(amount.x + amount.width).toBeLessThanOrEqual(card.x + card.width);
+});
+
 test("a receipt for a purchase already here is read into it, which is back in review", async ({
   page,
 }) => {

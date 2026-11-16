@@ -401,6 +401,11 @@ Smaller improvements picked up between milestones. Those still open are in
       Bank connections by bank, breadcrumbs for Back, one-row list headers with filter pills,
       subaccounts on a node's page, find on page. [M20's plan](milestones/m20-design-polish/PLAN.md)
       has the list.
+- [x] **Starred budgets on home, and Kael's nits** (2026-11-15, `v0.1.32`; design.md has the
+      decisions): ☆ a budget on the Budgets page (a new one is starred for whoever set it) and
+      it's on home in a Budgets card, as starred funds are; none starred, no card. An account's
+      "+ Add transaction" is a quiet link under its search, its ⋮ beside its name; a long
+      account in a picker loses its start, not its leaf, and review's splits stay on the card.
 - [x] **The site and its demo video** (Kael, 2026-11-14; design.md has the decisions): a landing
       page on GitHub Pages (https://luminous-money.github.io/luminous-money/) with an 83-second
       video of the features, both made from nine Stageshow scenes in the app's look

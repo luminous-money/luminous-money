@@ -257,7 +257,7 @@ test.describe("an account's ledger", () => {
     expect(gone.response.status).toBe(404);
   });
 
-  test("the line above the transactions adds one", async ({ page }) => {
+  test("the link above the transactions adds one", async ({ page }) => {
     const { session, book, account } = await setUpUser(page);
     await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
       params: { path: { book_id: book.id } },
@@ -265,10 +265,19 @@ test.describe("an account's ledger", () => {
     });
     await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
 
-    const add = page.getByRole("button", { name: "+ Add transaction" });
+    // A quiet link between the search and the list; the account's ⋮ is beside its name.
+    const add = page.getByRole("link", { name: "+ Add transaction" });
+    const search = page.getByRole("searchbox");
     const list = page.getByRole("list", { name: "Transactions" });
     await expect(list.getByRole("listitem")).toHaveCount(1);
-    expect((await add.boundingBox())!.y).toBeLessThan((await list.boundingBox())!.y);
+    const at = async (l: typeof add) => (await l.boundingBox())!;
+    expect((await at(add)).y).toBeGreaterThan((await at(search)).y);
+    expect((await at(add)).y).toBeLessThan((await at(list)).y);
+    await expect(add).toHaveCSS("font-style", "italic");
+    const title = await at(page.getByRole("heading", { name: "PNC Checking" }));
+    const more = await at(page.getByRole("button", { name: "Account actions" }));
+    expect(more.y + more.height / 2).toBeGreaterThan(title.y);
+    expect(more.y + more.height / 2).toBeLessThan(title.y + title.height);
     await add.click();
     await expect(page.getByRole("heading", { name: "New transaction" })).toBeVisible();
     await page.getByRole("textbox", { name: "Payee" }).fill("Corner Cafe");

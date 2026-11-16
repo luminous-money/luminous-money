@@ -3,12 +3,21 @@ import { Link } from "wouter";
 
 import { AccountPicker } from "../components/AccountPicker.js";
 import { BudgetBar, BudgetForm, leftWords } from "../components/Budget.js";
+import { Info } from "../components/Info.js";
+import { StarButton } from "../components/Star.js";
 import { displayName } from "../lib/accounts.js";
 import { daysLeft } from "../lib/budgets.js";
 import { formatMoney } from "../lib/decimal.js";
 import { today } from "../lib/format.js";
 import type { BudgetBasis, BudgetLine } from "../lib/ledger.js";
-import { explain, useAccountTree, useBudgetStatus, useCanWrite } from "../lib/queries.js";
+import {
+  explain,
+  useAccountTree,
+  useBudgetStars,
+  useBudgetStatus,
+  useCanWrite,
+  useSetBudgetStar,
+} from "../lib/queries.js";
 import { Loading } from "../components/Loading.js";
 
 // Spending first: it's what most budgets are about.
@@ -21,7 +30,8 @@ const money = (a: { number: string; currency: string }) => formatMoney(a.number,
  * Budgets: one card, a section per type, every budgeted account in a tree with the accounts
  * above it, each with what's gone against it this period as a filled line. A budgeted node with
  * budgets under it has an Other row: what it keeps for itself. Tapping a row opens its budget in
- * place; its › opens the account. "Per month" restates every budget on one basis.
+ * place; its ☆ puts it on the user's home page; its › opens the account. "Per month" restates
+ * every budget on one basis.
  */
 export function Budgets({ book }: { book: string }) {
   const [basis, setBasis] = useState<BudgetBasis>("period");
@@ -30,6 +40,8 @@ export function Budgets({ book }: { book: string }) {
   const own = useBudgetStatus(book, "period");
   const tree = useAccountTree(book);
   const canWrite = useCanWrite(book);
+  const stars = useBudgetStars(book);
+  const setStar = useSetBudgetStar(book);
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [picked, setPicked] = useState("");
@@ -126,6 +138,16 @@ export function Budgets({ book }: { book: string }) {
               </span>
             ))}
           </div>
+          <span className="budget-star">
+            {line && (
+              <StarButton
+                starred={!!stars.data?.includes(account)}
+                disabled={!stars.data || setStar.isPending}
+                label={`Star ${account}'s budget`}
+                onToggle={(starred) => setStar.mutate({ account, starred })}
+              />
+            )}
+          </span>
           {depth > 0 ? (
             <Link
               href={found?.kind === "node" ? `${href}/edit` : href}
@@ -161,6 +183,7 @@ export function Budgets({ book }: { book: string }) {
                       `Other in ${account}`
                     )}
                   </span>
+                  <span className="budget-star" aria-hidden />
                   <span className="chart-open" aria-hidden />
                 </div>
               </li>
@@ -176,7 +199,12 @@ export function Budgets({ book }: { book: string }) {
   return (
     <main>
       <header className="page-head chart-head">
-        <h1>Budgets</h1>
+        <h1 className="with-info">
+          Budgets
+          {roots.length > 0 && (
+            <Info label="About budgets">Starred budgets (☆ beside one) are on your home page.</Info>
+          )}
+        </h1>
         {canWrite && (
           <button
             type="button"

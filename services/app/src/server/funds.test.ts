@@ -25,6 +25,22 @@ describe("starred funds", () => {
   });
 });
 
+describe("starred budgets", () => {
+  it("are each user's own, by account, in the order they were starred, once each", () => {
+    const db = fresh();
+    db.starBudget("u", "b", "Expenses:Food");
+    db.starBudget("u", "b", "Expenses:Fun");
+    db.starBudget("u", "b", "Expenses:Food");
+    db.starBudget("v", "b", "Expenses:Home");
+
+    expect(db.budgetStars("u", "b")).toEqual(["Expenses:Food", "Expenses:Fun"]);
+    expect(db.budgetStars("v", "b")).toEqual(["Expenses:Home"]);
+
+    db.unstarBudget("u", "b", "Expenses:Food");
+    expect(db.budgetStars("u", "b")).toEqual(["Expenses:Fun"]);
+  });
+});
+
 describe("renaming a fund (Funds A)", () => {
   it("follows into the rules, schedules and stars that name it", () => {
     const db = fresh();

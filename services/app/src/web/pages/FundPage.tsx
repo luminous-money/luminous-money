@@ -33,6 +33,7 @@ import {
 import { ApiError } from "../lib/ledger.js";
 import { Loading } from "../components/Loading.js";
 import { Crumbs } from "../components/Crumbs.js";
+import { StarButton } from "../components/Star.js";
 
 const money = (a: { number: string; currency: string }) => formatMoney(a.number, a.currency);
 
@@ -520,30 +521,5 @@ function ArchiveFund({
         </div>
       </DialogForm>
     </Dialog>
-  );
-}
-
-/** A fund's star: starred funds are the ones home's Funds card shows. */
-function StarButton({
-  starred,
-  disabled,
-  onToggle,
-}: {
-  starred: boolean;
-  disabled: boolean;
-  onToggle: (starred: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`star${starred ? " on" : ""}`}
-      aria-pressed={starred}
-      aria-label="Starred"
-      title={starred ? "Starred: on the home page" : "Star: show on the home page"}
-      disabled={disabled}
-      onClick={() => onToggle(!starred)}
-    >
-      {starred ? "★" : "☆"}
-    </button>
   );
 }

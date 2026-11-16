@@ -2,7 +2,7 @@ M20: Design polish: plan
 ==================================================================================================
 
 > **Status: the first pass and Kael's round of nits are built and released (2026-11-14,
-> `v0.1.31`).** What's left is below ("Not done, noted"). Smaller polish between milestones is in
+> `v0.1.31`), and a second round of nits (2026-11-15, `v0.1.32`).** What's left is below ("Not done, noted"). Smaller polish between milestones is in
 > [M99: Follow-ups](../m99-follow-ups/PLAN.md#polish).
 
 Kael (2026-11-14): "It works very well, but it feels like open source software; I want it to
@@ -90,6 +90,14 @@ WCAG where it makes for better use, without chasing full compliance.
 
 Taken as settled when Kael asked to commit and release: the sidebar on wide screens, the menu's
 groups, Sync now in a ledger's ⋯, the cooler neutrals, field edges short of 3:1.
+
+## Kael's nits (2026-11-15)
+
+- [x] **An account's ledger:** "+ Add transaction" is a small, dim, italic link under the
+      search, and the ⋯ is a ⋮ on the title's row.
+- [x] **A long account in a picker** is cut at its start, its leaf kept, and review's splits no
+      longer run off a phone's screen.
+- [x] **Starred budgets on home** (a feature, with these): design.md's Budgets (M11) has it.
 
 ## Not done, noted
 

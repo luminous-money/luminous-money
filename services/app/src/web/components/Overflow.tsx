@@ -1,4 +1,4 @@
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, MoreVertical } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 
 import { usePopover } from "../lib/popover.js";
@@ -6,13 +6,15 @@ import { usePopover } from "../lib/popover.js";
 /**
  * "⋯": the actions a page doesn't need in view (Repeat…, Delete), folded away. A disclosure, not
  * an ARIA menu: its items stay the links and buttons they are (`.menu-item`), reached by Tab;
- * choosing one closes it.
+ * choosing one closes it. `vertical` (⋮) sits beside a title.
  */
 export function Overflow({
   label = "More actions",
+  vertical = false,
   children,
 }: {
   label?: string;
+  vertical?: boolean;
   children: ReactNode;
 }) {
   const { open, setOpen, ref } = usePopover();
@@ -34,7 +36,7 @@ export function Overflow({
         aria-expanded={open}
         onClick={toggle}
       >
-        <MoreHorizontal aria-hidden="true" />
+        {vertical ? <MoreVertical aria-hidden="true" /> : <MoreHorizontal aria-hidden="true" />}
       </button>
       {open && (
         <div

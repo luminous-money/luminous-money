@@ -90,9 +90,7 @@ test("a house is revalued with Update value", async ({ page }) => {
   await value.getByRole("textbox", { name: /Value \(/ }).fill("425000");
   await value.getByRole("button", { name: "Update value" }).click();
 
-  await expect(page.getByRole("heading", { name: /House/ }).locator("..")).toContainText(
-    "$425,000.00"
-  );
+  await expect(page.locator("main > header")).toContainText("$425,000.00");
   await page.goto("/ui/");
   await expect(card).not.toContainText("Needs a new value");
   await expect(card).toContainText(`valued ${day(0)}`);

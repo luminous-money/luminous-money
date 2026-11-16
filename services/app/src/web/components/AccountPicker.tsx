@@ -126,7 +126,11 @@ export function AccountPicker({
         disabled={disabled}
         onClick={reopen}
       >
-        {value ? <AccountName name={value} /> : <span className="muted">{placeholder}</span>}
+        <span className="picker-text">
+          <bdi>
+            {value ? <AccountName name={value} /> : <span className="muted">{placeholder}</span>}
+          </bdi>
+        </span>
       </button>
     );
   }

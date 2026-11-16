@@ -44,14 +44,16 @@ import { upcomingFor } from "../lib/upcoming.js";
 import type { LedgerRow } from "@luminous-money/ledger-client";
 import { Loading } from "../components/Loading.js";
 import { Crumbs } from "../components/Crumbs.js";
+import { StarButton } from "../components/Star.js";
 
 /**
  * One account's ledger: every transaction, newest first, 200 at a time, more loading as you
  * scroll. "Go to date" opens a partial view instead (`?date=`): from that date back, with
  * "Load more" above for the newer page before it, so pages load either way until it's all
  * there (components/Paged). A simple transaction shows the account on its other side; one with
- * more splits shows <multiple>. Tapping one opens it; the line above them adds a new one. Its header stars the
- * account (putting it on the home page) and links to importing into it. Amounts and balances
+ * more splits shows <multiple>. Tapping one opens it; the dim link under the search adds a new
+ * one. Its header stars the account (putting it on the home page), with the account's actions in
+ * ⋮ beside its name (importing into it among them). Amounts and balances
  * are shown as the account reads (a card's balance is what's owed); colors follow the stored
  * sign, the effect on net worth. Transactions a schedule staged are marked ↻, and its
  * occurrences coming in the next UPCOMING_DAYS (16) days show above, grayed, with the projected balance.
@@ -129,54 +131,17 @@ export function AccountLedger({ book, account }: { book: string; account: string
     <main>
       <header className="page-head">
         <Crumbs />
-        <div className="home-head">
-          <div>
-            <h1>
-              {displayName(info ?? { name: account })}{" "}
-              <button
-                type="button"
-                className={`star${starred ? " on" : ""}`}
-                aria-pressed={starred}
-                aria-label="Starred"
-                title={starred ? "Starred: on the home page" : "Star: show on the home page"}
-                disabled={!stars.data || setStar.isPending}
-                onClick={() => setStar.mutate({ account, starred: !starred })}
-              >
-                {starred ? "★" : "☆"}
-              </button>
-            </h1>
-            {info && <p className="muted">{headline(info)}</p>}
-            {info && <AccountValueNote account={info} />}
-            {linked && <ReportedLine status={linked} type={info?.type} />}
-            {linked && <BankErrors status={linked} />}
-            {accounts.data && (
-              <ReconcileStatus book={book} account={account} accounts={accounts.data} />
-            )}
-          </div>
-        </div>
-        {budget && (
-          <Link href={`/books/${book}/budgets`} className="budget-link" aria-label="Budget">
-            <BudgetGlance line={budget} name={displayName(info ?? { name: account })} />
-          </Link>
-        )}
-        {canWrite && !selection.selecting && (
-          <div className="actions">
-            <button
-              type="button"
-              className="primary"
-              onClick={() =>
-                navigate(
-                  withBack(
-                    // A divided account's own postings are its parts': the main part, to start.
-                    `/books/${book}/transactions/new?account=${encodeURIComponent(info?.divided && info.main_part ? info.main_part : account)}`,
-                    here
-                  )
-                )
-              }
-            >
-              + Add transaction
-            </button>
-            <Overflow label="Account actions">
+        <div className="title-row">
+          <h1>
+            {displayName(info ?? { name: account })}{" "}
+            <StarButton
+              starred={starred}
+              disabled={!stars.data || setStar.isPending}
+              onToggle={(starred) => setStar.mutate({ account, starred })}
+            />
+          </h1>
+          {canWrite && !selection.selecting && (
+            <Overflow label="Account actions" vertical>
               {reconcilable && (
                 <Link href={withBack(`${base}/reconcile`, here)} className="menu-item">
                   Reconcile
@@ -220,7 +185,19 @@ export function AccountLedger({ book, account }: { book: string; account: string
                 </button>
               )}
             </Overflow>
-          </div>
+          )}
+        </div>
+        {info && <p className="muted">{headline(info)}</p>}
+        {info && <AccountValueNote account={info} />}
+        {linked && <ReportedLine status={linked} type={info?.type} />}
+        {linked && <BankErrors status={linked} />}
+        {accounts.data && (
+          <ReconcileStatus book={book} account={account} accounts={accounts.data} />
+        )}
+        {budget && (
+          <Link href={`/books/${book}/budgets`} className="budget-link" aria-label="Budget">
+            <BudgetGlance line={budget} name={displayName(info ?? { name: account })} />
+          </Link>
         )}
       </header>
 
@@ -270,6 +247,19 @@ export function AccountLedger({ book, account }: { book: string; account: string
           ) : null
         }
       />
+      {/* Below the list's tools, quietly: most transactions arrive by import (Kael, 2026-11-15). */}
+      {canWrite && !selection.selecting && (
+        <Link
+          className="add-line small"
+          href={withBack(
+            // A divided account's own postings are its parts': the main part, to start.
+            `/books/${book}/transactions/new?account=${encodeURIComponent(info?.divided && info.main_part ? info.main_part : account)}`,
+            here
+          )}
+        >
+          + Add transaction
+        </Link>
+      )}
 
       {ledger.isPending && <Loading />}
       {ledger.error && <p className="card error">{explain(ledger.error)}</p>}

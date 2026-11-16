@@ -771,6 +771,17 @@ bring in (a **goal**, for income, assets such as savings, and liabilities being 
   so they don't move to the substitute.
 - **A book's weeks start** on a day kept in `app`'s book settings (Monday unless set; a
   versioned `PATCH /settings`), where a new weekly budget starts by default.
+- **Starred budgets are home's Budgets card** (Kael, 2026-11-15), as starred funds are its Funds
+  card: per user, in `app` (`budget_star`: user, book, account; migration 25), keyed by the
+  budgeted account, so a rename carries it and deleting or merging the account drops it, as
+  its budgets go. ☆ beside a budget on the Budgets page stars it; a budget set where there was
+  none (Budgets' + Add, a row, an account's editor) is starred for whoever set it, as a new
+  fund is. The card (between the accounts and Funds, under the same short rule) lists starred
+  budgets in the order starred, each over its own period ("$312 of $400 this month", the bar,
+  what's left and the days), opening its account (a node's editor), with All budgets ›. A star
+  whose budget has ended, or whose account is archived, shows nothing; with none to show,
+  there's no card. Budgets set through the API start unstarred: nothing says whose they'd be.
+  "Spent this month" above stays the sum over the highest-level expense budgets.
 
 ### Transfers paired in review
 
@@ -2003,6 +2014,17 @@ offline; picking up a new version).
   size-contained, which collapses it in a flex row.)
 - **Hover is for devices with it** (`@media (hover: hover)`): a touch screen keeps "hover" on
   what was tapped, which tinted Select mode's cards gray.
+- **Kael's nits, 2026-11-15:**
+  - **An account's ledger:** its ⋮ (vertical, `Overflow`'s `vertical`) sits on the title's row,
+    at its right; "+ Add transaction" is a small, dim, italic link under the list's search
+    (`.add-line`), not the page's primary button: most transactions arrive by import.
+  - **A chosen account in a picker** (`AccountPicker`'s closed field) is cut at its start, its
+    leaf kept ("…Braces-and-Supports"), on one line, as a split's account is in the split
+    list. The split editor still wraps it whole. Review's splits take no more than the card's
+    width (`minmax(0, 1fr)`), so a long name or memo can't push the card off a phone's screen.
+  - **Home's cards share their rows** (`.home-card`, `.home-list`, `.home-row`): Budgets and
+    Funds look alike; `StarButton` (`components/Star.tsx`) is the one star, for accounts,
+    funds and budgets.
 
 ### How the review queue works
 

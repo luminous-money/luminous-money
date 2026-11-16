@@ -1388,14 +1388,14 @@ export function FundsCard({ book }: { book: string }) {
   if (!funds?.length) return null;
   const all = `/books/${book}/funds`;
   return (
-    <section className="card funds-home" aria-label="Funds">
+    <section className="card home-card" aria-label="Funds">
       <h2 className="section-title">Funds</h2>
-      <ul className="fund-list">
+      <ul className="home-list">
         {funds.map((f) => (
           <li key={f.name}>
-            <Link href={`${all}/${encodeURIComponent(f.name)}`} className="fund-row">
-              <span className="fund-row-top">
-                <span className="fund-name">{f.name}</span>
+            <Link href={`${all}/${encodeURIComponent(f.name)}`} className="home-row">
+              <span className="home-row-top">
+                <span className="home-row-name">{f.name}</span>
                 <span className={`num${isNegative(f.value.number) ? " negative" : ""}`}>
                   {money(f.value)}
                 </span>
@@ -1412,7 +1412,7 @@ export function FundsCard({ book }: { book: string }) {
           </li>
         ))}
       </ul>
-      <p className="small fund-all">
+      <p className="small home-all">
         <Link href={all}>All funds ›</Link>
       </p>
     </section>

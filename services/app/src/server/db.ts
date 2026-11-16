@@ -421,6 +421,15 @@ export const MIGRATIONS: Migration[] = [
       ["PRIMARY KEY (user_id, book_id, notification_id)"]
     ),
   ],
+  // 25: starred budgets, per user: the ones home's Budgets card shows (as starred funds are the
+  // funds it shows). Keyed by the budgeted account, followed on renames and dropped with it.
+  [
+    createTable(
+      "budget_star",
+      ["user_id TEXT NOT NULL", "book_id TEXT NOT NULL", "account TEXT NOT NULL"],
+      ["PRIMARY KEY (user_id, book_id, account)"]
+    ),
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -714,6 +723,32 @@ export class AppDb {
     this.db
       .prepare("DELETE FROM fund_star WHERE user_id = ? AND book_id = ? AND fund = ?")
       .run(user, book, fund);
+  }
+
+  /** The user's starred budgets in the book (by account), in the order they were starred. */
+  budgetStars(user: string, book: string): string[] {
+    const rows = this.db
+      .prepare(
+        "SELECT account FROM budget_star WHERE user_id = ? AND book_id = ? ORDER BY created_at, rowid"
+      )
+      .all(user, book) as { account: string }[];
+    return rows.map((r) => r.account);
+  }
+
+  starBudget(user: string, book: string, account: string): void {
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO budget_star (user_id, book_id, account, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT DO NOTHING`
+      )
+      .run(user, book, account, stamp, stamp);
+  }
+
+  unstarBudget(user: string, book: string, account: string): void {
+    this.db
+      .prepare("DELETE FROM budget_star WHERE user_id = ? AND book_id = ? AND account = ?")
+      .run(user, book, account);
   }
 
   /** The notifications the user has dismissed in the book. */
@@ -1532,6 +1567,7 @@ export class AppDb {
     // Columns holding one account name: dropped (if `drop` says) or renamed.
     for (const [table, dropIt] of [
       ["star", true],
+      ["budget_star", true],
       ["simplefin_link", true],
       ["simplefin_attempt", true],
       ["reconcile_draft", true],
@@ -1636,6 +1672,9 @@ export class AppDb {
         "DELETE FROM import_batch WHERE book_id = ?",
         "DELETE FROM csv_profile WHERE book_id = ?",
         "DELETE FROM star WHERE book_id = ?",
+        "DELETE FROM fund_star WHERE book_id = ?",
+        "DELETE FROM budget_star WHERE book_id = ?",
+        "DELETE FROM notification_dismissal WHERE book_id = ?",
         "DELETE FROM schedule_occurrence WHERE schedule_id IN (SELECT id FROM schedule WHERE book_id = ?)",
         "DELETE FROM schedule WHERE book_id = ?",
         "DELETE FROM loan WHERE book_id = ?",
