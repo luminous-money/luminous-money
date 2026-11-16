@@ -17,6 +17,8 @@ import { queryClient } from "./queries.js";
 
 /** How often to ask for a new version while the app is open. */
 const CHECK_EVERY = 15 * 60_000;
+/** How long a reload waits for the new version's service worker to take over. */
+const TAKEOVER_WAIT = 10_000;
 
 // What the user is doing, read from the document as a whole, so no form needs to say.
 let typed = false;
@@ -41,19 +43,34 @@ function activity(): Activity {
   };
 }
 
-// A new version waiting, and how to switch to it (the service worker's).
-let waiting: ((reload?: boolean) => Promise<void>) | null = null;
+// Whether a new version is waiting, and the service worker's registration it waits in.
+let waiting = false;
+let registration: ServiceWorkerRegistration | undefined;
+let reloading = false;
 const listeners = new Set<() => void>();
-const ready = () => waiting !== null;
+const ready = () => waiting;
 const subscribe = (listener: () => void) => {
   listeners.add(listener);
   return () => void listeners.delete(listener);
 };
 
-/** Take the new version in: the service worker activates it, and the page reloads. */
-export function reloadNow() {
-  if (waiting) void waiting(true);
-  else window.location.reload();
+/** Take the new version in: its service worker takes over, then the page reloads, whatever
+ * happens. The reload waits for the worker to be active, not for it to take this page over: a
+ * page no worker controls (opened before one was installed, or by a hard reload) is never taken
+ * over, and Reload did nothing there. No worker waiting (it's already in), it just reloads. */
+export async function reloadNow() {
+  if (reloading) return;
+  reloading = true;
+  const next = registration?.waiting;
+  if (next)
+    await new Promise<void>((resolve) => {
+      next.addEventListener("statechange", () => {
+        if (next.state === "activated" || next.state === "redundant") resolve();
+      });
+      window.setTimeout(resolve, TAKEOVER_WAIT);
+      next.postMessage({ type: "SKIP_WAITING" });
+    });
+  window.location.reload();
 }
 
 /** Register the service worker and start watching for new versions. In development there's
@@ -68,14 +85,15 @@ export async function watchForUpdates() {
     });
 
   const { registerSW } = await import("virtual:pwa-register");
-  const update = registerSW({
+  registerSW({
     onNeedRefresh() {
-      waiting = update;
+      waiting = true;
       listeners.forEach((listener) => listener());
     },
-    onRegisteredSW(_url, registration) {
-      if (!registration) return;
-      const check = () => void registration.update().catch(() => undefined);
+    onRegisteredSW(_url, registered) {
+      if (!registered) return;
+      registration = registered;
+      const check = () => void registered.update().catch(() => undefined);
       window.setInterval(check, CHECK_EVERY);
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") check();
@@ -84,7 +102,7 @@ export async function watchForUpdates() {
   });
   // Waiting for a quiet moment: checked now and then, and the moment the app goes out of view.
   const tryNow = () => {
-    if (waiting && canReload(activity(), Date.now())) reloadNow();
+    if (waiting && canReload(activity(), Date.now())) void reloadNow();
   };
   window.setInterval(tryNow, 5_000);
   document.addEventListener("visibilitychange", tryNow);
@@ -99,7 +117,7 @@ export function useUpdateWaiting(): boolean {
   useEffect(() => {
     if (location === opened) return;
     setOpened(location);
-    if (waiting && canReload({ ...activity(), typed: false }, Date.now(), true)) reloadNow();
+    if (waiting && canReload({ ...activity(), typed: false }, Date.now(), true)) void reloadNow();
     typed = false;
   }, [location, opened]);
   return pending;

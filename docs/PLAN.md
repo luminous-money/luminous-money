@@ -406,6 +406,12 @@ Smaller improvements picked up between milestones. Those still open are in
       it's on home in a Budgets card, as starred funds are; none starred, no card. An account's
       "+ Add transaction" is a quiet link under its search, its ⋮ beside its name; a long
       account in a picker loses its start, not its leaf, and review's splits stay on the card.
+- [x] **Reload takes a new version in** (Kael, 2026-11-16; design.md has the decision): the
+      banner's Reload did nothing in a page no service worker controlled; it now waits for the
+      new worker to be active, then reloads, whatever happens.
+- [x] **Kael's nits, 2026-11-16** (design.md has the decisions): an itemized transaction's
+      splits stay picks in review, memo and all, after one's placed; a long memo wraps on the
+      transaction's page. The site's headline, lede and loans title are Kael's new words.
 - [x] **The site and its demo video** (Kael, 2026-11-14; design.md has the decisions): a landing
       page on GitHub Pages (https://luminous-money.github.io/luminous-money/) with an 83-second
       video of the features, both made from nine Stageshow scenes in the app's look

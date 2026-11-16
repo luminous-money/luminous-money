@@ -764,6 +764,13 @@ summary:focus-visible {
   font-size: 0.9rem;
 }
 
+/* A long memo wraps (a button doesn't, by itself), on the card. */
+.split-top .split-memo {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* No memo: a placeholder as faint as an empty field's, keeping every split's spacing. */
 .split-memo.placeholder {
   color: var(--muted);

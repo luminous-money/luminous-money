@@ -35,13 +35,13 @@ function Landing() {
         <section className="lp-hero">
           <div className="lp-eyebrow">Free and open source · self-hosted</div>
           <h1 className="lp-title">
-            Double-entry accounting
+            Household accounting
             <br />
-            <span className="lp-glow">you can host yourself.</span>
+            <span className="lp-glow">for modern life.</span>
           </h1>
           <p className="lp-lede">
-            Your books on your own server, with bank feeds, receipts read and itemized, rich reports, budgets, goals
-            and loans. Built for your phone first, and built on Beancount.
+            Manage your assets, expenses, goals, budgets and loans on mobile or desktop. Open source and
+            self-hostable.
           </p>
           <div className="lp-ctas">
             <a className="lp-btn lp-btn--primary" href="#start">Get started<ArrowRight size={18} strokeWidth={2.25} /></a>

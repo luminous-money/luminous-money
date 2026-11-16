@@ -90,7 +90,7 @@ export const SCENES: Scene[] = [
   },
   {
     id: 'loans',
-    title: 'Loans, worked out',
+    title: 'Managing loans, made easy',
     line: "A mortgage or a car loan, from its amortization table: what's owed, the next payment's parts, and what paying extra saves.",
     points: [
       "Declared from the lender's amortization table",

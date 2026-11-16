@@ -1854,6 +1854,11 @@ on GitHub Pages: https://luminous-money.github.io/luminous-money/. All of it is 
   every re-recording; `publish.sh` takes the published ones when none were recorded locally.
 - **A relative base** (`base: './'`), so the build works under Pages' `/luminous-money/` and
   anywhere else.
+- **The pitch, in Kael's words (2026-11-16):** "Household accounting for modern life." (the
+  second line keeps the white-to-cyan glow), then "Manage your assets, expenses, goals, budgets
+  and loans on mobile or desktop. Open source and self-hostable." The loans scene is "Managing
+  loans, made easy". The reel's intro card and the page's `<title>` and `og:description` follow
+  the same words, though the published video changes only when it's recorded again.
 
 ## Architecture
 
@@ -1968,6 +1973,16 @@ offline; picking up a new version).
   banner says a new version is ready, with Reload. "Typed in" is read from the document
   (`input` events), so no form has to declare it. The first release with this still waits for
   the old worker's tabs to close: the old one never listened.
+- **Reload waits for the new worker to be active, then reloads, whatever happens** (Kael,
+  2026-11-16: Reload did nothing in the installed app on his phone). vite-plugin-pwa reloads
+  only when the new worker takes control of the page, and a page no worker controls (opened
+  before one was installed, or by a hard reload) is never taken over: there the new worker
+  activates at once, the banner shows, and Reload had nothing to wait for. Now `reloadNow`
+  tells the waiting worker to take over, waits for it to be active (at most 10 seconds), and
+  reloads; with none waiting it just reloads. The button says "Reloading…" meanwhile. The
+  browser test (`updates.spec.ts`) installs a byte-different "old" worker and lets the real one
+  be the update, in a controlled page and in an uncontrolled one; it runs full Chromium told the
+  suite's `http://traefik` is safe, since nothing else there has a service worker at all.
 
 ### The design pass: how it looks and moves (M20, 2026-11-14)
 
@@ -2025,6 +2040,14 @@ offline; picking up a new version).
   - **Home's cards share their rows** (`.home-card`, `.home-list`, `.home-row`): Budgets and
     Funds look alike; `StarButton` (`components/Star.tsx`) is the one star, for accounts,
     funds and budgets.
+- **Kael's nits, 2026-11-16:**
+  - **An itemized transaction's splits stay picks in review** (every split but the account it
+    came from, with its memo above), placed or not. A split used to be a pick only while still
+    to place (flagged or uncategorized), so placing one turned it into a bare line with no memo,
+    and changing it again meant opening the transaction. "Itemized" is any split but the first
+    having a `memo:` (a receipt's or an Amazon order's lines); other transactions are as before.
+  - **A split's memo wraps** on the transaction's page: the split is a button, and buttons
+    don't wrap by themselves, so a long one (an Amazon item's name) ran off the card.
 
 ### How the review queue works
 

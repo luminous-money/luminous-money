@@ -174,6 +174,16 @@ test("an itemized receipt's splits are each placed in review", async ({ page }) 
       ["Expenses:Food:Restaurant", null],
       ["Expenses:Food:Groceries", "!"],
     ]);
+  // Placed, it's still a pick with its memo above it, to change again.
+  await expect(item.locator(".split-memo").filter({ hasText: "FIRST ITEM" })).toBeVisible();
+  await expect(item.getByRole("button", { name: /^FIRST ITEM/ })).toContainText("Restaurant");
+  await item.getByRole("button", { name: /^FIRST ITEM/ }).click();
+  await item.getByRole("combobox", { name: "FIRST ITEM" }).fill("groc");
+  await page.keyboard.press("Enter");
+  await expect(item.getByRole("button", { name: /^FIRST ITEM/ })).toContainText("Groceries");
+  await expect
+    .poll(async () => (await stored(book.id, id)).postings[1].account)
+    .toBe("Expenses:Food:Groceries");
   await item.getByRole("button", { name: "Confirm" }).click();
   // Opened without a way back, it goes home.
   await expect(page).toHaveURL((url) => url.pathname.endsWith(`/books/${book.id}`));
@@ -227,6 +237,49 @@ test("a long account fits its split's field on a phone: its start gives way, not
   // Its amount is still on the card.
   const amount = (await item.getByText("$29.99").boundingBox())!;
   expect(amount.x + amount.width).toBeLessThanOrEqual(card.x + card.width);
+});
+
+test("a long memo wraps on the transaction's page, keeping its split on the card", async ({
+  page,
+}) => {
+  const { session, book, account } = await setUpUser(page);
+  const memo =
+    "Toddler Kids Sunglasses for Boys Girls Age 2-6 Polarized UV400 with Strap | Kids Gifts,TAC " +
+    "Polarized Lenses,UV400 Protection,Flexible TPEE Rubber Frame,Square Everyday Shades";
+  const { data } = await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+    params: { path: { book_id: book.id } },
+    body: {
+      date: yesterday(),
+      flag: "!",
+      payee: "Amazon",
+      narration: "",
+      postings: [
+        { account, units: { number: "-17.39", currency: "USD" } },
+        {
+          account: "Expenses:Uncategorized",
+          units: { number: "15.99", currency: "USD" },
+          meta: { memo },
+        },
+        {
+          account: "Expenses:Uncategorized",
+          units: { number: "1.40", currency: "USD" },
+          meta: { memo: "Tax" },
+        },
+      ],
+    },
+  });
+  await page.setViewportSize({ width: 1376, height: 900 });
+  await page.goto(`/ui/books/${book.id}/transactions/${data!.id}`);
+
+  const row = page.getByRole("button", { name: /^Split: Toddler/ });
+  const list = (await page.locator(".split-list").boundingBox())!;
+  const memoBox = (await row.locator(".split-memo").boundingBox())!;
+  expect(memoBox.x + memoBox.width).toBeLessThanOrEqual(list.x + list.width);
+  // On more than one line.
+  const line = await row
+    .locator(".split-memo")
+    .evaluate((e) => parseFloat(getComputedStyle(e).lineHeight));
+  expect(memoBox.height).toBeGreaterThan(line * 1.5);
 });
 
 test("a receipt for a purchase already here is read into it, which is back in review", async ({

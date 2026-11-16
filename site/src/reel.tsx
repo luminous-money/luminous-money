@@ -44,7 +44,7 @@ function Intro() {
       <div className="reel-card__inner" data-mark="end">
         <Logo size={96} className="reel-card__logo" />
         <div className="reel-card__name">Luminous Money</div>
-        <div className="reel-card__line">Double-entry accounting you can host yourself.</div>
+        <div className="reel-card__line">Household accounting for modern life.</div>
       </div>
     </div>
   )

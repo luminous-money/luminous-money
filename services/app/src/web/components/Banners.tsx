@@ -1,5 +1,5 @@
 import { onlineManager } from "@tanstack/react-query";
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { queryClient } from "../lib/queries.js";
 import { serverReachable } from "../lib/session.js";
@@ -20,6 +20,7 @@ export function Banners() {
   );
   const reachable = useSyncExternalStore(serverReachable.subscribe, serverReachable.get);
   const update = useUpdateWaiting();
+  const [reloading, setReloading] = useState(false);
 
   // Online but unanswered (the server restarting, say): ask again now and then, and once it
   // answers, everything shown is read again.
@@ -57,8 +58,16 @@ export function Banners() {
             <strong>A new version is ready.</strong> Reload once you've saved what you're working
             on.
           </span>
-          <button type="button" className="small-button" onClick={reloadNow}>
-            Reload
+          <button
+            type="button"
+            className="small-button"
+            disabled={reloading}
+            onClick={() => {
+              setReloading(true);
+              void reloadNow();
+            }}
+          >
+            {reloading ? "Reloading…" : "Reload"}
           </button>
         </p>
       )}

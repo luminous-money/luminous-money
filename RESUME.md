@@ -1,10 +1,40 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-15._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-16._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-15, evening): starred budgets on home, and Kael's nits, released as `v0.1.32`
+## Latest (2026-11-16): Reload works, review keeps itemized picks, memos wrap, the site's words
+
+Four things from Kael, one change set. **Not committed, released or published yet.** design.md
+has the decisions (Errors, loading, connection and new versions: "Reload waits for the new
+worker to be active"; the design pass: "Kael's nits, 2026-11-16"; the site: "The pitch").
+
+- **The new-version banner's Reload did nothing** (the installed app, Brave on Android).
+  vite-plugin-pwa reloads only when the new worker takes control of the page, and a page no
+  worker controls is never taken over: the new worker activates at once, the banner still
+  shows, and Reload sent its message to no one. That's the case the browser test reproduces
+  (it failed before the fix). Which way Kael's phone got there isn't known; the fix also covers
+  a worker that's slow to take over. `reloadNow` (`lib/updates.ts`) posts `SKIP_WAITING` to the
+  waiting worker itself, waits for it to be `activated` (at most 10 seconds), then always
+  reloads; the button says "Reloading…" meanwhile.
+- **Review keeps an itemized transaction's splits as picks** (`pages/Review.tsx`'s `itemized`):
+  any split but the first with a memo makes every one a pick with its memo, placed or not.
+  Placing one used to turn it into a bare line without its memo.
+- **A long memo wraps on the transaction's page** (`.split-top .split-memo`): the split row is
+  a button, and the stylesheet's buttons don't wrap.
+- **The site** (`site/`): headline "Household accounting / for modern life." (the glow kept on
+  the second line), the new lede, "Managing loans, made easy"; the reel's intro card, `<title>`
+  and `og:description` follow. **The published video still has the old intro card and loans
+  title** until it's recorded again (`site/README.md`); then `./scripts/publish.sh`.
+- **Tests:** `tests/ui/src/updates.spec.ts`, the suite's first with a service worker (full
+  Chromium with `http://traefik` treated as secure, which the default headless shell ignores;
+  its route stays in place, since taking it away mid-load left a request hanging, 2 in 285 runs).
+  m16: a placed item stays a pick with its memo and can be changed again; a long memo wraps at
+  1376 wide. Both new m16 checks and the uncontrolled-page update test failed before the fixes.
+  `pnpm test` and `pnpm e2e` passed (browser 145 of 145).
+
+## Before that (2026-11-15, evening): starred budgets on home, and Kael's nits, released as `v0.1.32`
 
 Kael expected a budget to show on home once started; it never had (home only ever summed the
 top-level expense budgets, now "Spent this month"). He asked for budget stars that work as fund

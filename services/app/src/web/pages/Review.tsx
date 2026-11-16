@@ -318,6 +318,9 @@ function QueueItem({
   const detail = withBack(`/books/${book}/transactions/${t.id}`, here);
   const busy = edit.isPending || confirmMatch.isPending;
   const blocked = t.postings.some((p) => unresolved(p.account));
+  // An itemized transaction (a receipt's or an order's lines, each with its memo) keeps every
+  // split pickable, memo and all, after one's placed: so a pick can be changed where it was made.
+  const itemized = t.postings.some((p, i) => i > 0 && memoOf(p) !== null);
 
   // Edits to this transaction queue up in order (see lib/queries), so these can fire freely.
   const save = (changes: Parameters<typeof edit.mutateAsync>[0]) => {
@@ -500,9 +503,10 @@ function QueueItem({
           ) : (
             <ul className="splits">
               {t.postings.map((p, i) =>
-                // A split still to place (M16): what it is, its amount, and its account to pick.
-                // Each says its tags; they're changed on the transaction's page.
-                i > 0 && (p.flag === "!" || unresolved(p.account)) ? (
+                // A split still to place (M16), or any of an itemized one's: what it is, its
+                // amount, and its account to pick. Each says its tags; they're changed on the
+                // transaction's page.
+                i > 0 && (itemized || p.flag === "!" || unresolved(p.account)) ? (
                   <li key={i} className={`open-split${unresolved(p.account) ? " needs" : ""}`}>
                     <span className="split-memo small muted">
                       {memoOf(p) ?? "The rest"}
