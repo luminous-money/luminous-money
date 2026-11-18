@@ -34,9 +34,9 @@ docs/deploying.md, "Connecting Claude", how.
   (sending a receipt or a file through MCP) are for later; M99's "The MCP server" has those and
   the rest left over.
 
-**Kael, to use it on Emmer:** make the new `mcp` image public on ghcr.io (the package's
-settings, once), upgrade, then add `https://luminous.money/api/mcp/v1` as a custom connector in
-claude.ai. Emmer's nginx must pass the forwarded host (or set `LUMINOUS_MONEY_PUBLIC_URL`).
+**Released** (the workflow and CI green; the new `mcp` image is public on ghcr.io already,
+pulled anonymously). **Kael, to use it on Emmer:** upgrade, then add
+`https://luminous.money/api/mcp/v1` as a custom connector in claude.ai. Emmer's nginx must pass the forwarded host (or set `LUMINOUS_MONEY_PUBLIC_URL`).
 
 **Next:** what real clients turn up; then HSA tracking.
 
@@ -1212,7 +1212,7 @@ How it's put together:
    declares his mortgage on Emmer. **Funds B's step 1 is out** (`v0.1.15`); Kael sets his
    Fidelity accounts up in funds.
 4. **MCP Server is out** (`v1.2.0`, [its plan](docs/milestones/.archived/mcp-server/PLAN.md)):
-   Kael makes the `mcp` image public on ghcr.io, connects claude.ai, and reports what turns up.
+   Kael upgrades Emmer, connects claude.ai, and reports what turns up.
    **Next to build:** HSA
    tracking; the rest of the order is [docs/PLAN.md](docs/PLAN.md)'s "Ahead".
 5. Later, not pressing: [M99: Follow-ups](docs/milestones/m99-follow-ups/PLAN.md) (email,
