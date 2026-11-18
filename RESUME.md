@@ -1,10 +1,38 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-16._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-17._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-16): `v1.0.0`: Reload works, review keeps itemized picks, memos wrap, the site's words
+## Latest (2026-11-17): `v1.1.0`: journal amounts, Share page, budgets higher on home
+
+Three things from Kael. **Committed, pushed and released as `v1.1.0`** (a minor: Share page
+is new). design.md has the decisions
+(Reports (M12): "A journal row's amount is what left where money is held"; the design pass:
+"Share page", "Kael's nits, 2026-11-17"; Budgets (M11): the card's place).
+
+- **A journal row's amount** (Transactions, home's recent ones, Reports' lists:
+  `lib/journal.ts`'s `movement`): what left the `Assets:`/`Liabilities:` accounts, else what
+  reached them, else the larger side; each account's splits are summed first, so from → to
+  counts an account once. It was the larger of all money in and out: Kael's Costco receipts
+  read as the charge plus an `Income:Discounts` split, or the gross before per-item coupons.
+  A paycheck now reads as its deposit, not its gross. An account's ledger was already right.
+  Kael's open point (a filtered Transactions page showing the chosen accounts' sum) is M99's
+  open question 4.
+- **Share page** in the menu, under Find on page, in the installed app only
+  (`lib/installed.ts`'s `installedApp`, now Find's test too): the system share sheet, or the
+  address copied ("Link copied") where there's none.
+- **Home:** starred budgets (`BudgetsCard`) under "Spent this month", above recent
+  transactions; the short rule is only for Funds now.
+- **Tests:** `journal.test.ts` (a coupon on a line, gift cards with a discount, a refund, a move
+  between categories, the paycheck's deposit); browser m1 (Share page: absent in a browser;
+  shares, or copies, in the installed app, its `navigator.standalone` faked), m11 (the card's
+  place), m12 (a discount's charge in Transactions). `pnpm test` and `pnpm e2e` passed (browser
+  147 of 147).
+
+**Next:** MCP Server, elaborated with Kael (its plan's questions first).
+
+## Before that (2026-11-16): `v1.0.0`: Reload works, review keeps itemized picks, memos wrap, the site's words
 
 Four things from Kael, one change set. **Committed, pushed and released as `v1.0.0`** (Kael's
 call: the first 1.x), **and the site published** (with the old video: see below). design.md

@@ -85,6 +85,11 @@ test("starred budgets are on home, in a card of their own; with none starred, th
 
   await page.goto(`/ui/books/${book}`);
   await expect(card.getByRole("heading", { name: "Budgets" })).toBeVisible();
+  // Under the month's spending, above recent transactions.
+  const top = async (name: string) => (await page.getByRole("region", { name }).boundingBox())!.y;
+  await expect(page.getByRole("region", { name: "Recent transactions" })).toBeVisible();
+  expect(await top("Spent this month")).toBeLessThan(await top("Budgets"));
+  expect(await top("Budgets")).toBeLessThan(await top("Recent transactions"));
   await expect(card.getByRole("meter", { name: "Groceries's budget" })).toHaveAttribute(
     "aria-valuetext",
     "$100.00 of $400.00"

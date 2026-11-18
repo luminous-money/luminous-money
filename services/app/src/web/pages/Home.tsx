@@ -16,21 +16,19 @@ import {
   useJournal,
   useLastImports,
   useStarredAccounts,
-  useStarredBudgets,
   useStarredFunds,
 } from "../lib/queries.js";
 import { ReportedLine } from "../components/BankStatus.js";
 import { Loading } from "../components/Loading.js";
 
-/** This month's spending against the budget, recent transactions, the user's starred
- * accounts, with their balances (as shown: a card's is what's owed) and when each was last
- * updated by an import, and (a rule apart) their starred budgets and funds, when they've starred
- * any. */
+/** This month's spending against the budget, the user's starred budgets (when they've starred
+ * any), recent transactions, their starred accounts, with their balances (as shown: a card's is
+ * what's owed) and when each was last updated by an import, and (a rule apart) their starred
+ * funds. */
 export function Home({ book }: { book: Book }) {
   const accounts = useStarredAccounts(book.id);
   const imports = useLastImports(book.id);
   const bank = useBankStatus(book.id);
-  const starredBudgets = useStarredBudgets(book.id);
   const starredFunds = useStarredFunds(book.id).funds;
 
   return (
@@ -43,6 +41,8 @@ export function Home({ book }: { book: Book }) {
       </header>
 
       <SpendingThisMonth book={book.id} />
+      {/* Beside the month's spending, above what's recent (Kael, 2026-11-17). */}
+      <BudgetsCard book={book.id} />
       <RecentTransactions book={book.id} />
       {/* Rare now that banks sync: a small link, not the page's button (Kael, 2026-11-14). */}
       {book.role !== "read" && (
@@ -88,11 +88,10 @@ export function Home({ book }: { book: Book }) {
           })}
       </section>
 
-      {accounts.data &&
-        accounts.data.length > 0 &&
-        (!!starredBudgets?.length || !!starredFunds?.length) && <hr className="home-rule" />}
+      {accounts.data && accounts.data.length > 0 && !!starredFunds?.length && (
+        <hr className="home-rule" />
+      )}
 
-      <BudgetsCard book={book.id} />
       <FundsCard book={book.id} />
     </main>
   );

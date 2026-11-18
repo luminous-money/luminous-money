@@ -412,6 +412,11 @@ Smaller improvements picked up between milestones. Those still open are in
 - [x] **Kael's nits, 2026-11-16** (`v1.0.0`; design.md has the decisions): an itemized transaction's
       splits stay picks in review, memo and all, after one's placed; a long memo wraps on the
       transaction's page. The site's headline, lede and loans title are Kael's new words.
+- [x] **Journal amounts, Share page, budgets higher on home** (Kael, 2026-11-17, `v1.1.0`;
+      design.md has the decisions): a row in Transactions (and home's recent ones) shows what left the
+      accounts money is held in, so a discount or coupon split no longer adds to a charge; the
+      installed app's menu shares or copies the page's address; starred budgets are under the
+      month's spending, above recent transactions.
 - [x] **The site and its demo video** (Kael, 2026-11-14; design.md has the decisions): a landing
       page on GitHub Pages (https://luminous-money.github.io/luminous-money/) with an 83-second
       video of the features, both made from nine Stageshow scenes in the app's look

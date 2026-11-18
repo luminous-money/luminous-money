@@ -30,6 +30,11 @@ M99: Follow-ups
    left the UI in step 3 with their code kept ([the loans
    plan](../.archived/loans/PLAN.md#calls-made-without-asking-to-review), call 10). Bring them
    back somewhere, or remove the code?
+4. **Transactions filtered to accounts: their own amount?** A row shows what left where money
+   is held (design.md, "A journal row's amount"), even with `?account=` chosen. Kael's "account
+   context" is the account's ledger, which shows its own change; a filtered Transactions page
+   could show the chosen accounts' sum instead (its sign as the account reads), so filtering
+   to Groceries shows each receipt's groceries. (2026-11-17)
 
 ## Calls made without asking, still to review
 

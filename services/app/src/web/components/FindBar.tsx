@@ -2,6 +2,8 @@ import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
+import { installedApp } from "../lib/installed.js";
+
 /**
  * Find on the page, for the installed app, which has no browser menu and so no browser find
  * (no page can open the browser's own). It marks what matches with the CSS Custom Highlight API,
@@ -15,13 +17,8 @@ const OPEN = "luminous-money:find";
 /** Whether this browser can mark matches (Safari 17.2, Chrome 105, Firefox 140 on). */
 export const canFind = () => typeof CSS !== "undefined" && "highlights" in CSS;
 
-/** Whether to offer it: in the installed app, where there's no browser find; and on the dev
- * server, to try it. */
-export const offerFind = () =>
-  canFind() &&
-  (import.meta.env.DEV ||
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (navigator as { standalone?: boolean }).standalone === true);
+/** Whether to offer it: in the installed app, where there's no browser find. */
+export const offerFind = () => canFind() && installedApp();
 
 /** Open the find bar. */
 export const openFind = () => window.dispatchEvent(new Event(OPEN));

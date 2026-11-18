@@ -121,6 +121,45 @@ test("the menu has home, manage books, review and log out", async ({ page }) => 
   await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
 });
 
+test("in the installed app, the menu shares the page's address, or copies it", async ({ page }) => {
+  const { book } = await setUpUser(page);
+  const nav = page.getByRole("navigation", { name: "Main" });
+  const open = () => page.getByRole("button", { name: "Menu", exact: true }).click();
+  // A browser has its own address bar: nothing to offer.
+  await page.goto(`/ui/books/${book.id}/review`);
+  await open();
+  await expect(nav.getByRole("button", { name: "Log out" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Share page" })).toHaveCount(0);
+
+  await page.addInitScript(() => {
+    const seen: string[] = [];
+    (window as unknown as { seen: string[] }).seen = seen;
+    Object.defineProperty(navigator, "standalone", { value: true });
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: async (text: string) => void seen.push(`copied ${text}`) },
+    });
+    if (!localStorage.getItem("no-share"))
+      Object.defineProperty(navigator, "share", {
+        value: async ({ url }: { url: string }) => void seen.push(`shared ${url}`),
+      });
+  });
+  const seen = () => page.evaluate(() => (window as unknown as { seen: string[] }).seen);
+  const here = `/ui/books/${book.id}/review`;
+  await page.reload();
+  await open();
+  await nav.getByRole("button", { name: "Share page" }).click();
+  await expect(nav).toHaveCount(0); // the menu closed for the sheet
+  expect(await seen()).toEqual([`shared ${new URL(here, page.url()).href}`]);
+
+  // No share sheet: copied, and said so.
+  await page.evaluate(() => localStorage.setItem("no-share", "1"));
+  await page.reload();
+  await open();
+  await nav.getByRole("button", { name: "Share page" }).click();
+  await expect(nav.getByRole("button", { name: "Link copied" })).toBeVisible();
+  expect(await seen()).toEqual([`copied ${new URL(here, page.url()).href}`]);
+});
+
 test("a book exports as a Beancount file", async ({ page }) => {
   await setUpUser(page);
   await page.goto("/ui/books");

@@ -776,7 +776,8 @@ bring in (a **goal**, for income, assets such as savings, and liabilities being 
   budgeted account, so a rename carries it and deleting or merging the account drops it, as
   its budgets go. ☆ beside a budget on the Budgets page stars it; a budget set where there was
   none (Budgets' + Add, a row, an account's editor) is starred for whoever set it, as a new
-  fund is. The card (between the accounts and Funds, under the same short rule) lists starred
+  fund is. The card (under "Spent this month", above recent transactions: Kael, 2026-11-17;
+  it was between the accounts and Funds, under their short rule) lists starred
   budgets in the order starred, each over its own period ("$312 of $400 this month", the bar,
   what's left and the days), opening its account (a node's editor), with All budgets ›. A star
   whose budget has ended, or whose account is archived, shows nothing; with none to show,
@@ -849,6 +850,16 @@ same money in through another's, a day or so later. Both would sit in review, un
   SQL a page at a time (no running balance to accumulate), as account ledgers are. Home shows
   its first page in a window of its own; its title opens the Transactions page, paged and
   dated as an account's ledger is (one paging hook and its pieces, `components/Paged`).
+- **A journal row's amount is what left where money is held** (`lib/journal.ts`'s `movement`;
+  Kael, 2026-11-17): the outflow from the balance sheet's accounts (`Assets:`/`Liabilities:`),
+  else what reached them, else (only categories) the larger of in and out; each account's
+  splits are summed first, and from → to counts each account once. It was the larger of all
+  money in and all money out, which counted a negative category with the charge: an itemized
+  receipt with an `Income:Discounts` split (gift cards bought below their value) read as the
+  charge plus the discount, and one with per-item coupons as the gross. No user setting: the
+  roots already say which accounts hold money (a gift card is one, and buying it isn't
+  spending). A paycheck now reads as what reached the bank, not its gross. An account's
+  ledger was already right: its amount is that account's change.
 
 ### Sharing books (M13)
 
@@ -2014,6 +2025,11 @@ offline; picking up a new version).
   the group rather than a label cut into its border.
 - **Find on page** for the installed app (no browser chrome, so no browser find, and no page can
   open it): the CSS Custom Highlight API marks matches without touching the page.
+- **Share page**, under Find on page, also only in the installed app (`lib/installed.ts`'s
+  `installedApp`, which Find uses too; and the dev server): it has no address bar, so no way to
+  copy where you are (Kael, 2026-11-17). It opens the system's share sheet with the page's
+  address (Android's has Copy), closing the phone's menu; with no share sheet, it copies the
+  address and says "Link copied".
 - **Back is breadcrumbs, made from where you came from** (Kael's round, 2026-11-14): a lone "‹
   Home" on an account opened from the Accounts page was never where he wanted to go. A page's
   trail is the page it was opened from (`?back=`, kept with its query so review comes back to
@@ -2048,6 +2064,8 @@ offline; picking up a new version).
     having a `memo:` (a receipt's or an Amazon order's lines); other transactions are as before.
   - **A split's memo wraps** on the transaction's page: the split is a button, and buttons
     don't wrap by themselves, so a long one (an Amazon item's name) ran off the card.
+- **Kael's nits, 2026-11-17:** home's starred budgets sit under the month's spending, above
+  recent transactions (Budgets (M11) has it); the installed app's menu has Share page (above).
 
 ### How the review queue works
 

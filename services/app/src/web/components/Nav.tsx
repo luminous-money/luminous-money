@@ -14,6 +14,7 @@ import {
   PiggyBank,
   Search,
   Server,
+  Share2,
   ShoppingCart,
   Target,
   UserRound,
@@ -26,6 +27,7 @@ import { useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 
 import { bookHome, useSelectedBook } from "../lib/books.js";
+import { installedApp } from "../lib/installed.js";
 import { offerFind, openFind } from "./FindBar.js";
 import { useBooks, useLogOut, useMe, useSystemAccess } from "../lib/queries.js";
 
@@ -119,6 +121,31 @@ function readOpen(): string[] {
   }
 }
 
+/** The page's address, for the installed app, which doesn't show it: the system's share sheet
+ * (which copies it too), or copied where there's none. `onShare`: the phone's menu closes. */
+function SharePage({ onShare }: { onShare?: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const share = () => {
+    const url = window.location.href;
+    const { clipboard } = navigator as { clipboard?: Clipboard };
+    if ("share" in navigator) {
+      onShare?.();
+      // Closing the sheet rejects: nothing to say.
+      navigator.share({ title: document.title, url }).catch(() => {});
+    } else
+      void clipboard?.writeText(url).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+  };
+  return (
+    <button type="button" className="nav-item" onClick={share}>
+      <Share2 aria-hidden="true" className="nav-icon" />
+      {copied ? "Link copied" : "Share page"}
+    </button>
+  );
+}
+
 /**
  * The main navigation. A section folds away (an accordion), and stays as left; the one holding
  * the page you're on is always open. `onNavigate`: the phone's menu closes on a choice.
@@ -180,6 +207,7 @@ export function Nav({ onNavigate }: { onNavigate?: () => void }) {
                   Find on page
                 </button>
               )}
+              {section.end && installedApp() && <SharePage onShare={onNavigate} />}
               {section.end && (
                 <button type="button" className="nav-item" onClick={() => logOut.mutate()}>
                   <LogOut aria-hidden="true" className="nav-icon" />

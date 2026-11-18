@@ -3550,7 +3550,7 @@ select.fund-pick {
   gap: 0.25rem;
 }
 
-/* Home: a short rule between the starred accounts and the starred budgets and funds. */
+/* Home: a short rule between the starred accounts and the starred funds. */
 .home-rule {
   width: 40%;
   margin: 1.5rem auto;

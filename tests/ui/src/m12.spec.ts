@@ -66,6 +66,43 @@ test("home shows this month's spending, and recent transactions open the whole j
   await expect(all.first()).toContainText("PNC-Checking → Food:Groceries");
 });
 
+test("a charge shows as what left the card, though a discount is negative too", async ({
+  page,
+}) => {
+  const { book, session, account } = await withHistory(page);
+  const gift = "Assets:Gift-Cards:Cafe";
+  const discounts = "Income:Discounts";
+  for (const name of [gift, discounts])
+    await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+      params: { path: { book_id: book } },
+      body: { name, kind: "leaf" },
+    });
+  const usd = (number: string) => ({ number, currency: "USD" });
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+    params: { path: { book_id: book } },
+    body: {
+      date: today(),
+      flag: "*",
+      payee: "Warehouse Club",
+      narration: "",
+      postings: [
+        { account, units: usd("-90.00") },
+        { account: gift, units: usd("50.00") },
+        { account: gift, units: usd("50.00") },
+        { account: GROCERIES, units: usd("10.00") },
+        { account: discounts, units: usd("-20.00") },
+      ],
+    },
+  });
+  await page.goto(`/ui/books/${book}/transactions`);
+  const row = page
+    .getByRole("list", { name: "Transactions" })
+    .getByRole("listitem")
+    .filter({ hasText: "Warehouse Club" });
+  await expect(row).toContainText("2 accounts → 2 accounts");
+  await expect(row).toContainText("$90.00");
+});
+
 test("Reports break spending down, and drill into a category", async ({ page }) => {
   const { book } = await withHistory(page);
   await page.goto(`/ui/books/${book}/reports`);
