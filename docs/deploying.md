@@ -347,6 +347,35 @@ certificate, how much data there is, the last backup, and whether a newer releas
 **Check now**). It changes nothing: it says what to run on the server. Anyone else gets "not
 found".
 
+## Connecting Claude (the MCP server)
+
+Luminous Money has an MCP server, so an AI assistant (Claude, or any MCP client) can read and
+work with your books as you: find transactions, categorize what's in review, set budgets, record
+a trade. Its address is your server's, at `/api/mcp/v1`:
+
+```
+https://books.example.com/api/mcp/v1
+```
+
+- **claude.ai and the Claude apps:** Settings → Connectors → Add custom connector, with that
+  address. Claude sends you to Luminous Money to log in and allow it; the phone and desktop
+  apps use the same connector. Claude's servers connect to yours, so it must be reachable from
+  the internet over HTTPS on port 443 (a Tailscale-only server won't do), from Anthropic's
+  addresses (`160.79.104.0/21`) if you filter.
+- **Claude Code:** `claude mcp add --transport http luminous-money https://books.example.com/api/mcp/v1`,
+  then `/mcp` to sign in. Or with an API token (Your account → API tokens), no sign-in: add
+  `--header "Authorization: Bearer lm_…"`. To let it read without asking each time, allow
+  `mcp__luminous-money__read_*`; writes are `write_*` and deletes `delete_*`.
+- **What it signs in as:** a connected app acts as you, with your role in each book, and only
+  through the MCP server. **Your account → Connected apps** lists them, with Disconnect, which
+  stops one at once.
+- **Behind a proxy of your own,** set `LUMINOUS_MONEY_PUBLIC_URL`: it's the address Claude is told
+  to sign in at. (Without it, the address comes from the request's forwarded host.)
+
+The assistant loads a skill first (how the books work), and one for each part of the app before
+working in it; the server tells it so. Sending a file through it (a receipt's photo, a bank's
+CSV) isn't possible yet: do those in the app.
+
 ## Settings
 
 All in `.env` (`env.example` in the release lists them). After changing any, `./luminous-money up`.

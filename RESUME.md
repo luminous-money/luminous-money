@@ -1,10 +1,46 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-17._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-18._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-17): `v1.1.0`: journal amounts, Share page, budgets higher on home
+## Latest (2026-11-18): the MCP server, released as `v1.2.0`
+
+Claude (claude.ai, its apps, Claude Code), or any MCP client, can work with a book as the user.
+[The plan](docs/milestones/.archived/mcp-server/PLAN.md) (archived: done) has the tools by
+domain, Kael's decisions and the spike's numbers; design.md, "The MCP server", the reasons;
+docs/deploying.md, "Connecting Claude", how.
+
+- **`services/mcp`** (TypeScript, Hono, the MCP SDK's low-level `Server`; no database), at
+  `/api/mcp/v1` behind Traefik's session check. 93 tools in twelve domains
+  (`src/tools/<domain>.ts`), named `read_`/`write_`/`delete_` with annotations to match, calling
+  the ledger and `app` as the user (`src/upstream.ts`). Ledger tools take the OpenAPI document's
+  schemas (`src/schemas.ts`, `@luminous-money/ledger-client/openapi.json`, now exported).
+- **Skills** (`services/mcp/skills/<domain>.md`): `load_skill(domain)`; every tool refuses until
+  its domain's (and the base) is loaded in the session. Every tool is listed from the start: a
+  list that changes would re-read the conversation in most clients (the spike).
+- **OAuth in `auth`** (`src/oauth.ts`, migration 3): metadata at the root's `/.well-known/`
+  (routed by the gateway), dynamic registration, the consent at the PWA's `/ui/authorize`
+  (`pages/Authorize.tsx`), codes with S256 PKCE, `/oauth/token` and `/oauth/revoke`. A grant is
+  a session with `client_id` and `audience`; its tokens reach `/api/mcp/` only (`/verify`), and
+  a refusal there points to the metadata. The Account page has **Connected apps**.
+- **The stack:** compose, bake (`mcp`, `mcp-release`), the gateway's routes, the release
+  workflow, the CLI's health and image lists, the e2e stack.
+- **Tests:** `auth` (30, 6 of them OAuth's), `services/mcp` (9), e2e `mcp.test.ts` (3; API
+  suite 118 of 118), browser `mcp.spec.ts` (2; 149 of 149). `pnpm test` and `pnpm e2e` passed.
+  An MCP client in a `node --test` file must be closed (`client.close()`), or its open stream
+  keeps the file's process running and the suite hangs without a word.
+- **Not tried with claude.ai or the phone** (Kael: release, then fix what comes up). Uploads
+  (sending a receipt or a file through MCP) are for later; M99's "The MCP server" has those and
+  the rest left over.
+
+**Kael, to use it on Emmer:** make the new `mcp` image public on ghcr.io (the package's
+settings, once), upgrade, then add `https://luminous.money/api/mcp/v1` as a custom connector in
+claude.ai. Emmer's nginx must pass the forwarded host (or set `LUMINOUS_MONEY_PUBLIC_URL`).
+
+**Next:** what real clients turn up; then HSA tracking.
+
+## Before that (2026-11-17): `v1.1.0`: journal amounts, Share page, budgets higher on home
 
 Three things from Kael. **Committed, pushed and released as `v1.1.0`** (a minor: Share page
 is new). design.md has the decisions
@@ -128,7 +164,7 @@ lists it. No code changes, so no release.
 ## Before that (2026-11-14, late night): the roadmap reordered
 
 Kael reordered what's ahead in [docs/PLAN.md](docs/PLAN.md): **MCP Server** is new and next
-([noted](docs/milestones/mcp-server/PLAN.md), with questions for when it starts), **HSA
+([noted](docs/milestones/.archived/mcp-server/PLAN.md), with questions for when it starts), **HSA
 tracking** second, then the rest of Funds B, Tags more, split-level tags and funds, M20 and
 M99. **M18 is parked in [M99's Deferred](docs/milestones/m99-follow-ups/PLAN.md#deferred)**
 (Kael isn't sure it's worth doing): its brief moved there, and its folder is gone. HSA
@@ -1162,8 +1198,8 @@ How it's put together:
 
 ## Next steps
 
-1. **The first live deployment, on Emmer,** is up at `https://luminous.money` (since
-   2026-10-27; see "Also" above), on 0.1.14, with Kael's real bank feed. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
+1. **The live deployment, on Emmer,** is up at `https://luminous.money` (since 2026-10-27;
+   see "Also" above), with Kael's real bank feed; the latest release is `v1.1.0`. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
    `LM_SOURCE=release`: the installer on 127.0.0.1:8080 behind Emmer's nginx, which has the
    certificate; then `70_dns.sh` and `80_web.sh`). The release's five images must be public on
    ghcr.io (a package's settings, once each) for an install to pull them.
@@ -1175,7 +1211,9 @@ How it's put together:
 3. **Loans is out** (`v0.1.16` to `v0.1.18`, [its plan](docs/milestones/.archived/loans/PLAN.md)); Kael
    declares his mortgage on Emmer. **Funds B's step 1 is out** (`v0.1.15`); Kael sets his
    Fidelity accounts up in funds.
-4. **Next to build: MCP Server** ([noted](docs/milestones/mcp-server/PLAN.md)), then HSA
+4. **MCP Server is out** (`v1.2.0`, [its plan](docs/milestones/.archived/mcp-server/PLAN.md)):
+   Kael makes the `mcp` image public on ghcr.io, connects claude.ai, and reports what turns up.
+   **Next to build:** HSA
    tracking; the rest of the order is [docs/PLAN.md](docs/PLAN.md)'s "Ahead".
 5. Later, not pressing: [M99: Follow-ups](docs/milestones/m99-follow-ups/PLAN.md) (email,
    ownership transfer, the rest of M8's auth questions, and the rest of what's left over).

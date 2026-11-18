@@ -39,6 +39,8 @@ export type SessionInfo = {
   created_at: string;
   last_used_at: string;
   current: boolean;
+  /** A connected app's (OAuth: Claude, say), whose `device` is the app's name. */
+  app: boolean;
 };
 
 export type ApiToken = {
@@ -201,6 +203,28 @@ export const resetPassword = (token: string, password: string) =>
 
 export const verifyEmail = (token: string) =>
   call<void>("/email/verify", { method: "POST", json: { token } });
+
+// Connecting an app (OAuth for MCP clients: the Authorize page)
+
+/** An app's request to act as you, as its authorization URL's query has it. */
+export type AppRequest = Record<string, string>;
+
+export const oauth = {
+  /** Who's asking, and where they'd return to; refused (400) when the app can't be trusted. */
+  check: (request: AppRequest) =>
+    call<{ client_name: string; redirect_host: string }>("/oauth/authorize", {
+      method: "POST",
+      json: request,
+      own: true,
+    }),
+  /** Allow or deny: where to send the browser back to the app. */
+  decide: (request: AppRequest, decision: "allow" | "deny") =>
+    call<{ redirect: string }>("/oauth/authorize", {
+      method: "POST",
+      json: { ...request, decision },
+      own: true,
+    }),
+};
 
 // Your account
 

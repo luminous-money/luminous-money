@@ -8,6 +8,8 @@
  *   first used is a stolen copy (or the copy a thief already used), and ends the whole session.
  *   Within the grace, a second use gets a fresh token too, so two tabs refreshing at once don't
  *   log the user out.
+ * - **An app connected by OAuth** (oauth.ts) has a session too, with its client and the resource
+ *   its access tokens are for (`audience`): ending it disconnects the app.
  * - **API tokens** are long-lived bearer tokens for scripts, named, optionally expiring.
  */
 import { after, now, transaction, type DatabaseSync } from "@luminous-money/db";
@@ -29,6 +31,10 @@ export type Session = {
   expires_at: string;
   ended_at: string | null;
   end_reason: string | null;
+  /** The OAuth client it was started for, if it's a connected app's. */
+  client_id: string | null;
+  /** What its access tokens are for (their `aud`): an OAuth session's resource. */
+  audience: string | null;
   updated_at: string;
 };
 
@@ -73,17 +79,34 @@ export function deviceLabel(userAgent: string | undefined): string {
 export class Sessions {
   constructor(private readonly db: DatabaseSync) {}
 
-  /** Start a session; returns it and its first refresh token. */
-  start(userId: string, method: string, device: string): { session: Session; refresh: string } {
+  /** Start a session (for an OAuth client: `app`); returns it and its first refresh token. */
+  start(
+    userId: string,
+    method: string,
+    device: string,
+    app?: { clientId: string; audience: string }
+  ): { session: Session; refresh: string } {
     const id = newId();
     const stamp = after(null);
     return transaction(this.db, () => {
       this.db
         .prepare(
-          `INSERT INTO session (id, user_id, method, device, last_used_at, expires_at, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO session (id, user_id, method, device, last_used_at, expires_at, client_id,
+             audience, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .run(id, userId, method, device, stamp, later(MAX_AGE_MS), stamp, stamp);
+        .run(
+          id,
+          userId,
+          method,
+          device,
+          stamp,
+          later(MAX_AGE_MS),
+          app?.clientId ?? null,
+          app?.audience ?? null,
+          stamp,
+          stamp
+        );
       return { session: this.get(id)!, refresh: this.issue(id) };
     });
   }

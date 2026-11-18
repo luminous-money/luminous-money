@@ -22,7 +22,7 @@ variable "SOURCE" {
 }
 
 group "default" {
-  targets = ["gateway", "auth", "ledger", "app", "ai", "shops"]
+  targets = ["gateway", "auth", "ledger", "app", "ai", "shops", "mcp"]
 }
 
 group "test" {
@@ -30,7 +30,7 @@ group "test" {
 }
 
 group "release" {
-  targets = ["gateway-release", "auth-release", "ledger-release", "app-release", "ai-release", "shops-release"]
+  targets = ["gateway-release", "auth-release", "ledger-release", "app-release", "ai-release", "shops-release", "mcp-release"]
 }
 
 # Service images
@@ -83,6 +83,17 @@ target "ai" {
     workspace = "target:workspace"
   }
   tags = ["${REGISTRY}/ai:${VERSION}"]
+  args = { VERSION = VERSION }
+}
+
+# The MCP server: AI clients working with a book as the user.
+target "mcp" {
+  context    = "."
+  dockerfile = "services/mcp/Dockerfile"
+  contexts = {
+    workspace = "target:workspace"
+  }
+  tags = ["${REGISTRY}/mcp:${VERSION}"]
   args = { VERSION = VERSION }
 }
 
@@ -189,4 +200,8 @@ target "ai-release" {
 
 target "shops-release" {
   inherits = ["shops", "_release"]
+}
+
+target "mcp-release" {
+  inherits = ["mcp", "_release"]
 }

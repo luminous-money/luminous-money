@@ -17,7 +17,9 @@ const ALG = "EdDSA";
 type KeyRow = { kid: string; private_jwk: string; public_jwk: string; retired_at: string | null };
 type Key = Parameters<SignJWT["sign"]>[0];
 
-export type AccessClaims = { sub: string; sid: string };
+/** `aud` is AUDIENCE for the browser and scripts, or an OAuth session's resource (the MCP
+ * server's URL), which only that resource takes. */
+export type AccessClaims = { sub: string; sid: string; aud?: string };
 
 export class SigningKeys {
   private readonly imported = new Map<string, Promise<Key>>();
@@ -97,14 +99,14 @@ export class SigningKeys {
     };
   }
 
-  async sign({ sub, sid }: AccessClaims): Promise<string> {
+  async sign({ sub, sid, aud = AUDIENCE }: AccessClaims): Promise<string> {
     const row = this.signing();
     if (!row) throw new Error("no signing key: call ensure() first");
     return new SignJWT({ sid })
       .setProtectedHeader({ alg: ALG, kid: row.kid, typ: "at+jwt" })
       .setSubject(sub)
       .setIssuer(ISSUER)
-      .setAudience(AUDIENCE)
+      .setAudience(aud)
       .setIssuedAt()
       .setExpirationTime(`${ACCESS_TTL_SECONDS}s`)
       .sign(await this.key(row.kid, "private_jwk")!);
@@ -127,13 +129,14 @@ export class SigningKeys {
         {
           algorithms: [ALG],
           issuer: ISSUER,
-          audience: AUDIENCE,
           typ: "at+jwt",
           ...(ignoreExpiry ? { currentDate: new Date(0) } : {}),
         }
       );
-      return typeof payload.sub === "string" && typeof payload.sid === "string"
-        ? { sub: payload.sub, sid: payload.sid }
+      return typeof payload.sub === "string" &&
+        typeof payload.sid === "string" &&
+        typeof payload.aud === "string"
+        ? { sub: payload.sub, sid: payload.sid, aud: payload.aud }
         : undefined;
     } catch {
       return undefined;

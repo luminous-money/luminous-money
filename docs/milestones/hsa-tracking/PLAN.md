@@ -7,7 +7,7 @@ HSA tracking: plan
 > funds](../split-level-tags-and-funds/PLAN.md), whose step 1 (tags per split) is built
 > (2026-11-12): an item's split can carry `#hsa-eligible` now, so the steps below tag splits
 > from the start and step 4 is done. **Moved ahead of Tags, more** (Kael, 2026-11-14; second in
-> line, behind [MCP Server](../mcp-server/PLAN.md)), so it brings the part of that chain it needs
+> line, behind [MCP Server](../.archived/mcp-server/PLAN.md), built 2026-11-18), so it brings the part of that chain it needs
 > (the AI proposing a tag) with it.
 
 ## The brief (Kael, 2026-11-07)

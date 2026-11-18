@@ -1,0 +1,4 @@
+# Production-safe settings for mcp (APP_ENV=production, the default).
+PORT=3000
+LEDGER_URL=http://ledger:8000
+APP_URL=http://app:3000

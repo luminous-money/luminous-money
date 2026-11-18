@@ -418,6 +418,8 @@ to be told to leave it alone.
 | `/api/auth/v1` | `auth` | Login, logout, who's logged in, and the verify endpoint. The only API without the session check. |
 | `/api/ledger/v1` | `ledger` | Books API: entries, staging, BQL, import/export, backup. |
 | `/api/app/v1` | `app` | Review queue, the resolver pipeline, schedules, import sources. |
+| `/api/mcp/v1` | `mcp` | The MCP server (AI clients). Without a token, the 401 says where to sign in. |
+| `/.well-known/oauth-*` | `auth` | OAuth's metadata for MCP clients. No session check. |
 | `/ui` | `app` | The review PWA. Unknown paths under `/ui` get the app shell, for client-side routing. |
 | `/` | (redirect) | Redirects to `/ui/`. |
 
@@ -475,6 +477,8 @@ How auth works (M8; the shape is M1's):
 - **Other clients** get tokens in the body (`"delivery": "body"`) and send `Authorization:
   Bearer`. **API tokens** (`lm_…`, hashed, optionally expiring) serve scripts and backups; they
   reach every API but can't manage the account.
+- **Apps connected by OAuth** (MCP clients: "The MCP server", below) get tokens for the MCP
+  server alone.
 - **Email is optional** (`SMTP_URL`): with it, verification and reset links (to
   `LUMINOUS_MONEY_PUBLIC_URL`, never the request's Host). Without it, resets go through the CLI.
 - **Deleting an account** deletes every book it owns, through `app`'s book deletion.
@@ -1871,6 +1875,80 @@ on GitHub Pages: https://luminous-money.github.io/luminous-money/. All of it is 
   loans, made easy". The reel's intro card and the page's `<title>` and `og:description` follow
   the same words, though the published video changes only when it's recorded again.
 
+### The MCP server (2026-11-17, built 2026-11-18)
+
+An AI assistant (Claude, or any MCP client) works with a book as the user: `services/mcp`, at
+`/api/mcp/v1`. [Its plan](milestones/.archived/mcp-server/PLAN.md) has the tools by domain and
+the spike's numbers. Kael's calls, with their reasons:
+
+- **Reading and writing at once,** one milestone: an assistant is meant to work with a book as
+  Kael does, and that's mostly writing (entering, categorizing, review).
+- **A service in the stack** (Streamable HTTP, behind Traefik's session check like every API),
+  not a local process: one URL for every client, the phone included, installed and released
+  with the rest. It has no database: every tool is a call to the ledger or `app` as the user, so
+  roles and versioning hold as they do for the PWA.
+- **OAuth from the start:** claude.ai's and the Claude apps' connectors sign in by OAuth, so
+  without it they couldn't connect at all (below). API tokens still work as Bearer.
+- **No rule for the AI's writes:** it does what the user asks, or uses its judgement, as the
+  user would in the app. It stages or confirms as the app can; nothing marks its writes.
+- **Skills from the server:** MCP has no way to give a client a skill, so the server brings its
+  own (`services/mcp/skills/<domain>.md`): one tool, `load_skill(domain)`, and twelve domains
+  (base, review, accounts, budgets, reports, funds, investments, loans, schedules, reconciling,
+  receipts, imports). Every other tool's description starts with its domain.
+- **Gating by refusing, not by changing the tool list:** every tool is listed from the start,
+  and refuses ("Load the loans skill first") until its domain's skill (and the base) is loaded
+  in the session. The spike (2026-11-17) found a tool list that changes mid-conversation
+  re-reads the whole conversation in Claude Code (a prompt-cache miss: on an 800k-token one,
+  about $3 each time on Sonnet) unless its tool search is forced on; a refusal is only a message
+  at the end. The cost is the list's size: 93 tools, about 21k tokens of definitions, which
+  clients with tool search load as needed.
+- **Names say what a tool does:** `read_…`, `write_…`, `delete_…`, with MCP's annotations to
+  match (`readOnlyHint`; `destructiveHint` on deletes and on writes that change rather than
+  add), so a client can grant reads at once (`mcp__<server>__read_*` in Claude Code; claude.ai
+  groups by the annotations) and ask before deletes.
+- **Curated tools, not generated from the OpenAPI document:** 82 ledger operations, many of
+  them parts of one task (confirming in review is a PATCH and a settle), and none of `app`'s.
+  The ledger's tools take its OpenAPI schemas (resolved inline), so they're described as the API
+  is; `app`'s are written from its types. Edit tools for schedules, loans and rules name their
+  add tool's fields rather than repeating the schema, to keep the list smaller.
+- **Sessions** (`Mcp-Session-Id`) are in memory, bound to the user who started one, holding
+  which skills are loaded; unused for 12 hours, or after a restart, a client starts a new one
+  (MCP says it must on a 404) and loads the skills again when a tool says so.
+- **Left out:** creating or deleting books, sharing, setting up bank and Amazon connections, AI
+  and book settings, migration, the system page and the user's account (management, done in the
+  app); and, until there's a way to send a file through MCP (**uploads**, later: Kael), capturing
+  a receipt or importing a file. Reading a receipt already attached is in.
+
+**OAuth in `auth`** (claude.com's connector requirements, and MCP's authorization spec):
+
+- **Discovery:** `/verify`, asked about a request on its way to `/api/mcp/`, answers a 401 with
+  `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/api/mcp/v1"`
+  (Traefik passes the refusal on). That document (RFC 9728) names the resource as the URL the user
+  types into Claude (`https://<host>/api/mcp/v1`) and `auth` as its authorization server, whose
+  metadata (RFC 8414) is at `/.well-known/oauth-authorization-server`. Both are `auth`'s, at the
+  root, routed without the session check. The host is `LUMINOUS_MONEY_PUBLIC_URL`, or the
+  request's forwarded scheme and host.
+- **Registration is dynamic** (RFC 7591), for public clients only (no secret: PKCE instead).
+  Client ID metadata documents (which Claude prefers when advertised) aren't offered, so `auth`
+  never fetches a document from outside. Redirects are `https`, or loopback on any port (RFC
+  8252: Claude Code's).
+- **The consent is the PWA's** (`/ui/authorize`, the authorization endpoint): logged out, the
+  login comes first on the same address; then "Claude wants to use Luminous Money as you", Allow
+  or Deny. It posts to `auth`'s `/oauth/authorize` with the login's cookie (the Origin check
+  holds), which checks the client and the exact redirect and answers where to send the browser.
+  A request whose app or redirect can't be trusted is shown as an error, never redirected.
+- **Codes** are single use, five minutes, hashed (`oauth_code`); one used twice ends the session
+  it was traded for. S256 PKCE only.
+- **A grant is a session** (method `oauth`, the app's name as its device, `client_id` and
+  `audience` on it; auth migration 3), so it has the browser's rotation, reuse detection and
+  limits, and ending it stops its token at once. The Account page lists these under **Connected
+  apps**, with Disconnect. Its refresh token is traded only at `/oauth/token` (form-encoded or
+  JSON, RFC 6749 errors), never at the browser's `/token`.
+- **Audience-bound tokens:** an app's access token's `aud` is the MCP server's URL, and `/verify`
+  lets it through only on the way to `/api/mcp/`; it's refused everywhere else, `auth`'s own
+  routes included. The `mcp` service reaches the ledger and `app` inside the stack with
+  `X-User-Id`, so the token goes no further than the tools.
+
 ## Architecture
 
 The design separates four things:
@@ -1917,6 +1995,7 @@ The design separates four things:
 | `ledger` | Python | System of record for all books. Runs the Beancount engine (booking, validation, BQL). Owns Beancount import/export, the change log and backup chunks. |
 | `app` | TypeScript | Serves the PWA (React + Vite + `vite-plugin-pwa`) and its API (Hono): CSV profiles and imports. Hosts the participants, the context builder and the resolver chain, and owns import history (later schedules too). Modules get split into their own services only when there's a reason. |
 | `ai` | TypeScript | Everything AI (M16): each book's AI settings and sealed credential, the providers (Claude; a fake for tests), and reading receipts for `app` to stage. Reads; never writes books. |
+| `mcp` | TypeScript | The MCP server: AI clients work with a book as the user, through the ledger's and `app`'s APIs, with skills to load first. No database. |
 
 ## The review app
 

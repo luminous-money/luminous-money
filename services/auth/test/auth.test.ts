@@ -14,6 +14,7 @@ import {
   pwnedPasswords,
   verifyPassword,
 } from "../src/passwords.js";
+import { OAuth } from "../src/oauth.js";
 import { ApiTokens, GRACE_MS, Sessions } from "../src/sessions.js";
 import { allowList } from "../src/access.js";
 import { STUB_USER_ID, Users } from "../src/users.js";
@@ -34,6 +35,7 @@ async function setup(extra: Partial<Services> = {}) {
     apiTokens: new ApiTokens(db),
     keys,
     links: new EmailLinks(db),
+    oauth: new OAuth(db),
     breached: async (p) => p === BREACHED,
     mail: { mailer: { send: async (m) => void sent.push(m) }, publicUrl: "https://books.example" },
     deleteBooks: async (id) => void deleted.push(id),
@@ -489,5 +491,206 @@ describe("the pre-M8 stub", () => {
     });
     expect(((await login.json()) as Tokens).user.id).toBe(STUB_USER_ID);
     expect(() => users.claimStub("Again", "x@example.com", "h")).toThrow(/already been claimed/);
+  });
+});
+
+describe("OAuth for MCP clients", () => {
+  const BASE = "https://books.example";
+  const RESOURCE = `${BASE}/api/mcp/v1`;
+  const CALLBACK = "https://claude.ai/api/mcp/auth_callback";
+  const VERIFIER = "a-verifier-long-enough-to-be-a-real-pkce-code-verifier-0123456789";
+  const CHALLENGE = createHash("sha256").update(VERIFIER).digest("base64url");
+
+  async function connected() {
+    const ctx = await setup({ publicUrl: BASE });
+    const { call } = ctx;
+    const me = await signUp(call);
+    const registered = await call("/oauth/register", {
+      method: "POST",
+      json: { client_name: "Claude", redirect_uris: [CALLBACK, "http://localhost:3118/callback"] },
+    });
+    expect(registered.status).toBe(201);
+    const client = (await registered.json()) as { client_id: string };
+    /** The consent, as the logged-in user; the redirect it answers. */
+    const authorize = async (extra: Record<string, unknown> = {}) => {
+      const response = await call("/oauth/authorize", {
+        method: "POST",
+        headers: bearer(me.access_token),
+        json: {
+          client_id: client.client_id,
+          redirect_uri: CALLBACK,
+          response_type: "code",
+          code_challenge: CHALLENGE,
+          code_challenge_method: "S256",
+          state: "xyz",
+          resource: RESOURCE,
+          decision: "allow",
+          ...extra,
+        },
+      });
+      return { response, json: (await response.json()) as Record<string, string> };
+    };
+    const codeOf = (redirect: string) => new URL(redirect).searchParams.get("code")!;
+    const token = (form: Record<string, string>) =>
+      call("/oauth/token", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(form).toString(),
+      });
+    const exchange = (code: string, verifier = VERIFIER) =>
+      token({
+        grant_type: "authorization_code",
+        code,
+        code_verifier: verifier,
+        redirect_uri: CALLBACK,
+        client_id: client.client_id,
+        resource: RESOURCE,
+      });
+    const verify = (access: string, uri = "/api/mcp/v1") =>
+      call("/verify", { headers: { ...bearer(access), "x-forwarded-uri": uri } });
+    return { ...ctx, me, client, authorize, codeOf, token, exchange, verify };
+  }
+
+  it("publishes where to sign in, and says so when a request to the MCP server has no token", async () => {
+    const { app, call } = await setup({ publicUrl: BASE });
+    const resource = await (
+      await app.request("/.well-known/oauth-protected-resource/api/mcp/v1")
+    ).json();
+    expect(resource).toMatchObject({ resource: RESOURCE, authorization_servers: [BASE] });
+    const server = await (await app.request("/.well-known/oauth-authorization-server")).json();
+    expect(server).toMatchObject({
+      issuer: BASE,
+      authorization_endpoint: `${BASE}/ui/authorize`,
+      token_endpoint: `${BASE}/api/auth/v1/oauth/token`,
+      registration_endpoint: `${BASE}/api/auth/v1/oauth/register`,
+      code_challenge_methods_supported: ["S256"],
+      token_endpoint_auth_methods_supported: ["none"],
+    });
+
+    const refused = await call("/verify", { headers: { "x-forwarded-uri": "/api/mcp/v1" } });
+    expect(refused.status).toBe(401);
+    expect(refused.headers.get("www-authenticate")).toBe(
+      `Bearer resource_metadata="${BASE}/.well-known/oauth-protected-resource/api/mcp/v1"`
+    );
+    const elsewhere = await call("/verify", {
+      headers: { "x-forwarded-uri": "/api/ledger/v1/books" },
+    });
+    expect(elsewhere.headers.get("www-authenticate")).toBeNull();
+  });
+
+  it("takes https and loopback redirects only", async () => {
+    const { call } = await setup();
+    const register = (uris: string[]) =>
+      call("/oauth/register", { method: "POST", json: { client_name: "x", redirect_uris: uris } });
+    expect((await register(["http://evil.example/cb"])).status).toBe(400);
+    expect((await register([])).status).toBe(400);
+    expect((await register(["http://127.0.0.1:9000/cb"])).status).toBe(201);
+  });
+
+  it("trades a consent's code for tokens that reach the MCP server alone", async () => {
+    const { authorize, codeOf, exchange, verify, call, token, client } = await connected();
+
+    const check = await authorize({ decision: undefined });
+    expect(check.json).toEqual({ client_name: "Claude", redirect_host: "claude.ai" });
+
+    const { json } = await authorize();
+    const redirect = new URL(json.redirect!);
+    expect(redirect.origin + redirect.pathname).toBe(CALLBACK);
+    expect(redirect.searchParams.get("state")).toBe("xyz");
+    expect(redirect.searchParams.get("iss")).toBe(BASE);
+
+    const traded = await exchange(codeOf(json.redirect!));
+    expect(traded.status).toBe(200);
+    const tokens = (await traded.json()) as { access_token: string; refresh_token: string };
+
+    expect((await verify(tokens.access_token)).status).toBe(200);
+    expect((await verify(tokens.access_token, "/api/ledger/v1/books")).status).toBe(401);
+    expect((await call("/me", { headers: bearer(tokens.access_token) })).status).toBe(401);
+
+    // Refreshing rotates, at the OAuth endpoint only.
+    expect(
+      (await call("/token", { method: "POST", json: { refresh_token: tokens.refresh_token } }))
+        .status
+    ).toBe(401);
+    const refreshed = await token({
+      grant_type: "refresh_token",
+      refresh_token: tokens.refresh_token,
+      client_id: client.client_id,
+    });
+    expect(refreshed.status).toBe(200);
+    const next = (await refreshed.json()) as { access_token: string; refresh_token: string };
+    expect(next.refresh_token).not.toBe(tokens.refresh_token);
+    expect((await verify(next.access_token)).status).toBe(200);
+  });
+
+  it("refuses a wrong verifier, a redirect it didn't register, and a code used twice", async () => {
+    const { authorize, codeOf, exchange, verify, call, me } = await connected();
+
+    const wrong = await exchange(codeOf((await authorize()).json.redirect!), `${VERIFIER}x`);
+    expect(wrong.status).toBe(400);
+    expect(await wrong.json()).toMatchObject({ error: "invalid_grant" });
+
+    const elsewhere = await authorize({ redirect_uri: "https://evil.example/cb" });
+    expect(elsewhere.response.status).toBe(400);
+
+    // The resource is checked by its path: a proxy may name the host differently.
+    const proxied = await authorize({ resource: "http://books.internal/api/mcp/v1/" });
+    expect(proxied.json.redirect).toMatch(/[?&]code=/);
+    const other = await authorize({ resource: `${BASE}/api/ledger/v1` });
+    expect(new URL(other.json.redirect!).searchParams.get("error")).toBe("invalid_target");
+
+    // A loopback redirect may come back on another port.
+    const loopback = await authorize({ redirect_uri: "http://localhost:51234/callback" });
+    expect(loopback.json.redirect).toMatch(/^http:\/\/localhost:51234\/callback\?code=/);
+
+    const code = codeOf((await authorize()).json.redirect!);
+    const first = (await (await exchange(code)).json()) as { access_token: string };
+    expect((await verify(first.access_token)).status).toBe(200);
+    const again = await exchange(code);
+    expect(await again.json()).toMatchObject({ error: "invalid_grant" });
+    // The session the code was traded for ends.
+    expect((await verify(first.access_token)).status).toBe(401);
+
+    const denied = await authorize({ decision: "deny" });
+    expect(new URL(denied.json.redirect!).searchParams.get("error")).toBe("access_denied");
+    // Someone not logged in can't consent.
+    expect((await call("/oauth/authorize", { method: "POST", json: {} })).status).toBe(401);
+    void me;
+  });
+
+  it("lists a connected app, and disconnecting it stops its token", async () => {
+    const { authorize, codeOf, exchange, verify, call, me } = await connected();
+    const tokens = (await (await exchange(codeOf((await authorize()).json.redirect!))).json()) as {
+      access_token: string;
+    };
+    const list = (await (await call("/sessions", { headers: bearer(me.access_token) })).json()) as {
+      id: string;
+      device: string;
+      app: boolean;
+    }[];
+    const app = list.find((s) => s.app)!;
+    expect(app.device).toBe("Claude");
+    expect(list.filter((s) => !s.app)).toHaveLength(1);
+
+    await call(`/sessions/${app.id}`, { method: "DELETE", headers: bearer(me.access_token) });
+    expect((await verify(tokens.access_token)).status).toBe(401);
+  });
+
+  it("revokes a token's session", async () => {
+    const { authorize, codeOf, exchange, verify, call } = await connected();
+    const tokens = (await (await exchange(codeOf((await authorize()).json.redirect!))).json()) as {
+      access_token: string;
+      refresh_token: string;
+    };
+    const revoked = await call("/oauth/revoke", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        origin: "https://other.example",
+      },
+      body: new URLSearchParams({ token: tokens.refresh_token }).toString(),
+    });
+    expect(revoked.status).toBe(200);
+    expect((await verify(tokens.access_token)).status).toBe(401);
   });
 });

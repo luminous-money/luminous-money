@@ -14,8 +14,8 @@ import {
 } from "../lib/queries.js";
 import { account, type User } from "../lib/session.js";
 
-/** Your account: name and email, password, the devices you're logged in on, API tokens for
- * scripts, and deleting it all. */
+/** Your account: name and email, password, the devices you're logged in on, apps connected to it
+ * (Claude), API tokens for scripts, and deleting it all. */
 export function Account() {
   const me = useMe();
   if (!me.data) return null;
@@ -27,6 +27,7 @@ export function Account() {
       <Profile user={me.data} />
       <Password />
       <Devices />
+      <ConnectedApps />
       <Tokens />
       <DeleteAccount />
     </main>
@@ -151,7 +152,8 @@ function Devices() {
   const sessions = useSessions();
   const end = useAccountChange(account.endSession);
   const endOthers = useAccountChange(account.endOthers);
-  const others = (sessions.data ?? []).filter((s) => !s.current).length;
+  const devices = (sessions.data ?? []).filter((s) => !s.app);
+  const others = devices.filter((s) => !s.current).length;
   return (
     <section className="card" aria-label="Devices">
       <h2 className="section-title">Devices</h2>
@@ -159,7 +161,7 @@ function Devices() {
         Where you're logged in. A device that's unused for 60 days is logged out.
       </p>
       <ul className="plain-list">
-        {sessions.data?.map((s) => (
+        {devices.map((s) => (
           <li key={s.id} className="row-between">
             <span>
               {s.device}
@@ -186,6 +188,46 @@ function Devices() {
             Log out everywhere else
           </button>
         </div>
+      )}
+    </section>
+  );
+}
+
+/** Apps connected by OAuth (Claude, through the MCP server): each acts as you until it's
+ * disconnected, which stops it at once. */
+function ConnectedApps() {
+  const sessions = useSessions();
+  const end = useAccountChange(account.endSession);
+  const apps = (sessions.data ?? []).filter((s) => s.app);
+  return (
+    <section className="card" aria-label="Connected apps">
+      <h2 className="section-title">Connected apps</h2>
+      <p className="small muted">
+        Apps you've allowed to use Luminous Money as you, like Claude. One unused for 60 days is
+        disconnected.
+      </p>
+      {apps.length === 0 ? (
+        <p className="small muted">None.</p>
+      ) : (
+        <ul className="plain-list">
+          {apps.map((s) => (
+            <li key={s.id} className="row-between">
+              <span>
+                {s.device}
+                <span className="muted small block">
+                  Connected {formatWhen(s.created_at)} · last used {formatWhen(s.last_used_at)}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => end.mutate(s.id)}
+                aria-label={`Disconnect ${s.device}`}
+              >
+                Disconnect
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );

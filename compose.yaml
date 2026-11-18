@@ -129,6 +129,16 @@ services:
     logging: *logging
     deploy: *restart
 
+  # The MCP server: an AI assistant (Claude, or any MCP client) works with a book as the user,
+  # signed in by OAuth (auth) or an API token. Holds nothing of its own. Connect Claude to
+  # https://<your domain>/api/mcp/v1 (docs/deploying.md).
+  mcp:
+    image: ${LUMINOUS_MONEY_REGISTRY:-luminous-money}/mcp:${LUMINOUS_MONEY_VERSION:-dev}
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+    logging: *logging
+    deploy: *restart
+
 volumes:
   data:
   certs:

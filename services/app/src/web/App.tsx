@@ -17,6 +17,7 @@ import {
   useTimeZoneBackfill,
 } from "./lib/queries.js";
 import { Account } from "./pages/Account.js";
+import { Authorize } from "./pages/Authorize.js";
 import { System } from "./pages/System.js";
 import { AccountEditor } from "./pages/AccountEditor.js";
 import { ChartOfAccounts } from "./pages/ChartOfAccounts.js";
@@ -118,6 +119,14 @@ function Gate() {
       </>
     );
   }
+  // Connecting an app needs only you, not your books (logged out, you log in here first).
+  if (location === "/authorize")
+    return (
+      <>
+        <Masthead />
+        <Authorize />
+      </>
+    );
   if (!books.data)
     return (
       <>

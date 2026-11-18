@@ -80,4 +80,26 @@ export const MIGRATIONS: Migration[] = [
       "used_at TEXT",
     ]),
   ],
+  // 3: OAuth for MCP clients (the MCP server milestone): clients registered by themselves (RFC
+  // 7591), authorization codes, and a session's client and the resource its tokens are for.
+  [
+    createTable("oauth_client", [
+      "id TEXT PRIMARY KEY",
+      "name TEXT NOT NULL",
+      "redirect_uris TEXT NOT NULL", // JSON: a list of URIs
+    ]),
+    createTable("oauth_code", [
+      "hash TEXT PRIMARY KEY",
+      "client_id TEXT NOT NULL REFERENCES oauth_client(id) ON DELETE CASCADE",
+      "user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE",
+      "redirect_uri TEXT NOT NULL",
+      "challenge TEXT NOT NULL", // PKCE, S256
+      "resource TEXT NOT NULL",
+      "expires_at TEXT NOT NULL",
+      "used_at TEXT",
+      "session_id TEXT", // what it was traded for, ended if the code comes again
+    ]),
+    "ALTER TABLE session ADD COLUMN client_id TEXT REFERENCES oauth_client(id)",
+    "ALTER TABLE session ADD COLUMN audience TEXT",
+  ],
 ];

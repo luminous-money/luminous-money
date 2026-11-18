@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { Config } from "./config.js";
 import { SigningKeys } from "./keys.js";
 import { EmailLinks } from "./links.js";
+import { OAuth } from "./oauth.js";
 import { pwnedPasswords } from "./passwords.js";
 import { ApiTokens, Sessions } from "./sessions.js";
 import { Users } from "./users.js";
@@ -20,6 +21,7 @@ export function fromConfig(config: Config) {
     apiTokens: new ApiTokens(db),
     keys: new SigningKeys(db),
     links: new EmailLinks(db),
+    oauth: new OAuth(db),
     breached: config.breachedPasswords ? pwnedPasswords() : null,
     publicUrl: config.publicUrl,
   };

@@ -12,8 +12,8 @@ M99: Follow-ups
 > item grows into real work, it becomes a milestone of its own and moves there. What belongs to
 > an active milestone lives in that milestone instead: [Funds B](../funds-b/PLAN.md), [Tags,
 > more](../tags-more/PLAN.md), [split-level tags and
-> funds](../split-level-tags-and-funds/PLAN.md), [HSA tracking](../hsa-tracking/PLAN.md),
-> [MCP Server](../mcp-server/PLAN.md) and [M20](../m20-design-polish/PLAN.md).
+> funds](../split-level-tags-and-funds/PLAN.md), [HSA tracking](../hsa-tracking/PLAN.md) and
+> [M20](../m20-design-polish/PLAN.md).
 
 ## Open questions
 
@@ -175,6 +175,27 @@ Mobile usability is [M20](../m20-design-polish/PLAN.md)'s.
   unused, a year at most); passkeys and two-factor (a milestone of their own); which OIDC
   providers first (Google, Apple, GitHub, or any OIDC issuer); Luminous Money as an OIDC
   provider; scoped API tokens; CAPTCHA; terms and privacy pages for a public service.
+
+### The MCP server
+
+Left over from [its milestone](../.archived/mcp-server/PLAN.md) (2026-11-18):
+
+- **Uploads** (Kael: later): a way to send a file through MCP (a receipt's photo, a bank's
+  CSV, a lender's schedule). Proposed: a tool answering a short-lived, single-use upload link the
+  client sends the file to (Claude Code with `curl`; claude.ai perhaps from its code sandbox, if
+  its network allows the server; else the user taps it and picks the file), then `app`'s
+  existing reading.
+- **What real clients turn up:** it was released without trying claude.ai or the phone (Kael:
+  fix what comes up). Watch the first connection (`docker compose logs auth mcp`).
+- **The tool list's size:** 93 tools, about 21k tokens of definitions in a client without tool
+  search. If it's a problem, merge tools (the reports' one `read_report` is the pattern) or
+  slim the ledger's schemas further.
+- **Client ID metadata documents** (Claude's preferred registration) aren't offered; Claude
+  falls back to dynamic registration. Offering them means `auth` fetching a client's document.
+- **Sessions are in memory:** a restart makes clients start new ones and load skills again
+  (they're told to). Stored sessions, if that's ever a bother.
+- **A receipt being read is polled** (`read_job`); MCP's progress notifications or tasks could
+  say when it's done instead.
 
 ### Operating it
 

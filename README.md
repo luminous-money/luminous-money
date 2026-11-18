@@ -49,6 +49,8 @@ books, each independent: switching books is like switching profiles.
   - reconciliation against a statement, and bank-fed accounts that reconcile themselves
 - **Reports:** this month's spending against the budget and a projection, cash flow, breakdowns
   by account, the largest transactions, net worth, and what an account typically comes to.
+- **Claude, or any AI assistant:** an MCP server, so Claude (claude.ai, its apps, Claude Code)
+  can find, categorize, enter and report on your books as you, after you allow it.
 - **Running it:** one command installs, upgrades (backing up first), backs up and restores
   everything, collects logs and reports health. Optional built-in HTTPS, private instances for a
   list of emails, and a System page for admins.
@@ -97,6 +99,7 @@ account** (anyone can). For demo data, make an API token on "Your account" and r
 | `/api/app/v1` | The PWA's API: imports, bank feeds, rules, schedules, funds, loans, orders |
 | `/api/ai/v1` | Each book's AI settings, and reading receipts |
 | `/api/shops/v1` | Reading shops' orders (Amazon) |
+| `/api/mcp/v1` | The MCP server, for Claude and other AI clients ([connecting](docs/deploying.md#connecting-claude-the-mcp-server)) |
 | `/api/health` | The stack's health, public (for uptime monitors) |
 
 ## Everyday commands
@@ -136,6 +139,7 @@ services/
   app/                TypeScript: PWA, imports, the pipeline           → /ui, /api/app/v1
   ai/                 TypeScript: AI settings, reading receipts         → /api/ai/v1
   shops/              Python: shops' orders, Amazon first               → /api/shops/v1
+  mcp/                TypeScript: the MCP server, its tools and skills  → /api/mcp/v1
 packages/
   ledger-client/      typed client generated from the ledger's OpenAPI schema
   ai-api/             the ai service's types, shared with app and the PWA

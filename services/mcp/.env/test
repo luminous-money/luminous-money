@@ -1,0 +1,4 @@
+# The test stack (APP_ENV=test): as in production.
+PORT=3000
+LEDGER_URL=http://ledger:8000
+APP_URL=http://app:3000

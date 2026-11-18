@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 docker buildx bake default e2e ui-tests simplefin-fake || exit 1
 
 compose="docker compose -p luminous-money-e2e -f compose.yaml -f compose.e2e.yaml"
-$compose up -d --wait traefik auth ledger app ai mailpit simplefin-fake || exit 1
+$compose up -d --wait traefik auth ledger app ai mcp mailpit simplefin-fake || exit 1
 $compose run --rm e2e
 api=$?
 # The browser suite keeps its container until its failures' traces and page snapshots are copied

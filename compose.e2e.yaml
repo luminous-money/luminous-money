@@ -27,6 +27,10 @@ services:
     environment:
       - APP_ENV=test
 
+  mcp:
+    environment:
+      - APP_ENV=test
+
   simplefin-fake:
     image: ${LUMINOUS_MONEY_REGISTRY:-luminous-money}/simplefin-fake:${LUMINOUS_MONEY_VERSION:-dev}
 
@@ -36,10 +40,10 @@ services:
   e2e:
     image: ${LUMINOUS_MONEY_REGISTRY:-luminous-money}/e2e:${LUMINOUS_MONEY_VERSION:-dev}
     profiles: [tests]
-    depends_on: [traefik, auth, ledger, app, ai, mailpit, simplefin-fake]
+    depends_on: [traefik, auth, ledger, app, ai, mcp, mailpit, simplefin-fake]
 
   ui:
     image: ${LUMINOUS_MONEY_REGISTRY:-luminous-money}/ui-tests:${LUMINOUS_MONEY_VERSION:-dev}
     profiles: [tests]
-    depends_on: [traefik, auth, ledger, app, ai, mailpit, simplefin-fake]
+    depends_on: [traefik, auth, ledger, app, ai, mcp, mailpit, simplefin-fake]
     ipc: host # Chromium needs more shared memory than Docker's default

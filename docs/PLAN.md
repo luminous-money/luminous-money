@@ -25,9 +25,7 @@ Two principles set the order:
 
 Roughly in order; each is elaborated with Kael when it starts.
 
-- [ ] **MCP Server** (next; Kael, 2026-11-14; [noted](milestones/mcp-server/PLAN.md), not
-      planned): an MCP server for the ledger, so an AI assistant can work with a book.
-- [ ] **HSA tracking** (Kael, 2026-11-07; [noted](milestones/hsa-tracking/PLAN.md), not planned):
+- [ ] **HSA tracking** (next; Kael, 2026-11-07; [noted](milestones/hsa-tracking/PLAN.md), not planned):
       the AI tags every split that appears to pay for something HSA-eligible. Amazon says so on
       its items, so its charges need no guess. Builds on Tags, more (the chain proposing tags) and
       split-level tags (built); moved ahead of Tags, more (2026-11-14), so it brings the part of
@@ -312,6 +310,15 @@ Each with its plan in [milestones/.archived](milestones/.archived/).
       it the book's history by payee. Still open: whether imports and bank feeds ask the AI by
       themselves (they don't; [M99](milestones/m99-follow-ups/PLAN.md#open-questions)'s open
       questions).
+
+- [x] **MCP Server** (Kael, 2026-11-14; planned with Kael 2026-11-17 and 18, built 2026-11-18:
+      [its plan](milestones/.archived/mcp-server/PLAN.md), `v1.2.0`): an AI assistant (Claude,
+      or any MCP client) works with a book as the user. A service in the stack (`/api/mcp/v1`),
+      OAuth from the start (`auth` the authorization server; the PWA's consent; Connected apps),
+      93 tools named `read_`/`write_`/`delete_`, and twelve skills loaded with `load_skill`,
+      each tool refusing until its domain's is. **Left over:** uploads (sending a receipt or a
+      file through MCP), in [M99](milestones/m99-follow-ups/PLAN.md); and whatever real clients
+      turn up.
 
 ### Polish, built
 

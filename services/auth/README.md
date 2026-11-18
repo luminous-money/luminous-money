@@ -16,7 +16,9 @@ design.md ("Routing and auth"); running it is in docs/deploying.md.
 | `GET /tokens`, `POST /tokens`, `DELETE /tokens/:id` | Your API tokens (`lm_…`). |
 | `POST /password/forgot`, `POST /password/reset`, `POST /email/verify` | Email links. |
 | `GET /config`, `GET /.well-known/jwks.json` | What the server supports; the access tokens' public keys. |
-| `GET /verify` | For Traefik: 200 with `X-User-Id`, or 401. |
+| `GET /verify` | For Traefik: 200 with `X-User-Id`, or 401 (on the way to the MCP server, with `WWW-Authenticate` saying where to sign in). |
+| `POST /oauth/register`, `POST /oauth/authorize`, `POST /oauth/token`, `POST /oauth/revoke` | OAuth for MCP clients (Claude): registration, the consent (from the PWA's `/ui/authorize`), tokens, revoking. |
+| `GET /.well-known/oauth-protected-resource[/api/mcp/v1]`, `GET /.well-known/oauth-authorization-server` | At the root: where MCP clients sign in. |
 
 Access tokens are 10-minute Ed25519 JWTs; refresh tokens rotate, and a reused one ends its
 session. Passwords are Argon2id (Node 24's built-in), at least 15 characters, checked against
