@@ -1,7 +1,8 @@
 /** M17: tags, a split's: on a transaction's page, in Select mode, on rows, in ledger filters and
  * reports. */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { addTransactions, setUpUser, splitRows } from "./support.js";
 
 test("a split is tagged on its page; rows show it and the ledger filters by it", async ({

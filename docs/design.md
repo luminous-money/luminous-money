@@ -412,6 +412,19 @@ to be told to leave it alone.
 - **Each service serves under its full prefix,** so Traefik strips nothing.
 - **Routes come from Traefik's file provider** (`deploy/traefik/routes.yml`), not Docker labels.
   The same config then works under Compose and Swarm, and Traefik needs no Docker socket.
+- **The gateway sets the security headers, once for every service** (scale readiness, S2,
+  2026-11-18), so no service can forget them:
+  - every response: `nosniff`, `X-Frame-Options: DENY` (the OAuth consent page, framed by
+    another site, could be clicked into giving a book away), `Referrer-Policy: same-origin`, and
+    HSTS for a year over HTTPS only (TLS at the gateway, or a trusted proxy's
+    `X-Forwarded-Proto: https`; Traefik doesn't count the header without `sslProxyHeaders`).
+    No `includeSubDomains` or `preload`: an operator's other hosts are theirs to decide.
+  - `/ui`: a Content Security Policy keeping the PWA to its own origin (`script-src 'self'`,
+    `connect-src 'self'`, `frame-ancestors 'none'`). Styles may be inline (charts' tooltips
+    write them into their markup), images `data:` and `blob:` (a receipt's preview). The APIs
+    go without one: JSON doesn't run, and an attachment brings its own (Attachments (M16)).
+  - **Every browser test checks the policy** (`tests/ui/src/fixtures.ts`): the browser blocks
+    quietly, so a test fails if it logged a refusal.
 
 | Route | Goes to | Notes |
 |---|---|---|

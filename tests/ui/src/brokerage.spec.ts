@@ -1,7 +1,8 @@
 /** Brokerage activity: a brokerage's rows read as what they are, on Bank connections, against the
  * e2e stack's fake SimpleFIN server (prices from the ledger's fixed source: 100 a share). */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { setUpUser } from "./support.js";
 
 const FAKE = process.env.SIMPLEFIN_FAKE_URL ?? "http://simplefin-fake:8080";

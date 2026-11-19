@@ -1,6 +1,7 @@
 /** M6: several books, each the context for everything while it's selected. */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { accounts, addAccount, app, setUpUser } from "./support.js";
 
 /** A second book for the current user, with a starred account. */

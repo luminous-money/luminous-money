@@ -1,6 +1,7 @@
 /** M14: reconciling a statement, the ledger filter, and divided accounts. */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { accountAction, addTransactions, editSplit, setUpUser } from "./support.js";
 
 test("a statement is ticked off, saved for later, and finished; ledgers show and filter it", async ({

@@ -1,6 +1,7 @@
 /** Migrating from another system (GnuCash): every step, on a book already linked to its bank. */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { accounts, logIn, setUpUser } from "./support.js";
 
 // GnuCash's exports, synthetic.

@@ -1,7 +1,8 @@
 /** M12: home's chart and recent transactions, the Transactions page, Reports, and an account's
  * typical periods. */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { setUpUser } from "./support.js";
 
 const GROCERIES = "Expenses:Food:Groceries";

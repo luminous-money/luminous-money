@@ -2,7 +2,9 @@
  * Account page's Connected apps. */
 import { createHash, randomBytes } from "node:crypto";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+
+import { test } from "./fixtures.js";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 

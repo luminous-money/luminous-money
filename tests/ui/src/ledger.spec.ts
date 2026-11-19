@@ -1,6 +1,7 @@
 /** An account's ledger from a date (a partial view), loading either way. The full view: m1. */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { addTransactions, setUpUser } from "./support.js";
 
 // 450 a day apart from 2024-02-01 (the last 2025-04-25), and the opening balance on 2024-01-01.

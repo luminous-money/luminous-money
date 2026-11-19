@@ -4,8 +4,9 @@
  * More options, archiving, a rule's fund on an import, a schedule's occurrence, and a writer, who
  * can choose funds and move money but not set them up.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { addAccount, app, crumb, logIn, openMore, stored } from "./support.js";
 
 const PNC = "Assets:Bank:PNC";

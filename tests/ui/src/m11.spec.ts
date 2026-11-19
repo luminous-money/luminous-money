@@ -1,6 +1,7 @@
 /** M11: budgets, on their page, an account's ledger and editor, and home. */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { openMore, setUpUser, stored } from "./support.js";
 
 const GROCERIES = "Expenses:Food:Groceries";

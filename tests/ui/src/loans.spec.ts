@@ -7,8 +7,9 @@
  *
  * In Chicago's time zone, where a due date on the 1st once showed as the month before.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { importText, logIn } from "./support.js";
 
 test.use({ timezoneId: "America/Chicago" });

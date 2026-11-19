@@ -1,6 +1,7 @@
 /** M5: holdings and value, trades, revalued assets, commodities. */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { app, importText, setUpUser } from "./support.js";
 
 const day = (offset: number) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);

@@ -2,7 +2,9 @@
 /** A new version: the banner's Reload takes it in, whether or not a service worker controls the
  * page. The "old" version is the same worker with a byte appended (served once, when it's first
  * registered); asking for an update then finds the real one. */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+
+import { test } from "./fixtures.js";
 
 // The suite's stack is plain http on a name other than localhost, where a browser has no
 // service workers unless told that origin is safe (which only full Chromium hears, not the

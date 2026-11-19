@@ -1,6 +1,7 @@
 /** Importing a chart of accounts: a CSV read into a preview, then added in one write. */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { accounts, setUpUser } from "./support.js";
 
 const CSV = [

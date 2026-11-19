@@ -1,6 +1,7 @@
 /** Transfers paired in review: two imports (out of one account, into another) made one. */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { app, importText, logIn } from "./support.js";
 
 const PROFILE = {

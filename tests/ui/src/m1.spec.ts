@@ -1,7 +1,9 @@
 /** M1: one bank account, end to end. */
 import { readFileSync } from "node:fs";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+
+import { test } from "./fixtures.js";
 
 import {
   accountAction,

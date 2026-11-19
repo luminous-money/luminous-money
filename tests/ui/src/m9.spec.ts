@@ -1,6 +1,7 @@
 /** M9: bank feeds through SimpleFIN, against the e2e stack's fake SimpleFIN server. */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { app, setUpUser } from "./support.js";
 
 const FAKE = process.env.SIMPLEFIN_FAKE_URL ?? "http://simplefin-fake:8080";

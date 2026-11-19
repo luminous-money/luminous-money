@@ -1,7 +1,8 @@
 /** A transaction's splits: each shown as it is and opened in the split editor; several at once in
  * Select mode (a long press, or a click with Shift). */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { editSplit, setUpUser, splitRows, stored } from "./support.js";
 
 const usd = (number: string) => ({ number, currency: "USD" });

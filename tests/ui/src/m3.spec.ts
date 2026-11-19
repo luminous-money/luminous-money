@@ -1,6 +1,7 @@
 /** M3: schedules made with "Repeat…", staging occurrences marked in the ledger. */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { app, editSplit, setUpUser, splitRows } from "./support.js";
 
 const day = (offset: number) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);

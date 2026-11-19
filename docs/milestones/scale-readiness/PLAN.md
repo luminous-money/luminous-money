@@ -1,11 +1,12 @@
 Scale readiness: plan
 ==================================================================================================
 
-> **Status: assessed (2026-11-18); S1 fixed, the rest not planned or started.** Kael asked what it would take to
-> run Luminous Money as a scalable public service: performance bottlenecks, security gaps and
-> deployment infrastructure. This is that assessment, read from the code at `v1.2.0`, turned
-> into a checklist. Nothing here is decided: the open questions at the end come first when it
-> starts, and what's decided then goes to design.md with its reasons.
+> **Status: assessed (2026-11-18); S1 and S2 fixed, the rest not planned or started.** Kael
+> asked what it would take to run Luminous Money as a scalable public service: performance
+> bottlenecks, security gaps and deployment infrastructure. This is that assessment, read from
+> the code at `v1.2.0`, turned into a checklist. Nothing else here is decided: the open
+> questions at the end come first when it starts, and what's decided then goes to design.md
+> with its reasons.
 
 Luminous Money is built for what it set out to be: one self-hosted stack for a household or a
 small company (design.md, "Easy for anyone to stand up, not tied to any one host"). Auth is sound
@@ -32,7 +33,8 @@ service is a different product, and three kinds of work stand between here and t
       images and PDF only, send anything else as `Content-Disposition: attachment`, and add
       `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox` to file
       responses; better, serve files from another origin or object storage with signed URLs.
-- [ ] **S2: no security headers anywhere:** no CSP, HSTS, `nosniff` or `frame-ancestors`. The
+- [x] **S2: no security headers anywhere** (fixed 2026-11-18, `v1.2.1`: design.md, "Routing
+      and auth"): no CSP, HSTS, `nosniff` or `frame-ancestors`. The
       OAuth consent page (`/ui/authorize`) can be framed by another site, so a clickjacking page
       could have someone approve an MCP connection to their books. A Traefik `headers`
       middleware on every router (`deploy/gateway/routes.yml`): HSTS, a strict CSP,

@@ -82,6 +82,38 @@ describe("routing through Traefik", () => {
     });
   });
 
+  describe("security headers", () => {
+    it("sends every response with no type guessed, never framed, no address to other sites", async () => {
+      for (const response of [
+        await fetch(`${BASE_URL}/ui/`),
+        await fetch(`${BASE_URL}/api/auth/v1/config`),
+        await fetch(`${BASE_URL}/api/ledger/v1/books`), // refused, still with them
+        await authed(`${BASE_URL}/api/ledger/v1/books`),
+        await fetch(`${BASE_URL}/`, { redirect: "manual" }),
+      ]) {
+        assert.equal(response.headers.get("x-content-type-options"), "nosniff", response.url);
+        assert.equal(response.headers.get("x-frame-options"), "DENY", response.url);
+        assert.equal(response.headers.get("referrer-policy"), "same-origin", response.url);
+      }
+    });
+
+    it("keeps the PWA to its own origin, and out of other sites' frames", async () => {
+      const policy = (await fetch(`${BASE_URL}/ui/`)).headers.get("content-security-policy") ?? "";
+
+      assert.match(policy, /script-src 'self';/);
+      assert.match(policy, /frame-ancestors 'none'/);
+      assert.match(policy, /object-src 'none'/);
+    });
+
+    it("sends HSTS over HTTPS only (a proxy's X-Forwarded-Proto: https counts)", async () => {
+      const plain = await fetch(`${BASE_URL}/ui/`);
+      const proxied = await fetch(`${BASE_URL}/ui/`, { headers: { "X-Forwarded-Proto": "https" } });
+
+      assert.equal(plain.headers.get("strict-transport-security"), null);
+      assert.equal(proxied.headers.get("strict-transport-security"), "max-age=31536000");
+    });
+  });
+
   it("answers unknown top-level paths with 404 rather than reaching any service", async () => {
     const response = await fetch(`${BASE_URL}/no-such-route`);
 

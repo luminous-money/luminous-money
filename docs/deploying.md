@@ -107,8 +107,10 @@ bash luminous-money install --port 8080 --bind 127.0.0.1
 
 Then in `.env`, set `LUMINOUS_MONEY_PUBLIC_URL` to the address people use (`https://books.example.com`)
 and `./luminous-money up`. The proxy must pass `X-Forwarded-Proto: https`, which they all do; then
-session cookies are `Secure`. If the proxy isn't on this machine or a private network, list its
-address in `LUMINOUS_MONEY_TRUSTED_PROXIES`.
+session cookies are `Secure`, and browsers are told to use HTTPS for the address from then on
+(HSTS, for a year). If the proxy isn't on this machine or a private network, list its address in
+`LUMINOUS_MONEY_TRUSTED_PROXIES`. The gateway sets the security headers itself (design.md,
+"Routing and auth"), so the proxy needn't add any.
 
 - **Caddy:** `books.example.com { reverse_proxy 127.0.0.1:8080 }`
 - **nginx:** `proxy_pass http://127.0.0.1:8080;` with `proxy_set_header Host $host;` and

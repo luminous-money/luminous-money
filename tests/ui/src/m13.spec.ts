@@ -1,6 +1,7 @@
 /** M13: sharing a book by link with a second user, who accepts and sees it. */
-import { devices, expect, test } from "@playwright/test";
+import { devices, expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { logIn, setUpUser } from "./support.js";
 
 test("a book is shared by link, and the person who accepts it can open it", async ({

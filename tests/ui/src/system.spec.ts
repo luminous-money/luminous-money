@@ -1,6 +1,7 @@
 /** Production readiness: the system page, an admin's alone (named in the config, and confirmed). */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { linkMailedTo, setUpUser } from "./support.js";
 
 test.use({ storageState: { cookies: [], origins: [] } });

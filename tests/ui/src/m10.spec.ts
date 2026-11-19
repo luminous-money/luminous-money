@@ -1,6 +1,7 @@
 /** M10: the chart of accounts, and editing accounts from it. */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { accountAction, addAccount, addTransactions, setUpUser } from "./support.js";
 
 async function chart(page: Page) {

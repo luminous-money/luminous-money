@@ -1,6 +1,7 @@
 /** M4: categorization in review. */
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { setUpUser } from "./support.js";
 
 const usd = (number: string) => ({ number, currency: "USD" });

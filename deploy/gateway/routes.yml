@@ -11,44 +11,48 @@ http:
     auth-api:
       rule: PathPrefix(`/api/auth/v1`)
       service: auth
+      middlewares: [security-headers]
     ledger-api:
       rule: PathPrefix(`/api/ledger/v1`)
       service: ledger
-      middlewares: [session]
+      middlewares: [security-headers, session]
     app-api:
       rule: PathPrefix(`/api/app/v1`)
       service: app
-      middlewares: [session]
+      middlewares: [security-headers, session]
     ai-api:
       rule: PathPrefix(`/api/ai/v1`)
       service: ai
-      middlewares: [session]
+      middlewares: [security-headers, session]
     shops-api:
       rule: PathPrefix(`/api/shops/v1`)
       service: shops
-      middlewares: [session]
+      middlewares: [security-headers, session]
     # The MCP server (Claude and other AI clients). Without a token, auth's 401 says where to
     # sign in (OAuth's metadata, below).
     mcp-api:
       rule: PathPrefix(`/api/mcp/v1`)
       service: mcp
-      middlewares: [session]
+      middlewares: [security-headers, session]
     # OAuth's metadata for MCP clients (RFC 9728, RFC 8414): public, at the root, as they look
     # for it there.
     oauth-metadata:
       rule: PathPrefix(`/.well-known/oauth-`)
       service: auth
+      middlewares: [security-headers]
     # The stack's health, for uptime monitors: public, so no session (app answers it).
     health:
       rule: Path(`/api/health`)
       service: app
+      middlewares: [security-headers]
     app-ui:
       rule: PathPrefix(`/ui`)
       service: app
+      middlewares: [security-headers, ui-policy]
     root:
       rule: Path(`/`)
       service: app
-      middlewares: [to-ui]
+      middlewares: [security-headers, to-ui]
   middlewares:
     session:
       forwardAuth:
@@ -57,6 +61,29 @@ http:
         # entrypoints' forwardedHeaders.trustedIPs already strip from anyone untrusted.
         trustForwardHeader: true
         authResponseHeaders: [X-User-Id, X-User-Name, X-User-Email, X-User-Email-Verified]
+    # Every response (scale readiness, S2): HSTS over HTTPS only (TLS here, or a trusted proxy's
+    # X-Forwarded-Proto: https, which Traefik doesn't count as HTTPS without sslProxyHeaders), no
+    # type guessed, never framed (the OAuth consent is a click away from giving a book away), and
+    # no address sent to other sites. No includeSubDomains or preload: the operator's other hosts
+    # are theirs to decide.
+    security-headers:
+      headers:
+        stsSeconds: 31536000
+        sslProxyHeaders:
+          X-Forwarded-Proto: https
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: same-origin
+    # The PWA's pages and scripts: nothing but its own origin. Styles may be inline (charts'
+    # tooltips write them into their markup); images may be data: and blob: (a receipt's preview
+    # before it's sent). The browser tests fail on any violation (tests/ui/src/fixtures.ts).
+    ui-policy:
+      headers:
+        contentSecurityPolicy: >-
+          default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
+          img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self';
+          worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self';
+          form-action 'self'; frame-ancestors 'none'
     to-ui:
       redirectRegex:
         regex: ^(https?://[^/]+)/$

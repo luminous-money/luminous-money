@@ -1,5 +1,6 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { accounts, seedBook, stored, type Seeded } from "./support.js";
 
 let seeded: Seeded;

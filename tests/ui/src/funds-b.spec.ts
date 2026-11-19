@@ -4,8 +4,9 @@
  * through Notifications to review (the only fund that could have sold, suggested); and an IRA's
  * default fund, previewed in the account editor.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { importText, logIn, openMore, stored } from "./support.js";
 
 const CASH = "Assets:Brokerage:Fidelity:Cash";

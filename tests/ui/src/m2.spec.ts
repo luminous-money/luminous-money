@@ -1,6 +1,7 @@
 /** M2: matches proposed on import, reviewed in the queue. */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { app, setUpUser } from "./support.js";
 
 const PROFILE = {

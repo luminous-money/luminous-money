@@ -3,8 +3,9 @@
  * photo kept as a JPEG; an account's payment cards. */
 import { readFileSync } from "node:fs";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { accounts, setUpUser, stored } from "./support.js";
 
 // A tiny JPEG (a white pixel), as a file to upload.

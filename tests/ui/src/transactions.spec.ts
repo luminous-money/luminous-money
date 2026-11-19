@@ -1,6 +1,7 @@
 /** The Transactions page (every account's): its search and its filter by accounts. */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { crumb, importText, setUpUser } from "./support.js";
 
 test("Transactions searches payees, descriptions and items, and filters by any of some accounts", async ({

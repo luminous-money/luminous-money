@@ -4,7 +4,7 @@ Where We Left Off
 _Updated 2026-11-18._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-18, evening): scale readiness's S1, for `v1.2.1`
+## Latest (2026-11-18, evening): scale readiness's S1 and S2, for `v1.2.1`
 
 Kael asked for S1, S2 and S4 of [scale readiness](docs/milestones/scale-readiness/PLAN.md),
 one commit each, then a release.
@@ -13,8 +13,17 @@ one commit each, then a release.
   (`file_headers` in `api.py`) shows in place only JPEG, PNG, GIF, WebP, AVIF and PDF, and
   downloads anything else; every file goes with `nosniff`, and every one but a PDF with a
   sandboxing CSP. Any file is still accepted; its type is kept lowercased.
+- **S2, the gateway sets the security headers** (design.md, "Routing and auth";
+  `deploy/gateway/routes.yml`'s `security-headers` and `ui-policy`): `nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: same-origin` and HSTS (HTTPS only, a trusted
+  proxy's `X-Forwarded-Proto` counting) on everything; a Content Security Policy on `/ui`.
+- **Every browser test checks the CSP:** specs take `test` from `tests/ui/src/fixtures.ts`
+  (Playwright's, with a page that fails its test on any refusal the console logs). A new spec
+  does the same.
 - **Tests:** ledger (`test_attachments.py`: each type's disposition and headers), browser
-  (m16: an attached web page is downloaded, not opened).
+  (m16: an attached web page is downloaded, not opened; the CSP, throughout), e2e
+  (`routing.test.ts`: the headers, HSTS only over HTTPS). The ledger's API document changed
+  (a docstring): the client is regenerated.
 
 ## Before that (2026-11-18, later): scale readiness, assessed
 

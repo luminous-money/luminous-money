@@ -1,6 +1,7 @@
 /** M15: dividing an account into parts, moving money between them, and choosing a part. */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
+import { test } from "./fixtures.js";
 import { addTransactions, setUpUser } from "./support.js";
 
 test("an account is divided into parts, money moves between them, and a transaction changes part", async ({
