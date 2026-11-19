@@ -4,7 +4,7 @@ Where We Left Off
 _Updated 2026-11-18._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-18, evening): scale readiness's S1, S2 and S4, for `v1.2.1`
+## Latest (2026-11-18, evening): scale readiness's S1, S2 and S4, released as `v1.2.1`
 
 Kael asked for S1, S2 and S4 of [scale readiness](docs/milestones/scale-readiness/PLAN.md),
 one commit each, then a release.
@@ -31,6 +31,17 @@ one commit each, then a release.
   ledger's API document changed (a docstring): the client is regenerated.
 - **To run auth's tests outside Docker** you need Node 24 (Argon2 is new in its `crypto`);
   this machine's is 22, so they ran in `node:24-slim` with the repo mounted.
+- **A flake seen once:** brokerage's "reads again" (`brokerage.spec.ts`) waits 5 seconds for the
+  reread's job; on a loaded machine (the browser suite at 1.4 minutes, not its usual 40
+  seconds) it was still running. It passed on the run again, and on every other run.
+
+**Released** (the workflow and CI green; all seven images pulled anonymously from ghcr.io).
+**Kael, on Emmer:** `./luminous-money upgrade`. Behind its nginx, HSTS (a year) starts once
+nginx passes `X-Forwarded-Proto: https`, as it does; if nginx sets security headers of its own,
+both reach the browser, which is harmless.
+
+**Next:** unchanged: what real MCP clients turn up; then HSA tracking. S3 (containers trusting
+each other's `X-User-Id`) is still open in scale readiness.
 
 ## Before that (2026-11-18, later): scale readiness, assessed
 
