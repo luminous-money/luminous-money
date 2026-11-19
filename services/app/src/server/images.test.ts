@@ -6,8 +6,9 @@ import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
 import { createApi } from "./api.js";
+import { createApp } from "./app.js";
 import { AppDb } from "./db.js";
-import { isHeif, MAX_SIDE, normalized } from "./images.js";
+import { isHeif, MAX_SIDE, normalized, UPLOAD_LIMIT } from "./images.js";
 import { FakeLedger } from "./testing.js";
 
 // A synthetic HEIC (HEVC-coded, as an iPhone's are), made with libheif's heif-enc.
@@ -76,5 +77,45 @@ describe("attaching a file through the app", () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({ filename: "IMG_0001.jpg" });
     expect(ledger.attachments[0]).toMatchObject({ name: "IMG_0001.jpg", type: "image/jpeg" });
+  });
+});
+
+describe("request bodies (scale readiness, S4)", () => {
+  const app = () => {
+    const tmp = mkdtempSync(join(tmpdir(), "app-"));
+    return createApp(tmp, {
+      db: new AppDb(join(tmp, "app.sqlite")),
+      ledgerFor: () => new FakeLedger(),
+    });
+  };
+  const over = UPLOAD_LIMIT + 1024 * 1024 + 1;
+  const attach = { "x-user-id": "u1", "content-type": "image/jpeg" };
+
+  it("refuses one over an upload and its form's fields, before reading it", async () => {
+    const response = await app().request("/api/app/v1/books/b/transactions/t/attachments", {
+      method: "POST",
+      headers: { ...attach, "content-length": String(over) },
+      body: "x",
+    });
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ detail: "a request is at most 25 MB" });
+  });
+
+  it("stops reading one sent chunked at the limit", async () => {
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= over) return controller.close();
+        controller.enqueue(new Uint8Array(1024 * 1024));
+        sent += 1024 * 1024;
+      },
+    });
+    const response = await app().request("/api/app/v1/books/b/transactions/t/attachments", {
+      method: "POST",
+      headers: attach,
+      body,
+      duplex: "half",
+    } as RequestInit);
+    expect(response.status).toBe(413);
   });
 });

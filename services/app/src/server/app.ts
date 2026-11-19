@@ -4,6 +4,7 @@
  */
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 
 import { health } from "@luminous-money/db";
 
@@ -14,6 +15,7 @@ import type { LedgerPort } from "./ledger.js";
 import type { AiPort } from "./ai.js";
 import type { ShopsPort } from "./shops.js";
 import { stackHealth, type Peers } from "./health.js";
+import { UPLOAD_LIMIT } from "./images.js";
 import type { System } from "./system.js";
 
 export function createApp(
@@ -44,6 +46,15 @@ export function createApp(
       return c.json(stack, stack.status === "down" ? 503 : 200);
     });
 
+  // A body is at most an upload (a receipt, an attachment, a bank's CSV, another system's
+  // history: 25 MB) and its form's fields; nothing reads more (scale readiness, S4).
+  app.use(
+    "/api/*",
+    bodyLimit({
+      maxSize: UPLOAD_LIMIT + 1024 * 1024,
+      onError: (c) => c.json({ detail: "a request is at most 25 MB" }, 413),
+    })
+  );
   app.route("/", createApi(services));
 
   app.get("/ui", (c) => c.redirect("/ui/"));

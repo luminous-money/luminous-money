@@ -694,3 +694,41 @@ describe("OAuth for MCP clients", () => {
     expect((await verify(tokens.access_token)).status).toBe(401);
   });
 });
+
+describe("request bodies (scale readiness, S4)", () => {
+  it("refuses one over 64 KB, before reading it", async () => {
+    const { call } = await setup();
+    const big = JSON.stringify({ email: "kael@example.com", password: "x".repeat(64 * 1024) });
+    const response = await call("/login", {
+      method: "POST",
+      body: big,
+      headers: { "content-type": "application/json", "content-length": String(big.length) },
+    });
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ detail: "a request is at most 64 KB" });
+  });
+
+  it("stops reading one sent chunked at 64 KB: the sign-up it held never happens", async () => {
+    const { call, users } = await setup();
+    const big = JSON.stringify({
+      name: "Kael",
+      email: "kael@example.com",
+      password: PASSWORD,
+      padding: "x".repeat(64 * 1024),
+    });
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(big));
+        controller.close();
+      },
+    });
+    const response = await call("/signup", {
+      method: "POST",
+      body,
+      headers: { "content-type": "application/json" },
+      duplex: "half",
+    } as RequestInit);
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(users.byEmail("kael@example.com")).toBeUndefined();
+  });
+});

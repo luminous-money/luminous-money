@@ -74,7 +74,8 @@ Roughly in order; each is elaborated with Kael when it starts.
 - [ ] **Scale readiness** (Kael, 2026-11-18; [assessed](milestones/scale-readiness/PLAN.md),
       not planned, not ordered): what running Luminous Money as a scalable public service
       would take. Four security fixes first (stored XSS through attachments, no security
-      headers, containers trusting each other's `X-User-Id`, unbounded request bodies), then
+      headers, containers trusting each other's `X-User-Id`, unbounded request bodies: all but
+      the third done 2026-11-18, `v1.2.1`), then
       the ledger's book cache and its one lock, state held in single processes, and the
       infrastructure (cells recommended over stateless replicas). Its open questions come
       first.

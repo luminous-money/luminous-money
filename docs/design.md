@@ -425,6 +425,25 @@ to be told to leave it alone.
     go without one: JSON doesn't run, and an attachment brings its own (Attachments (M16)).
   - **Every browser test checks the policy** (`tests/ui/src/fixtures.ts`): the browser blocks
     quietly, so a test fails if it logged a refusal.
+- **Each service limits request bodies itself** (scale readiness, S4, 2026-11-18): nothing reads
+  more than its limit, refused (413) before a byte is read when `Content-Length` says it's over,
+  or once past it when sent chunked. Not the gateway: Traefik's buffering middleware buffers
+  responses too, which would hold up the MCP server's streamed ones.
+
+  | Service | Limit | Why |
+  |---|---|---|
+  | `ledger` | 25 MB; an attachment, 5 MB | a whole book's Beancount text; the file itself |
+  | `app` | 25 MB and a form's fields (1 MB) | an upload: a receipt, an attachment, a bank's CSV, another system's history |
+  | `ai` | 25 MB | a receipt or a loan table, as base64, from `app` |
+  | `mcp` | 4 MB | JSON-RPC messages; no files yet |
+  | `auth`, `shops` | 64 KB | forms and small JSON |
+
+  25 MB is what docs/deploying.md already tells a proxy (`client_max_body_size 25m`). The
+  Python services use their own `bodies.BodyLimit` (ASGI; `shops` has a copy, the two sharing
+  no package), which reads the body up to the limit and hands it on, so an oversized one is
+  always a 413. The TypeScript ones use Hono's `bodyLimit`: a chunked one past the limit is cut
+  off, but a handler that swallows a body it can't read (`.json().catch(...)`) answers its own
+  error rather than 413. Browsers always send `Content-Length`, so only scripts see that.
 
 | Route | Goes to | Notes |
 |---|---|---|

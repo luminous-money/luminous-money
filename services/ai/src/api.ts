@@ -5,6 +5,7 @@
  * uses its two operations (extract a receipt's facts, categorize splits). The credential is
  * sealed at rest and never sent back.
  */
+import { bodyLimit } from "hono/body-limit";
 import { Hono, type Context } from "hono";
 
 import type { Sealer } from "@luminous-money/db";
@@ -48,6 +49,15 @@ export function createApi({
   roleOf: RoleOf;
 }) {
   const api = new Hono<Env>().basePath("/api/ai/v1");
+  // A receipt's or a loan table's file comes as base64, from `app` (which keeps receipts to 5 MB,
+  // PDFs too): 25 MB is ample, and nothing reads more (scale readiness, S4).
+  api.use(
+    "*",
+    bodyLimit({
+      maxSize: 25 * 1024 * 1024,
+      onError: (c) => c.json({ detail: "a request is at most 25 MB" }, 413),
+    })
+  );
   const names = providers.map((p) => p.name) as ProviderName[];
 
   /** Up, and with which providers: what the PWA checks before offering anything AI. */

@@ -9,6 +9,7 @@
 import { randomUUID } from "node:crypto";
 
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { bodyLimit } from "hono/body-limit";
 import { Hono, type Context as HonoContext } from "hono";
 
 import { sessionServer } from "./server.js";
@@ -54,6 +55,15 @@ const rpcError = (code: number, message: string) => ({
 export function createApp({ tools, ledgerUrl, appUrl, idleMs, fetcher }: Options) {
   const sessions = new Map<string, Session>();
   const app = new Hono();
+  // JSON-RPC messages, no files (not yet): 4 MB is ample, and nothing reads more (scale
+  // readiness, S4). The MCP SDK's transport sets no limit of its own.
+  app.use(
+    "*",
+    bodyLimit({
+      maxSize: 4 * 1024 * 1024,
+      onError: (c) => c.json(rpcError(-32600, "a message is at most 4 MB"), 413),
+    })
+  );
 
   app.all(PATH, async (c) => {
     const user = userOf(c);

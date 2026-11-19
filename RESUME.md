@@ -4,7 +4,7 @@ Where We Left Off
 _Updated 2026-11-18._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-18, evening): scale readiness's S1 and S2, for `v1.2.1`
+## Latest (2026-11-18, evening): scale readiness's S1, S2 and S4, for `v1.2.1`
 
 Kael asked for S1, S2 and S4 of [scale readiness](docs/milestones/scale-readiness/PLAN.md),
 one commit each, then a release.
@@ -20,10 +20,17 @@ one commit each, then a release.
 - **Every browser test checks the CSP:** specs take `test` from `tests/ui/src/fixtures.ts`
   (Playwright's, with a page that fails its test on any refusal the console logs). A new spec
   does the same.
-- **Tests:** ledger (`test_attachments.py`: each type's disposition and headers), browser
-  (m16: an attached web page is downloaded, not opened; the CSP, throughout), e2e
-  (`routing.test.ts`: the headers, HSTS only over HTTPS). The ledger's API document changed
-  (a docstring): the client is regenerated.
+- **S4, every service limits request bodies** (design.md, "Routing and auth", with the
+  table): `ledger` 25 MB (attachments 5 MB) and `shops` 64 KB through `bodies.BodyLimit` (ASGI;
+  `shops` has a copy); `app` 26 MB, `ai` 25 MB, `mcp` 4 MB and `auth` 64 KB through Hono's
+  `bodyLimit`. In the services, not Traefik: its buffering would hold up streamed responses.
+- **Tests:** ledger (`test_attachments.py`: each type's disposition and headers;
+  `test_bodies.py`), shops (`test_bodies.py`), auth, app (`images.test.ts`), ai and mcp (each
+  a limit), browser (m16: an attached web page is downloaded, not opened; the CSP,
+  throughout), e2e (`routing.test.ts`: the headers, HSTS only over HTTPS, two limits). The
+  ledger's API document changed (a docstring): the client is regenerated.
+- **To run auth's tests outside Docker** you need Node 24 (Argon2 is new in its `crypto`);
+  this machine's is 22, so they ran in `node:24-slim` with the repo mounted.
 
 ## Before that (2026-11-18, later): scale readiness, assessed
 

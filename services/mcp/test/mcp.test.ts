@@ -273,3 +273,21 @@ describe("sessions", () => {
     expect(stolen.status).toBe(404);
   });
 });
+
+describe("request bodies (scale readiness, S4)", () => {
+  it("refuses a message over 4 MB, as JSON-RPC's error", async () => {
+    const response = await fetch(base, {
+      method: "POST",
+      headers: {
+        "x-user-id": "kael",
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+      },
+      body: "x".repeat(4 * 1024 * 1024 + 1),
+    });
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({
+      error: { message: "a message is at most 4 MB" },
+    });
+  });
+});

@@ -1,8 +1,8 @@
 Scale readiness: plan
 ==================================================================================================
 
-> **Status: assessed (2026-11-18); S1 and S2 fixed, the rest not planned or started.** Kael
-> asked what it would take to run Luminous Money as a scalable public service: performance
+> **Status: assessed (2026-11-18); S1, S2 and S4 fixed, the rest not planned or started.**
+> Kael asked what it would take to run Luminous Money as a scalable public service: performance
 > bottlenecks, security gaps and deployment infrastructure. This is that assessment, read from
 > the code at `v1.2.0`, turned into a checklist. Nothing else here is decided: the open
 > questions at the end come first when it starts, and what's decided then goes to design.md
@@ -46,11 +46,12 @@ service is a different product, and three kinds of work stand between here and t
       networks so only Traefik, `app` and `mcp` reach the ledger; better, have `auth` issue a
       short-lived signed internal token that services check against the JWKS it already
       publishes.
-- [ ] **S4: no limit on request sizes.** The attachment's 5 MB check reads `Content-Length`
-      only, so a chunked upload is read whole into memory before it's measured
-      (`api.py`, `attach`). Beancount imports and CSVs have no limit, and the gateway sets none.
-      Traefik's `buffering.maxRequestBodyBytes`, and checks in the services that stop reading
-      at the limit.
+- [x] **S4: no limit on request sizes** (fixed 2026-11-18, `v1.2.1`: design.md, "Routing and
+      auth"). The attachment's 5 MB check read `Content-Length` only, so a chunked upload was
+      read whole into memory before it was measured; Beancount imports and CSVs had no limit,
+      and the gateway set none. Each service now limits its own bodies, said or chunked. Not
+      Traefik's buffering middleware, as first suggested here: it buffers responses too, which
+      would hold up the MCP server's streamed ones.
 
 ### What a public service needs
 
@@ -185,8 +186,7 @@ Needed either way:
 3. **Scaling out:** cells' control plane (or Postgres, Redis and a queue), durable jobs and
    schedules, upgrades without downtime, KMS, compliance.
 
-S1 and S2 are small and contained, and S1 is worth doing for a single household's server now:
-they could come ahead of the rest, on their own.
+S1, S2 and S4 came ahead of the rest, on their own (Kael, 2026-11-18; `v1.2.1`).
 
 ## Open questions
 
@@ -196,4 +196,5 @@ they could come ahead of the rest, on their own.
 3. **`shops` (Amazon) on the public service:** off, or kept with what it would take?
 4. **MFA:** TOTP, WebAuthn (passkeys), or both? Required, or offered?
 5. **Hosting:** which provider, and managed pieces (Postgres, object storage, a KMS) or our own?
-6. **S1 and S2 now,** apart from this milestone, for the current deployments?
+6. ~~**S1 and S2 now,** apart from this milestone, for the current deployments?~~ Answered
+   (Kael, 2026-11-18): S1, S2 and S4, released in `v1.2.1`.

@@ -114,6 +114,29 @@ describe("routing through Traefik", () => {
     });
   });
 
+  describe("request bodies", () => {
+    it("are refused over each service's limit, before they're read", async () => {
+      const form = await fetch(`${BASE_URL}/api/auth/v1/login`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "big@test.local", password: "x".repeat(64 * 1024) }),
+      });
+      const file = await authed(
+        `${BASE_URL}/api/ledger/v1/books/any/transactions/any/attachments?filename=big.jpg`,
+        {
+          method: "POST",
+          headers: { "content-type": "image/jpeg" },
+          body: new Uint8Array(5 * 1024 * 1024 + 1),
+        }
+      );
+
+      assert.equal(form.status, 413);
+      assert.deepEqual(await form.json(), { detail: "a request is at most 64 KB" });
+      assert.equal(file.status, 413);
+      assert.deepEqual(await file.json(), { detail: "an attachment is at most 5 MB" });
+    });
+  });
+
   it("answers unknown top-level paths with 404 rather than reaching any service", async () => {
     const response = await fetch(`${BASE_URL}/no-such-route`);
 

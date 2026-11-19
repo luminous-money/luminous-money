@@ -21,6 +21,7 @@
  * With `testUsers` (AUTH_TEST_USERS=true, test stacks only), `/login` with just an email logs in
  * a user for it, made if new, with no password.
  */
+import { bodyLimit } from "hono/body-limit";
 import { Hono, type Context, type Next } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 
@@ -111,6 +112,14 @@ export function createApp(services: Services) {
   const registrations = new Rate(limits.signups);
   // The root holds OAuth's metadata (/.well-known/…); everything else is under BASE.
   const root = new Hono<Env>();
+  // Only forms come here, so a body is at most 64 KB (scale readiness, S4): nothing reads more.
+  root.use(
+    "*",
+    bodyLimit({
+      maxSize: 64 * 1024,
+      onError: (c) => c.json({ detail: "a request is at most 64 KB" }, 413),
+    })
+  );
   const app = root.basePath(BASE);
 
   // Behind a TLS-terminating proxy, cookies are Secure (and the access cookie gets the __Host-

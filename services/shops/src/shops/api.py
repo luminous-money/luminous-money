@@ -28,7 +28,7 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from . import amazon, lines, seal
+from . import amazon, bodies, lines, seal
 from .db import Db, StaleVersion
 
 log = logging.getLogger("shops")
@@ -116,6 +116,8 @@ def view(row: dict[str, Any] | None, cards: list[dict[str, Any]]) -> dict[str, A
 
 def create_app(db: Db, data_dir: str, role_of: RoleOf, send_orders: SendOrders | None = None) -> FastAPI:
     app = FastAPI(title="Luminous Money shops", version=VERSION)
+    # Only small JSON comes here (a connection's settings), so 64 KB is plenty (S4).
+    app.add_middleware(bodies.BodyLimit, limit_for=lambda _: (64 * 1024, "a request is at most 64 KB"))
     api = APIRouter(prefix="/api/shops/v1")
     jobs: dict[str, dict[str, Any]] = {}
     jobs_lock = threading.Lock()

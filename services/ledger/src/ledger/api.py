@@ -25,7 +25,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
-from . import budgets, chart, engine, fundlines, funds, investments, models, reconcile
+from . import bodies, budgets, chart, engine, fundlines, funds, investments, models, reconcile
 from .service import Ledger, NameTaken, NotFound, TooLarge
 from .store import Row, StaleVersion, Store
 
@@ -106,6 +106,7 @@ def create_app(ledger: Ledger) -> FastAPI:
         openapi_url="/api/ledger/v1/openapi.json",
     )
     app.state.ledger = ledger
+    app.add_middleware(bodies.BodyLimit, limit_for=body_limit)
     api = APIRouter(prefix="/api/ledger/v1")
 
     @app.get("/health", include_in_schema=False)
@@ -733,10 +734,7 @@ def create_app(ledger: Ledger) -> FastAPI:
         filename: Annotated[str, Query(description="The file's name, as it was.")] = "attachment",
     ) -> models.Attachment:
         """Attach a file (at most 5 MB): the body is the file, its `Content-Type` its type."""
-        declared = int(request.headers.get("content-length") or 0)
-        if declared > Ledger.ATTACHMENT_LIMIT:
-            raise TooLarge("an attachment is at most 5 MB")
-        data = await request.body()
+        data = await request.body()  # at most 5 MB: `body_limit`
         content_type = request.headers.get("content-type") or "application/octet-stream"
         return ledger.attach(book_id, directive_id, filename, content_type.split(";")[0].strip().lower(), data)
 
@@ -811,6 +809,18 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     app.include_router(api)
     return app
+
+
+# Request bodies (scale readiness, S4): an attachment's is the file, at most 5 MB; anything else (a
+# whole book's Beancount text, at most) 25 MB, as the proxies in docs/deploying.md are told.
+BODY_LIMIT = 25 * bodies.MB
+ATTACHING = re.compile(r"^/api/ledger/v1/books/[^/]+/transactions/[^/]+/attachments$")
+
+
+def body_limit(path: str) -> bodies.Limit:
+    if ATTACHING.match(path):
+        return Ledger.ATTACHMENT_LIMIT, "an attachment is at most 5 MB"
+    return BODY_LIMIT, "a request is at most 25 MB"
 
 
 # Attachments the browser may show in place: images it draws without running anything (not SVG,

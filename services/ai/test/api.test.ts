@@ -399,3 +399,19 @@ describe("Claude", () => {
     );
   });
 });
+
+describe("request bodies (scale readiness, S4)", () => {
+  it("refuses one over 25 MB, before reading it", async () => {
+    const response = await api.request("/api/ai/v1/books/b/receipts/extract", {
+      method: "POST",
+      headers: {
+        "x-user-id": "owner",
+        "content-type": "application/json",
+        "content-length": String(25 * 1024 * 1024 + 1),
+      },
+      body: "{}",
+    });
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ detail: "a request is at most 25 MB" });
+  });
+});
