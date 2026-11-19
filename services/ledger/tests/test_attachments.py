@@ -63,3 +63,35 @@ def test_attachments_over_the_api_and_the_limit(ledger):
 
     with pytest.raises(TooLarge):
         ledger.attach(book, lunch, "big.jpg", "image/jpeg", b"x" * (5 * 1024 * 1024 + 1))
+
+
+@pytest.mark.parametrize(
+    ("content_type", "disposition", "sandboxed"),
+    [
+        ("image/png", "inline", True),
+        ("application/pdf", "inline", False),
+        # Whatever might run as the app is downloaded, never shown in place (stored XSS).
+        ("text/html", "attachment", True),
+        ("image/svg+xml", "attachment", True),
+        ("application/xhtml+xml", "attachment", True),
+        ("text/csv", "attachment", True),
+    ],
+)
+def test_only_safe_files_open_in_the_browser(ledger, content_type, disposition, sandboxed):
+    book = ledger.create_book(name="Ours", owner_id=USER, text=TEXT).id
+    lunch = ledger.create_transaction(book, LUNCH).id
+    client = http(ledger)
+
+    made = client.post(
+        f"/api/ledger/v1/books/{book}/transactions/{lunch}/attachments",
+        params={"filename": 'a "file"'},
+        content=b"<script>alert(1)</script>",
+        headers={"content-type": content_type.upper() + "; charset=utf-8"},
+    )
+    got = client.get(f"/api/ledger/v1/books/{book}/attachments/{made.json()['id']}")
+
+    assert made.json()["content_type"] == content_type
+    assert got.headers["content-disposition"] == f'{disposition}; filename="a file"'
+    assert got.headers["x-content-type-options"] == "nosniff"
+    policy = got.headers.get("content-security-policy", "")
+    assert policy.startswith("sandbox;") if sandboxed else policy == ""

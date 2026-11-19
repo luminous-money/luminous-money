@@ -348,6 +348,30 @@ test("an iPhone's photo is kept as a JPEG, and read into its transaction as the 
   expect(t.postings[0]!.units?.number).toBe("-15.00");
 });
 
+test("an attached web page is downloaded, never opened as part of the app", async ({ page }) => {
+  const { session, book, account } = await setUpUser(page);
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/accounts", {
+    params: { path: { book_id: book.id } },
+    body: { name: "Expenses:Food:Groceries", kind: "leaf" },
+  });
+  const t0 = await bankCopy(session, book.id, account, { date: yesterday(), amount: "-15.00" });
+
+  await page.goto(`/ui/books/${book.id}/transactions/${t0.id}`);
+  await page.getByLabel("Upload a file").setInputFiles({
+    name: "page.html",
+    mimeType: "text/html",
+    buffer: Buffer.from("<script>document.title = 'ran as the app'</script>"),
+  });
+  const link = page.getByRole("link", { name: "page.html" });
+  await expect(link).toBeVisible();
+
+  // Opened, it's a download: no page of the app's origin runs what it holds.
+  const download = page.waitForEvent("download");
+  await page.goto((await link.getAttribute("href"))!).catch(() => {});
+  expect((await download).suggestedFilename()).toBe("page.html");
+  expect(await page.title()).not.toBe("ran as the app");
+});
+
 test("what the AI cost: after reading a receipt, and this month on the AI page", async ({
   page,
 }) => {

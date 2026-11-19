@@ -4,7 +4,19 @@ Where We Left Off
 _Updated 2026-11-18._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-18, later): scale readiness, assessed
+## Latest (2026-11-18, evening): scale readiness's S1, for `v1.2.1`
+
+Kael asked for S1, S2 and S4 of [scale readiness](docs/milestones/scale-readiness/PLAN.md),
+one commit each, then a release.
+
+- **S1, attachments can't run as the app** (design.md, "Attachments (M16)"): the ledger
+  (`file_headers` in `api.py`) shows in place only JPEG, PNG, GIF, WebP, AVIF and PDF, and
+  downloads anything else; every file goes with `nosniff`, and every one but a PDF with a
+  sandboxing CSP. Any file is still accepted; its type is kept lowercased.
+- **Tests:** ledger (`test_attachments.py`: each type's disposition and headers), browser
+  (m16: an attached web page is downloaded, not opened).
+
+## Before that (2026-11-18, later): scale readiness, assessed
 
 Kael asked what running Luminous Money as a scalable public service would take. The
 assessment is [its own milestone](docs/milestones/scale-readiness/PLAN.md) (assessed, not

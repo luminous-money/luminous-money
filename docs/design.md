@@ -970,6 +970,16 @@ same money in through another's, a day or so later. Both would sit in review, un
   anything else is kept as it is. HEIC is decoded by libheif in WASM (`heic-decode`), since
   sharp's own build has no HEVC; sharp does the rest. Uploads may be 25 MB before that. The PWA
   still shrinks a big JPEG, PNG or WebP before sending it, only to send less.
+- **Only images and PDFs open in the browser; anything else is downloaded** (scale readiness,
+  S1, 2026-11-18). A file's type is whatever its uploader said, and it's served from the app's
+  own origin, so an HTML file shown in place would run as the app for whoever opened it (a
+  shared book's other members, say): stored XSS. The ledger (`file_headers` in `api.py`) shows
+  in place only JPEG, PNG, GIF, WebP, AVIF and PDF (not SVG, which can hold scripts), sends
+  everything with `nosniff` so the browser never guesses a type, and sandboxes every file but a
+  PDF (`Content-Security-Policy: sandbox`; Chrome won't show a PDF under it). Any file is still
+  accepted: refusing types would only move the problem to the next one nobody thought of. The
+  type is kept lowercased. Serving files from another origin would be stronger, and comes with
+  object storage (scale readiness, P6).
 - **Exports and backups don't carry them yet:** they're Beancount text. Noted for later.
 
 ### Receipts and AI (M16)

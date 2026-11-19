@@ -480,7 +480,8 @@ export interface paths {
     };
     /**
      * Attachment File
-     * @description An attachment's file, as it was attached.
+     * @description An attachment's file, as it was attached. Images a browser shows safely, and PDFs,
+     *     open in the browser; anything else is downloaded (see `file_headers`).
      */
     get: operations["attachment_file_api_ledger_v1_books__book_id__attachments__attachment_id__get"];
     put?: never;

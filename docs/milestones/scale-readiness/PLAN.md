@@ -1,7 +1,7 @@
 Scale readiness: plan
 ==================================================================================================
 
-> **Status: assessed, not planned or started (2026-11-18).** Kael asked what it would take to
+> **Status: assessed (2026-11-18); S1 fixed, the rest not planned or started.** Kael asked what it would take to
 > run Luminous Money as a scalable public service: performance bottlenecks, security gaps and
 > deployment infrastructure. This is that assessment, read from the code at `v1.2.0`, turned
 > into a checklist. Nothing here is decided: the open questions at the end come first when it
@@ -23,7 +23,8 @@ service is a different product, and three kinds of work stand between here and t
 
 ### Vulnerabilities today
 
-- [ ] **S1: stored XSS through attachments.** An attachment keeps the `Content-Type` its
+- [x] **S1: stored XSS through attachments** (fixed 2026-11-18, `v1.2.1`: design.md,
+      "Attachments (M16)"). An attachment keeps the `Content-Type` its
       uploader sent and is served back `inline` from the app's own origin
       (`services/ledger/src/ledger/api.py`, `attach` and `attachment_file`). Upload `text/html`
       with a script, and any member of the shared book who opens it runs that script as

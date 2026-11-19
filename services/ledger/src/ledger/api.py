@@ -738,7 +738,7 @@ def create_app(ledger: Ledger) -> FastAPI:
             raise TooLarge("an attachment is at most 5 MB")
         data = await request.body()
         content_type = request.headers.get("content-type") or "application/octet-stream"
-        return ledger.attach(book_id, directive_id, filename, content_type.split(";")[0].strip(), data)
+        return ledger.attach(book_id, directive_id, filename, content_type.split(";")[0].strip().lower(), data)
 
     @api.get(
         "/books/{book_id}/attachments/{attachment_id}",
@@ -746,13 +746,13 @@ def create_app(ledger: Ledger) -> FastAPI:
         responses={200: {"content": {"application/octet-stream": {}}, "description": "The file."}},
     )
     def attachment_file(book_id: MemberBook, attachment_id: str) -> Response:
-        """An attachment's file, as it was attached."""
+        """An attachment's file, as it was attached. Images a browser shows safely, and PDFs,
+        open in the browser; anything else is downloaded (see `file_headers`)."""
         found, data = ledger.attachment(book_id, attachment_id)
-        safe = re.sub(r'["\\\r\n]', "", found.filename) or "attachment"
         return Response(
             content=data,
             media_type=found.content_type,
-            headers={"Content-Disposition": f'inline; filename="{safe}"', "Cache-Control": "private, max-age=3600"},
+            headers=file_headers(found.filename, found.content_type),
         )
 
     @api.delete("/books/{book_id}/attachments/{attachment_id}", status_code=204)
@@ -811,6 +811,33 @@ def create_app(ledger: Ledger) -> FastAPI:
 
     app.include_router(api)
     return app
+
+
+# Attachments the browser may show in place: images it draws without running anything (not SVG,
+# which can hold scripts), and PDFs.
+INLINE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/avif", "application/pdf"}
+
+# What a file may do once open in the browser: nothing (no scripts, no requests, a unique origin),
+# but show itself. A PDF goes without it: Chrome won't show a PDF under `sandbox`, and its viewer
+# doesn't run a PDF's scripts with the site's origin anyway.
+FILE_POLICY = "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"
+
+
+def file_headers(filename: str, content_type: str) -> dict[str, str]:
+    """An attachment's response headers. Its type is whatever its uploader said, and it's served
+    from the app's own origin, so an HTML file shown in place would run as the app (stored XSS):
+    only `INLINE_TYPES` are shown in place, the rest downloaded; the browser never guesses a type
+    (`nosniff`); and the file is sandboxed."""
+    safe = re.sub(r'["\\\r\n]', "", filename) or "attachment"
+    disposition = "inline" if content_type in INLINE_TYPES else "attachment"
+    headers = {
+        "Content-Disposition": f'{disposition}; filename="{safe}"',
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, max-age=3600",
+    }
+    if content_type != "application/pdf":
+        headers["Content-Security-Policy"] = FILE_POLICY
+    return headers
 
 
 def _row(r: Row) -> models.Directive:
