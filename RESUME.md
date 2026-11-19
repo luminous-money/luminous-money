@@ -4,7 +4,30 @@ Where We Left Off
 _Updated 2026-11-18._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-18): the MCP server, released as `v1.2.0`
+## Latest (2026-11-18, later): scale readiness, assessed
+
+Kael asked what running Luminous Money as a scalable public service would take. The
+assessment is [its own milestone](docs/milestones/scale-readiness/PLAN.md) (assessed, not
+planned or ordered), listed in docs/PLAN.md's Ahead. Docs only: no code changed, no release.
+
+- **Four vulnerabilities today** (S1 to S4): attachments served `inline` with the uploader's
+  `Content-Type` (stored XSS to a shared book's members, so worth fixing for a household's
+  server too); no security headers, so the OAuth consent page can be framed; every container
+  on one network, any of them able to call the ledger as anyone with `X-User-Id`; no limit on
+  request bodies.
+- **Scaling:** every service is one process with state in memory (the ledger's booked books,
+  `auth`'s rate limits, `app`'s jobs and daily scheduler, MCP sessions) on SQLite on one
+  volume. The ledger's book cache never evicts, and one lock serializes every book's load.
+- **Infrastructure:** cells (many copies of today's stack behind a control plane) recommended
+  over stateless replicas; backups, deploys without downtime, observability, secrets, quotas;
+  and the business side (policies, terms, incident response).
+- **Its open questions come first**, including whether S1 and S2 should be done now, apart
+  from the milestone.
+
+**Next:** unchanged (what real MCP clients turn up; then HSA tracking), unless Kael takes up
+S1 and S2.
+
+## Before that (2026-11-18): the MCP server, released as `v1.2.0`
 
 Claude (claude.ai, its apps, Claude Code), or any MCP client, can work with a book as the user.
 [The plan](docs/milestones/.archived/mcp-server/PLAN.md) (archived: done) has the tools by

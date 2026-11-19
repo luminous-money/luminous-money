@@ -71,6 +71,13 @@ Roughly in order; each is elaborated with Kael when it starts.
 - [ ] **M20: Design polish** ([its plan](milestones/m20-design-polish/PLAN.md); the first pass is
       built and released, 2026-11-14): mobile usability
       across the app, so far.
+- [ ] **Scale readiness** (Kael, 2026-11-18; [assessed](milestones/scale-readiness/PLAN.md),
+      not planned, not ordered): what running Luminous Money as a scalable public service
+      would take. Four security fixes first (stored XSS through attachments, no security
+      headers, containers trusting each other's `X-User-Id`, unbounded request bodies), then
+      the ledger's book cache and its one lock, state held in single processes, and the
+      infrastructure (cells recommended over stateless replicas). Its open questions come
+      first.
 - [ ] **M99: Follow-ups** ([the list](milestones/m99-follow-ups/PLAN.md)): open questions, polish,
       calls made without asking still to review, and what done milestones left over. **M18**
       (suggested recurring transactions and matching rules) is parked in its

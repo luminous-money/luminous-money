@@ -12,8 +12,8 @@ M99: Follow-ups
 > item grows into real work, it becomes a milestone of its own and moves there. What belongs to
 > an active milestone lives in that milestone instead: [Funds B](../funds-b/PLAN.md), [Tags,
 > more](../tags-more/PLAN.md), [split-level tags and
-> funds](../split-level-tags-and-funds/PLAN.md), [HSA tracking](../hsa-tracking/PLAN.md) and
-> [M20](../m20-design-polish/PLAN.md).
+> funds](../split-level-tags-and-funds/PLAN.md), [HSA tracking](../hsa-tracking/PLAN.md),
+> [M20](../m20-design-polish/PLAN.md) and [scale readiness](../scale-readiness/PLAN.md).
 
 ## Open questions
 
