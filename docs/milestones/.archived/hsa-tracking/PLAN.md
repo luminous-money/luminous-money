@@ -1,7 +1,7 @@
 HSA tracking: plan
 ==================================================================================================
 
-> **Status: built (2026-11-19), not yet released.** Noted by Kael 2026-11-07; his answers are
+> **Status: built (2026-11-19), released as `v1.3.0` (2026-11-20).** Noted by Kael 2026-11-07; his answers are
 > [below](#kaels-answers-2026-11-19), and Amazon's mark was read from his real orders on Emmer
 > the same day ([what Amazon shows](#what-amazon-shows-read-on-emmer-2026-11-19)). Kael asked
 > for the plan and the build at once: the calls made without asking are under [Calls to

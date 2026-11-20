@@ -326,7 +326,7 @@ Each with its plan in [milestones/.archived](milestones/.archived/).
       file through MCP), in [M99](milestones/m99-follow-ups/PLAN.md). Tried with a real client
       (Kael, 2026-11-19, Claude on the phone: "worked great"); nothing turned up to fix.
 - [x] **HSA tracking** (Kael, 2026-11-07; his answers and the plan 2026-11-19, built the same day:
-      [its plan](milestones/.archived/hsa-tracking/PLAN.md), not yet released): every split that
+      [its plan](milestones/.archived/hsa-tracking/PLAN.md), `v1.3.0`): every split that
       pays for something an HSA or FSA can pay for gets `#hsa-fsa-eligible`. Amazon's "FSA or HSA
       eligible" mark (read from Kael's real orders on Emmer) tags an item outright, and its orders
       kept before are read again once; history, item history and the AI propose it for the rest

@@ -1,10 +1,10 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-19._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-20._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-19, later): HSA tracking, built (not released)
+## Latest (2026-11-19, later): HSA tracking, released as `v1.3.0` (2026-11-20)
 
 Kael skipped the pharmacy receipt check (none to look at) and asked to explore his Amazon orders
 on Emmer, then write the detailed plan and build it. [The
@@ -42,12 +42,16 @@ tracking", the reasons.
   browser 152 of 152), with the new `tests/e2e/src/hsa.test.ts` and `tests/ui/src/hsa.spec.ts`.
   The ledger's API didn't change.
 
-**Not released, nor committed** (Kael's call). Once released and on Emmer: the next morning sync
-(or Sync now on the Amazon page) reads the 69 kept orders again and tags the marked items'
-splits in the book; `docker logs -t luminous-money-shops-1` shows it.
+**Released** as `v1.3.0` (2026-11-20, at Kael's "continue": the workflow and CI green; all
+seven images pulled anonymously from ghcr.io). Committed as one change set with the morning's
+docs (S3, MCP, the decisions), since they share files. Before committing, details of Kael's real
+orders written into the plan, RESUME and a test were taken out (the repo is public).
+**Kael, on Emmer:** `./luminous-money upgrade`. Then the next morning sync (or Sync now on the
+Amazon page) reads the 69 kept orders again and tags the marked items' splits in the book;
+`docker logs -t luminous-money-shops-1` shows it.
 
-**Next:** Kael reviews the calls and releases; then the order in docs/PLAN.md's Ahead (Funds B,
-the rest of Tags, more, funds per split, M20).
+**Next:** Kael reviews the 7 calls (M99); then the order in docs/PLAN.md's Ahead (Funds B, the
+rest of Tags, more, funds per split, M20).
 
 ## Before that (2026-11-19): MCP tried, S3 deferred, HSA tracking's questions and Tags, more's decisions
 
@@ -1332,7 +1336,7 @@ How it's put together:
 ## Next steps
 
 1. **The live deployment, on Emmer,** is up at `https://luminous.money` (since 2026-10-27;
-   see "Also" above), with Kael's real bank feed; the latest release is `v1.2.1`. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
+   see "Also" above), with Kael's real bank feed; the latest release is `v1.3.0`. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
    `LM_SOURCE=release`: the installer on 127.0.0.1:8080 behind Emmer's nginx, which has the
    certificate; then `70_dns.sh` and `80_web.sh`). The release's five images must be public on
    ghcr.io (a package's settings, once each) for an install to pull them.
@@ -1345,8 +1349,8 @@ How it's put together:
    declares his mortgage on Emmer. **Funds B's step 1 is out** (`v0.1.15`); Kael sets his
    Fidelity accounts up in funds.
 4. **MCP Server is out** (`v1.2.0`, [its plan](docs/milestones/.archived/mcp-server/PLAN.md)),
-   and works from Claude on the phone (Kael, 2026-11-19). **HSA tracking is built**
-   ([its plan](docs/milestones/.archived/hsa-tracking/PLAN.md), 2026-11-19), not yet released.
+   and works from Claude on the phone (Kael, 2026-11-19). **HSA tracking is out**
+   ([its plan](docs/milestones/.archived/hsa-tracking/PLAN.md), `v1.3.0`); Kael upgrades Emmer.
    **Next to build:** the order in [docs/PLAN.md](docs/PLAN.md)'s "Ahead" (Funds B first).
 5. Later, not pressing: [M99: Follow-ups](docs/milestones/m99-follow-ups/PLAN.md) (email,
    ownership transfer, the rest of M8's auth questions, and the rest of what's left over).
