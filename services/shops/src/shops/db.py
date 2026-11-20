@@ -259,6 +259,15 @@ class Db:
         rows = self.conn.execute("SELECT order_number FROM amazon_order WHERE book_id = ?", (book,)).fetchall()
         return {r["order_number"] for r in rows}
 
+    def unmarked_orders(self, book: str) -> set[str]:
+        """Orders kept before items' FSA or HSA marks were read (HSA tracking): read again once."""
+        rows = self.conn.execute("SELECT order_number, data FROM amazon_order WHERE book_id = ?", (book,)).fetchall()
+        return {
+            r["order_number"]
+            for r in rows
+            if any("hsa_fsa_eligible" not in i for i in json.loads(r["data"]).get("items") or [])
+        }
+
     def put_order(self, book: str, order_number: str, placed: str | None, data: dict[str, Any]) -> None:
         stamp = now()
         with self.lock:

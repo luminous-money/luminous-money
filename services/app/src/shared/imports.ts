@@ -3,6 +3,7 @@
  * types; the app API is small enough to share hand-written ones instead.)
  */
 export type { CsvProfile } from "@luminous-money/csv-import";
+import type { TagSource } from "./tags.js";
 
 /** What became of one CSV row. */
 export type Outcome =
@@ -63,6 +64,8 @@ export type ProposalSummary = {
   payee: string | null;
   confidence: number | null;
   reason: string | null;
+  /** The tags it put on splits, and who proposed each (HSA tracking; Tags, more). */
+  tags?: TagSource[];
 };
 
 /** Where a batch of rows came from: a CSV file, or a bank feed. */

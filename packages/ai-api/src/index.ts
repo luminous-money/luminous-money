@@ -31,6 +31,8 @@ export type AiSettings = {
   eagerness: Eagerness;
   /** What kinds of accounts you like, in your words. */
   guidance: string | null;
+  /** May it suggest tags (the book's own, and `hsa-fsa-eligible`)? On by default. */
+  suggest_tags: boolean;
   /** Null until first saved. */
   updated_at: string | null;
 };
@@ -38,7 +40,13 @@ export type AiSettings = {
 export type AiSettingsPatch = Partial<
   Pick<
     AiSettings,
-    "enabled" | "provider" | "itemize" | "create_accounts" | "eagerness" | "guidance"
+    | "enabled"
+    | "provider"
+    | "itemize"
+    | "create_accounts"
+    | "eagerness"
+    | "guidance"
+    | "suggest_tags"
   >
 > & { updated_at: string | null };
 
@@ -131,8 +139,13 @@ export type CategorizeHistory = {
   date: string;
   payee: string | null;
   narration: string | null;
-  postings: { account: string; amount: string | null; memo: string | null }[];
+  /** Each split's tags (none: left out). */
+  postings: { account: string; amount: string | null; memo: string | null; tags?: string[] }[];
 };
+
+/** A tag the book uses: how many transactions have it, and its first and last dates (a trip's
+ * tag spans its trip). */
+export type BookTag = { name: string; count: number; first: string; last: string };
 
 /** What the person's history says about one payee (from another system's history and the
  * book's own, recent transactions weighing more): where its transactions went, and for how
@@ -163,16 +176,21 @@ export type CategorizeIn = {
   history: CategorizeHistory[];
   /** The reference's entries for payees like these transactions' (none: not used). */
   reference?: PayeeReference[];
+  /** The tags it may suggest (with the book's "Suggest tags" on): the book's own, and
+   * `hsa-fsa-eligible` (HSA tracking), whether the book has it yet or not. */
+  tags?: BookTag[];
   currency: string;
 };
 
 /** Where a transaction's splits belong. */
 export type SplitProposal = {
   id: string;
-  /** Accounts for the splits it could place. */
-  splits: { index: number; account: string }[];
+  /** Accounts for the splits it could place, and tags for each (only ones it was offered). */
+  splits: { index: number; account: string; tags?: string[] }[];
   /** The account the transaction as a whole belongs to, for the splits it didn't place. */
   fallback: string | null;
+  /** Tags for the transaction as a whole (what the money was for). */
+  tags?: string[];
   /** 0 to 1: how likely the person is to accept it unchanged. */
   confidence: number;
   /** One short sentence the person sees in review. */

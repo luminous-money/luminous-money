@@ -7,6 +7,10 @@ left over to the largest; a gift card or rewards points paying part of a charge 
 its account (gift cards and other payments, and rewards points, as the connection says), so the
 bank's smaller amount still balances.
 
+An item Amazon marks FSA or HSA eligible says so on its line (`hsa_fsa_eligible`, HSA tracking);
+when every item of a charge is, so are its tax, shipping and gift wrap (`_eligible`), as Amazon's
+own eligible amount counts them.
+
 Amazon charges per shipment and doesn't say which items a charge paid for. An order charged
 once is all of it. One charged more than once is matched to its shipments by their sums
 (the order's total shared in proportion to each shipment's items); when that's clear, each
@@ -52,12 +56,32 @@ def _line(text: str, amount: Decimal, *, account: str | None = None, **more: Any
     return {"text": text, "amount": str(cents(amount)), "account": account, **more}
 
 
+def _marked(i: dict[str, Any]) -> dict[str, Any]:
+    """An item line's FSA or HSA mark, when Amazon gives it one."""
+    return {"hsa_fsa_eligible": True} if i.get("hsa_fsa_eligible") else {}
+
+
 def _items(items: list[dict[str, Any]], discount: Decimal) -> list[dict[str, Any]]:
     costs = [dec(i["price"]) * (i["quantity"] or 1) for i in items]
     return [
-        _line(i["title"], cost + share, quantity=i["quantity"] or 1, url=i.get("link"))
+        _line(i["title"], cost + share, quantity=i["quantity"] or 1, url=i.get("link"), **_marked(i))
         for i, cost, share in zip(items, costs, spread(discount, costs))
     ]
+
+
+# What a charge pays besides its items, eligible when all its items are.
+ALONG = ("Shipping", "Gift wrap", "Tax")
+
+
+def _eligible(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """`lines` with tax, shipping and gift wrap marked FSA or HSA eligible when every item line
+    is: the whole charge is then eligible, as Amazon's summary counts it."""
+    items = [line for line in lines if "quantity" in line]
+    if items and all(line.get("hsa_fsa_eligible") for line in items):
+        for line in lines:
+            if line["text"] in ALONG and not line["account"]:
+                line["hsa_fsa_eligible"] = True
+    return lines
 
 
 def _rest(totals: dict[str, Any], share: Decimal, other: str, rewards: str) -> list[dict[str, Any]]:
@@ -152,10 +176,11 @@ def _refund(order: dict[str, Any], refund: Decimal, discount: Decimal, grand: De
     full = sum(base) * grand / subtotal if subtotal and grand else sum(base)
     scale = min(Decimal(1), refund / full) if full else Decimal(1)
     lines = [
-        _line(i["title"], -(b * scale), quantity=i["quantity"] or 1, url=i.get("link")) for i, b in zip(found, base)
+        _line(i["title"], -(b * scale), quantity=i["quantity"] or 1, url=i.get("link"), **_marked(i))
+        for i, b in zip(found, base)
     ]
     left = -refund - sum(dec(line["amount"]) for line in lines)
-    return ([*lines, _line("Tax", left)] if cents(left) else lines), note
+    return _eligible([*lines, _line("Tax", left)] if cents(left) else lines), note
 
 
 def order_charges(
@@ -183,7 +208,7 @@ def order_charges(
         paid = -dec(c["amount"])
         lines = _items(items, discount) + _rest(totals, Decimal(1), other, rewards)
         note = None if not grand or cents(grand) == paid else f"Amazon's total for the order is {cents(grand)}."
-        out[c["id"]] = (_balanced(lines, paid, "Other (Amazon's total differs)"), note)
+        out[c["id"]] = (_eligible(_balanced(lines, paid, "Other (Amazon's total differs)")), note)
         return out
 
     # Charged more than once: by shipment, if the sums say which.
@@ -205,7 +230,7 @@ def order_charges(
         base = sum(bases[s] for s in groups[n])
         lines = _items(own, discount * base / subtotal) + _rest(totals, base / subtotal, other, rewards)
         out[c["id"]] = (
-            _balanced(lines, paid, "Other (its share of the order)"),
+            _eligible(_balanced(lines, paid, "Other (its share of the order)")),
             "Amazon charged this order in parts; these are the items its shipments' sums say this paid for.",
         )
     return out

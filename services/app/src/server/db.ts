@@ -25,6 +25,7 @@ import type { CategoryRule, CategoryRuleIn, RuleConditions } from "../shared/rul
 import type { ReconcileDraft } from "../shared/reconcile.js";
 import type { Occurrence, Rule, TransactionTemplate } from "../shared/schedule.js";
 import type { Loan, LoanAccounts } from "../shared/loans.js";
+import type { TagSource } from "../shared/tags.js";
 
 export type { ReconcileDraft };
 
@@ -430,6 +431,9 @@ export const MIGRATIONS: Migration[] = [
       ["PRIMARY KEY (user_id, book_id, account)"]
     ),
   ],
+  // 26: the tags a proposal put on splits, and who proposed each (HSA tracking; Tags, more):
+  // JSON `[{index, tag, by}]`, for review to say where a tag came from.
+  ["ALTER TABLE proposal ADD COLUMN tags TEXT"],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -489,15 +493,18 @@ export type StoredProposal = {
   payee: string | null;
   payee_categorizer: string | null;
   proposal: unknown;
+  /** The tags it put on splits, and who proposed each (a categorizer, or a shop). */
+  tags: TagSource[] | null;
   accepted: boolean | null;
   payee_accepted: boolean | null;
 };
 
 type ProposalRecord = Omit<
   StoredProposal,
-  "postings" | "proposal" | "accepted" | "payee_accepted"
+  "postings" | "proposal" | "tags" | "accepted" | "payee_accepted"
 > & {
   postings: string | null;
+  tags: string | null;
   proposal: string | null;
   accepted: number | null;
   payee_accepted: number | null;
@@ -509,6 +516,7 @@ const toProposal = (r: ProposalRecord): StoredProposal => ({
   ...r,
   postings: r.postings ? JSON.parse(r.postings) : null,
   proposal: r.proposal ? JSON.parse(r.proposal) : null,
+  tags: r.tags ? JSON.parse(r.tags) : null,
   accepted: bool(r.accepted),
   payee_accepted: bool(r.payee_accepted),
 });
@@ -1971,13 +1979,13 @@ export class AppDb {
     const stamp = now();
     const insert = this.db.prepare(
       `INSERT INTO proposal (transaction_id, book_id, request_id, incoming_id, categorizer, confidence, reason,
-         postings, payee, payee_categorizer, proposal, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         postings, payee, payee_categorizer, proposal, tags, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (transaction_id) DO UPDATE SET request_id = excluded.request_id,
          incoming_id = excluded.incoming_id, categorizer = excluded.categorizer,
          confidence = excluded.confidence, reason = excluded.reason, postings = excluded.postings,
          payee = excluded.payee, payee_categorizer = excluded.payee_categorizer,
-         proposal = excluded.proposal, accepted = NULL, payee_accepted = NULL,
+         proposal = excluded.proposal, tags = excluded.tags, accepted = NULL, payee_accepted = NULL,
          updated_at = excluded.updated_at`
     );
     transaction(this.db, () => {
@@ -1994,6 +2002,7 @@ export class AppDb {
           p.payee,
           p.payee_categorizer,
           p.proposal ? JSON.stringify(p.proposal) : null,
+          p.tags?.length ? JSON.stringify(p.tags) : null,
           stamp,
           stamp
         );
@@ -2022,7 +2031,21 @@ export class AppDb {
       payee: p.payee,
       confidence: p.confidence,
       reason: p.reason,
+      ...(p.tags ? { tags: p.tags } : {}),
     };
+  }
+
+  /** Add tags a shop said of a transaction's splits since its proposal was recorded (HSA
+   * tracking: an order read again with Amazon's marks), if it has one. */
+  addProposalTags(book: string, transaction: string, tags: TagSource[]): void {
+    const found = this.proposal(book, transaction);
+    if (!found || !tags.length) return;
+    const had = found.tags ?? [];
+    const more = tags.filter((t) => !had.some((h) => h.index === t.index && h.tag === t.tag));
+    if (!more.length) return;
+    this.db
+      .prepare("UPDATE proposal SET tags = ?, updated_at = ? WHERE transaction_id = ?")
+      .run(JSON.stringify([...had, ...more]), now(), transaction);
   }
 
   proposal(book: string, transaction: string): StoredProposal | undefined {

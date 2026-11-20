@@ -94,10 +94,11 @@ A bad configuration stops `app` at startup, rather than quietly categorizing les
         "narration": "POS DEBIT 0398 CORNER CAFE #42 CHICAGO IL",
         "postings": [
           { "account": "Assets:Bank:Checking", "amount": { "number": "-3.75", "currency": "USD" } },
-          { "account": "Expenses:Food:Coffee", "amount": { "number": "3.75", "currency": "USD" } }
+          { "account": "Expenses:Food:Coffee", "amount": { "number": "3.75", "currency": "USD" }, "tags": ["business"] }
         ]
       }
-    ]
+    ],
+    "tags": [{ "name": "business", "count": 1, "first": "2024-02-12", "last": "2024-02-12" }]
   }
 }
 ```
@@ -111,7 +112,9 @@ A bad configuration stops `app` at startup, rather than quietly categorizing les
   before the earliest transaction in the request, and anything after, from all accounts, never
   sampled. **Learn from `flag: "*"`** (confirmed by the user); `"!"` is still waiting for review.
   A posting's `amount` is null only where the ledger can't say without full booking (lots,
-  prices).
+  prices). A posting's `tags` (a split's, sorted) are left out when it has none.
+- **`context.tags`** (2026-11-19, HSA tracking): the tags `history` has, each with how many of
+  its transactions have it and its first and last dates (a trip's tag spans its trip).
 
 The context is the same for every provider in a run, and can be large (thousands of
 transactions). It's the user's financial history: run providers you trust with it.
@@ -139,6 +142,10 @@ transactions). It's the user's financial history: run providers you trust with i
   - **Several postings** (a split, e.g. a shop's charge as groceries and household) need
     amounts in the transaction's currency that sum to the negative of the transaction's amount.
 - **`payee`** (optional): a clean name for the payee. The bank's text stays the description.
+- **`tags`** (optional, 2026-11-19): tags for what the money was for, only ones in
+  `context.tags`, or `hsa-fsa-eligible` for spending an HSA or FSA can pay for. They're added
+  beside any the transaction has, never removing one, and count whether or not your `postings`
+  are the ones used: tags don't compete. They don't count toward acceptance.
 - **`confidence`:** 0 to 1, meant as the **chance the user accepts the proposal unchanged**. At
   0.9 or more, the transaction is settled and later providers aren't asked.
 - **`reason`:** one short sentence, shown in review next to the proposal.
@@ -156,7 +163,8 @@ place the splits themselves). Nothing about the API changed for them: it's still
 A proposal is dropped (and logged) if it names a transaction that wasn't asked about, gives a
 confidence outside 0 to 1, proposes an account that isn't an open leaf (or is the imported
 account itself), or proposes a split that doesn't balance. The rest of the response still
-counts.
+counts. A tag that isn't already a tag as Luminous Money writes them (lowercase, letters, digits
+and `-`, `_`, `/`, `.`) is dropped on its own.
 
 ### Failures
 

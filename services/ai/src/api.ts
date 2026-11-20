@@ -23,7 +23,7 @@ import {
 } from "@luminous-money/ai-api";
 
 import { StaleVersion, type AiDb, type Operation } from "./db.js";
-import { ReadFailed, type Meter, type Provider } from "./providers/types.js";
+import { offeredTags, ReadFailed, untagged, type Meter, type Provider } from "./providers/types.js";
 
 type Env = { Variables: { user: string } };
 export type Role = "owner" | "manage" | "write" | "read";
@@ -105,7 +105,7 @@ export function createApi({
       return c.json({ detail: `the provider is one of ${names.join(", ")}` }, 422);
     if (patch.eagerness !== undefined && !EAGERNESS.includes(patch.eagerness))
       return c.json({ detail: `eagerness is one of ${EAGERNESS.join(", ")}` }, 422);
-    for (const flag of ["enabled", "itemize", "create_accounts"] as const)
+    for (const flag of ["enabled", "itemize", "create_accounts", "suggest_tags"] as const)
       if (patch[flag] !== undefined && typeof patch[flag] !== "boolean")
         return c.json({ detail: `${flag} is true or false` }, 422);
     if (
@@ -236,7 +236,8 @@ export function createApi({
   });
 
   /** Where transactions' unconfirmed splits belong, with the book's guidance (and its
-   * account creation, if it's on). */
+   * account creation, if it's on), and the tags offered on them (with "Suggest tags" on: only
+   * those offered are kept). */
   api.post("/books/:book/categorize", async (c) => {
     const use = await ready(c);
     if (use.refused) return use.refused;
@@ -244,18 +245,22 @@ export function createApi({
     if (!Array.isArray(input?.transactions) || !Array.isArray(input.accounts) || !input.currency)
       return c.json({ detail: "send the transactions, the accounts and the currency" }, 422);
     const { settings } = use;
+    const tags = settings.suggest_tags && Array.isArray(input.tags) ? input.tags : [];
     return answer(c, "categorize", (meter) =>
-      use.provider.categorize(
-        {
-          ...input,
-          history: input.history ?? [],
-          reference: Array.isArray(input.reference) ? input.reference : [],
-          guidance: settings.guidance,
-          creation: settings.create_accounts ? { eagerness: settings.eagerness } : null,
-        },
-        use.credential,
-        meter
-      )
+      use.provider
+        .categorize(
+          {
+            ...input,
+            history: settings.suggest_tags ? (input.history ?? []) : untagged(input.history ?? []),
+            reference: Array.isArray(input.reference) ? input.reference : [],
+            tags,
+            guidance: settings.guidance,
+            creation: settings.create_accounts ? { eagerness: settings.eagerness } : null,
+          },
+          use.credential,
+          meter
+        )
+        .then((out) => offeredTags(out, new Set(tags.map((t) => t.name))))
     );
   });
 

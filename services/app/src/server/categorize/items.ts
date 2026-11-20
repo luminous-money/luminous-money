@@ -6,6 +6,9 @@
  * - **Confidence:** as history's, the winning share discounted for little history
  *   (`share × n / (n + 1)`), and by a fifth at another payee.
  * - One proposal per split, since each has its own confidence.
+ * - **Tags:** the ones the item's most recent confirmed split had, from the same place it learned
+ *   from (Tags, more's decision 11): an item tagged `#hsa-fsa-eligible` is again, and one whose
+ *   tag was taken off isn't.
  */
 import { payeeKey } from "../../shared/payees.js";
 import type { Categorizer, InternalProposal, Request } from "./types.js";
@@ -20,7 +23,7 @@ export const itemKey = (memo: string) =>
     .replace(/[^\p{L}\p{Nd}]+/gu, " ")
     .trim();
 
-type Past = { item: string; payee: string; account: string; date: string };
+type Past = { item: string; payee: string; account: string; date: string; tags: readonly string[] };
 
 function learned(history: Request["context"]["history"]): Past[] {
   return history.flatMap((t) =>
@@ -34,6 +37,7 @@ function learned(history: Request["context"]["history"]): Past[] {
                   payee: payeeKey(t.payee || t.narration || ""),
                   account: p.account,
                   date: t.date,
+                  tags: p.tags ?? [],
                 },
               ]
             : []
@@ -64,10 +68,17 @@ export const items: Categorizer = {
           ([, a], [, b]) => b.n - a.n || b.last.localeCompare(a.last)
         )[0]!;
         const total = found.length;
+        const latest = found.reduce((a, b) => (b.date > a.date ? b : a));
         return [
           {
             id: t.id,
-            splits: [{ index: s.index, account }],
+            splits: [
+              {
+                index: s.index,
+                account,
+                ...(latest.tags.length ? { tags: [...latest.tags] } : {}),
+              },
+            ],
             confidence: Number(((n / total) * (total / (total + 1)) * factor).toFixed(3)),
             reason: `${n} of ${total} past "${s.memo}" → ${account}`,
           },

@@ -114,4 +114,56 @@ describe("Shops' orders", () => {
     });
     assert.deepEqual(await again.json(), { received: 1, new: 0 });
   });
+
+  it("tags a line the shop marks HSA or FSA eligible, and one read before once it's marked (HSA tracking)", async () => {
+    const user = await newUser();
+    const book = await bookWithCard(user);
+    const send = (charges: unknown[]) =>
+      user.app(`/books/${book}/orders`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ charges }),
+      });
+    const marked = (c: ReturnType<typeof charge>, texts: string[]) => ({
+      ...c,
+      lines: c.lines.map((l) => (texts.includes(l.text) ? { ...l, hsa_fsa_eligible: true } : l)),
+    });
+    const transactionOf = async (id: string) => {
+      const list = (await (await user.app(`/books/${book}/orders?shop=amazon`)).json()) as Stored[];
+      const found = list.find((c) => c.id === id);
+      assert.equal(found?.state, "read");
+      const { data } = await user.ledger.GET(
+        "/api/ledger/v1/books/{book_id}/transactions/{directive_id}",
+        { params: { path: { book_id: book, directive_id: found!.transaction_id! } } }
+      );
+      return data!;
+    };
+    const tags = (t: { postings: { tags?: string[] | null }[] }) =>
+      t.postings.map((p) => p.tags ?? []);
+
+    await send([marked(charge("h1", "4242"), ["Paper towels, 12 rolls"]), charge("h2", "4242")]);
+    const first = await eventually(() => transactionOf("h1"));
+    assert.deepEqual(tags(first), [[], ["hsa-fsa-eligible"], [], [], []]);
+    const proposals = (await (await user.app(`/books/${book}/proposals`)).json()) as Record<
+      string,
+      { tags?: { index: number; tag: string; by: string }[] }
+    >;
+    assert.deepEqual(proposals[first.id]?.tags, [
+      { index: 1, tag: "hsa-fsa-eligible", by: "amazon" },
+    ]);
+
+    // Read again, with a mark it didn't have: its split is tagged, and nothing else changes.
+    const before = await eventually(() => transactionOf("h2"));
+    await send([marked(charge("h2", "4242"), ["Coffee beans"])]);
+    const after = await eventually(async () => {
+      const t = await transactionOf("h2");
+      assert.deepEqual(tags(t), [[], [], [], ["hsa-fsa-eligible"], []]);
+      return t;
+    });
+    assert.equal(after.flag, before.flag);
+    assert.deepEqual(
+      after.postings.map((p) => p.account),
+      before.postings.map((p) => p.account)
+    );
+  });
 });

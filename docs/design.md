@@ -467,7 +467,9 @@ How auth works (M8; the shape is M1's):
 - **There's no Traefik plugin.** The token logic lives in the `auth` service, in TypeScript.
 - **Services trust `X-User-Id`,** since they're only reachable through Traefik on the internal
   network. `app` passes it on when it calls the ledger as that user; `auth` does the same to
-  delete an account's books.
+  delete an account's books. That network is one flat network, though, so any container (`shops`'
+  headless Chromium, say) could call the ledger as anyone: scale readiness's S3, deferred
+  indefinitely (Kael, 2026-11-19).
 - **No special accounts.** Luminous Money may run as a public service, so anyone can sign up, and
   there's nothing global to administer: everyone is an ordinary user, including whoever runs the
   server. Operator tasks (reset links, disabling an account, key rotation) go through `auth`'s
@@ -1182,7 +1184,8 @@ pages: a shop's reader hands it charges (`shared/orders.ts`), and `server/orders
   charges: 86 itemized, 18 refunds and 6 parts of unclear orders a line each, 2 with no order
   (before refunds were matched to their items).
 - **The same charge again changes nothing** once read (keyed by the book, shop and its ID); one
-  still waiting takes what's new (its order may have been read since).
+  still waiting takes what's new (its order may have been read since). The exception is a line
+  newly marked HSA or FSA eligible ("Where tags come from: HSA tracking", below).
 - **The morning sync** (`orders/sync.ts`, a daily job at 09:00 in the book's zone, after the
   bank feeds): each book that's had a shop's charges, once a local day, as whoever sent them
   last; not while Amazon wants a person. That's said in **Notifications** ("Amazon wants you to
@@ -1231,7 +1234,7 @@ pages: a shop's reader hands it charges (`shared/orders.ts`), and `server/orders
   were moved rather than kept beside split tags as a shorthand, at Kael's call ("no one else is
   using this, and I'm happy to just lose any tags I've already used"). No registry: a tag
   exists while a split has it, without colors, descriptions or a hierarchy.
-- **In the books, the posting's `tags:`** (`tags: "#gift #hsa-eligible"`, one string, since
+- **In the books, the posting's `tags:`** (`tags: "#gift #hsa-fsa-eligible"`, one string, since
   Beancount metadata has no lists; the `#` so the text reads as tags and a search for `#gift`
   finds them), read leniently and refused (422) when a word isn't a tag. The ledger's API has
   them as `Posting.tags`, rendered into the metadata and read back out of it, so a split's
@@ -1293,6 +1296,52 @@ pages: a shop's reader hands it charges (`shared/orders.ts`), and `server/orders
   something exclusive and conserved. That's what funds are for (Funds A, below).
 - **Funds stay the transaction's** for now; a split's fund is [split-level tags and
   funds](milestones/split-level-tags-and-funds/PLAN.md)' second step.
+
+### Where tags come from: HSA tracking (2026-11-19)
+
+[HSA tracking](milestones/.archived/hsa-tracking/PLAN.md) has Kael's answers and what Amazon's
+pages showed. It brought [Tags, more](milestones/tags-more/PLAN.md)'s slice: the chain
+proposing tags. Rules', schedules' and receipts' Tags are still Tags, more's.
+
+- **One fixed tag for what an HSA or FSA can pay back, `hsa-fsa-eligible`** (`HSA_FSA_ELIGIBLE`,
+  Kael): the point is knowing, years later, which purchases qualified. Fixed rather than a
+  book's setting or a described tag, since Amazon's mark has one meaning and the AI is told to
+  look for it in every book; one tag for both, since Amazon's mark doesn't tell them apart.
+- **A shop's mark tags outright** (Kael: it's Amazon's word, not a guess): `OrderLine.hsa_fsa_eligible`
+  tags the line's split as the charge is itemized. When every item of a charge is marked, its
+  tax, shipping and gift wrap are too (`shops.lines._eligible`), as Amazon's own eligible amount
+  counts them; a mixed charge tags its items only (its tax would need splitting by Amazon's
+  amount, which is kept, `totals.hsa_fsa_eligible`, but not used).
+- **Orders read before the mark are read again once** (`Db.unmarked_orders`, at the next sync),
+  and **a charge already read takes the tag then** (`OrdersStore.receive` returns the newly
+  marked lines, `retag` adds the tag to the split with that memo and amount): only adding, the
+  transaction staying where it was, confirmed or not, since it's a fact. A split re-split since
+  isn't found and is left.
+- **Tags don't compete** (Tags, more's decision 3, as Kael settled it): every proposal's tags go
+  on its splits, whether or not its account won (`Decision.tags`, `{index, tag, by}`), a whole
+  transaction's on every split being placed; `placed()` adds them beside what's there, never
+  removing one, so orders, receipts, imports and Suggest categories all get them. A tag that
+  isn't already normal is dropped. Acceptance stays about accounts (decision 8).
+- **History** proposes a tag every one of the payee's past transactions it learned from has
+  (3 or more: a payee always `#business`, not a trip's), **item history** the tags of the item's
+  most recent confirmed split (decision 11, Kael): the chain doesn't ask the AI about a split
+  item history settled, so without it a repeat item would never be tagged; and one whose tag
+  was taken off isn't tagged again.
+- **The AI is offered the book's tags and `hsa-fsa-eligible`,** and only those are kept
+  (decision 7, with that one exception, Kael). The book's tags are its context's: the 14 months
+  of history categorizers already get, with each tag's count and dates (`contextTags`), rather
+  than another call to the ledger; a tag unused that long is unlikely to apply. They go in the
+  user message, since they change as the book is tagged; the instructions (`TAGS_INSTRUCTIONS`)
+  in the cached system prompt: a tag only when history shows it or a tag's dates fit, and
+  `hsa-fsa-eligible` on medical care as IRS Publication 502 counts it, not general health.
+- **"Suggest tags"** (an AI setting, `suggest_tags`, on by default, decision 9): off, the ai
+  service offers no tags, strips history's, and drops any in the answer. Amazon's mark is a
+  fact, so it tags either way.
+- **Review says where a tag came from:** the proposal record keeps its tags' sources
+  (`proposal.tags`, app migration 26; Amazon's as `by: "amazon"`), and a card lists each still on
+  its splits ("#hsa-fsa-eligible on Digital thermometer from Amazon's order").
+- **Paying one back isn't tracked yet** (Kael): decided when the first payback comes. The past
+  beyond Amazon is the MCP server's: Claude can tag past splits through `write_edit_transaction`.
 
 ### Search and the filter by accounts (2026-11-07)
 

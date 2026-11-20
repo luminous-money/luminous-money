@@ -19,7 +19,7 @@ import { createApi, type Role } from "../src/api.js";
 import { AiDb } from "../src/db.js";
 import { claude, type Client } from "../src/providers/claude.js";
 import { fake } from "../src/providers/fake.js";
-import { checkedFacts, ReadFailed } from "../src/providers/types.js";
+import { checkedFacts, checkedProposals, ReadFailed } from "../src/providers/types.js";
 
 const KEY = Buffer.alloc(32, 3).toString("base64");
 let db: AiDb;
@@ -397,6 +397,97 @@ describe("Claude", () => {
     expect(await read(new Anthropic.APIConnectionError({ message: "fetch failed" }))).toBe(
       "Claude couldn't be reached (is this server online?)"
     );
+  });
+});
+
+describe("tags (HSA tracking)", () => {
+  const HSA = { name: "hsa-fsa-eligible", count: 0, first: "2026-01-24", last: "2026-01-24" };
+  const FIRST_AID: CategorizeIn = {
+    ...CATEGORIZE,
+    transactions: [
+      {
+        ...CATEGORIZE.transactions[0]!,
+        splits: [
+          { index: 1, amount: "9.99", memo: "BANDAGES 30CT" },
+          { index: 2, amount: "9.99", memo: "MILK FRD ORG GAL" },
+        ],
+      },
+    ],
+    tags: [HSA],
+  };
+
+  it("are suggested only from those offered, and not at all with Suggest tags off", async () => {
+    await useFake();
+    const start = (await (await call("reader", "/books/b/settings")).json()) as AiSettings;
+    expect(start.suggest_tags).toBe(true);
+
+    const on = (await (
+      await call("writer", "/books/b/categorize", "POST", FIRST_AID)
+    ).json()) as CategorizeOut;
+    expect(on.proposals[0]!.splits.map((s) => s.tags)).toEqual([["hsa-fsa-eligible"], []]);
+    const notOffered = (await (
+      await call("writer", "/books/b/categorize", "POST", { ...FIRST_AID, tags: [] })
+    ).json()) as CategorizeOut;
+    expect(notOffered.proposals[0]!.splits.flatMap((s) => s.tags)).toEqual([]);
+
+    const off = (await (
+      await call("owner", "/books/b/settings", "PATCH", {
+        updated_at: start.updated_at,
+        suggest_tags: false,
+      })
+    ).json()) as AiSettings;
+    expect(off.suggest_tags).toBe(false);
+    const answered = (await (
+      await call("writer", "/books/b/categorize", "POST", FIRST_AID)
+    ).json()) as CategorizeOut;
+    expect(answered.proposals[0]!.splits.flatMap((s) => s.tags)).toEqual([]);
+    expect(
+      (
+        await call("owner", "/books/b/settings", "PATCH", {
+          updated_at: off.updated_at,
+          suggest_tags: "yes",
+        })
+      ).status
+    ).toBe(422);
+  });
+
+  it("Claude is told the tags it may use, and what hsa-fsa-eligible is for; with none, to leave them", async () => {
+    const opus = scripted({ proposals: [], new_accounts: [] });
+    await claude({ ...models, client: () => opus.client }).categorize(
+      { ...FIRST_AID, guidance: null, creation: null },
+      "sk-key"
+    );
+    const asked = JSON.stringify(opus.asked[0]);
+    expect(asked).toContain("Publication 502");
+    expect(asked).toContain('[{\\"name\\":\\"hsa-fsa-eligible\\"');
+
+    const none = scripted({ proposals: [], new_accounts: [] });
+    await claude({ ...models, client: () => none.client }).categorize(
+      { ...CATEGORIZE, guidance: null, creation: null },
+      "sk-key"
+    );
+    expect(JSON.stringify(none.asked[0])).toContain("Leave tags empty.");
+    expect(JSON.stringify(none.asked[0])).not.toContain("Publication 502");
+  });
+
+  it("an answer's tags are read, and odd ones left as an empty list", () => {
+    const out = checkedProposals({
+      proposals: [
+        {
+          id: "t1",
+          splits: [{ index: 1, account: "Expenses:Groceries", tags: ["hsa-fsa-eligible"] }],
+          fallback: null,
+          tags: "not a list",
+          confidence: 0.7,
+          reason: "",
+        },
+      ],
+      new_accounts: [],
+    });
+    expect(out.proposals[0]).toMatchObject({
+      splits: [{ index: 1, tags: ["hsa-fsa-eligible"] }],
+      tags: [],
+    });
   });
 });
 

@@ -1,10 +1,81 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-18._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-19._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-18, evening): scale readiness's S1, S2 and S4, released as `v1.2.1`
+## Latest (2026-11-19, later): HSA tracking, built (not released)
+
+Kael skipped the pharmacy receipt check (none to look at) and asked to explore his Amazon orders
+on Emmer, then write the detailed plan and build it. [The
+plan](docs/milestones/.archived/hsa-tracking/PLAN.md) (archived: built) has it all, with 7 calls
+made without asking ("Calls to review", listed in M99); design.md, "Where tags come from: HSA
+tracking", the reasons.
+
+- **Amazon's mark, read on Emmer** with the session `shops` keeps (no sign-in; four of Kael's
+  orders, nothing of them kept here): every item on an order's page has a
+  `data-component="healthBenefitAccountInformation"` block, "FSA or HSA eligible" when it is,
+  empty when not, inside the element amazon-orders keeps as `Item.parsed`, so no extra request;
+  the summary has the eligible amount, tax and shipping included.
+- **`shops`:** `marked_eligible` and `eligible_amount` (`amazon.py`); each item's
+  `hsa_fsa_eligible`; **orders kept before marks are read again once** at the next sync
+  (`Db.unmarked_orders`: 69 for Kael's book, at a second apart); `lines` marks an item's line,
+  and tax, shipping and gift wrap when every item of the charge is.
+- **`app`, orders:** `OrderLine.hsa_fsa_eligible` tags the split `hsa-fsa-eligible`
+  (`HSA_FSA_ELIGIBLE`, `shared/tags.ts`) outright; a charge already read whose lines come newly
+  marked is **re-tagged** (`OrdersStore.receive` returns it, `retag` adds the tag to the split
+  with that memo and amount, staying confirmed if it was).
+- **`app`, the chain (Tags, more's slice):** `Proposal.tags` and `splits[].tags`;
+  `Decision.tags` (`{index, tag, by}`) from **every** proposal; `placed()` adds them;
+  `history` (a tag all of 3+ past transactions have), `items` (the latest confirmed split's
+  tags); the context's tags (`contextTags`); the proposal record's `tags` (**app migration
+  26**), shown in review ("#hsa-fsa-eligible on … from Amazon's order", `TagSources` in
+  `Review.tsx`).
+- **The AI:** offered the book's tags plus `hsa-fsa-eligible`, keeps only those
+  (`categorize/ai.ts`, and `offeredTags` in the ai service); the schema's `tags`; instructions
+  (`TAGS_INSTRUCTIONS`); **"Suggest tags"** on the AI page (`suggest_tags`, **ai migration 3**,
+  on by default; off, no tags offered or kept). The fake provider tags a memo with bandage,
+  thermometer or first aid.
+- **The MCP server's base skill** names the tag, for tagging past spending through Claude (the
+  past beyond Amazon is the MCP server's, not a button).
+- **Tests:** `pnpm test` passed (app 364, ai 19, shops 21); `pnpm e2e` passed (API 124 of 124,
+  browser 152 of 152), with the new `tests/e2e/src/hsa.test.ts` and `tests/ui/src/hsa.spec.ts`.
+  The ledger's API didn't change.
+
+**Not released, nor committed** (Kael's call). Once released and on Emmer: the next morning sync
+(or Sync now on the Amazon page) reads the 69 kept orders again and tags the marked items'
+splits in the book; `docker logs -t luminous-money-shops-1` shows it.
+
+**Next:** Kael reviews the calls and releases; then the order in docs/PLAN.md's Ahead (Funds B,
+the rest of Tags, more, funds per split, M20).
+
+## Before that (2026-11-19): MCP tried, S3 deferred, HSA tracking's questions and Tags, more's decisions
+
+Docs only: no code changed, no release.
+
+- **The MCP server works with a real client:** Kael used it from Claude on the phone ("worked
+  great"); nothing turned up to fix. Checked off in docs/PLAN.md and the
+  [archived plan](docs/milestones/.archived/mcp-server/PLAN.md).
+- **S3 deferred indefinitely** (Kael): containers trusting each other's `X-User-Id` stays open
+  in [scale readiness](docs/milestones/scale-readiness/PLAN.md); design.md ("Routing and auth")
+  now says the network is flat, and that this is deferred.
+- **[HSA tracking](docs/milestones/.archived/hsa-tracking/PLAN.md)'s six questions answered**, in its
+  plan: one fixed tag, `#hsa-fsa-eligible`, for HSA and FSA both; Amazon's mark tags it
+  outright; the AI (wherever "Suggest tags" is on) and history propose it, the AI even in a book
+  without it yet (the one exception to Tags, more's decision 7); Tags, more's slice comes with
+  it, as Tags, more planned it; paying one back isn't in this milestone.
+- **[Tags, more](docs/milestones/tags-more/PLAN.md)'s decisions for that slice settled** (its
+  Decisions to review, 3 and 7 to 11): **every proposal's tags count**, whether or not its
+  account won (3, changed from "only those used"); the AI proposes only the book's tags (7);
+  tags don't count toward acceptance (8); "Suggest tags" on by default (9); history's payee rule
+  as planned (10); and, new, **item history carries the tags of the item's most recent
+  confirmed split** (11), since the chain never asks the AI about a split item history already
+  settled. 1, 2 and 4 to 6 (rules, schedules, receipts) still await Kael.
+
+**Next:** HSA tracking's plan, written with Kael. Before it: where Amazon shows its mark, read
+from a real order on Emmer; and whether pharmacy receipts mark eligible items.
+
+## Before that (2026-11-18, evening): scale readiness's S1, S2 and S4, released as `v1.2.1`
 
 Kael asked for S1, S2 and S4 of [scale readiness](docs/milestones/scale-readiness/PLAN.md),
 one commit each, then a release.
@@ -471,7 +542,7 @@ but three comments' paths to the migration's plan.
 - **New milestones:** [M99: Follow-ups](docs/milestones/m99-follow-ups/PLAN.md) (open questions,
   calls made without asking still to review, a bug, polish, and every archived plan's leftovers,
   by area; docs/PLAN.md's notes, Deferred, Open questions, Later and Polish moved there), [HSA
-  tracking](docs/milestones/hsa-tracking/PLAN.md) (Kael's brief, what's here, six questions),
+  tracking](docs/milestones/.archived/hsa-tracking/PLAN.md) (Kael's brief, what's here, six questions),
   and [split-level tags and funds](docs/milestones/split-level-tags-and-funds/PLAN.md) (from
   PLAN.md's "Funds and tags per split"). M18 and M20 have their briefs.
 - **docs/PLAN.md** is the milestones ahead, then those done (with the polish built), and how
@@ -1261,7 +1332,7 @@ How it's put together:
 ## Next steps
 
 1. **The live deployment, on Emmer,** is up at `https://luminous.money` (since 2026-10-27;
-   see "Also" above), with Kael's real bank feed; the latest release is `v1.1.0`. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
+   see "Also" above), with Kael's real bank feed; the latest release is `v1.2.1`. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
    `LM_SOURCE=release`: the installer on 127.0.0.1:8080 behind Emmer's nginx, which has the
    certificate; then `70_dns.sh` and `80_web.sh`). The release's five images must be public on
    ghcr.io (a package's settings, once each) for an install to pull them.
@@ -1273,10 +1344,10 @@ How it's put together:
 3. **Loans is out** (`v0.1.16` to `v0.1.18`, [its plan](docs/milestones/.archived/loans/PLAN.md)); Kael
    declares his mortgage on Emmer. **Funds B's step 1 is out** (`v0.1.15`); Kael sets his
    Fidelity accounts up in funds.
-4. **MCP Server is out** (`v1.2.0`, [its plan](docs/milestones/.archived/mcp-server/PLAN.md)):
-   Kael upgrades Emmer, connects claude.ai, and reports what turns up.
-   **Next to build:** HSA
-   tracking; the rest of the order is [docs/PLAN.md](docs/PLAN.md)'s "Ahead".
+4. **MCP Server is out** (`v1.2.0`, [its plan](docs/milestones/.archived/mcp-server/PLAN.md)),
+   and works from Claude on the phone (Kael, 2026-11-19). **HSA tracking is built**
+   ([its plan](docs/milestones/.archived/hsa-tracking/PLAN.md), 2026-11-19), not yet released.
+   **Next to build:** the order in [docs/PLAN.md](docs/PLAN.md)'s "Ahead" (Funds B first).
 5. Later, not pressing: [M99: Follow-ups](docs/milestones/m99-follow-ups/PLAN.md) (email,
    ownership transfer, the rest of M8's auth questions, and the rest of what's left over).
 

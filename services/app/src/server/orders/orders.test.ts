@@ -10,7 +10,7 @@ import type { OrderCharge } from "../../shared/orders.js";
 import type { AiPort } from "../ai.js";
 import { AppDb } from "../db.js";
 import { FakeLedger } from "../testing.js";
-import { readCharge, readWaiting, type OrderDeps } from "./read.js";
+import { readCharge, readWaiting, retag, type OrderDeps } from "./read.js";
 import { chargeProblem } from "./routes.js";
 import { shopNotifications, type ShopConnection, type ShopsPort } from "../shops.js";
 import { OrdersStore } from "./store.js";
@@ -206,11 +206,11 @@ describe("a shop's charge, as a receipt", () => {
 
   it("changes nothing when sent again once read; one still waiting takes what's new", async () => {
     const { orders } = setUp();
-    expect(orders.receive("b", "u", [charge()])).toBe(1);
+    expect(orders.receive("b", "u", [charge()]).added).toBe(1);
     orders.settle("b", "amazon", "c1", "read", null, "t1");
     expect(
       orders.receive("b", "u", [charge({ lines: [{ text: "Other", amount: "30.00" }] })])
-    ).toBe(0);
+    ).toEqual({ added: 0, marked: [] });
     expect(orders.charge("b", "amazon", "c1")?.lines).toHaveLength(4);
 
     orders.receive("b", "u", [charge({ id: "c2", card: null })]);
@@ -318,5 +318,111 @@ describe("the morning's shop sync, and Amazon wanting a person", () => {
       href: "/books/b/amazon",
     });
     expect(n!.detail).toMatch(/picture puzzle/);
+  });
+});
+
+describe("HSA tracking: a line the shop marks HSA or FSA eligible", () => {
+  const marked = (c: Partial<OrderCharge> = {}) =>
+    charge({
+      lines: [
+        { text: "Digital thermometer", amount: "20.00", hsa_fsa_eligible: true },
+        { text: "Coffee beans", amount: "12.00" },
+        { text: "Tax", amount: "3.00" },
+        { text: "Gift card", amount: "-5.00", account: "Income:Gifts" },
+      ],
+      ...c,
+    });
+
+  it("tags its split outright, and the record says the shop said so", async () => {
+    const { ledger, db, orders, deps } = setUp();
+    orders.receive("b", "u", [marked()]);
+    await readWaiting(deps, "b");
+
+    const [t] = ledger.transactions;
+    expect(t!.postings.map((p) => [p.meta?.["memo"], p.tags ?? []])).toEqual([
+      [undefined, []],
+      ["Digital thermometer", ["hsa-fsa-eligible"]],
+      ["Coffee beans", []],
+      ["Tax", []],
+      ["Gift card", []],
+    ]);
+    expect(db.proposal("b", t!.id)?.tags).toEqual([
+      { index: 1, tag: "hsa-fsa-eligible", by: "amazon" },
+    ]);
+    expect(db.proposalOf(t!.id)?.tags).toEqual([
+      { index: 1, tag: "hsa-fsa-eligible", by: "amazon" },
+    ]);
+  });
+
+  it("tags one already read when its lines come again newly marked, leaving it confirmed", async () => {
+    const { ledger, db, orders, deps } = setUp();
+    orders.receive("b", "u", [charge()]);
+    await readWaiting(deps, "b");
+    const [t] = ledger.transactions;
+    t!.flag = "*";
+
+    const sent = charge({
+      lines: charge().lines.map((l) =>
+        l.text.startsWith("Paper towels") ? { ...l, hsa_fsa_eligible: true } : l
+      ),
+    });
+    const { added, marked: again } = orders.receive("b", "u", [sent]);
+    expect(added).toBe(0);
+    expect(again.map((m) => m.lines.map((l) => l.text))).toEqual([["Paper towels, 12 rolls"]]);
+    expect(await retag(deps, "b", again[0]!.charge, again[0]!.lines)).toBe(1);
+
+    const after = await ledger.transaction("b", t!.id);
+    expect(after.flag).toBe("*");
+    expect(after.postings[1]!.tags).toEqual(["hsa-fsa-eligible"]);
+    expect(after.postings.slice(2).every((p) => !p.tags?.length)).toBe(true);
+    expect(db.proposal("b", t!.id)?.tags).toEqual([
+      { index: 1, tag: "hsa-fsa-eligible", by: "amazon" },
+    ]);
+    // Sent again as it is now, nothing more to do.
+    expect(orders.receive("b", "u", [sent]).marked).toEqual([]);
+  });
+
+  it("leaves a split the person changed since", async () => {
+    const { ledger, orders, deps } = setUp();
+    orders.receive("b", "u", [charge()]);
+    await readWaiting(deps, "b");
+    const [t] = ledger.transactions;
+    t!.postings[1]!.units = { number: "19.00", currency: "USD" };
+    t!.postings[2]!.units = { number: "13.00", currency: "USD" };
+    const sent = charge({
+      lines: charge().lines.map((l, i) => (i === 0 ? { ...l, hsa_fsa_eligible: true } : l)),
+    });
+    const { marked: again } = orders.receive("b", "u", [sent]);
+    expect(await retag(deps, "b", again[0]!.charge, again[0]!.lines)).toBe(0);
+  });
+
+  it("the AI is offered the tag; what it proposes lands, recorded as the AI's", async () => {
+    const { ledger, db, orders, deps, asked } = setUp();
+    const port = deps.aiFor!("u");
+    deps.aiFor = () => ({
+      ...port,
+      categorize: async (book, input) => {
+        const out = await port.categorize(book, input);
+        if ("ok" in out)
+          out.ok.proposals[0]!.splits[1]!.tags = ["hsa-fsa-eligible", "never-offered"];
+        return out;
+      },
+    });
+    orders.receive("b", "u", [charge()]);
+    await readWaiting(deps, "b");
+
+    expect(asked[0]!.tags?.map((t) => t.name)).toEqual(["hsa-fsa-eligible"]);
+    const [t] = ledger.transactions;
+    expect(t!.postings.map((p) => p.tags ?? [])).toEqual([[], [], ["hsa-fsa-eligible"], [], []]);
+    expect(db.proposal("b", t!.id)?.tags).toEqual([
+      { index: 2, tag: "hsa-fsa-eligible", by: "ai" },
+    ]);
+  });
+
+  it("must be true or false", () => {
+    const bad = charge({
+      lines: [{ text: "Thermometer", amount: "30.00", hsa_fsa_eligible: "yes" as never }],
+    });
+    expect(chargeProblem(bad)).toMatch(/hsa_fsa_eligible/);
   });
 });

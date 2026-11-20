@@ -1,8 +1,9 @@
 /**
  * A book's AI (M16): on or off, the provider and its API key (set or replaced, never shown
- * again), whether receipts are itemized by default, and whether the AI may open accounts (how
- * eagerly, with what guidance). Managers change them; members see them. If the ai service is
- * down, it says so: nothing AI is offered until it's back.
+ * again), whether receipts are itemized by default, whether the AI may open accounts (how
+ * eagerly, with what guidance), and whether it suggests tags (HSA tracking). Managers change
+ * them; members see them. If the ai service is down, it says so: nothing AI is offered until it's
+ * back.
  */
 import { useState } from "react";
 
@@ -248,6 +249,24 @@ function Form({ book, settings, manage }: { book: string; settings: Settings; ma
             </label>
           </>
         )}
+      </section>
+
+      <section className="card editor" aria-label="Tags">
+        <h2 className="section-title">Tags</h2>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={settings.suggest_tags}
+            disabled={!manage || patch.isPending}
+            onChange={(e) => change({ suggest_tags: e.target.checked })}
+          />
+          Suggest tags
+        </label>
+        <p className="small muted">
+          The book&rsquo;s own tags, where its history says so, and #hsa-fsa-eligible on what an HSA
+          or FSA can pay for. Amazon&rsquo;s &ldquo;FSA or HSA eligible&rdquo; items are tagged
+          either way.
+        </p>
       </section>
       {error && <p className="error">{explain(error)}</p>}
       {!manage && <p className="small muted">Only a manager of the book can change these.</p>}

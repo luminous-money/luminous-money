@@ -104,6 +104,8 @@ export function gap(facts: Pick<ReceiptFacts, "total" | "lines">): string | null
 export const sumOf = (facts: Pick<ReceiptFacts, "lines">) =>
   decimalOf(facts.lines.reduce((n, l) => n + cents(l.amount), 0));
 
+const tagList = z.array(z.string()).catch([]);
+
 const ProposalsSchema = z.object({
   proposals: z
     .array(z.unknown())
@@ -113,8 +115,11 @@ const ProposalsSchema = z.object({
         const proposal = z
           .object({
             id: z.string(),
-            splits: z.array(z.object({ index: z.number().int(), account: z.string() })).catch([]),
+            splits: z
+              .array(z.object({ index: z.number().int(), account: z.string(), tags: tagList }))
+              .catch([]),
             fallback: nullable(z.string()),
+            tags: tagList,
             confidence: z.number().min(0).max(1).catch(0.5),
             reason: z.string().catch(""),
           })
@@ -130,6 +135,24 @@ export function checkedProposals(answer: unknown): CategorizeOut {
   if (!parsed.success) throw new ReadFailed("the answer wasn't a categorization");
   return parsed.data;
 }
+
+/** `out` with only the tags in `offered` (none, with "Suggest tags" off): an answer never puts a
+ * tag on a split it wasn't offered (Tags, more's decision 7). */
+export function offeredTags(out: CategorizeOut, offered: ReadonlySet<string>): CategorizeOut {
+  const only = (tags?: string[]) => (tags ?? []).filter((tag) => offered.has(tag));
+  return {
+    ...out,
+    proposals: out.proposals.map((p) => ({
+      ...p,
+      splits: p.splits.map((s) => ({ ...s, tags: only(s.tags) })),
+      tags: only(p.tags),
+    })),
+  };
+}
+
+/** History without its tags: what the AI sees with "Suggest tags" off. */
+export const untagged = (history: CategorizeInput["history"]): CategorizeInput["history"] =>
+  history.map((t) => ({ ...t, postings: t.postings.map(({ tags: _t, ...p }) => p) }));
 
 const text = (description?: string) => ({
   anyOf: [{ type: "string" }, { type: "null" }],
@@ -199,7 +222,7 @@ export const PROPOSALS_JSON_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["id", "splits", "fallback", "confidence", "reason"],
+        required: ["id", "splits", "fallback", "tags", "confidence", "reason"],
         properties: {
           id: { type: "string" },
           splits: {
@@ -207,11 +230,20 @@ export const PROPOSALS_JSON_SCHEMA = {
             items: {
               type: "object",
               additionalProperties: false,
-              required: ["index", "account"],
-              properties: { index: { type: "integer" }, account: { type: "string" } },
+              required: ["index", "account", "tags"],
+              properties: {
+                index: { type: "integer" },
+                account: { type: "string" },
+                tags: { type: "array", items: { type: "string" }, description: "Usually none." },
+              },
             },
           },
           fallback: text("The account the transaction as a whole belongs to."),
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            description: "Tags for the transaction as a whole; usually none.",
+          },
           confidence: { type: "number", description: "0 to 1." },
           reason: { type: "string" },
         },

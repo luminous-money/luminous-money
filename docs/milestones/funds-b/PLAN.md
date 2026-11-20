@@ -611,7 +611,7 @@ like any milestone, it's planned with Kael when it starts. What it takes in, gat
   parts, and splitting deposits by share
   ([M15's plan](../.archived/m15-sub-accounts-of-linked-accounts/PLAN.md), "Out of scope").
 - **Restricted money:** gift cards, the HSA and escrow, counted as spendable or not (the
-  scenarios' theme 7). [HSA tracking](../hsa-tracking/PLAN.md) touches the HSA from the
+  scenarios' theme 7). [HSA tracking](../.archived/hsa-tracking/PLAN.md) touches the HSA from the
   spending side.
 - **Naming:** "funds" collides with mutual funds (scenario 43).
 - **A's known gaps** ([A's plan](../.archived/funds-a/PLAN.md), "Not in A"; still not built):

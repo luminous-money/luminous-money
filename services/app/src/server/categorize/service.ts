@@ -15,6 +15,7 @@ import { isUncategorized } from "../../shared/accounts.js";
 import { negate } from "../../shared/decimal.js";
 import { hasReceipt } from "../../shared/receipts.js";
 import type { CategoryRule } from "../../shared/rules.js";
+import type { TagSource } from "../../shared/tags.js";
 import type { AppDb, StoredProposal } from "../db.js";
 import type { LedgerPort } from "../ledger.js";
 import { categorize, placed, representative } from "./chain.js";
@@ -50,11 +51,13 @@ export function openToCategorizing(t: Transaction): Incoming | undefined {
 type Services = { db: AppDb; ledger: LedgerPort; book: { id: string; name: string } };
 
 /** What's stored of a decision for a transaction (review shows it; acceptance is measured
- * against it): the proposal standing for its category, and its payee's. */
+ * against it): the proposal standing for its category, and its payee's; and the tags put on its
+ * splits, and by whom. */
 export function proposalRecord(
   ids: { transaction: string; book: string; request: string; incoming: string },
   lead: Chosen | undefined,
-  payee: Chosen | undefined
+  payee: Chosen | undefined,
+  tags?: TagSource[]
 ): Parameters<AppDb["saveProposals"]>[0][number] {
   const { auto_confirm: _a, rule_id: _r, categorizer: _c, ...given } = lead ?? ({} as Chosen);
   return {
@@ -69,6 +72,7 @@ export function proposalRecord(
     payee: payee?.payee ?? null,
     payee_categorizer: payee?.categorizer ?? null,
     proposal: lead ? given : null,
+    tags: tags?.length ? tags : null,
   };
 }
 
@@ -87,7 +91,7 @@ async function apply(
   const { payee } = decision;
   const postings = placed(t.postings, incoming, decision);
   const lead = representative(decision, postings, incoming);
-  if (!lead && !payee) return false;
+  if (!lead && !payee && !decision.tags?.length) return false;
   // A rule's fund, on a transaction with no fund lines yet (Funds A).
   const lines = t.funds?.length ? undefined : decidedLines(decision, postings, funds);
   await ledger.patch(
@@ -105,7 +109,8 @@ async function apply(
     proposalRecord(
       { transaction: t.id, book: book.id, request: requestId, incoming: incoming.id },
       lead,
-      payee
+      payee,
+      decision.tags
     ),
   ]);
   return true;

@@ -6,7 +6,8 @@ MCP Server: plan
 > (2026-11-17), asked for skills, and settled the rest on 2026-11-18: `load_skill`, tools named
 > by what they do (`read_`, `write_`, `delete_`), gating by refusing, the domains below, uploads
 > later. No further spike: the first release is the speculative build, and what turns up with
-> real clients gets fixed after (Kael: he's the only user so far).
+> real clients gets fixed after (Kael: he's the only user so far). **Tried with a real client**
+> (Kael, 2026-11-19, Claude on the phone: "worked great"); nothing turned up to fix.
 
 ## The brief (Kael, 2026-11-14)
 

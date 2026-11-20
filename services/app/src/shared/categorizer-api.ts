@@ -45,8 +45,13 @@ export type HistoryTransaction = {
   payee: string | null;
   /** The description (for imported transactions, the bank's text). */
   narration: string | null;
-  postings: { account: string; amount: Money | null }[];
+  /** Each split's `tags`, sorted (none: left out). */
+  postings: { account: string; amount: Money | null; tags?: string[] }[];
 };
+
+/** A tag in the book's history: how many of `history`'s transactions have it, and the first and
+ * last dates (a trip's tag spans its trip). */
+export type ContextTag = { name: string; count: number; first: string; last: string };
 
 /** `POST <provider>/v1/categorize` */
 export type CategorizeRequest = {
@@ -61,6 +66,8 @@ export type CategorizeRequest = {
     accounts: ContextAccount[];
     /** Every transaction in the book from `from` on, oldest first, from all accounts. */
     history: HistoryTransaction[];
+    /** The tags `history` has, by name. A proposal may only use these, and `hsa-fsa-eligible`. */
+    tags?: ContextTag[];
   };
 };
 
@@ -78,6 +85,12 @@ export type Proposal = {
   postings?: { account: string; amount?: Money | null }[];
   /** A clean payee name ("Corner Cafe"), if the provider has one. */
   payee?: string | null;
+  /**
+   * Tags for what the money was for (the other side's splits): only ones in `context.tags`, or
+   * `hsa-fsa-eligible` for spending an HSA or FSA can pay for. Added beside any the transaction
+   * has, never removing one.
+   */
+  tags?: string[];
   /**
    * 0 to 1: how likely the user is to accept this unchanged. 0.9 or more settles the
    * transaction (later providers aren't asked). luminous-money measures acceptance per provider,

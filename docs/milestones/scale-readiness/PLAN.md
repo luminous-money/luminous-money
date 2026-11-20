@@ -1,7 +1,8 @@
 Scale readiness: plan
 ==================================================================================================
 
-> **Status: assessed (2026-11-18); S1, S2 and S4 fixed, the rest not planned or started.**
+> **Status: assessed (2026-11-18); S1, S2 and S4 fixed, S3 deferred indefinitely, the rest not
+> planned or started.**
 > Kael asked what it would take to run Luminous Money as a scalable public service: performance
 > bottlenecks, security gaps and deployment infrastructure. This is that assessment, read from
 > the code at `v1.2.0`, turned into a checklist. Nothing else here is decided: the open
@@ -39,7 +40,8 @@ service is a different product, and three kinds of work stand between here and t
       could have someone approve an MCP connection to their books. A Traefik `headers`
       middleware on every router (`deploy/gateway/routes.yml`): HSTS, a strict CSP,
       `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`.
-- [ ] **S3: any container can act as any user.** Services trust `X-User-Id` because only
+- [ ] **S3: any container can act as any user** (deferred indefinitely: Kael, 2026-11-19).
+      Services trust `X-User-Id` because only
       Traefik reaches them (design.md, "Routing and auth"), but all seven containers share one
       flat network (`compose.yaml` has no `networks:`). A compromised `shops` (a headless
       Chromium loading Amazon's pages) or `ai` could call the ledger as anyone. Split the
@@ -186,7 +188,8 @@ Needed either way:
 3. **Scaling out:** cells' control plane (or Postgres, Redis and a queue), durable jobs and
    schedules, upgrades without downtime, KMS, compliance.
 
-S1, S2 and S4 came ahead of the rest, on their own (Kael, 2026-11-18; `v1.2.1`).
+S1, S2 and S4 came ahead of the rest, on their own (Kael, 2026-11-18; `v1.2.1`). S3 is deferred
+indefinitely (Kael, 2026-11-19).
 
 ## Open questions
 

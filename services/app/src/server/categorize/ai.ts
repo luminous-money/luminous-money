@@ -6,15 +6,31 @@
  * whose migration turned the reference on), the reference's entries for payees like the
  * batch's, worked out from the imported history and the book's own (migrate/reference.ts).
  * Receipts and Suggest categories call it; imports and bank feeds don't (yet).
+ *
+ * **Tags** (HSA tracking; Tags, more): it's offered the book's tags (its context's) and
+ * `hsa-fsa-eligible`, which every book is, and its history carries each split's tags. Only tags
+ * it was offered are kept from its answer; the ai service drops them all when the book's
+ * "Suggest tags" is off.
  */
-import type { AiCost, CategorizeHistory } from "@luminous-money/ai-api";
+import type { AiCost, BookTag, CategorizeHistory } from "@luminous-money/ai-api";
 
 import { buildReference, entriesFor, seenInBook, type Seen } from "../migrate/reference.js";
 
 import { UNKNOWN } from "../../shared/accounts.js";
 import { payeeKey } from "../../shared/payees.js";
+import { HSA_FSA_ELIGIBLE } from "../../shared/tags.js";
 import type { AiPort } from "../ai.js";
 import type { Categorizer, InternalProposal, Request } from "./types.js";
+
+/** The tags it's offered: the book's (its context's), and `hsa-fsa-eligible` whether the book has
+ * it yet or not (Kael, 2026-11-19: the one exception to Tags, more's decision 7). */
+export function offered(request: Request): BookTag[] {
+  const tags = request.context.tags ?? [];
+  const today = new Date().toISOString().slice(0, 10);
+  return tags.some((t) => t.name === HSA_FSA_ELIGIBLE)
+    ? tags
+    : [...tags, { name: HSA_FSA_ELIGIBLE, count: 0, first: today, last: today }];
+}
 
 /** At most this much history goes with a request. */
 const HISTORY = 60;
@@ -79,6 +95,7 @@ export function aiCategorizer(
           account: p.account,
           amount: p.amount?.number ?? null,
           memo: p.memo ?? null,
+          ...(p.tags?.length ? { tags: p.tags } : {}),
         })),
       }));
     return ai.categorize(book, {
@@ -111,6 +128,7 @@ export function aiCategorizer(
             ).map(({ key: _k, weight: _w, ...entry }) => entry),
           }
         : {}),
+      tags: offered(request),
       currency,
     });
   };
@@ -120,6 +138,11 @@ export function aiCategorizer(
     async categorize(request: Request) {
       const proposals: InternalProposal[] = [];
       const reference = referenceOf(request);
+      const names = new Set(offered(request).map((t) => t.name));
+      const only = (tags?: string[]) => {
+        const kept = (tags ?? []).filter((tag) => names.has(tag));
+        return kept.length ? { tags: kept } : {};
+      };
       for (let i = 0; i < request.transactions.length; i += BATCH) {
         const answer = await ask(request, request.transactions.slice(i, i + BATCH), reference);
         const cost = "ok" in answer ? answer.ok.cost : answer.cost;
@@ -132,7 +155,9 @@ export function aiCategorizer(
         const proposed = new Set(answer.ok.new_accounts);
         const allowed = (account: string) => opens || !proposed.has(account);
         for (const p of answer.ok.proposals) {
-          const splits = p.splits.filter((s) => allowed(s.account));
+          const splits = p.splits
+            .filter((s) => allowed(s.account))
+            .map(({ tags, ...s }) => ({ ...s, ...only(tags) }));
           const fallback = p.fallback && allowed(p.fallback) ? p.fallback : null;
           const used = [...splits.map((s) => s.account), ...(fallback ? [fallback] : [])];
           const opening = [...proposed].filter((name) => opens && used.includes(name));
@@ -141,6 +166,7 @@ export function aiCategorizer(
             ...(splits.length ? { splits } : {}),
             ...(fallback ? { postings: [{ account: fallback }] } : {}),
             ...(opening.length ? { opens: opening } : {}),
+            ...only(p.tags),
             confidence: p.confidence,
             reason: p.reason,
           });

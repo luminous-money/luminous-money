@@ -3,6 +3,7 @@
  *
  * - `POST /orders` `{charges}`: a shop's reader hands the book its charges (shared/orders.ts);
  *   kept, then read into their transactions in the background (202, with how many were new).
+ *   One already read whose lines come newly marked HSA or FSA eligible has its splits tagged.
  * - `GET /orders?shop=`: what the book made of each, newest first.
  * - `POST /orders/read`: read the waiting ones now (what's left waiting, and why, is in the list).
  * - `POST /orders/:shop/:id/assign` `{transaction_id}`: read a waiting one (its card in no
@@ -15,7 +16,7 @@ import type { Hono } from "hono";
 import { add, isDecimal, isZero, negate } from "../../shared/decimal.js";
 import type { OrderCharge } from "../../shared/orders.js";
 import { LedgerError } from "../ledger.js";
-import { OrderProblem, readCharge, readWaiting, type OrderDeps } from "./read.js";
+import { OrderProblem, readCharge, readWaiting, retag, type OrderDeps } from "./read.js";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const SHOP = /^[a-z0-9-]{1,40}$/;
@@ -33,9 +34,12 @@ export function chargeProblem(c: OrderCharge): string | null {
   if (!Array.isArray(c.orders) || c.orders.some((o) => typeof o?.number !== "string"))
     return `${c.id}: \`orders\` is a list, each with its \`number\``;
   if (!Array.isArray(c.lines)) return `${c.id}: \`lines\` is a list`;
-  for (const l of c.lines)
+  for (const l of c.lines) {
     if (typeof l?.text !== "string" || typeof l.amount !== "string" || !isDecimal(l.amount))
       return `${c.id}: each line has its \`text\` and \`amount\``;
+    if (l.hsa_fsa_eligible !== undefined && typeof l.hsa_fsa_eligible !== "boolean")
+      return `${c.id}: a line's \`hsa_fsa_eligible\` is true or false`;
+  }
   const left = c.lines.reduce((sum, l) => add(sum, l.amount), c.amount);
   if (c.lines.length && !isZero(left))
     return `${c.id}: its lines come to ${add(left, negate(c.amount))}, not ${negate(c.amount)}`;
@@ -60,8 +64,14 @@ export function orderRoutes(
       const problem = chargeProblem(charge);
       if (problem) return c.json({ detail: problem }, 422);
     }
-    const added = deps.orders.receive(book, c.get("user"), body.charges);
+    const { added, marked } = deps.orders.receive(book, c.get("user"), body.charges);
     void reading(book);
+    void (async () => {
+      for (const { charge, lines } of marked)
+        await retag(deps, book, charge, lines).catch((error) =>
+          console.error(`orders: tagging ${book}'s charge ${charge.id} failed:`, error)
+        );
+    })();
     return c.json({ received: body.charges.length, new: added }, 202);
   });
 

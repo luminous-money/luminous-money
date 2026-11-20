@@ -21,6 +21,19 @@ export function toTag(text: string): string | null {
   return tag || null;
 }
 
+/** Whether `tag` is already a tag as `toTag` makes one: what a categorizer may propose. */
+export const isTag = (tag: unknown): tag is string => typeof tag === "string" && toTag(tag) === tag;
+
+/** The one tag HSA tracking puts on spending an HSA or FSA can pay back (Kael, 2026-11-19): a
+ * fixed name, since Amazon's mark says "FSA or HSA eligible" and the AI is told to look for it
+ * in every book, whether or not the book has it yet. */
+export const HSA_FSA_ELIGIBLE = "hsa-fsa-eligible";
+
+/** A tag something other than the person put on a split (HSA tracking; Tags, more): the split's
+ * index in the transaction, the tag, and `by` whom (a categorizer's name, or a shop's: `amazon`),
+ * so review can say where it came from. */
+export type TagSource = { index: number; tag: string; by: string };
+
 /** Whether `tags` (a split's) has every one of `wanted`: how tag filters match (AND). */
 export const hasTags = (tags: readonly string[] | null | undefined, wanted: readonly string[]) =>
   wanted.every((tag) => tags?.includes(tag));
@@ -70,6 +83,13 @@ export function withTags<P extends Tagged>(postings: readonly P[], wanted: reado
   for (const tag of had) if (!wanted.includes(tag)) out = withoutTag(out, tag);
   for (const tag of wanted) if (!had.includes(tag)) out = withTag(out, tag);
   return out;
+}
+
+/** `p` with `tags` added beside its own, never removing one: what a categorizer or a shop says
+ * of a split (HSA tracking). */
+export function adding<P extends Tagged>(p: P, tags: readonly string[]): P {
+  const missing = tags.filter((tag) => !p.tags?.includes(tag));
+  return missing.length ? { ...p, tags: sortedTags([...(p.tags ?? []), ...missing]) } : p;
 }
 
 /** `items` taking the tags of the splits they replace: itemizing (a receipt's or an order's lines

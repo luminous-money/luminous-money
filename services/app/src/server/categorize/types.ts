@@ -8,6 +8,7 @@
  * account, for whatever isn't placed otherwise) when there are several; `splits` place
  * particular ones.
  */
+import type { TagSource } from "../../shared/tags.js";
 import type {
   CategorizeRequest,
   FeedbackRequest,
@@ -30,9 +31,9 @@ export type OpenSplit = {
 /** A transaction to categorize: the external API's, and its splits still to place. */
 export type Incoming = IncomingTransaction & { splits: OpenSplit[] };
 
-/** The history, with what each split was (its `memo:`), for item history. */
+/** The history, with what each split was (its `memo:`), for item history, and its tags. */
 export type History = (Omit<HistoryTransaction, "postings"> & {
-  postings: { account: string; amount: Money | null; memo?: string | null }[];
+  postings: { account: string; amount: Money | null; memo?: string | null; tags?: string[] }[];
 })[];
 
 /** An account in the context, with its human words: for the AI (the external API has neither). */
@@ -58,8 +59,9 @@ export type InternalProposal = Proposal & {
   /** Where the transaction's own side lands, a part of the divided account it came into (M15):
    * a user's own rule. */
   part?: string;
-  /** Accounts for particular splits, by index (M16): item history and the AI. */
-  splits?: { index: number; account: string }[];
+  /** Accounts for particular splits, by index (M16): item history and the AI; and tags for each
+   * (HSA tracking). */
+  splits?: { index: number; account: string; tags?: string[] }[];
   /** Accounts it would open, used in its proposal: the AI, with the book's account creation on. */
   opens?: string[];
   /** The fund it's taken from or put toward, all of it (Funds A): a user's own rule. */
@@ -79,5 +81,11 @@ export type Chosen = InternalProposal & { categorizer: string };
 
 /** What the chain decided for one transaction: the category (its other side, or with several
  * splits its fallback), the accounts for particular splits, and the payee, each possibly from a
- * different categorizer. */
-export type Decision = { category?: Chosen; splits?: Map<number, Chosen>; payee?: Chosen };
+ * different categorizer; and the tags every proposal put on its splits, each with the first
+ * categorizer to propose it (tags don't compete: decision 3 of Tags, more, as Kael settled it). */
+export type Decision = {
+  category?: Chosen;
+  splits?: Map<number, Chosen>;
+  payee?: Chosen;
+  tags?: TagSource[];
+};

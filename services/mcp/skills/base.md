@@ -34,6 +34,9 @@ if several, ask which, unless they said.
 - **Staged and confirmed:** `flag` `!` is staged, waiting in review (imports, bank feeds,
   schedules and receipts arrive staged); `*` is confirmed. Confirming is setting `*`.
 - **Tags** are on splits (`tags` on a posting): a transaction's tags are its splits'.
+  `hsa-fsa-eligible` marks a split an HSA or FSA can pay back (medical care as IRS Publication
+  502 counts it); Amazon's marked items get it by themselves, and it goes on the item's split,
+  not the whole purchase.
 - **Fund lines** (`funds` on the transaction) say what money is for; the funds skill explains.
 - `"meta": {"budget": false}` on a transaction keeps it out of budgets (a once-in-twenty-years
   roof), while it counts everywhere else.

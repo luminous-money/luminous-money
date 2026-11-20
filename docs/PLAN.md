@@ -25,11 +25,6 @@ Two principles set the order:
 
 Roughly in order; each is elaborated with Kael when it starts.
 
-- [ ] **HSA tracking** (next; Kael, 2026-11-07; [noted](milestones/hsa-tracking/PLAN.md), not planned):
-      the AI tags every split that appears to pay for something HSA-eligible. Amazon says so on
-      its items, so its charges need no guess. Builds on Tags, more (the chain proposing tags) and
-      split-level tags (built); moved ahead of Tags, more (2026-11-14), so it brings the part of
-      that chain it needs.
 - [ ] **Funds B: Complex Fund Functionality** (Kael, 2026-11-02;
       [its plan](milestones/funds-b/PLAN.md)): everything else designed for funds, built in
       steps.
@@ -48,9 +43,11 @@ Roughly in order; each is elaborated with Kael when it starts.
         [71 scenarios](milestones/funds-b/scenarios.md) still to gut-check.
 - [ ] **Tags, more** (after M17; Kael, 2026-10-29): tags everywhere M17 left them out. Rules
       that add tags, Capture receipt's Tags, the AI and history proposing the book's own tags.
-      [Planned](milestones/tags-more/PLAN.md) 2026-10-29, not started; its decisions to review
-      await Kael. Tags are splits' since 2026-11-12, so it's to be read through that first
-      (schedules' Tags and transfers keeping their sides' tags came with split-level tags).
+      [Planned](milestones/tags-more/PLAN.md) 2026-10-29. **Its slice for HSA tracking is built**
+      (2026-11-19: the chain, history, item history and the AI proposing tags, "Suggest tags",
+      review saying where a tag came from; its decisions 3 and 7 to 11 settled by Kael). Left:
+      rules' Tags, Capture receipt's Tags and schedules' save-time check, with decisions 1, 2
+      and 4 to 6, which await Kael.
 - [ ] **Split-level tags and funds** (Kael, 2026-11-07;
       [its plan](milestones/split-level-tags-and-funds/PLAN.md)): often only part of a
       transaction is a fund's (one item of a receipt from Emergency), and the same is true of tags
@@ -75,7 +72,8 @@ Roughly in order; each is elaborated with Kael when it starts.
       not planned, not ordered): what running Luminous Money as a scalable public service
       would take. Four security fixes first (stored XSS through attachments, no security
       headers, containers trusting each other's `X-User-Id`, unbounded request bodies: all but
-      the third done 2026-11-18, `v1.2.1`), then
+      the third done 2026-11-18, `v1.2.1`; the third deferred indefinitely, Kael, 2026-11-19),
+      then
       the ledger's book cache and its one lock, state held in single processes, and the
       infrastructure (cells recommended over stateless replicas). Its open questions come
       first.
@@ -325,8 +323,17 @@ Each with its plan in [milestones/.archived](milestones/.archived/).
       OAuth from the start (`auth` the authorization server; the PWA's consent; Connected apps),
       93 tools named `read_`/`write_`/`delete_`, and twelve skills loaded with `load_skill`,
       each tool refusing until its domain's is. **Left over:** uploads (sending a receipt or a
-      file through MCP), in [M99](milestones/m99-follow-ups/PLAN.md); and whatever real clients
-      turn up.
+      file through MCP), in [M99](milestones/m99-follow-ups/PLAN.md). Tried with a real client
+      (Kael, 2026-11-19, Claude on the phone: "worked great"); nothing turned up to fix.
+- [x] **HSA tracking** (Kael, 2026-11-07; his answers and the plan 2026-11-19, built the same day:
+      [its plan](milestones/.archived/hsa-tracking/PLAN.md), not yet released): every split that
+      pays for something an HSA or FSA can pay for gets `#hsa-fsa-eligible`. Amazon's "FSA or HSA
+      eligible" mark (read from Kael's real orders on Emmer) tags an item outright, and its orders
+      kept before are read again once; history, item history and the AI propose it for the rest
+      (Tags, more's slice: proposals carrying tags, every proposal's tags counting, "Suggest
+      tags"), and review says where a tag came from. **Left over:** recording a payback, a mixed
+      charge's tax, an in-app search of past spending, and its 7 calls to review, in
+      [M99](milestones/m99-follow-ups/PLAN.md).
 
 ### Polish, built
 

@@ -37,10 +37,13 @@ Roles are the ledger's, asked as the caller (`X-User-Id`, set by the gateway).
    noted; only the book's charges are kept (by card: the included ones, or all, never the
    excluded; one with no card always), and ones no longer the book's are forgotten.
 3. Read each order behind the book's charges not read before, and any from the last 14 days
-   again, one at a time, a second apart: its items, totals, shipments and payment.
+   again, one at a time, a second apart: its items, totals, shipments and payment, and which
+   items Amazon marks "FSA or HSA eligible" (each item's `healthBenefitAccountInformation`
+   block; HSA tracking). Orders kept before that mark was read are read again once.
 4. Hand the book's charges to `app` (`POST /api/app/v1/books/{book}/orders`, as whoever
    synced), each with its lines (`shops.lines`: items, tax, shipping, a gift card or points from
-   their accounts), for it to itemize them into the book as receipts. `app` starts the morning's
+   their accounts; an eligible item's line says so, `hsa_fsa_eligible`, and so do the tax and
+   shipping when every item is), for it to itemize them into the book as receipts. `app` starts the morning's
    sync itself (09:00 in the book's zone).
 
 ## Configuration

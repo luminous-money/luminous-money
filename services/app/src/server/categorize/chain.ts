@@ -12,6 +12,10 @@
  * most confident fallback, and the payee its most confident one (the earlier categorizer wins a
  * tie). Whatever the confidence, a proposal is applied: weak ones get corrected in review.
  *
+ * **Tags don't compete** (HSA tracking; Tags, more's decision 3, as Kael settled it): every
+ * proposal's tags go on its splits, whether or not its account won, a whole transaction's on every
+ * split being placed. A tag that isn't already normal (`isTag`) is dropped.
+ *
  * Proposals are checked before they count: accounts must be open leaves (or ones the proposal
  * would open, well named), a split proposal's indexes the transaction's open splits, and a
  * split's amounts must balance the transaction. A categorizer that fails or times out is
@@ -19,7 +23,7 @@
  */
 import { isUncategorized } from "../../shared/accounts.js";
 import { add, isZero, negate } from "../../shared/decimal.js";
-import { inheriting } from "../../shared/tags.js";
+import { adding, inheriting, isTag, type TagSource } from "../../shared/tags.js";
 import type {
   Categorizer,
   Chosen,
@@ -75,6 +79,35 @@ export function invalid(p: InternalProposal, request: Request): string | null {
   return null;
 }
 
+/** `p` with only tags a categorizer may propose: normal ones, the rest dropped. */
+function cleanTags(p: InternalProposal): InternalProposal {
+  return {
+    ...p,
+    ...(p.tags ? { tags: p.tags.filter(isTag) } : {}),
+    ...(p.splits
+      ? { splits: p.splits.map((s) => (s.tags ? { ...s, tags: s.tags.filter(isTag) } : s)) }
+      : {}),
+  };
+}
+
+/** Every tag `proposals` (in the chain's order) put on `t`'s splits, once each, with the first to
+ * propose it: a whole transaction's on every split being placed, a split's on it. */
+function tagsOf(t: Incoming, proposals: Chosen[]): TagSource[] {
+  const out: TagSource[] = [];
+  const seen = new Set<string>();
+  const put = (index: number, tag: string, by: string) => {
+    if (seen.has(`${index} ${tag}`)) return;
+    seen.add(`${index} ${tag}`);
+    out.push({ index, tag, by });
+  };
+  for (const p of proposals) {
+    for (const tag of p.tags ?? []) for (const s of t.splits) put(s.index, tag, p.categorizer);
+    for (const s of p.splits ?? [])
+      for (const tag of s.tags ?? []) put(s.index, tag, p.categorizer);
+  }
+  return out;
+}
+
 /** Whether a transaction's postings proposal settles it: only with one split to place. */
 const settles = (t: Incoming, p: InternalProposal) =>
   !!p.postings && p.confidence >= SETTLE && t.splits.length <= 1;
@@ -102,12 +135,13 @@ export async function categorize(
       log(`categorizer ${c.name} failed: ${error instanceof Error ? error.message : error}`);
       continue;
     }
-    for (const p of proposals ?? []) {
-      const problem = invalid(p, { ...request, transactions: asked });
+    for (const given of proposals ?? []) {
+      const problem = invalid(given, { ...request, transactions: asked });
       if (problem) {
         log(`categorizer ${c.name}: dropped a proposal (${problem})`);
         continue;
       }
+      const p = cleanTags(given);
       all.push({ ...p, categorizer: c.name });
       const t = asked.find((x) => x.id === p.id)!;
       const done = settled.get(p.id)!;
@@ -128,12 +162,14 @@ export async function categorize(
         const best = most(mine.filter((p) => p.splits?.some((x) => x.index === s.index)));
         if (best) splits.set(s.index, best);
       }
+      const tags = tagsOf(t, mine);
       return [
         t.id,
         {
           category: most(mine.filter((p) => p.postings)),
           ...(splits.size ? { splits } : {}),
           payee: most(mine.filter((p) => p.payee)),
+          ...(tags.length ? { tags } : {}),
         },
       ];
     })
@@ -156,23 +192,27 @@ type PostingIn = {
  * replaces it (several postings: a provider's split of a bank row, each taking its tags); with
  * several, the fallback only fills splits that are still uncategorized, never one placed by
  * name. A rule may land the transaction's own side (its first posting) in a part of the divided
- * account it came into (M15).
+ * account it came into (M15). Each open split gains the decision's tags for it, beside its own.
  */
 export function placed<P extends PostingIn>(postings: P[], t: Incoming, d: Decision): PostingIn[] {
   const open = new Set(t.splits.map((s) => s.index));
   const other = d.category?.postings;
+  const tagsFor = (i: number) => d.tags?.flatMap((x) => (x.index === i ? [x.tag] : [])) ?? [];
   return postings.flatMap((p, i): PostingIn[] => {
     if (i === 0 && d.category?.part) return [{ ...p, account: d.category.part }];
     if (!open.has(i)) return [p];
+    const tagged = (out: PostingIn[]) => out.map((q) => adding(q, tagsFor(i)));
     const own = d.splits?.get(i)?.splits?.find((s) => s.index === i)?.account;
-    if (own) return [{ ...p, account: own, flag: "!" }];
+    if (own) return tagged([{ ...p, account: own, flag: "!" }]);
     if (other && other.length > 1 && t.splits.length === 1)
-      return inheriting(
-        other.map((x) => ({ account: x.account, units: x.amount ?? null, flag: "!" })),
-        [p]
+      return tagged(
+        inheriting(
+          other.map((x) => ({ account: x.account, units: x.amount ?? null, flag: "!" })),
+          [p]
+        )
       );
     const fills = t.splits.length === 1 || isUncategorized(p.account);
-    return [{ ...p, account: (fills && other?.[0]?.account) || p.account, flag: "!" }];
+    return tagged([{ ...p, account: (fills && other?.[0]?.account) || p.account, flag: "!" }]);
   });
 }
 

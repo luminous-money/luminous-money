@@ -15,6 +15,19 @@ Tags, more: tags in rules, schedules, receipts and the AI: plan
 > card's do), and `TransactionIn.tags` is gone. Done on the way: **schedules** show and edit
 > each split's tags (the splits editor has them), and **pairing a transfer** keeps each side's
 > tags on its split.
+>
+> **HSA tracking built its slice** (2026-11-19; [its plan](../.archived/hsa-tracking/PLAN.md),
+> answer 4; design.md, "Where tags come from: HSA tracking"): proposals carrying tags
+> (`Proposal.tags`, `splits[].tags`, `Decision.tags`, `placed()`, `proposal.tags`), history,
+> item history and the AI proposing them ("AI categorization" below, all of it, with "Suggest
+> tags"), and review saying where a tag came from. Decisions 3 and 7 to 11 were settled for it
+> (Kael, 2026-11-19; [below](#decisions-to-review)): 3 changed, so a proposal's tags count
+> whether or not its account won, and item history carries tags too (11). One exception to
+> decision 7: the AI may propose HSA tracking's fixed `#hsa-fsa-eligible` in a book that doesn't
+> have it yet. Two differences from what's below: the book's tags offered are its context's (14
+> months of history), not the ledger's `GET /tags`; and the AI's tags are per split too. **Left
+> for Tags, more:** rules', schedules' save-time check, receipts' (Capture receipt's Tags), and
+> pairing transfers (done 2026-11-12), with decisions 1, 2 and 4 to 6.
 
 ## What's there now
 
@@ -43,9 +56,11 @@ way:
 - **`InternalProposal.tags?: string[]`** (and the external API's `Proposal.tags`, optional, so
   `api_version` stays `"1"`, as the categorizer API says for additions that don't change
   meaning).
-- **`Decision.tags?: string[]`:** every tag proposed for the transaction by the categorizers
-  whose answers were used, with duplicates removed. A tag doesn't compete the way a category
-  does, so there's nothing to choose between. (Decision 3.)
+- **`Decision.tags?: string[]`:** every tag proposed for the transaction by any categorizer,
+  whether or not its account won, with duplicates removed. A tag doesn't compete the way a
+  category does, so there's nothing to choose between, and a categorizer that lost on the
+  account can still be right about the tag. Read through split-level tags: a proposal's tags go
+  on the split it was about. (Decision 3, as Kael settled it 2026-11-19.)
 - **Applying adds and never removes.** Tags go on alongside any the transaction already has
   (tagged in review, or from a schedule). Where a decision gets written:
   - `stagedTransaction` (imports and bank feeds): `tags: decision.tags ?? []`
@@ -139,6 +154,11 @@ The data path is there already; this is the editor, plus a check on save.
 - **`history.ts`** proposes a tag that every one of the payee's last confirmed transactions has
   (at least 3 of them), so a recurring `#business` payee carries it without a rule or the AI. A
   trip's tag rarely covers all of a payee's history, so it won't spread. (Decision 10.)
+- **`items.ts`** (item history, M16; added 2026-11-19, Kael, for HSA tracking) proposes the tags
+  the item's most recent confirmed split had, at the same payee if there is one, else at any (as
+  it picks the item's account). It matters because the chain doesn't ask a later categorizer
+  about a split already settled: without it, the AI never sees a repeat item to tag it.
+  (Decision 11.)
 
 ### Where the AI is asked
 
@@ -199,14 +219,20 @@ change.
 2. **A rule still needs a category;** tag-only rules go to Later. They'd need rules that apply
    after categorizing, and to transactions a rule didn't categorize.
 3. **Tags from different categorizers combine** (rule, history and AI), rather than the first
-   one winning as payee does.
+   one winning as payee does. **Settled, changed** (Kael, 2026-11-19): every proposal's tags
+   count, not only those whose account was used.
 4. **A rule's tags don't reach a row matched to your own transaction** (nothing categorizes
    it).
 5. **A rule made from a transaction doesn't copy its tags; a schedule made from one does.**
 6. **Capture receipt starts with the page's tag filter.**
-7. **The AI proposes only the book's existing tags,** never new ones.
+7. **The AI proposes only the book's existing tags,** never new ones. **Settled** (Kael,
+   2026-11-19), with one exception: HSA tracking's fixed `#hsa-fsa-eligible`.
 8. **Tags don't count toward a proposal being accepted.** Removing an AI tag doesn't count
-   against the AI. Counting tags separately can come later if the AI over-tags.
-9. **"Suggest tags" is on by default** with the book's AI.
+   against the AI. Counting tags separately can come later if the AI over-tags. **Settled**
+   (Kael, 2026-11-19).
+9. **"Suggest tags" is on by default** with the book's AI. **Settled** (Kael, 2026-11-19).
 10. **History proposes a tag that all of a payee's last 3 or more confirmed transactions
-    have.**
+    have.** **Settled** (Kael, 2026-11-19).
+11. **Item history proposes the tags the item's most recent confirmed split had** (Kael,
+    2026-11-19, over "every past one had it" and "3 or more, as for payees"). Same payee first
+    is Claude's reading, following how it picks the account.

@@ -8,7 +8,8 @@
  *   (with account creation on, the first split to `Expenses:Fake-Store`, proposed to open), and
  *   that account as the fallback. A transaction whose payee or narration contains a reference
  *   entry's payee (ignoring case) goes to that entry's most usual account instead, with "From
- *   the reference" as its reason.
+ *   the reference" as its reason. With `hsa-fsa-eligible` offered, a split whose memo says
+ *   bandage, thermometer or first aid is tagged with it.
  * - **A loan's table:** twelve payments of a made-up $12,000 loan at 6%, first due on the 1st
  *   of next January, with $100.00 of escrow each.
  * - **Cost:** each operation is one made-up call, `FAKE_CALL` ($0.0042), so costs can be shown
@@ -76,6 +77,11 @@ export const fake: Provider = {
           leaves.has(r.accounts[0].account) &&
           text.toLowerCase().includes(r.payee.toLowerCase())
       )?.accounts[0]!.account;
+    const eligible = input.tags?.some((tag) => tag.name === "hsa-fsa-eligible");
+    const tagsFor = (memo: string | null) =>
+      eligible && /bandage|thermometer|first aid/i.test(memo ?? "")
+        ? { tags: ["hsa-fsa-eligible"] }
+        : {};
     return {
       proposals: input.transactions.map((t) => {
         const known = referenced(`${t.payee ?? ""} ${t.narration ?? ""}`);
@@ -91,7 +97,7 @@ export const fake: Provider = {
           id: t.id,
           splits: t.splits.flatMap((s, i) => {
             const account = i === 0 && created ? created : category;
-            return account ? [{ index: s.index, account }] : [];
+            return account ? [{ index: s.index, account, ...tagsFor(s.memo) }] : [];
           }),
           fallback: category,
           confidence: 0.8,

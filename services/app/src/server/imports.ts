@@ -213,11 +213,11 @@ export async function prepareStage({
   const record = (ids: string[]) => {
     const uses = new Map<string, number>();
     const stored = ids.flatMap((id, i) => {
-      const { category, payee } = decided[i]!;
+      const { category, payee, tags } = decided[i]!;
       if (category?.rule_id) uses.set(category.rule_id, (uses.get(category.rule_id) ?? 0) + 1);
-      if (!category && !payee) return [];
+      if (!category && !payee && !tags?.length) return [];
       const ids = { transaction: id, book: book.id, request: request!.request_id };
-      return [proposalRecord({ ...ids, incoming: incoming[i]!.id }, category, payee)];
+      return [proposalRecord({ ...ids, incoming: incoming[i]!.id }, category, payee, tags)];
     });
     db.saveProposals(stored);
     db.countRuleUses(uses);
@@ -226,14 +226,15 @@ export async function prepareStage({
 }
 
 /** What a decision amounts to, for import results and review. */
-export function summarize({ category, payee }: Decision): ProposalSummary | null {
-  if (!category && !payee) return null;
+export function summarize({ category, payee, tags }: Decision): ProposalSummary | null {
+  if (!category && !payee && !tags?.length) return null;
   return {
     categorizer: category?.categorizer ?? null,
     accounts: category?.postings?.map((p) => p.account) ?? [],
     payee: payee?.payee ?? null,
     confidence: category?.confidence ?? null,
     reason: category?.reason ?? payee?.reason ?? null,
+    ...(tags?.length ? { tags } : {}),
   };
 }
 

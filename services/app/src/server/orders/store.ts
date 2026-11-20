@@ -1,7 +1,7 @@
 /** Shops' charges as the book keeps them (Amazon orders, step 2): see read.ts. */
 import { now, transaction, type DatabaseSync } from "@luminous-money/db";
 
-import type { OrderCharge, OrderState, StoredCharge } from "../../shared/orders.js";
+import type { OrderCharge, OrderLine, OrderState, StoredCharge } from "../../shared/orders.js";
 
 type Row = {
   shop: string;
@@ -23,15 +23,28 @@ const stored = (r: Row): StoredCharge & { user_id: string } => ({
   user_id: r.user_id,
 });
 
+/** A charge already read whose lines came newly marked HSA or FSA eligible, with those lines. */
+export type Marked = { charge: StoredCharge & { user_id: string }; lines: OrderLine[] };
+
+/** The lines of `sent` marked HSA or FSA eligible that weren't in `kept` (by text and amount). */
+function newlyMarked(kept: OrderCharge, sent: OrderCharge): OrderLine[] {
+  const was = (l: OrderLine) =>
+    kept.lines.some((k) => k.text === l.text && k.amount === l.amount && k.hsa_fsa_eligible);
+  return sent.lines.filter((l) => l.hsa_fsa_eligible && !was(l));
+}
+
 export class OrdersStore {
   constructor(private readonly db: DatabaseSync) {}
 
   /** Keep what a reader sent: new charges wait to be read; one still waiting takes what was
-   * sent (its lines may be better now its order's been read); one already read or left is left
-   * as it is. Returns how many were new. */
-  receive(book: string, user: string, charges: OrderCharge[]): number {
+   * sent (its lines may be better now its order's been read); one already read is left as it is,
+   * unless its lines come newly marked HSA or FSA eligible (HSA tracking): it takes what was
+   * sent, and is returned with those lines, for its splits to be tagged (`retag`). Returns how
+   * many were new, and those. */
+  receive(book: string, user: string, charges: OrderCharge[]): { added: number; marked: Marked[] } {
     const stamp = now();
     let added = 0;
+    const marked: Marked[] = [];
     transaction(this.db, () => {
       for (const c of charges) {
         const data = JSON.stringify(c);
@@ -47,15 +60,25 @@ export class OrdersStore {
             .run(book, c.shop, c.id, user, c.date, c.amount, data, stamp, stamp);
           added++;
         } else if (found.state === "waiting" && found.data !== data)
-          this.db
-            .prepare(
-              `UPDATE shop_charge SET user_id = ?, date = ?, amount = ?, data = ?, updated_at = ?
-               WHERE book_id = ? AND shop = ? AND id = ?`
-            )
-            .run(user, c.date, c.amount, data, stamp, book, c.shop, c.id);
+          this.update(book, user, c, data, stamp);
+        else if (found.state === "read" && found.data !== data) {
+          const lines = newlyMarked(JSON.parse(found.data) as OrderCharge, c);
+          if (!lines.length) continue;
+          this.update(book, user, c, data, stamp);
+          marked.push({ charge: this.charge(book, c.shop, c.id)!, lines });
+        }
       }
     });
-    return added;
+    return { added, marked };
+  }
+
+  private update(book: string, user: string, c: OrderCharge, data: string, stamp: string): void {
+    this.db
+      .prepare(
+        `UPDATE shop_charge SET user_id = ?, date = ?, amount = ?, data = ?, updated_at = ?
+         WHERE book_id = ? AND shop = ? AND id = ?`
+      )
+      .run(user, c.date, c.amount, data, stamp, book, c.shop, c.id);
   }
 
   /** A book's charges, newest first (one shop's, if named). */

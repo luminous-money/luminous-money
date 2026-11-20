@@ -52,7 +52,7 @@ import {
   unresolved,
   withCounterpart,
 } from "../lib/split.js";
-import { tagsOf, withTags } from "../../shared/tags.js";
+import { tagsOf, withTags, type TagSource } from "../../shared/tags.js";
 import { aiCostSentence } from "../lib/ai.js";
 import { holdingsOf, suggestedFund } from "../lib/funds.js";
 import { wholeLines } from "../../shared/funds.js";
@@ -539,6 +539,8 @@ function QueueItem({
             </ul>
           )}
 
+          <TagSources sources={proposal?.tags} postings={t.postings} />
+
           <PairedTransfer book={book} transaction={t} />
 
           <PartChoice
@@ -698,5 +700,51 @@ function MatchPanel({ book, row }: { book: string; row: ProposedMatch }) {
       )}
       {assign.error && <p className="error">{explain(assign.error)}</p>}
     </section>
+  );
+}
+
+/** Who put a tag on a split, as the card says it (HSA tracking; Tags, more). */
+const SOURCES: Record<string, string> = {
+  amazon: "from Amazon's order",
+  ai: "suggested by the AI",
+  history: "from history",
+  items: "from item history",
+  rules: "from a rule",
+};
+
+/**
+ * Where the tags that something other than the person put on its splits came from: a line per tag
+ * and source, still on its splits, naming them (by what they are) when there are several. Removing
+ * one is the transaction page's ×, as for any tag.
+ */
+function TagSources({
+  sources,
+  postings,
+}: {
+  sources: TagSource[] | undefined;
+  postings: Transaction["postings"];
+}) {
+  const still = (sources ?? []).filter((s) => postings[s.index]?.tags?.includes(s.tag));
+  if (!still.length) return null;
+  const groups = new Map<string, { tag: string; by: string; on: number[] }>();
+  for (const s of still) {
+    const key = `${s.tag} ${s.by}`;
+    const group = groups.get(key) ?? { tag: s.tag, by: s.by, on: [] };
+    group.on.push(s.index);
+    groups.set(key, group);
+  }
+  return (
+    <ul className="tag-sources small muted" aria-label="Where its tags came from">
+      {[...groups.values()].map(({ tag, by, on }) => {
+        const named =
+          postings.length > 2 ? on.map((i) => memoOf(postings[i]!) ?? `split ${i}`) : [];
+        return (
+          <li key={`${tag} ${by}`}>
+            #{tag}
+            {named.length ? ` on ${named.join(", ")}` : ""} {SOURCES[by] ?? `from ${by}`}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

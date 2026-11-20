@@ -11,6 +11,9 @@ export type OrderLine = {
   account?: string | null;
   quantity?: number;
   url?: string | null;
+  /** The shop marks it as something an HSA or FSA can pay for (Amazon's "FSA or HSA
+   * eligible"): its split is tagged `hsa-fsa-eligible` (HSA tracking). */
+  hsa_fsa_eligible?: boolean;
 };
 
 /** A charge to a card, as the shop shows it: negative a purchase, positive a refund. */

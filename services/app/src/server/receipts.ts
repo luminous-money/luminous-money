@@ -475,12 +475,13 @@ async function read({
   }
   if (attach) await ledger.attach(book, id, file);
   const lead = keeps ? undefined : representative(decision, postings, incoming);
-  if (db && request && (lead || decision.payee))
+  if (db && request && (lead || decision.payee || decision.tags?.length))
     db.saveProposals([
       proposalRecord(
         { transaction: id, book, request: request.request_id, incoming: incoming.id },
         lead,
-        decision.payee
+        decision.payee,
+        keeps ? undefined : decision.tags
       ),
     ]);
   return {

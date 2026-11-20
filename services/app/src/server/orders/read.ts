@@ -16,6 +16,10 @@
  *    Else it's **made, as a receipt is** (`source: "order"`), and the bank's copy is matched to it
  *    when it comes in.
  * 4. **It goes to review** (`!`), its order noted (`order:`, `order-url:`, `order-read:`).
+ *
+ * A line the shop marks HSA or FSA eligible (Amazon's mark) tags its split `hsa-fsa-eligible`,
+ * outright (HSA tracking; Kael, 2026-11-19), and the proposal record says it came from the
+ * shop. One already read whose lines come again newly marked gets the tag then (`retag`).
  */
 import type { Account, Transaction, TransactionIn } from "@luminous-money/ledger-client";
 import { addCost, NO_COST, type AiCost } from "@luminous-money/ai-api";
@@ -24,7 +28,7 @@ import { isUncategorized, UNCATEGORIZED, UNKNOWN } from "../../shared/accounts.j
 import { isNegative, negate } from "../../shared/decimal.js";
 import { landsIn } from "../../shared/divided.js";
 import type { OrderCharge, OrderState, StoredCharge } from "../../shared/orders.js";
-import { inheriting } from "../../shared/tags.js";
+import { adding, HSA_FSA_ELIGIBLE, inheriting, type TagSource } from "../../shared/tags.js";
 import type { AiPort } from "../ai.js";
 import { aiCategorizer } from "../categorize/ai.js";
 import { categorize, placed, representative } from "../categorize/chain.js";
@@ -82,6 +86,7 @@ export function chargePostings(
     account: l.account || other,
     units: units(l.amount),
     flag: "!" as const,
+    ...(l.hsa_fsa_eligible ? { tags: [HSA_FSA_ELIGIBLE] } : {}),
     meta: { memo: l.text },
   }));
   return {
@@ -101,6 +106,13 @@ export function chargePostings(
     },
   };
 }
+
+/** The tags a charge's shop put on its lines' splits (by index among the postings, the paying
+ * side first). */
+export const shopTags = (charge: OrderCharge): TagSource[] =>
+  charge.lines.flatMap((l, i) =>
+    l.hsa_fsa_eligible ? [{ index: i + 1, tag: HSA_FSA_ELIGIBLE, by: charge.shop }] : []
+  );
 
 /** The chain for a user's book: the built-in categorizers, then the book's AI if it's ready. */
 async function chainFor(deps: OrderDeps, user: string, book: string, currency: string) {
@@ -242,12 +254,19 @@ export async function readCharge(
     id = made!.id;
   }
   const lead = representative(decision, final, incoming);
-  if (lead || decision.payee)
+  const tags = [
+    ...shopTags(charge),
+    ...(decision.tags ?? []).filter(
+      (t) => !(t.tag === HSA_FSA_ELIGIBLE && charge.lines[t.index - 1]?.hsa_fsa_eligible)
+    ),
+  ];
+  if (lead || decision.payee || tags.length)
     deps.db.saveProposals([
       proposalRecord(
         { transaction: id, book, request: request.request_id, incoming: incoming.id },
         lead,
-        decision.payee
+        decision.payee,
+        tags
       ),
     ]);
   const how = target
@@ -261,6 +280,43 @@ export async function readCharge(
 }
 
 const waiting = (detail: string): Outcome => ({ state: "waiting", detail, transaction_id: null });
+
+/**
+ * Tag the splits of a charge already read that its shop now marks HSA or FSA eligible (HSA
+ * tracking: Amazon's orders read again for the mark): each newly marked line's split, found by
+ * its memo and amount, gains the tag. Only adds: the transaction stays where it is (confirmed
+ * stays confirmed), and a split the person has changed since isn't found and is left. Returns how
+ * many splits were tagged.
+ */
+export async function retag(
+  deps: OrderDeps,
+  book: string,
+  charge: StoredCharge & { user_id: string },
+  marked: OrderCharge["lines"]
+): Promise<number> {
+  if (!charge.transaction_id || !marked.length) return 0;
+  const ledger = deps.ledgerFor(charge.user_id);
+  const t = await ledger.transaction(book, charge.transaction_id);
+  const tagged: TagSource[] = [];
+  const postings = t.postings.map((p, i) => {
+    const line = marked.find(
+      (l) => p.meta?.["memo"] === l.text && !!p.units && sameNumber(p.units.number, l.amount)
+    );
+    if (!line || p.tags?.includes(HSA_FSA_ELIGIBLE)) return p;
+    tagged.push({ index: i, tag: HSA_FSA_ELIGIBLE, by: charge.shop });
+    return adding(p, [HSA_FSA_ELIGIBLE]);
+  });
+  if (!tagged.length) return 0;
+  await ledger.patch(
+    book,
+    t.id,
+    { postings: postings as TransactionIn["postings"] },
+    t.updated_at,
+    STAGING
+  );
+  deps.db.addProposalTags(book, t.id, tagged);
+  return tagged.length;
+}
 
 /** The side of a transaction that paid `amount`: on an account of money, exactly it. */
 function payingSide(t: Transaction, accounts: Account[], amount: string) {

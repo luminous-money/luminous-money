@@ -114,8 +114,16 @@ const EAGERNESS = {
   aggressive: "Open new, specific accounts freely whenever they'd describe a split better.",
 };
 
+/** What tags are for, when the book offers them ("Suggest tags"; HSA tracking). */
+export const TAGS_INSTRUCTIONS = [
+  "- tags: you may tag a split (its tags) or the transaction as a whole (tags), only with the tags offered with the transactions, written as offered. Tag only when the history shows it (this payee's or this item's past splits have the tag), or the transaction falls within a tag's dates and clearly belongs to it (a restaurant in Rome during italy-2026). Otherwise leave tags empty: most splits have none.",
+  "- hsa-fsa-eligible is always offered. Put it on each split that pays for something a health savings account (HSA) or flexible spending account (FSA) can pay for: medical care as IRS Publication 502 counts it, such as prescription and over-the-counter medicine, menstrual care products, bandages and first aid, medical devices and supplies (thermometers, braces and supports, blood pressure monitors), diagnostic tests (COVID and pregnancy tests), glasses, contact lenses and their solution, and care from doctors, dentists, clinics and pharmacies. Not general health or wellness (vitamins and supplements, toiletries, fitness) unless the line says it's prescribed. Put it on the item's split, not the rest of the receipt; a receipt's tax shares it only when every item on it is eligible.",
+];
+
 /** The categorizing system prompt's instructions: stable for a book. */
-export function categorizeSystem(input: Pick<CategorizeInput, "creation" | "guidance">): string {
+export function categorizeSystem(
+  input: Pick<CategorizeInput, "creation" | "guidance" | "tags">
+): string {
   const lines = [
     "You categorize transactions for a personal double-entry accounting app: for each transaction, choose the account each of its splits to place belongs in, from the book's chart of accounts.",
     "Answer with the JSON the schema describes.",
@@ -134,6 +142,8 @@ export function categorizeSystem(input: Pick<CategorizeInput, "creation" | "guid
       `- You may propose new accounts in new_accounts and use them: full names under Expenses or Income, each part capitalized, words joined by hyphens ("Expenses:Food:Coffee-Shops"), placed where they fit in the chart's hierarchy. ${EAGERNESS[input.creation.eagerness]}`
     );
   else lines.push("- Use only accounts in the chart; new_accounts stays empty.");
+  if (input.tags?.length) lines.push(...TAGS_INSTRUCTIONS);
+  else lines.push("- Leave tags empty.");
   if (input.guidance) lines.push("", `The person's guidance on accounts: ${input.guidance}`);
   return lines.join("\n");
 }
@@ -318,6 +328,11 @@ export function claude({ extractModel, categorizeModel, client }: ClaudeOptions)
                   ? `The book's history that bears on them (confirmed: the person's own choices):\n${JSON.stringify(input.history)}`
                   : "The book has no history that bears on them.",
                 ...(input.reference?.length ? [referenceText(input.reference)] : []),
+                ...(input.tags?.length
+                  ? [
+                      `The tags you may use (how many transactions have each, its first and last dates):\n${JSON.stringify(input.tags)}`,
+                    ]
+                  : []),
               ].join("\n\n"),
             },
           ],

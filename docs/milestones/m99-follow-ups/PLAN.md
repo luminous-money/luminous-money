@@ -12,8 +12,8 @@ M99: Follow-ups
 > item grows into real work, it becomes a milestone of its own and moves there. What belongs to
 > an active milestone lives in that milestone instead: [Funds B](../funds-b/PLAN.md), [Tags,
 > more](../tags-more/PLAN.md), [split-level tags and
-> funds](../split-level-tags-and-funds/PLAN.md), [HSA tracking](../hsa-tracking/PLAN.md),
-> [M20](../m20-design-polish/PLAN.md) and [scale readiness](../scale-readiness/PLAN.md).
+> funds](../split-level-tags-and-funds/PLAN.md), [M20](../m20-design-polish/PLAN.md) and [scale
+> readiness](../scale-readiness/PLAN.md).
 
 ## Open questions
 
@@ -51,6 +51,8 @@ Kael hasn't been recorded as going over these. Each is easy to change.
 - **Brokerage activity:** 5 ([its
   plan](../.archived/brokerage-activity/PLAN.md#as-built-2026-11-07-v0126), "Calls made without
   asking").
+- **HSA tracking:** 7 ([its plan](../.archived/hsa-tracking/PLAN.md#calls-to-review)), built
+  2026-11-19 with its plan at once, at Kael's asking.
 - **Kael's changes, 2026-11-12:** the split editor's 5 ([split-level tags and
   funds](../split-level-tags-and-funds/PLAN.md#the-split-editor-2026-11-12)); and, in design.md,
   a match with a confirmed transaction that can't take the bank's amount left proposed,
@@ -146,6 +148,12 @@ Mobile usability is [M20](../m20-design-polish/PLAN.md)'s.
 - **Renaming or merging a tag everywhere, OR filters ("any of"), tag-only rules, and
   tag-filtered budgets or "Spent this month"** (M17's "Not in M17"; [Tags,
   more](../tags-more/PLAN.md) leaves them here, its decision 2 for tag-only rules).
+- **HSA tracking, after** ([its plan](../.archived/hsa-tracking/PLAN.md), 2026-11-19): how a
+  payback is recorded (Kael: when the first one comes; a second tag and a "without this tag"
+  filter, or Funds B's restricted money); a mixed Amazon charge's tax split by Amazon's eligible
+  amount (kept by `shops`, `totals.hsa_fsa_eligible`), if Reports' totals should match it; an
+  in-app "find eligible spending" over past transactions, if the MCP server isn't enough; and
+  tuning what the AI is told is eligible, by what it proposes.
 
 ### Reports and budgets
 

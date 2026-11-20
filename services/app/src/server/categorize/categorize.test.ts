@@ -744,3 +744,144 @@ describe("splits (M16)", () => {
     ]);
   });
 });
+
+describe("tags (HSA tracking; Tags, more's slice)", () => {
+  const receipt = (): Incoming => ({
+    id: `r${next++}`,
+    date: "2024-03-01",
+    account: "Liabilities:Card",
+    amount: usd("-23.50"),
+    description: "Corner Pharmacy",
+    payee: "Corner Pharmacy",
+    splits: [
+      { index: 1, amount: usd("12.00"), memo: "BANDAGES 30CT" },
+      { index: 2, amount: usd("11.50"), memo: "CANDY BAR" },
+    ],
+  });
+  const postings = (t: Incoming) => [
+    { account: t.account, units: t.amount },
+    ...t.splits.map((s) => ({ account: "Expenses:Uncategorized", units: s.amount })),
+  ];
+
+  it("every proposal's tags count, whether or not its account won; odd ones are dropped", async () => {
+    const t = receipt();
+    const chain = [
+      fixed("history", (x) => [
+        {
+          id: x.id,
+          postings: [{ account: "Expenses:Food:Groceries" }],
+          tags: ["trip"],
+          confidence: 0.6,
+          reason: "",
+        },
+      ]),
+      fixed("ai", (x) => [
+        {
+          id: x.id,
+          splits: [
+            { index: 1, account: "Expenses:Food:Coffee", tags: ["hsa-fsa-eligible", "Not A Tag"] },
+          ],
+          tags: ["trip"],
+          confidence: 0.9,
+          reason: "",
+        },
+      ]),
+    ];
+
+    const d = (await categorize(chain, request([t]))).get(t.id)!;
+
+    expect(d.tags).toEqual([
+      { index: 1, tag: "trip", by: "history" },
+      { index: 2, tag: "trip", by: "history" },
+      { index: 1, tag: "hsa-fsa-eligible", by: "ai" },
+    ]);
+    // Each split's account is the most confident proposal's; the tags are everyone's, beside any
+    // the split had.
+    const before = postings(t).map((p, i) => (i === 2 ? { ...p, tags: ["gift"] } : p));
+    expect(placed(before, t, d).map((p) => [p.account, p.tags ?? []])).toEqual([
+      ["Liabilities:Card", []],
+      ["Expenses:Food:Coffee", ["hsa-fsa-eligible", "trip"]],
+      ["Expenses:Food:Groceries", ["gift", "trip"]],
+    ]);
+  });
+
+  it("history proposes a tag every one of 3 or more past transactions has", async () => {
+    const tagged = (tags: string[], date = "2024-01-01") => {
+      const h = past("COWORK SPACE", "Expenses:Food:Coffee", { date });
+      h.postings[1]!.tags = tags;
+      return h;
+    };
+    const ask = async (rows: HistoryTransaction[]) =>
+      (await history.categorize(request([row("COWORK SPACE")], rows))).proposals[0]!;
+
+    expect(
+      (await ask([tagged(["business"]), tagged(["business", "trip"]), tagged(["business"])])).tags
+    ).toEqual(["business"]);
+    expect((await ask([tagged(["business"]), tagged(["business"])])).tags).toBeUndefined();
+    expect(
+      (await ask([tagged(["business"]), tagged([]), tagged(["business"]), tagged(["business"])]))
+        .tags
+    ).toBeUndefined();
+  });
+
+  it("item history proposes the tags of the item's most recent confirmed split", async () => {
+    const bought = (date: string, tags: string[]) => ({
+      id: `h${next++}`,
+      date,
+      flag: "*",
+      payee: "Corner Pharmacy",
+      narration: "",
+      postings: [
+        { account: "Liabilities:Card", amount: usd("-12.00") },
+        { account: "Expenses:Food:Groceries", amount: usd("12.00"), memo: "Bandages 30ct", tags },
+      ],
+    });
+    const ask = async (history: HistoryTransaction[]) =>
+      (
+        await items.categorize({
+          ...request([receipt()]),
+          context: { from: "2023-01-01", accounts: ACCOUNTS, history },
+        })
+      ).proposals[0]!.splits;
+
+    expect(
+      await ask([bought("2024-01-01", []), bought("2024-02-01", ["hsa-fsa-eligible"])])
+    ).toEqual([{ index: 1, account: "Expenses:Food:Groceries", tags: ["hsa-fsa-eligible"] }]);
+    // Taken off the last time: not proposed again.
+    expect(
+      await ask([bought("2024-02-01", []), bought("2024-01-01", ["hsa-fsa-eligible"])])
+    ).toEqual([{ index: 1, account: "Expenses:Food:Groceries" }]);
+  });
+
+  it("Suggest categories puts the tags on, and records who proposed them", async () => {
+    const ledger = new FakeLedger();
+    ledger.addBook("b");
+    for (const a of ACCOUNTS) ledger.addAccount(a.name);
+    const db = new AppDb(join(mkdtempSync(join(tmpdir(), "app-")), "app.sqlite"));
+    const t = ledger.addTransaction({
+      date: "2024-03-01",
+      flag: "!",
+      payee: "Corner Pharmacy",
+      narration: "",
+      meta: {},
+      postings: [
+        { account: "Liabilities:Card", units: usd("-12.00") },
+        { account: "Expenses:Uncategorized", flag: "!", meta: { memo: "BANDAGES 30CT" } },
+      ],
+    } as never);
+    const ai = fixed("ai", (x) => [
+      {
+        id: x.id,
+        splits: [{ index: 1, account: "Expenses:Food:Groceries", tags: ["hsa-fsa-eligible"] }],
+        confidence: 0.7,
+        reason: "Bandages are first aid",
+      },
+    ]);
+
+    expect(
+      await suggestUnconfirmed({ db, ledger, book: { id: "b", name: "Book" }, categorizers: [ai] })
+    ).toBe(1);
+    expect((await ledger.transaction("b", t.id)).postings[1]!.tags).toEqual(["hsa-fsa-eligible"]);
+    expect(db.proposalOf(t.id)?.tags).toEqual([{ index: 1, tag: "hsa-fsa-eligible", by: "ai" }]);
+  });
+});

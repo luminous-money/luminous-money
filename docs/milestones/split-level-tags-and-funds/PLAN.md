@@ -3,7 +3,7 @@ Split-level tags and funds: plan
 
 > **Status: step 1 (tags per split) built** (2026-11-12, at Kael's asking: "moving tags from
 > transaction level to split level"; [as built](#as-built)), and [the split
-> editor](#the-split-editor-2026-11-12) after it, both released in `v0.1.27`; step 2 (funds per split) noted, not planned. [HSA tracking](../hsa-tracking/PLAN.md) waited on step 1;
+> editor](#the-split-editor-2026-11-12) after it, both released in `v0.1.27`; step 2 (funds per split) noted, not planned. [HSA tracking](../.archived/hsa-tracking/PLAN.md) waited on step 1;
 > [Funds B](../funds-b/PLAN.md) and [Tags, more](../tags-more/PLAN.md) sit beside it. Step 1's
 > calls made without asking are under [Calls to review](#calls-to-review).
 
@@ -147,7 +147,7 @@ theme 2).
    `tests/ui` (`m17.spec.ts`: a split tagged on the page, the ledger and Reports counting only
    it; `review.spec.ts`: a card's tag lands on its category's split).
 6. **Docs:** design.md ("Tags (M17)" rewritten for splits; the review card's note), this plan
-   ("As built"), [Tags, more](../tags-more/PLAN.md) and [HSA tracking](../hsa-tracking/PLAN.md)
+   ("As built"), [Tags, more](../tags-more/PLAN.md) and [HSA tracking](../.archived/hsa-tracking/PLAN.md)
    read through it, PLAN.md, the README's list, RESUME.md.
 
 `pnpm test` and `pnpm e2e` (it changes the ledger's API, the UI and the stack's data).

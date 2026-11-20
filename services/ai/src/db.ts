@@ -54,6 +54,8 @@ export const MIGRATIONS: Migration[] = [
     ]),
     "CREATE INDEX ai_usage_book ON ai_usage (book_id, created_at)",
   ],
+  // 3: "Suggest tags" (HSA tracking; Tags, more's decision 9: on by default).
+  ["ALTER TABLE ai_setting ADD COLUMN suggest_tags INTEGER NOT NULL DEFAULT 1"],
 ];
 
 /** An edit based on a version that has moved on. */
@@ -69,6 +71,7 @@ type Row = {
   create_accounts: number;
   eagerness: Eagerness;
   guidance: string | null;
+  suggest_tags: number;
   updated_at: string;
 };
 
@@ -101,6 +104,7 @@ export class AiDb {
       create_accounts: r?.create_accounts === 1,
       eagerness: r?.eagerness ?? "average",
       guidance: r?.guidance ?? null,
+      suggest_tags: r ? r.suggest_tags === 1 : true,
       updated_at: r?.updated_at ?? null,
     };
   }
@@ -120,6 +124,7 @@ export class AiDb {
           : {}),
         ...(patch.eagerness !== undefined ? { eagerness: patch.eagerness } : {}),
         ...(patch.guidance !== undefined ? { guidance: patch.guidance?.trim() || null } : {}),
+        ...(patch.suggest_tags !== undefined ? { suggest_tags: patch.suggest_tags ? 1 : 0 } : {}),
       });
     });
   }
@@ -208,18 +213,20 @@ export class AiDb {
       create_accounts: 0,
       eagerness: "average",
       guidance: null,
+      suggest_tags: 1,
       ...current,
       ...changes,
     };
     this.db
       .prepare(
         `INSERT INTO ai_setting (book_id, enabled, provider, credential, credential_hint, itemize,
-           create_accounts, eagerness, guidance, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           create_accounts, eagerness, guidance, suggest_tags, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (book_id) DO UPDATE SET enabled = excluded.enabled, provider = excluded.provider,
            credential = excluded.credential, credential_hint = excluded.credential_hint,
            itemize = excluded.itemize, create_accounts = excluded.create_accounts,
-           eagerness = excluded.eagerness, guidance = excluded.guidance, updated_at = excluded.updated_at`
+           eagerness = excluded.eagerness, guidance = excluded.guidance,
+           suggest_tags = excluded.suggest_tags, updated_at = excluded.updated_at`
       )
       .run(
         book,
@@ -231,6 +238,7 @@ export class AiDb {
         next.create_accounts,
         next.eagerness,
         next.guidance,
+        next.suggest_tags,
         stamp,
         stamp
       );

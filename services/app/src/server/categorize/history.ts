@@ -12,6 +12,9 @@
  * - **Confidence:** the winning share, discounted for little history (`share × n / (n + 1)`:
  *   1 of 1 is 0.5, 3 of 3 is 0.75, 20 of 20 about 0.95), and by a fifth each for a similar
  *   rather than identical key, and for another account.
+ * - **Tags:** a tag that every one of the past transactions it learned from has on its other
+ *   side, when there are 3 or more (Tags, more's decision 10): a payee that's always `#business`
+ *   stays so; a trip's tag, on only some of a payee's history, doesn't spread.
  *
  * Past transactions are seen from their balance-sheet side (an asset or liability), where an
  * import comes from.
@@ -27,7 +30,16 @@ import type { Categorizer, History, InternalProposal, Request } from "./types.js
 /** Accounts staging falls back to: never learned as a category. */
 const UNCATEGORIZED = new Set(["Expenses:Uncategorized", "Income:Uncategorized"]);
 
-type Past = { t: History[number]; key: string; account: string; other: string };
+type Past = {
+  t: History[number];
+  key: string;
+  account: string;
+  other: string;
+  tags: readonly string[];
+};
+
+/** At least this many past transactions, every one with a tag, for history to propose it. */
+const TAGGED = 3;
 
 /** The confirmed, categorized two-posting transactions in the context, with their keys, seen
  * from their balance-sheet side (where an import comes from). */
@@ -37,9 +49,9 @@ function learnable(history: History, balanceSheet: Set<string>): Past[] {
     const key = payeeKey(t.narration || t.payee || "");
     if (!key) return [];
     return t.postings.flatMap((p, i) => {
-      const other = t.postings[1 - i]!.account;
+      const { account: other, tags = [] } = t.postings[1 - i]!;
       return balanceSheet.has(p.account) && !UNCATEGORIZED.has(other)
-        ? [{ t, key, account: p.account, other }]
+        ? [{ t, key, account: p.account, other, tags }]
         : [];
     });
   });
@@ -83,10 +95,13 @@ function propose(
   const named = found
     .filter((p) => p.t.payee && p.t.payee !== p.t.narration)
     .sort((a, b) => b.t.date.localeCompare(a.t.date))[0];
+  const tags =
+    total >= TAGGED ? found[0]!.tags.filter((tag) => found.every((p) => p.tags.includes(tag))) : [];
   return {
     id: row.id,
     postings: [{ account }],
     ...(named ? { payee: named.t.payee } : {}),
+    ...(tags.length ? { tags: [...tags] } : {}),
     confidence,
     reason: `${n} of ${total} ${word} "${key}" → ${account}`,
   };

@@ -39,6 +39,12 @@ ORDER_PAUSE_SECONDS = 1.0
 # "it's not the end of the world if we miss one or two Amazon orders"), so each morning's is a
 # few pages, not every charge since the start.
 BACK_READ_DAYS = 15
+# Amazon's FSA or HSA mark (HSA tracking, read from real orders on Emmer 2026-11-19): every item
+# on an order's page has this block, holding "FSA or HSA eligible" when it is and empty when it
+# isn't; the order's summary has a line for the eligible amount, tax and shipping included.
+HEALTH_BENEFIT = '[data-component="healthBenefitAccountInformation"]'
+ELIGIBLE = re.compile(r"\beligible\b", re.I)
+FSA_HSA = re.compile(r"\b(FSA|HSA)\b")
 
 
 class NeedsPerson(Exception):
@@ -431,7 +437,7 @@ def belongs(last4: str | None, include: set[str], exclude: set[str]) -> bool:
     return not include or last4 in include
 
 
-def money(value: float | int | None) -> str | None:
+def money(value: float | int | Decimal | None) -> str | None:
     if value is None:
         return None
     return str(Decimal(str(value)).quantize(Decimal("0.01")))
@@ -451,6 +457,24 @@ def _config(directory: str) -> AmazonOrdersConfig:
     )
 
 
+def marked_eligible(parsed: Any) -> bool:
+    """Whether Amazon marks an item (its element, amazon-orders' `Item.parsed`) FSA or HSA
+    eligible: its `HEALTH_BENEFIT` block says so."""
+    block = parsed.select_one(HEALTH_BENEFIT) if parsed is not None else None
+    return bool(block and ELIGIBLE.search(block.get_text(" ", strip=True)))
+
+
+def eligible_amount(parsed: Any) -> str | None:
+    """The order's summary's eligible amount ("FSA or HSA eligible: (inc. tax and shipping)"),
+    if it has one."""
+    for label in parsed.select(".od-line-item-row-label") if parsed is not None else []:
+        if FSA_HSA.search(label.get_text(" ", strip=True)):
+            value = label.find_next_sibling()
+            number = re.search(r"-?[\d,]+\.\d{2}", value.get_text(" ", strip=True)) if value else None
+            return money(Decimal(number.group().replace(",", ""))) if number else None
+    return None
+
+
 def _order_data(order: Any) -> dict[str, Any]:
     def item(i: Any) -> dict[str, Any]:
         return {
@@ -459,6 +483,7 @@ def _order_data(order: Any) -> dict[str, Any]:
             "price": money(i.price),
             "asin": getattr(i, "asin", None),
             "link": i.link,
+            "hsa_fsa_eligible": marked_eligible(getattr(i, "parsed", None)),
         }
 
     fields = [
@@ -475,7 +500,10 @@ def _order_data(order: Any) -> dict[str, Any]:
         "last4": order.payment_method_last_4,
         "cancelled": getattr(order, "cancelled", False),
         "whole_foods": getattr(order, "is_whole_foods", False),
-        "totals": {f: money(getattr(order, f, None)) for f in fields},
+        "totals": {
+            **{f: money(getattr(order, f, None)) for f in fields},
+            "hsa_fsa_eligible": eligible_amount(getattr(order, "parsed", None)),
+        },
         "items": [item(i) for i in order.items or []],
         "shipments": [
             {
@@ -568,8 +596,10 @@ def sync(db: Db, data_dir: str, book: str, step: Callable[[str], None]) -> dict[
 
     known = db.order_numbers(book)
     recent = (today - datetime.timedelta(days=RECENT_DAYS)).isoformat()
+    # And, once, every order kept before items' FSA or HSA marks were read (HSA tracking).
     wanted = sorted(
         {r["order_number"] for r in rows if r["order_number"] and (r["order_number"] not in known or r["date"] >= recent)}
+        | db.unmarked_orders(book)
     )
     orders = AmazonOrders(session)
     failed: list[str] = []
