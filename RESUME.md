@@ -21,6 +21,10 @@ ledger didn't. Now it does:
   ledger's filter now has two "All"s. `pnpm test` and `pnpm e2e` passed (API 124 of 124,
   browser 153 of 153).
 
+**Released** (the workflow and CI green; all seven images pulled anonymously from ghcr.io).
+**Kael, on Emmer:** `./luminous-money upgrade`. **Next:** Kael reviews HSA tracking's 7 calls
+(M99); then docs/PLAN.md's Ahead (Funds B first).
+
 ## Before that (2026-11-21): HSA tracking, live on Emmer and checked
 
 Kael asked to finish whatever was left of the HSA work. On Emmer, read through the API and the
@@ -1408,7 +1412,7 @@ How it's put together:
 ## Next steps
 
 1. **The live deployment, on Emmer,** is up at `https://luminous.money` (since 2026-10-27;
-   see "Also" above), with Kael's real bank feed; the latest release is `v1.4.0`. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
+   see "Also" above), with Kael's real bank feed; the latest release is `v1.5.0`. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
    `LM_SOURCE=release`: the installer on 127.0.0.1:8080 behind Emmer's nginx, which has the
    certificate; then `70_dns.sh` and `80_web.sh`). The release's five images must be public on
    ghcr.io (a package's settings, once each) for an install to pull them.
