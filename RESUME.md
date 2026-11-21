@@ -1,10 +1,29 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-20._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-21._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-20): HSA tracking's documentation, released as `v1.4.0`
+## Latest (2026-11-21): HSA tracking, live on Emmer and checked
+
+Kael asked to finish whatever was left of the HSA work. On Emmer, read through the API and the
+logs (nothing of it written here but counts):
+
+- **`v1.3.0`'s first sync** (2026-11-20, Kael upgraded) re-read the 69 kept orders and tagged the
+  eligible items of 7 Amazon transactions (6 orders), confirmed ones staying confirmed.
+- **`v1.4.0`'s first sync** (2026-11-21, Kael upgraded; the morning sync, not an extra one)
+  saved the 6 eligible orders' invoices (1.1 MB in all) and attached them: each of the 7
+  transactions holds one PDF (an order charged twice has it on both).
+- **Past spending outside Amazon, tagged at Kael's OK** (through the ledger's API, a dry run
+  first): 36 splits in 31 transactions, in the health expense accounts he chose, supplements left
+  out; refund and discount lines tagged too, so totals net. That's M99's "the past beyond Amazon"
+  done once, by Claude rather than a button.
+- **The book now:** 38 transactions with `#hsa-fsa-eligible`, 9 holding a file, 29 without
+  (`/transactions?tag=hsa-fsa-eligible&receipt=no`): Kael's to attach (statements, superbills).
+
+**Next:** Kael reviews the 7 calls (M99); then docs/PLAN.md's Ahead (Funds B first).
+
+## Before that (2026-11-20): HSA tracking's documentation, released as `v1.4.0`
 
 Kael saw the 7 calls (no changes yet) and added: HSA and FSA purchases need documentation. Amazon's
 should have a hard copy of the invoice on the transaction; others mostly come from a read
