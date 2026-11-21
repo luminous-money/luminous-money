@@ -4,7 +4,7 @@ Where We Left Off
 _Updated 2026-11-20._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-20): HSA tracking's documentation: invoices attached, "No receipt"
+## Latest (2026-11-20): HSA tracking's documentation, released as `v1.4.0`
 
 Kael saw the 7 calls (no changes yet) and added: HSA and FSA purchases need documentation. Amazon's
 should have a hard copy of the invoice on the transaction; others mostly come from a read
@@ -32,7 +32,8 @@ it as built; design.md ("Where tags come from: HSA tracking") the reasons.
   passed (API 124 of 124, browser 152 of 152; the new checks are in `hsa.test.ts` and
   `hsa.spec.ts`).
 
-**Kael, on Emmer:** `./luminous-money upgrade` (to `v1.4.0` once it's out, below). The next sync
+**Released** as `v1.4.0` (the workflow and CI green; all seven images pulled anonymously from
+ghcr.io). **Kael, on Emmer:** `./luminous-money upgrade` (straight to `v1.4.0`). The next sync
 re-reads the 69 kept orders (from `v1.3.0`), saves the invoices of those with an eligible item,
 and the book's eligible charges get their tag and invoice; `docker logs -t
 luminous-money-shops-1` shows it, and the sync's status counts "invoices saved".
@@ -1371,7 +1372,7 @@ How it's put together:
 ## Next steps
 
 1. **The live deployment, on Emmer,** is up at `https://luminous.money` (since 2026-10-27;
-   see "Also" above), with Kael's real bank feed; the latest release is `v1.3.0`. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
+   see "Also" above), with Kael's real bank feed; the latest release is `v1.4.0`. Kael's ~/Setup has it (`scripts/emmer/65_luminous-money.sh`, with
    `LM_SOURCE=release`: the installer on 127.0.0.1:8080 behind Emmer's nginx, which has the
    certificate; then `70_dns.sh` and `80_web.sh`). The release's five images must be public on
    ghcr.io (a package's settings, once each) for an install to pull them.
