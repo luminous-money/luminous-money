@@ -152,3 +152,20 @@ def test_attached_keeps_those_holding_a_file_or_those_holding_none(ledger, book,
     assert found(False) == [made["barn"]]
     rows = http(ledger).get(f"/api/ledger/v1/books/{book}/journal", params={"attached": "false"}).json()["rows"]
     assert made["megamart"] not in [r["id"] for r in rows]
+
+
+def test_an_account_ledger_keeps_those_holding_a_file_or_none_with_its_balances(ledger, book, made):
+    """Attachments filter an account's ledger too (2026-11-21), its running balances the account's."""
+    ledger.attach(book, made["truck"], "receipt.jpg", "image/jpeg", b"made up")
+
+    def found(attached):
+        page = ledger.account_ledger(book, "Assets:Bank:Checking", attached=attached)
+        return [(r.id, r.balance.number) for r in page.rows]
+
+    assert found(True) == [(made["truck"], "-21.00")]
+    assert found(False) == [(made["juice"], "-25.00"), (made["barn"], "-12.00")]
+    assert len(found(None)) == 3
+    over_http = http(ledger).get(
+        f"/api/ledger/v1/books/{book}/accounts/Assets:Bank:Checking/ledger", params={"attached": "true"}
+    )
+    assert [r["id"] for r in over_http.json()["rows"]] == [made["truck"]]

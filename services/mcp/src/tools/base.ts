@@ -19,6 +19,10 @@ const PAGE = {
   tag: strs("Only transactions with a split that has every one of these tags."),
   date: date("The page starting on or before this date (newest first)."),
   reconciled: bool("Only reconciled transactions (true), or only those not (false)."),
+  attached: bool(
+    "Only those holding a file, a receipt say (true), or none (false). With the tag " +
+      "hsa-fsa-eligible: eligible spending still needing its receipt."
+  ),
   cursor: str("The `next_cursor` of the page before, for the next (older) page."),
   limit: int("How many (default 50, at most 1000)."),
 };
@@ -81,10 +85,6 @@ export const baseTools: Tool[] = [
       ...PAGE,
       account: strs("Only transactions with a split in one of these accounts or under one."),
       budgeted: bool("Only those counted in budgets (true), or only those kept out (false)."),
-      attached: bool(
-        "Only those holding a file, a receipt say (true), or none (false). With the tag " +
-          "hsa-fsa-eligible: eligible spending still needing its receipt."
-      ),
     },
     required: ["book"],
     run: (ctx, { book, limit, ...query }) =>

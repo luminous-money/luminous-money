@@ -3,7 +3,7 @@
 import { expect } from "@playwright/test";
 
 import { test } from "./fixtures.js";
-import { addAccount, app, setUpUser } from "./support.js";
+import { addAccount, addTransactions, app, setUpUser } from "./support.js";
 
 const CARD = "Liabilities:Example-Visa";
 
@@ -84,4 +84,39 @@ test("the AI page's Suggest tags is on by default, and can be turned off", async
   await expect(suggest).not.toBeChecked();
   await page.reload();
   await expect(page.getByLabel("Suggest tags")).not.toBeChecked();
+});
+
+test("an account's ledger filters by receipt too, its balances the account's", async ({ page }) => {
+  const { session, book, account } = await setUpUser(page);
+  await addTransactions(book.id, account, 2);
+  const { data } = await session.ledger.GET("/api/ledger/v1/books/{book_id}/journal", {
+    params: { path: { book_id: book.id } },
+  });
+  const shop2 = data!.rows.find((r) => r.payee === "Shop 2")!;
+  const attached = await app(
+    `/books/${book.id}/transactions/${shop2.id}/attachments?filename=r.jpg`,
+    {
+      method: "POST",
+      headers: { "content-type": "image/jpeg" },
+      // A white pixel, as m16's.
+      body: Buffer.from(
+        "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/yQALCAABAAEBAREA/8wABgAQEAX/2gAIAQEAAD8A0s8g/9k=",
+        "base64"
+      ),
+    }
+  );
+  expect(attached.ok).toBe(true);
+
+  await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
+  const rows = page.getByRole("list", { name: "Transactions" }).getByRole("listitem");
+  await expect(rows).toHaveCount(3); // the opening balance, and both shops
+  await page.getByRole("button", { name: "Filter" }).click();
+  await page
+    .getByRole("radiogroup", { name: "Receipt" })
+    .getByRole("radio", { name: "Has one" })
+    .click();
+  await expect(page).toHaveURL(/receipt=yes/);
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText("Shop 2");
+  await expect(rows.first()).toContainText("998.00"); // the running balance stays the account's
 });

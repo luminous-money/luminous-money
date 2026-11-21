@@ -208,8 +208,9 @@ print.
   tag with `attached` false and true); browser (`hsa.spec.ts`: the card's note, and All without
   one listing it). The Amazon invoice's own printing is only proven on Emmer: the e2e stack has
   no Amazon.
-- **Not built:** Receipt on an account's ledger (its filter is Transactions' and review's); an
-  invoice for every Amazon charge (M99).
+- **Not built:** an invoice for every Amazon charge (M99). ~~Receipt on an account's
+  ledger~~: built 2026-11-21 at Kael's asking (`v1.5.0`): the ledger's account ledger takes
+  `attached`, its filter has Receipt, and MCP's `read_account_ledger` too.
 
 ## Building it
 

@@ -4,7 +4,24 @@ Where We Left Off
 _Updated 2026-11-21._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-21): HSA tracking, live on Emmer and checked
+## Latest (2026-11-21, later): a Receipt filter on every list, released as `v1.5.0`
+
+Kael: "If there's not already a has attachments filter [in] transaction views, let's add one.
+Publish when you're done." Transactions and review had it (Receipt, `v1.4.0`); an account's
+ledger didn't. Now it does:
+
+- **The ledger:** `GET …/accounts/{account}/ledger` takes `attached`, applied after the running
+  balances (`Store.holding_files`), so they stay the account's; `pnpm generate` run.
+- **The PWA:** an account's ledger has Receipt in its filter (`?receipt=yes|no`);
+  `api.accountLedger` and `useAccountLedger` take a `JournalFilter` now, as the journal's do.
+- **MCP:** `attached` is in the page filters both `read_transactions` and `read_account_ledger`
+  take.
+- **Tests:** ledger (an account's ledger by file, balances kept), browser (`hsa.spec.ts`: Has one
+  on an account's ledger). `m14.spec.ts` scoped its Reconciliation clicks to their group: a
+  ledger's filter now has two "All"s. `pnpm test` and `pnpm e2e` passed (API 124 of 124,
+  browser 153 of 153).
+
+## Before that (2026-11-21): HSA tracking, live on Emmer and checked
 
 Kael asked to finish whatever was left of the HSA work. On Emmer, read through the API and the
 logs (nothing of it written here but counts):

@@ -58,7 +58,8 @@ import { StarButton } from "../components/Star.js";
  * sign, the effect on net worth. Transactions a schedule staged are marked ↻, and its
  * occurrences coming in the next UPCOMING_DAYS (16) days show above, grayed, with the projected balance.
  * Reconciled ones are marked ✓ (M14); the filter beside "Go to date" shows only those, or only
- * the rest (`?reconciled=`), and Reconcile is in the header for an account reconciled itself.
+ * the rest (`?reconciled=`), or only those holding a file or none (`?receipt=`), and Reconcile is
+ * in the header for an account reconciled itself.
  * An expense account that a loan or escrow counts as says what's counted there (Outflow's
  * CountedHere), since its balance is only what's booked to it.
  */
@@ -82,8 +83,9 @@ function partsLabel(row: LedgerRow, account: string): string | null {
 export function AccountLedger({ book, account }: { book: string; account: string }) {
   const [, navigate] = useLocation();
   const base = `/books/${book}/accounts/${encodeURIComponent(account)}`;
-  const { date, reconciled, tags, q, here, href } = useLedgerView(base);
-  const ledger = useAccountLedger(book, account, date, reconciled, tags, q);
+  const { date, reconciled, tags, q, filter, here, href } = useLedgerView(base);
+  const { attached } = filter;
+  const ledger = useAccountLedger(book, account, date, { reconciled, tags, q, attached });
   const summary = useSummary(book, [account]);
   const info = summary.data?.[0];
   const stars = useStars(book);
@@ -229,9 +231,10 @@ export function AccountLedger({ book, account }: { book: string; account: string
 
       <ListTools
         book={book}
-        view={{ date, reconciled, tags, q }}
+        view={{ date, reconciled, tags, q, attached }}
         onChange={(view, options) => navigate(href(view), options)}
         reconciliation
+        byReceipt
         onSelect={canWrite ? selection.start : undefined}
         selecting={
           selection.selecting ? (
@@ -265,8 +268,8 @@ export function AccountLedger({ book, account }: { book: string; account: string
       {ledger.error && <p className="card error">{explain(ledger.error)}</p>}
       {ledger.data && rows.length === 0 && (
         <p className="card muted">
-          {reconciled !== undefined || tags.length || q.trim()
-            ? `No ${filteredLabel({ reconciled, tags, q })}${date ? ` on or before ${date}` : ""}.`
+          {reconciled !== undefined || attached !== undefined || tags.length || q.trim()
+            ? `No ${filteredLabel({ reconciled, attached, tags, q })}${date ? ` on or before ${date}` : ""}.`
             : date
               ? `Nothing on or before ${date}.`
               : "No transactions yet."}

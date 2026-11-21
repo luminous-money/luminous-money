@@ -155,7 +155,7 @@ Mobile usability is [M20](../m20-design-polish/PLAN.md)'s.
   in-app "find eligible spending" over past transactions, if the MCP server isn't enough;
   tuning what the AI is told is eligible, by what it proposes; and, from its documentation
   (2026-11-20), an invoice for every Amazon charge, not only eligible ones (Kael: only eligible
-  for now), and Receipt in an account's ledger's filter.
+  for now). ~~Receipt in an account's ledger's filter~~ (built 2026-11-21, `v1.5.0`).
 
 ### Reports and budgets
 

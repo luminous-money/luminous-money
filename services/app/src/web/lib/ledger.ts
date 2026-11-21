@@ -219,9 +219,7 @@ export const api = {
     book_id: string,
     account: string,
     page: LedgerPageAt = {},
-    reconciled?: boolean,
-    tags: string[] = [],
-    q?: string
+    { reconciled, tags = [], q, attached }: JournalFilter = {}
   ): Promise<LedgerPage> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/accounts/{account}/ledger", {
@@ -233,6 +231,7 @@ export const api = {
             reconciled,
             tag: tags.length ? tags : undefined,
             q: q?.trim() || undefined,
+            attached,
           },
         },
       })

@@ -4229,6 +4229,8 @@ export interface operations {
         tag?: string[] | null;
         /** @description Only transactions whose payee, narration or a split's memo has every word of it. */
         q?: string | null;
+        /** @description Only those holding a file, a receipt say (true), or only those holding none (false). */
+        attached?: boolean | null;
       };
       header?: never;
       path: {

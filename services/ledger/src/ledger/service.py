@@ -774,6 +774,7 @@ class Ledger:
         reconciled: bool | None = None,
         tags: list[str] | None = None,
         search: str | None = None,
+        attached: bool | None = None,
     ) -> models.LedgerPage:
         """One account's ledger: its transactions newest first, with running balances.
 
@@ -786,7 +787,8 @@ class Ledger:
         out, they're unknown (None). With `reconciled`, only the rows that are (or aren't); with
         `tags`, only those with a split (in any account) that has all of them (M17); with
         `search`, only those whose payee, narration or a split's memo has every word of it (as
-        the journal's): any way, the balances stay the account's.
+        the journal's); with `attached`, only those holding a file (True) or none (False): any
+        way, the balances stay the account's.
         """
         rows = []
         totals: dict[str, Decimal] | None = {}
@@ -841,6 +843,9 @@ class Ledger:
         if search and search.strip():
             found = self.store.matching(book_id, search.strip())
             rows = [r for r in rows if r[1].id in found]
+        if attached is not None:
+            held = self.store.holding_files(book_id)
+            rows = [r for r in rows if (r[1].id in held) == attached]
         if after:  # the `limit` rows just newer, so up to the row it names
             end = sum(1 for r in rows if r[0] > _ledger_key(after))
             top = max(end - limit, 0)

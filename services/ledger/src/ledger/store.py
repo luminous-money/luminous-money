@@ -574,6 +574,15 @@ class Store:
             )
         }
 
+    def holding_files(self, book_id: str) -> set[str]:
+        """The transactions holding a file (an attachment: a receipt, say)."""
+        return {
+            row[0]
+            for row in self._conn.execute(
+                "SELECT DISTINCT directive_id FROM attachment WHERE book_id = ?", (book_id,)
+            )
+        }
+
     def matching(self, book_id: str, search: str) -> set[str]:
         """The live transactions whose payee, narration or a split's memo has every word of
         `search`."""

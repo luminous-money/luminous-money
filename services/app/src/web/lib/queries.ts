@@ -457,13 +457,11 @@ export const useAccountLedger = (
   book: string,
   account: string,
   date?: string,
-  reconciled?: boolean,
-  tags: string[] = [],
-  q = ""
+  { reconciled, tags = [], q = "", attached }: JournalFilter = {}
 ) =>
   usePages(
-    [...keys.ledger(book, account), reconciled ?? null, q.trim(), ...tags],
-    (at) => api.accountLedger(book, account, at, reconciled, tags, q),
+    [...keys.ledger(book, account), reconciled ?? null, attached ?? null, q.trim(), ...tags],
+    (at) => api.accountLedger(book, account, at, { reconciled, tags, q, attached }),
     date
   );
 

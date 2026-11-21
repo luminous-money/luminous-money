@@ -48,7 +48,10 @@ test("a statement is ticked off, saved for later, and finished; ledgers show and
 
   // The filter: only what isn't reconciled, kept in the URL; Select all takes just those.
   await page.getByRole("button", { name: "Filter" }).click();
-  await page.getByRole("radio", { name: "Not reconciled" }).click();
+  await page
+    .getByRole("radiogroup", { name: "Reconciliation" })
+    .getByRole("radio", { name: "Not reconciled" })
+    .click();
   await expect(page).toHaveURL(/reconciled=no/);
   await expect(transactions.getByRole("listitem")).toHaveCount(1);
   await expect(transactions).toContainText("Shop 3");
@@ -58,7 +61,10 @@ test("a statement is ticked off, saved for later, and finished; ledgers show and
   await page.getByRole("button", { name: "Done" }).click();
 
   // Editing a reconciled transaction asks first.
-  await page.getByRole("radio", { name: "All" }).click();
+  await page
+    .getByRole("radiogroup", { name: "Reconciliation" })
+    .getByRole("radio", { name: "All" })
+    .click();
   await transactions.getByRole("button", { name: /Shop 1/ }).click();
   await expect(page.getByText(/Reconciled with PNC Checking's Feb 29.* statement/)).toBeVisible();
   await editSplit(page, 0, { amount: "-1.25" });

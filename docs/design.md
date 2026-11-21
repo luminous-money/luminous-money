@@ -1357,11 +1357,14 @@ proposing tags. Rules', schedules' and receipts' Tags are still Tags, more's.
   transaction with an `#hsa-fsa-eligible` split and no file attached. A stored tag would have to
   be kept right by every path that tags or attaches (review, Select mode, the MCP server,
   receipts, orders) and by deleting a file; worked out, it can't drift, and an invoice that
-  couldn't be fetched shows up by itself. The ledger's journal takes `attached` (true: holding a
-  file; false: none), a general filter that composes with the tag: Transactions' and review's
-  filter have **Receipt** (`?receipt=no`), a review card says "HSA or FSA eligible, without a
+  couldn't be fetched shows up by itself. The ledger's journal and an account's ledger take
+  `attached` (true: holding a file; false: none; an account's ledger filters after its running
+  balances, as for tags), a general filter that composes with the tag: every list's filter
+  (Transactions, review, an account's ledger: 2026-11-21) has **Receipt** (`?receipt=no`), a
+  review card says "HSA or FSA eligible, without a
   receipt to claim it with" with links to attach one and to all without one
-  (`?tag=hsa-fsa-eligible&receipt=no`), and the MCP server's `read_transactions` has `attached`.
+  (`?tag=hsa-fsa-eligible&receipt=no`), and the MCP server's `read_transactions` and
+  `read_account_ledger` have `attached`.
   Only eligible spending is flagged (Kael); the filter works with any tag.
 
 ### Search and the filter by accounts (2026-11-07)
