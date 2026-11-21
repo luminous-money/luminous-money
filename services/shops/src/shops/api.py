@@ -42,12 +42,13 @@ SendOrders = Callable[[str, str, list[dict[str, Any]]], dict[str, Any]]
 
 
 def orders_to(app_url: str) -> SendOrders:
-    """Hand a book's charges to `app` (`POST /books/{book}/orders`), as the user."""
+    """Hand a book's charges to `app` (`POST /books/{book}/orders`), as the user: all of them,
+    so it forgets any this no longer keeps (one merged into another: `amazon.redated`)."""
 
     def send(book: str, user: str, charges: list[dict[str, Any]]) -> dict[str, Any]:
         request = urllib.request.Request(
             f"{app_url}/api/app/v1/books/{urllib.parse.quote(book, safe='')}/orders",
-            data=json.dumps({"charges": charges}).encode(),
+            data=json.dumps({"charges": charges, "all_of": "amazon"}).encode(),
             headers={"X-User-Id": user, "content-type": "application/json"},
             method="POST",
         )

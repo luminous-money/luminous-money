@@ -1142,9 +1142,23 @@ same money in through another's, a day or so later. Both would sit in review, un
   always kept. A sync reads every charge (the Transactions page is cheap), keeps the book's,
   reads only their orders, and forgets what's no longer the book's, so another card's orders
   aren't kept where the book's members could see them.
+- **A charge Amazon dates anew is the same charge** (2026-11-21): Amazon has no ID for a
+  charge, so its ID is its date, amount, card and order; and a charge read the day Amazon makes
+  it is dated a day later from the next sync on (four of Kael's in two weeks). Each read as a new
+  charge of the same order, so the book got a second transaction (its lines "Part of …", the
+  order seeming charged twice) and the bank's one row had two to choose from. Now a kept charge
+  the sync should have listed (dated after where it read back to) and didn't is the listed one
+  of the same order, amount and card nearest it, within 3 days (`amazon.redated`): it keeps the
+  ID it was kept under and takes the new date. One kept under both dates already is folded into
+  the first the same way. Recognized at the source, not in the book: once two transactions
+  exist, nothing tells a re-dated charge from an order really charged twice, which is itemized
+  per shipment as before (`shops.lines`), one transaction per charge, each matched to its bank
+  row.
 - **After each sync, it hands the book its charges** (`POST /api/app/v1/books/{book}/orders`,
   as whoever synced; `APP_URL`), each with its lines (`shops.lines`): what `app` takes from any
-  shop. A failed hand-over is said in the status and tried again by the next sync.
+  shop. A failed hand-over is said in the status and tried again by the next sync. They're all
+  it keeps (`all_of: "amazon"`), so the book forgets a charge `shops` no longer has (one folded
+  into another, or no longer the book's by its card); its transaction stays, as the book's.
 
 ### Shops' orders in the book (Amazon orders, steps 2 and 3, 2026-11-07)
 

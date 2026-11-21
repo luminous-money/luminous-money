@@ -113,6 +113,25 @@ describe("Shops' orders", () => {
       body: JSON.stringify({ charges: [charge("c1", "4242")] }),
     });
     assert.deepEqual(await again.json(), { received: 1, new: 0 });
+
+    // Sent as all of Amazon's, the one not sent is forgotten; its transaction isn't.
+    const all = await user.app(`/books/${book}/orders`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ charges: [charge("c1", "4242")], all_of: "amazon" }),
+    });
+    assert.equal(all.status, 202);
+    const kept = (await (await user.app(`/books/${book}/orders`)).json()) as Stored[];
+    assert.deepEqual(
+      kept.map((c) => c.id),
+      ["c1"]
+    );
+    const mixed = await user.app(`/books/${book}/orders`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ charges: [charge("c1", "4242")], all_of: "other-shop" }),
+    });
+    assert.equal(mixed.status, 422);
   });
 
   it("tags a line the shop marks HSA or FSA eligible, and one read before once it's marked (HSA tracking)", async () => {

@@ -39,6 +39,9 @@ ORDER_PAUSE_SECONDS = 1.0
 # "it's not the end of the world if we miss one or two Amazon orders"), so each morning's is a
 # few pages, not every charge since the start.
 BACK_READ_DAYS = 15
+# How far a charge's date may move between syncs and still be the same charge. Seen on Emmer
+# (2026-11-21): a charge read the day Amazon makes it is dated a day later from the next sync on.
+REDATED_DAYS = 3
 # Amazon's FSA or HSA mark (HSA tracking, read from real orders on Emmer 2026-11-19): every item
 # on an order's page has this block, holding "FSA or HSA eligible" when it is and empty when it
 # isn't; the order's summary has a line for the eligible amount, tax and shipping included.
@@ -612,6 +615,34 @@ def _charge_rows(transactions: list[Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def redated(kept: list[dict[str, Any]], rows: list[dict[str, Any]], since: datetime.date) -> dict[str, str]:
+    """Charges Amazon has dated anew since they were kept, as {the listed row's ID: the kept
+    charge's}. A charge's ID is made from its date, so one whose date moved reads as a new charge,
+    and was itemized into the book a second time (2026-11-21: four of Kael's did). A kept charge
+    this read should have listed (dated after `since`) and didn't is the listed one of the same
+    order, amount and card nearest it in date, within `REDATED_DAYS`, that no other has taken.
+    That one may be kept too, under its new date's ID (read before this was caught): it's the
+    same charge all the same, and the earlier ID stays."""
+    listed = {r["id"] for r in rows}
+    taken: set[str] = set()
+    moves: dict[str, str] = {}
+    for k in sorted(kept, key=lambda k: (k["date"], k["id"])):
+        if k["id"] in listed or k["date"] <= since.isoformat() or not k["order_number"]:
+            continue
+        day = datetime.date.fromisoformat(k["date"])
+        twins = sorted(
+            (abs((datetime.date.fromisoformat(r["date"]) - day).days), r["id"])
+            for r in rows
+            if r["id"] not in taken
+            and (r["order_number"], r["amount"], r["last4"]) == (k["order_number"], k["amount"], k["last4"])
+            and abs((datetime.date.fromisoformat(r["date"]) - day).days) <= REDATED_DAYS
+        )
+        if twins:
+            taken.add(twins[0][1])
+            moves[twins[0][1]] = k["id"]
+    return moves
+
+
 def sync(db: Db, data_dir: str, book: str, step: Callable[[str], None]) -> dict[str, Any]:
     """Log in, read the charges since `sync_from` and the orders behind them, and keep them.
     Returns counts; raises NeedsPerson, AmazonOrdersAuthError (Amazon refused the login) or
@@ -655,11 +686,15 @@ def sync(db: Db, data_dir: str, book: str, step: Callable[[str], None]) -> dict[
     include = set(json.loads(connection["include_cards"] or "[]"))
     exclude = set(json.loads(connection["exclude_cards"] or "[]"))
     mine = [r for r in rows if belongs(r["last4"], include, exclude)]
-    new_charges = db.put_charges(book, mine)
+    # A charge Amazon has dated anew keeps the ID it was kept under, so the book sees it once.
+    moves = redated(db.kept_charges(book, since.isoformat()), mine, since)
+    for r in mine:
+        r["id"] = moves.get(r["id"], r["id"])
+    new_charges = db.put_charges(book, mine, merged=list(moves))
     pruned = db.prune(book, lambda last4: belongs(last4, include, exclude))
     log.info(
-        "book %s: %d charges read, %d the book's (%d new), %d kept before no longer the book's",
-        book, len(rows), len(mine), new_charges, pruned,
+        "book %s: %d charges read, %d the book's (%d new, %d dated anew), %d kept before no longer the book's",
+        book, len(rows), len(mine), new_charges, len(moves), pruned,
     )
     rows = mine
 

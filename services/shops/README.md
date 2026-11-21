@@ -36,7 +36,9 @@ Roles are the ledger's, asked as the caller (`X-User-Id`, set by the gateway).
    last sync:
    each charge to a card, with its date, amount, card and order number. Every card seen is
    noted; only the book's charges are kept (by card: the included ones, or all, never the
-   excluded; one with no card always), and ones no longer the book's are forgotten.
+   excluded; one with no card always), and ones no longer the book's are forgotten. A kept
+   charge Amazon has dated anew (it does, a day later, after the first day) keeps its ID
+   (`amazon.redated`), so the book sees it once.
 3. Read each order behind the book's charges not read before, and any from the last 14 days
    again, one at a time, a second apart: its items, totals, shipments and payment, and which
    items Amazon marks "FSA or HSA eligible" (each item's `healthBenefitAccountInformation`
@@ -45,8 +47,8 @@ Roles are the ledger's, asked as the caller (`X-User-Id`, set by the gateway).
    asks for): Amazon's printable invoice read with the session, printed to a PDF in a headless
    Chromium that runs none of its scripts and loads only its pictures and styles (from Amazon's
    image hosts), kept as `/data/shops/amazon/<book>/invoices/<order>.pdf`.
-5. Hand the book's charges to `app` (`POST /api/app/v1/books/{book}/orders`, as whoever
-   synced), each with its lines (`shops.lines`: items, tax, shipping, a gift card or points from
+5. Hand all the book's charges to `app` (`POST /api/app/v1/books/{book}/orders` with
+   `all_of: "amazon"`, as whoever synced; it forgets any others it kept), each with its lines (`shops.lines`: items, tax, shipping, a gift card or points from
    their accounts; an eligible item's line says so, `hsa_fsa_eligible`, and so do the tax and
    shipping when every item is; an order whose invoice is kept, `invoice: true`), for it to
    itemize them into the book as receipts, attaching the invoice to an eligible one. `app` starts the morning's

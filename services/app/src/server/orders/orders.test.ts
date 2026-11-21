@@ -210,12 +210,24 @@ describe("a shop's charge, as a receipt", () => {
     orders.settle("b", "amazon", "c1", "read", null, "t1");
     expect(
       orders.receive("b", "u", [charge({ lines: [{ text: "Other", amount: "30.00" }] })])
-    ).toEqual({ added: 0, marked: [] });
+    ).toEqual({ added: 0, marked: [], forgotten: 0 });
     expect(orders.charge("b", "amazon", "c1")?.lines).toHaveLength(4);
 
     orders.receive("b", "u", [charge({ id: "c2", card: null })]);
     orders.receive("b", "u", [charge({ id: "c2", card: null, note: "better now" })]);
     expect(orders.charge("b", "amazon", "c2")?.note).toBe("better now");
+  });
+
+  it("sent as all of a shop's, forgets that shop's others kept, and leaves their transactions", async () => {
+    const { ledger, orders, deps } = setUp();
+    orders.receive("b", "u", [charge(), charge({ id: "c2", date: "2026-03-12" })]);
+    await readWaiting(deps, "b");
+    const made = orders.charge("b", "amazon", "c2")!.transaction_id!;
+    orders.receive("b", "u", [charge({ id: "elsewhere", shop: "other-shop" })]);
+
+    expect(orders.receive("b", "u", [charge()], "amazon")).toMatchObject({ forgotten: 1 });
+    expect(orders.charges("b").map((c) => c.id)).toEqual(["c1", "elsewhere"]);
+    expect((await ledger.transaction("b", made)).id).toBe(made);
   });
 
   it("can be read into a transaction by hand, if one of its accounts paid exactly that", async () => {

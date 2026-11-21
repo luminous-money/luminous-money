@@ -4,7 +4,35 @@ Where We Left Off
 _Updated 2026-11-21._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-21, later): a Receipt filter on every list, released as `v1.5.0`
+## Latest (2026-11-21, evening): an Amazon charge Amazon dates anew is one charge, `v1.5.1`
+
+Kael, from review: "Match with this instead" on an Amazon charge, which he took for an order
+charged in two parts, both fighting over the order. It wasn't: read on Emmer (`shops.sqlite`, read
+only) and through the API, **Amazon dates a charge a day later after the first day**, and a
+charge's ID is made from its date (Amazon has none), so the next sync read it as a new charge of
+the same order. `app` made a second transaction ("Part of Amazon order …", the order seeming
+charged twice), and the bank's one row had two candidates. Four of Kael's orders in two weeks.
+design.md ("Shops: reading Amazon") has the decision.
+
+- **`shops`:** `amazon.redated`: a kept charge the sync should have listed and didn't is the
+  listed one of the same order, amount and card nearest it, within 3 days; it keeps its ID and
+  takes the new date (`Db.put_charges(merged=…)`). Ones already kept under both dates fold into
+  the first, at the next sync after the upgrade.
+- **`app`:** `POST /orders` takes `all_of` (a shop): what's sent is all that shop's, and the book
+  forgets any other of its charges (`OrdersStore.receive`); transactions stay. `shops` sends it.
+- **Tests:** shops `test_charges.py`; app `orders.test.ts`; e2e `orders.test.ts`. `pnpm test`
+  and `pnpm e2e` passed (API 124 of 124, browser 153 of 153). The ledger's API didn't change.
+- **Kael's book, cleaned at his OK** (through the API): the later "Part of …" copy of each of the
+  three orders still doubled deleted (one more he'd deleted himself), the first, itemized one
+  kept; one bank row moved onto it and confirmed, another's match confirmed (its transaction
+  still `!`, for Kael), so review offers no "Match with this instead" for them. The folded
+  charges' app records go at the next sync after the upgrade.
+- **M99, a bug noted:** a proposed match keeps a candidate deleted since, and offers it.
+
+**Released** as `v1.5.1` (see below for its state). **Kael, on Emmer:** `./luminous-money upgrade`.
+**Next:** unchanged: Kael reviews HSA tracking's 7 calls (M99); then docs/PLAN.md's Ahead.
+
+## Before that (2026-11-21, later): a Receipt filter on every list, released as `v1.5.0`
 
 Kael: "If there's not already a has attachments filter [in] transaction views, let's add one.
 Publish when you're done." Transactions and review had it (Receipt, `v1.4.0`); an account's

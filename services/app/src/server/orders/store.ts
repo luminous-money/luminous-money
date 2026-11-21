@@ -51,12 +51,33 @@ export class OrdersStore {
    * sent (its lines may be better now its order's been read); one already read is left as it is,
    * unless its lines come newly marked HSA or FSA eligible, or its order's invoice newly kept
    * (HSA tracking): it takes what was sent, and is returned with what's new, for its splits to be
-   * tagged and the invoice attached (`refresh`). Returns how many were new, and those. */
-  receive(book: string, user: string, charges: OrderCharge[]): { added: number; marked: Marked[] } {
+   * tagged and the invoice attached (`refresh`). Sent as all of a shop's (`allOf`), any other of
+   * its charges kept is forgotten: the shop no longer has it (a charge Amazon dated anew, kept
+   * twice before that was caught); its transaction stays the book's. Returns how many were new,
+   * those marked, and how many were forgotten. */
+  receive(
+    book: string,
+    user: string,
+    charges: OrderCharge[],
+    allOf?: string
+  ): { added: number; marked: Marked[]; forgotten: number } {
     const stamp = now();
     let added = 0;
+    let forgotten = 0;
     const marked: Marked[] = [];
     transaction(this.db, () => {
+      if (allOf) {
+        const sent = new Set(charges.map((c) => c.id));
+        const kept = this.db
+          .prepare("SELECT id FROM shop_charge WHERE book_id = ? AND shop = ?")
+          .all(book, allOf) as { id: string }[];
+        for (const { id } of kept.filter((k) => !sent.has(k.id))) {
+          this.db
+            .prepare("DELETE FROM shop_charge WHERE book_id = ? AND shop = ? AND id = ?")
+            .run(book, allOf, id);
+          forgotten++;
+        }
+      }
       for (const c of charges) {
         const data = JSON.stringify(c);
         const found = this.db
@@ -82,7 +103,7 @@ export class OrdersStore {
         }
       }
     });
-    return { added, marked };
+    return { added, marked, forgotten };
   }
 
   private update(book: string, user: string, c: OrderCharge, data: string, stamp: string): void {

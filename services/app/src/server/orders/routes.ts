@@ -1,10 +1,11 @@
 /**
  * Shops' orders (Amazon orders, step 2), under /books/:book/orders:
  *
- * - `POST /orders` `{charges}`: a shop's reader hands the book its charges (shared/orders.ts);
- *   kept, then read into their transactions in the background (202, with how many were new).
- *   One already read whose lines come newly marked HSA or FSA eligible has its splits tagged,
- *   and its invoice attached once its shop's reader keeps it.
+ * - `POST /orders` `{charges, all_of?}`: a shop's reader hands the book its charges
+ *   (shared/orders.ts); kept, then read into their transactions in the background (202, with how
+ *   many were new). One already read whose lines come newly marked HSA or FSA eligible has its
+ *   splits tagged, and its invoice attached once its shop's reader keeps it. With `all_of` (a
+ *   shop), they're all that shop's: the book forgets any other of its charges it kept.
  * - `GET /orders?shop=`: what the book made of each, newest first.
  * - `POST /orders/read`: read the waiting ones now (what's left waiting, and why, is in the list).
  * - `POST /orders/:shop/:id/assign` `{transaction_id}`: read a waiting one (its card in no
@@ -61,13 +62,21 @@ export function orderRoutes(
 
   api.post("/books/:book/orders", async (c) => {
     const { book } = c.req.param();
-    const body = (await c.req.json().catch(() => null)) as { charges?: OrderCharge[] } | null;
+    const body = (await c.req.json().catch(() => null)) as {
+      charges?: OrderCharge[];
+      all_of?: string;
+    } | null;
     if (!Array.isArray(body?.charges)) return c.json({ detail: "send `{charges: [...]}`" }, 422);
+    const allOf = body.all_of;
+    if (allOf !== undefined && (typeof allOf !== "string" || !SHOP.test(allOf)))
+      return c.json({ detail: "`all_of` is a shop's short name, like amazon" }, 422);
     for (const charge of body.charges) {
       const problem = chargeProblem(charge);
       if (problem) return c.json({ detail: problem }, 422);
+      if (allOf && charge.shop !== allOf)
+        return c.json({ detail: `${charge.id}: it's ${charge.shop}'s, not ${allOf}'s` }, 422);
     }
-    const { added, marked } = deps.orders.receive(book, c.get("user"), body.charges);
+    const { added, marked } = deps.orders.receive(book, c.get("user"), body.charges, allOf);
     void reading(book);
     void (async () => {
       for (const news of marked)

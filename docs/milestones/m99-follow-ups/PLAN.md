@@ -65,6 +65,11 @@ are in [its plan](../tags-more/PLAN.md#decisions-to-review).
 
 ## Bugs
 
+- **A proposed match keeps a candidate deleted since** (seen 2026-11-21): a row's candidates are
+  kept as the import found them, so a candidate transaction deleted later (by hand, say) is still
+  offered as "Match with this instead", and taking it would point the row at nothing. Review
+  should leave out candidates the book no longer has, and `assignRow` refuse one.
+
 - **A lot of no shares crashes the book's engine** (found in a live book, 2026-11-06): a posting
   like `0.00 VTI {0 # 0 USD, 2026-01-02}` makes Beancount's booking divide 0 by 0, so the
   ledger's `/problems` and `/query` answer 500 for the whole book (the PWA uses neither today).

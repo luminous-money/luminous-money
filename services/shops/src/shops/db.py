@@ -184,11 +184,14 @@ class Db:
 
     # What was read
 
-    def put_charges(self, book: str, charges: list[dict[str, Any]]) -> int:
-        """Upsert charges by their ID; returns how many were new."""
+    def put_charges(self, book: str, charges: list[dict[str, Any]], merged: list[str] | None = None) -> int:
+        """Upsert charges by their ID, first forgetting those `merged` into another (a charge
+        Amazon dated anew: `amazon.redated`); returns how many were new."""
         new = 0
         with self.lock:
             self.conn.execute("BEGIN")
+            for id in merged or []:
+                self.conn.execute("DELETE FROM amazon_charge WHERE book_id = ? AND id = ?", (book, id))
             for c in charges:
                 stamp = now()
                 found = self.conn.execute(
@@ -211,6 +214,14 @@ class Db:
                     )
             self.conn.execute("COMMIT")
         return new
+
+    def kept_charges(self, book: str, after: str) -> list[dict[str, Any]]:
+        """The charges kept dated after `after` (an ISO date), as a sync's rows are."""
+        rows = self.conn.execute(
+            "SELECT id, date, amount, last4, order_number FROM amazon_charge WHERE book_id = ? AND date > ?",
+            (book, after),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def put_cards(self, book: str, charges: list[dict[str, Any]]) -> None:
         """The cards a sync's charges were on, with how many and the latest's date."""
