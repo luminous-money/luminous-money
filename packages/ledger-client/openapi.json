@@ -9049,6 +9049,24 @@
               "description": "Only those counted in budgets (true), or only those kept out of them (false).",
               "title": "Budgeted"
             }
+          },
+          {
+            "description": "Only those holding a file, a receipt say (true), or only those holding none (false).",
+            "in": "query",
+            "name": "attached",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only those holding a file, a receipt say (true), or only those holding none (false).",
+              "title": "Attached"
+            }
           }
         ],
         "responses": {

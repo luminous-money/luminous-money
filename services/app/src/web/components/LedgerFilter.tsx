@@ -2,7 +2,8 @@
  * A list's view, as its URL has it (so Back keeps it), and its header (`ListTools`): the search
  * (payees, descriptions and splits' items), Select, and the filter: Accounts (only transactions
  * with a split in any account chosen, or under one), Tags (only those with every tag chosen), a
- * date to go to (a ledger's), and Reconciliation (M14, M17). Ledgers filter at the server, so
+ * date to go to (a ledger's), Reconciliation (M14, M17), and Receipt (whether a transaction holds
+ * a file: HSA tracking's "No receipt", with the tag). Ledgers filter at the server, so
  * pages stay full and running balances stay the account's; review filters what it holds
  * (lib/filters).
  */
@@ -21,12 +22,12 @@ import { tagList, TagInput } from "./Tags.js";
 export type LedgerView = { date?: string } & JournalFilter;
 
 /** The view in the URL: `?date=` (a partial view, from that date back), `?reconciled=yes|no`,
- * `?tag=` and `?account=` (each repeated) and `?q=` (a search); `href` builds the URL for another
- * view of the same list, and `filter` is the view's filter. */
+ * `?receipt=yes|no`, `?tag=` and `?account=` (each repeated) and `?q=` (a search); `href`
+ * builds the URL for another view of the same list, and `filter` is the view's filter. */
 export function useLedgerView(base: string) {
   const date = useParam("date")?.match(/^\d{4}-\d{2}-\d{2}$/)?.[0];
-  const param = useParam("reconciled");
-  const reconciled = param === "yes" ? true : param === "no" ? false : undefined;
+  const reconciled = yesNo(useParam("reconciled"));
+  const attached = yesNo(useParam("receipt"));
   const tags = useParams("tag").filter(Boolean);
   const accounts = useParams("account").filter(Boolean);
   const q = useParam("q") ?? "";
@@ -34,6 +35,7 @@ export function useLedgerView(base: string) {
     const query = new URLSearchParams();
     if (view.date) query.set("date", view.date);
     if (view.reconciled !== undefined) query.set("reconciled", view.reconciled ? "yes" : "no");
+    if (view.attached !== undefined) query.set("receipt", view.attached ? "yes" : "no");
     for (const tag of view.tags ?? []) query.append("tag", tag);
     for (const account of view.accounts ?? []) query.append("account", account);
     // Kept as typed (a space included), so the search box isn't put right while it's typed in.
@@ -41,16 +43,26 @@ export function useLedgerView(base: string) {
     const text = query.toString();
     return text ? `${base}?${text}` : base;
   };
-  const filter: JournalFilter = { reconciled, tags, accounts, q };
+  const filter: JournalFilter = { reconciled, attached, tags, accounts, q };
   return { date, reconciled, tags, accounts, q, filter, here: href({ date, ...filter }), href };
 }
 
+const yesNo = (param: string | null | undefined) =>
+  param === "yes" ? true : param === "no" ? false : undefined;
+
 /** What a filter shows, for an empty list: "reconciled transactions tagged #trip in Food or
  * Home:Garden matching “oat milk”". */
-export function filteredLabel({ reconciled, tags = [], accounts = [], q }: JournalFilter) {
+export function filteredLabel({
+  reconciled,
+  attached,
+  tags = [],
+  accounts = [],
+  q,
+}: JournalFilter) {
   const kind = reconciled === undefined ? "" : reconciled ? "reconciled " : "unreconciled ";
   return (
     `${kind}transactions` +
+    (attached === undefined ? "" : attached ? " with a receipt" : " without a receipt") +
     (tags.length ? ` tagged ${tagList(tags)}` : "") +
     (accounts.length ? ` in ${inWords(accounts.map(shortName), "or")}` : "") +
     (q?.trim() ? ` matching “${q.trim()}”` : "")
@@ -64,6 +76,12 @@ const CHOICES = [
   ["All", undefined],
   ["Reconciled", true],
   ["Not reconciled", false],
+] as const;
+
+const RECEIPTS = [
+  ["All", undefined],
+  ["Has one", true],
+  ["None", false],
 ] as const;
 
 /** A list's view, without its search: what the filter panel changes. */
@@ -84,6 +102,7 @@ export function ListTools({
   onSelect,
   selecting,
   reconciliation = false,
+  byReceipt = false,
   byAccount = false,
   byDate = true,
 }: {
@@ -95,13 +114,15 @@ export function ListTools({
   /** Select mode's bar, in place of the row while selecting. */
   selecting?: React.ReactNode;
   reconciliation?: boolean;
+  /** Whether to offer Receipt: those holding a file, or none (HSA tracking). */
+  byReceipt?: boolean;
   byAccount?: boolean;
   /** Whether to offer "Go to date" (a ledger's, paged by date). */
   byDate?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const bookTags = useTags(book);
-  const { reconciled, tags = [], accounts = [], q = "", date } = view;
+  const { reconciled, attached, tags = [], accounts = [], q = "", date } = view;
   const set = (changed: LedgerView, options?: { replace?: boolean }) =>
     onChange({ ...view, ...changed }, options);
   const pills: { label: string; clear: () => void }[] = [
@@ -123,6 +144,14 @@ export function ListTools({
           {
             label: reconciled ? "reconciled" : "not reconciled",
             clear: () => set({ reconciled: undefined }),
+          },
+        ]),
+    ...(attached === undefined
+      ? []
+      : [
+          {
+            label: attached ? "has a receipt" : "no receipt",
+            clear: () => set({ attached: undefined }),
           },
         ]),
   ];
@@ -189,6 +218,25 @@ export function ListTools({
                     aria-checked={reconciled === value}
                     className={reconciled === value ? "on" : ""}
                     onClick={() => set({ reconciled: value })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {byReceipt && (
+            <>
+              <span className="small muted">Receipt (a file attached)</span>
+              <div className="segmented" role="radiogroup" aria-label="Receipt">
+                {RECEIPTS.map(([label, value]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    role="radio"
+                    aria-checked={attached === value}
+                    className={attached === value ? "on" : ""}
+                    onClick={() => set({ attached: value })}
                   >
                     {label}
                   </button>

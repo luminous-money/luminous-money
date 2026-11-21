@@ -45,6 +45,12 @@ BACK_READ_DAYS = 15
 HEALTH_BENEFIT = '[data-component="healthBenefitAccountInformation"]'
 ELIGIBLE = re.compile(r"\beligible\b", re.I)
 FSA_HSA = re.compile(r"\b(FSA|HSA)\b")
+# An order number, as Amazon writes them ("111-1234567-1234567", "D01-…"): a file's name.
+ORDER_NUMBER = re.compile(r"[A-Za-z0-9-]{1,40}")
+# How long printing an invoice may take, its pictures and styles loading.
+INVOICE_TIMEOUT_MS = 30_000
+# Where an invoice's pictures and styles come from: Amazon's image hosts, not its pages.
+IMAGE_HOSTS = ("media-amazon.com", "ssl-images-amazon.com")
 
 
 class NeedsPerson(Exception):
@@ -475,6 +481,69 @@ def eligible_amount(parsed: Any) -> str | None:
     return None
 
 
+def invoice_path(data_dir: str, book: str, number: str) -> str | None:
+    """Where an order's invoice is kept (a PDF, HSA tracking's documentation), beside the book's
+    Amazon session; None for a number that can't be a file's name."""
+    if not ORDER_NUMBER.fullmatch(number):
+        return None
+    return os.path.join(data_dir, "amazon", book, "invoices", f"{number}.pdf")
+
+
+def invoiced(data_dir: str, book: str, numbers: set[str]) -> set[str]:
+    """Which of these orders have their invoice kept."""
+    return {n for n in numbers if (path := invoice_path(data_dir, book, n)) and os.path.exists(path)}
+
+
+def _only_looks(route: Any) -> None:
+    """Let an invoice's page load its pictures and styles from Amazon's image hosts, and nothing
+    else: none of its scripts run, and it asks Amazon's pages for nothing."""
+    request = route.request
+    host = urlparse(request.url).hostname or ""
+    if request.resource_type in ("image", "stylesheet", "font") and host.endswith(IMAGE_HOSTS):
+        route.continue_()
+    else:
+        route.abort()
+
+
+def save_invoices(session: Session, data_dir: str, book: str, numbers: list[str], step: Callable[[str], None]) -> int:
+    """Keep Amazon's printable invoice of each order in `numbers` as a PDF (`invoice_path`), for
+    the transactions its charges are read into (HSA tracking: what an HSA or FSA asks for). The
+    page is read with the session, as amazon-orders reads an order's, then printed in a headless
+    Chromium (`_only_looks`). One that can't be saved is logged and left for the next sync.
+    Returns how many were saved."""
+    if not numbers:
+        return 0
+    base = session.config.constants.BASE_URL.rstrip("/") + "/"
+    saved = 0
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True, channel="chromium", args=BROWSER_ARGS)
+        try:
+            page = browser.new_page()
+            page.route("**/*", _only_looks)
+            for n, number in enumerate(numbers, start=1):
+                path = invoice_path(data_dir, book, number)
+                if path is None:
+                    continue
+                step(f"Saving invoice {n} of {len(numbers)}…")
+                try:
+                    response = session.get(f"{session.config.constants.ORDER_INVOICE_URL}?orderID={number}")
+                    html = response.response.text
+                    if number not in html or 'name="email"' in html or "ap_email" in html:
+                        raise AmazonOrdersError("Amazon didn't show its invoice")
+                    html = re.sub(r"(<head[^>]*>)", rf'\1<base href="{base}">', html, count=1, flags=re.I)
+                    page.set_content(html, wait_until="load", timeout=INVOICE_TIMEOUT_MS)
+                    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+                    page.pdf(path=f"{path}.part", format="Letter", print_background=True)
+                    os.replace(f"{path}.part", path)
+                    saved += 1
+                except (AmazonOrdersError, PlaywrightError, OSError) as e:
+                    log.warning("book %s: order %s's invoice couldn't be saved: %s", book, number, e)
+                time.sleep(ORDER_PAUSE_SECONDS)
+        finally:
+            browser.close()
+    return saved
+
+
 def _order_data(order: Any) -> dict[str, Any]:
     def item(i: Any) -> dict[str, Any]:
         return {
@@ -615,10 +684,15 @@ def sync(db: Db, data_dir: str, book: str, step: Callable[[str], None]) -> dict[
         time.sleep(ORDER_PAUSE_SECONDS)
     if since == start:
         db.set_read_back(book, start.isoformat())
+    # Each order with an item an HSA or FSA can pay for keeps its invoice, once (HSA tracking).
+    eligible = db.eligible_orders(book)
+    missing = sorted(eligible - invoiced(data_dir, book, eligible))
+    invoices = save_invoices(session, data_dir, book, missing, step)
     return {
         "charges": len(rows),
         "new_charges": new_charges,
         "other_cards": len(transactions) - len(rows),
         "orders": len(wanted) - len(failed),
         "failed": failed,
+        "invoices": invoices,
     }

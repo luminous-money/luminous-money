@@ -731,6 +731,7 @@ class Store:
         search: str | None = None,
         accounts: list[str] | None = None,
         budgeted: bool | None = None,
+        attached: bool | None = None,
         limit: int,
     ) -> list[sqlite3.Row]:
         """Live transactions, a keyset page: newest first, older than a row's key (date,
@@ -740,12 +741,16 @@ class Store:
         one that isn't; with `tags`, only those with a split that has all of them; with `search`,
         only those whose payee, narration or a split's memo has every word of it (ignoring case);
         with `accounts`, only those with a split in any of them (or under one); with `budgeted`,
-        only those counted in budgets (True) or kept out of them (False). Each row has every tag its
-        splits have (space-separated)."""
+        only those counted in budgets (True) or kept out of them (False); with `attached`, only
+        those holding a file (True) or none (False). Each row has every tag its splits have
+        (space-separated)."""
         where, args = ["book_id = ?", "deleted = 0", "kind = 'transaction'"], [book_id]
         if budgeted is not None:
             where.append("budgeted = ?")
             args.append(int(budgeted))
+        if attached is not None:
+            held = "EXISTS (SELECT 1 FROM attachment a WHERE a.book_id = directive.book_id AND a.directive_id = directive.id)"
+            where.append(held if attached else f"NOT {held}")
         if tags:
             clause, more = tagged("directive", tags)
             where.append(clause)

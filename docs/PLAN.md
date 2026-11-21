@@ -331,8 +331,12 @@ Each with its plan in [milestones/.archived](milestones/.archived/).
       eligible" mark (read from Kael's real orders on Emmer) tags an item outright, and its orders
       kept before are read again once; history, item history and the AI propose it for the rest
       (Tags, more's slice: proposals carrying tags, every proposal's tags counting, "Suggest
-      tags"), and review says where a tag came from. **Left over:** recording a payback, a mixed
-      charge's tax, an in-app search of past spending, and its 7 calls to review, in
+      tags"), and review says where a tag came from. **Documentation** (Kael, 2026-11-20,
+      `v1.4.0`): an eligible Amazon charge gets its order's invoice attached (a PDF `shops`
+      prints from Amazon's), and eligible spending without a file shows as needing a receipt
+      (worked out, not stored: the journal's `attached`, a Receipt filter, a note in review).
+      **Left over:** recording a payback, a mixed charge's tax, an in-app search of past
+      spending, every charge's invoice, and its 7 calls to review, in
       [M99](milestones/m99-follow-ups/PLAN.md).
 
 ### Polish, built

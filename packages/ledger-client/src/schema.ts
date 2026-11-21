@@ -5821,6 +5821,8 @@ export interface operations {
         account?: string[] | null;
         /** @description Only those counted in budgets (true), or only those kept out of them (false). */
         budgeted?: boolean | null;
+        /** @description Only those holding a file, a receipt say (true), or only those holding none (false). */
+        attached?: boolean | null;
       };
       header?: never;
       path: {

@@ -51,6 +51,7 @@ const orderDeps = {
   ledgerFor,
   aiFor: (user: string) => httpAi(config.aiUrl, user),
   categorizers,
+  shopsFor,
 };
 const simplefin = {
   store: new SimplefinStore(db.db),

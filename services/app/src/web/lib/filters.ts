@@ -8,6 +8,8 @@ import type { JournalFilter } from "./ledger.js";
 type Filterable = {
   payee?: string | null;
   narration?: string | null;
+  /** How many files it holds (a receipt, say). */
+  attachments?: number;
   postings: { account: string; tags?: string[] | null; meta?: Record<string, unknown> | null }[];
 };
 
@@ -35,19 +37,21 @@ export function touchesAny(t: Filterable, accounts: readonly string[] | undefine
   );
 }
 
-/** Whether a transaction is kept by `filter`: a split with every tag, the search and the
- * accounts. */
+/** Whether a transaction is kept by `filter`: a split with every tag, the search, the accounts,
+ * and whether it holds a file. */
 export function kept(t: Filterable, filter: JournalFilter): boolean {
   return (
     splitHas(t.postings, filter.tags ?? []) &&
     matchesSearch(t, filter.q) &&
-    touchesAny(t, filter.accounts)
+    touchesAny(t, filter.accounts) &&
+    (filter.attached === undefined || (t.attachments ?? 0) > 0 === filter.attached)
   );
 }
 
 /** Whether a filter keeps fewer than everything. */
 export const filtering = (filter: JournalFilter) =>
   filter.reconciled !== undefined ||
+  filter.attached !== undefined ||
   !!filter.tags?.length ||
   wordsOf(filter.q).length > 0 ||
   !!filter.accounts?.length;

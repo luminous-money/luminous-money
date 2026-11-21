@@ -52,7 +52,7 @@ import {
   unresolved,
   withCounterpart,
 } from "../lib/split.js";
-import { tagsOf, withTags, type TagSource } from "../../shared/tags.js";
+import { HSA_FSA_ELIGIBLE, tagsOf, withTags, type TagSource } from "../../shared/tags.js";
 import { aiCostSentence } from "../lib/ai.js";
 import { holdingsOf, suggestedFund } from "../lib/funds.js";
 import { wholeLines } from "../../shared/funds.js";
@@ -176,6 +176,7 @@ export function Review({ book }: { book: string }) {
           view={view.filter}
           onChange={(filter, options) => navigate(view.href(filter), options)}
           byAccount
+          byReceipt
           byDate={false}
           onSelect={selection.start}
           selecting={selection.selecting ? selectBar : null}
@@ -540,6 +541,7 @@ function QueueItem({
           )}
 
           <TagSources sources={proposal?.tags} postings={t.postings} />
+          <NeedsReceipt book={book} transaction={t} here={here} />
 
           <PairedTransfer book={book} transaction={t} />
 
@@ -746,5 +748,32 @@ function TagSources({
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * HSA tracking: spending an HSA or FSA can pay back needs its documentation, so a card with an
+ * `#hsa-fsa-eligible` split and no file attached says so, with a way to attach one (the
+ * transaction's page) and to see every other still without one. Worked out, not stored: attaching
+ * a file, or taking the tag off, is all it takes.
+ */
+function NeedsReceipt({
+  book,
+  transaction: t,
+  here,
+}: {
+  book: string;
+  transaction: Transaction;
+  here: string;
+}) {
+  if (t.attachments || !t.postings.some((p) => p.tags?.includes(HSA_FSA_ELIGIBLE))) return null;
+  const all = `/books/${book}/transactions?tag=${HSA_FSA_ELIGIBLE}&receipt=no`;
+  return (
+    <p className="small needs-receipt">
+      HSA or FSA eligible, without a receipt to claim it with.{" "}
+      <Link href={withBack(`/books/${book}/transactions/${t.id}`, here)}>Attach one</Link>
+      {" · "}
+      <Link href={withBack(all, here)}>All without one</Link>
+    </p>
   );
 }

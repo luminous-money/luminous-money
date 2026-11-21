@@ -81,6 +81,10 @@ export const baseTools: Tool[] = [
       ...PAGE,
       account: strs("Only transactions with a split in one of these accounts or under one."),
       budgeted: bool("Only those counted in budgets (true), or only those kept out (false)."),
+      attached: bool(
+        "Only those holding a file, a receipt say (true), or none (false). With the tag " +
+          "hsa-fsa-eligible: eligible spending still needing its receipt."
+      ),
     },
     required: ["book"],
     run: (ctx, { book, limit, ...query }) =>

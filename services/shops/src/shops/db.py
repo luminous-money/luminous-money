@@ -268,6 +268,16 @@ class Db:
             if any("hsa_fsa_eligible" not in i for i in json.loads(r["data"]).get("items") or [])
         }
 
+    def eligible_orders(self, book: str) -> set[str]:
+        """Orders with an item Amazon marks FSA or HSA eligible (HSA tracking): their invoices are
+        kept."""
+        rows = self.conn.execute("SELECT order_number, data FROM amazon_order WHERE book_id = ?", (book,)).fetchall()
+        return {
+            r["order_number"]
+            for r in rows
+            if any(i.get("hsa_fsa_eligible") for i in json.loads(r["data"]).get("items") or [])
+        }
+
     def put_order(self, book: str, order_number: str, placed: str | None, data: dict[str, Any]) -> None:
         stamp = now()
         with self.lock:

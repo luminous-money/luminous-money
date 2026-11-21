@@ -1,9 +1,11 @@
 /**
  * The shops service (Amazon orders), as the user: its connection's state, to say in Notifications
- * when Amazon wants a person, and its sync, for the morning's (orders/sync.ts). `shops` hands the
- * charges it reads back through `POST /books/:book/orders` (orders/routes.ts).
+ * when Amazon wants a person, and its sync, for the morning's (orders/sync.ts); and an order's
+ * invoice, to attach (HSA tracking). `shops` hands the charges it reads back through
+ * `POST /books/:book/orders` (orders/routes.ts).
  */
 import type { Notification } from "../shared/notifications.js";
+import type { FileIn } from "./images.js";
 
 /** A book's Amazon connection, as much of it as `app` uses. */
 export type ShopConnection = {
@@ -19,6 +21,8 @@ export interface ShopsPort {
   amazon(book: string): Promise<ShopConnection | null>;
   /** Start a sync (it runs in the background, and hands its charges back). */
   sync(book: string): Promise<void>;
+  /** An order's invoice as its shop's reader keeps it (a PDF); null if it has none. */
+  invoice(book: string, shop: string, order: string): Promise<FileIn | null>;
 }
 
 export function httpShops(baseUrl: string, userId: string): ShopsPort {
@@ -46,6 +50,20 @@ export function httpShops(baseUrl: string, userId: string): ShopsPort {
       // 409: one's running already, which is as good.
       if (!response.ok && response.status !== 409)
         throw new Error(`shops said ${response.status} starting the sync`);
+    },
+    async invoice(book, shop, order) {
+      if (shop !== "amazon") return null;
+      const response = await call(
+        `/books/${encodeURIComponent(book)}/amazon/orders/${encodeURIComponent(order)}/invoice`
+      );
+      if (response.status === 404) return null;
+      if (!response.ok)
+        throw new Error(`shops said ${response.status} for order ${order}'s invoice`);
+      return {
+        name: `Amazon order ${order}.pdf`,
+        type: "application/pdf",
+        bytes: new Uint8Array(await response.arrayBuffer()),
+      };
     },
   };
 }

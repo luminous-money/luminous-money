@@ -1184,8 +1184,9 @@ pages: a shop's reader hands it charges (`shared/orders.ts`), and `server/orders
   charges: 86 itemized, 18 refunds and 6 parts of unclear orders a line each, 2 with no order
   (before refunds were matched to their items).
 - **The same charge again changes nothing** once read (keyed by the book, shop and its ID); one
-  still waiting takes what's new (its order may have been read since). The exception is a line
-  newly marked HSA or FSA eligible ("Where tags come from: HSA tracking", below).
+  still waiting takes what's new (its order may have been read since). The exceptions are a line
+  newly marked HSA or FSA eligible and an order's invoice newly kept ("Where tags come from: HSA
+  tracking", below).
 - **The morning sync** (`orders/sync.ts`, a daily job at 09:00 in the book's zone, after the
   bank feeds): each book that's had a shop's charges, once a local day, as whoever sent them
   last; not while Amazon wants a person. That's said in **Notifications** ("Amazon wants you to
@@ -1342,6 +1343,26 @@ proposing tags. Rules', schedules' and receipts' Tags are still Tags, more's.
   its splits ("#hsa-fsa-eligible on Digital thermometer from Amazon's order").
 - **Paying one back isn't tracked yet** (Kael): decided when the first payback comes. The past
   beyond Amazon is the MCP server's: Claude can tag past splits through `write_edit_transaction`.
+- **A claim needs its documentation** (Kael, 2026-11-20). **An eligible Amazon charge gets its
+  order's invoice attached:** `shops` keeps the invoice of each order with an eligible item, once
+  (`save_invoices`: Amazon's printable invoice read with the session, printed to a PDF in a
+  headless Chromium that runs none of its scripts and loads only pictures and styles from
+  Amazon's image hosts; about 4 seconds each after the browser starts), says so on the charge
+  (`orders[].invoice`), and `app` fetches it (`ShopsPort.invoice`) and attaches it when the
+  charge has an eligible line and its transaction holds no file yet (`attachInvoices`; a receipt
+  already there documents it too), on reading the charge or when one already read gets its
+  invoice later (`refresh`). Only eligible orders' (Kael): each is one more Amazon page, and
+  every one counts toward its bot score. The invoice shows Amazon's own eligible amount.
+- **Needing a receipt is worked out, not stored** (Kael, over a `#needs-receipt` tag): a
+  transaction with an `#hsa-fsa-eligible` split and no file attached. A stored tag would have to
+  be kept right by every path that tags or attaches (review, Select mode, the MCP server,
+  receipts, orders) and by deleting a file; worked out, it can't drift, and an invoice that
+  couldn't be fetched shows up by itself. The ledger's journal takes `attached` (true: holding a
+  file; false: none), a general filter that composes with the tag: Transactions' and review's
+  filter have **Receipt** (`?receipt=no`), a review card says "HSA or FSA eligible, without a
+  receipt to claim it with" with links to attach one and to all without one
+  (`?tag=hsa-fsa-eligible&receipt=no`), and the MCP server's `read_transactions` has `attached`.
+  Only eligible spending is flagged (Kael); the filter works with any tag.
 
 ### Search and the filter by accounts (2026-11-07)
 

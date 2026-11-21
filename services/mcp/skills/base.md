@@ -36,7 +36,8 @@ if several, ask which, unless they said.
 - **Tags** are on splits (`tags` on a posting): a transaction's tags are its splits'.
   `hsa-fsa-eligible` marks a split an HSA or FSA can pay back (medical care as IRS Publication
   502 counts it); Amazon's marked items get it by themselves, and it goes on the item's split,
-  not the whole purchase.
+  not the whole purchase. A claim needs its receipt: `read_transactions` with that tag and
+  `attached: false` finds those still without one (Amazon's come with their invoice attached).
 - **Fund lines** (`funds` on the transaction) say what money is for; the funds skill explains.
 - `"meta": {"budget": false}` on a transaction keeps it out of budgets (a once-in-twenty-years
   roof), while it counts everywhere else.

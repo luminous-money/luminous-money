@@ -59,5 +59,14 @@ describe("a filter", () => {
     expect(filtering({ q: "oat" })).toBe(true);
     expect(filtering({ accounts: ["Expenses"] })).toBe(true);
     expect(filtering({ reconciled: false })).toBe(true);
+    expect(filtering({ attached: false })).toBe(true);
+  });
+
+  it("keeps those holding a file, or none (HSA tracking's No receipt)", () => {
+    const filed = { ...megamart, attachments: 1 };
+    expect(kept(filed, { attached: true })).toBe(true);
+    expect(kept(filed, { attached: false })).toBe(false);
+    expect(kept(megamart, { attached: false, tags: ["gift"] })).toBe(true);
+    expect(kept(megamart, { attached: true })).toBe(false);
   });
 });

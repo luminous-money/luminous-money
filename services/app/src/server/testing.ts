@@ -526,6 +526,8 @@ export class FakeLedger implements LedgerPort {
       type: file.type,
       size: file.bytes.length,
     });
+    const held = this.transactions.find((t) => t.id === transaction);
+    if (held) held.attachments = (held.attachments ?? 0) + 1;
     const id = `a${this.attachments.length}`;
     this.files.set(id, file);
     return {

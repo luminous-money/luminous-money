@@ -19,7 +19,9 @@
  *
  * A line the shop marks HSA or FSA eligible (Amazon's mark) tags its split `hsa-fsa-eligible`,
  * outright (HSA tracking; Kael, 2026-11-19), and the proposal record says it came from the
- * shop. One already read whose lines come again newly marked gets the tag then (`retag`).
+ * shop; its order's invoice, when the shop's reader keeps one, is attached as its documentation
+ * (`attachInvoices`). One already read whose lines come again newly marked, or whose invoice is
+ * newly kept, gets them then (`refresh`).
  */
 import type { Account, Transaction, TransactionIn } from "@luminous-money/ledger-client";
 import { addCost, NO_COST, type AiCost } from "@luminous-money/ai-api";
@@ -41,7 +43,8 @@ import type { Seen } from "../migrate/reference.js";
 import { sameNumber } from "../pipeline/matcher.js";
 import { matching, paidWith } from "../receipts.js";
 import { bookToday } from "../schedules.js";
-import type { OrdersStore } from "./store.js";
+import type { ShopsPort } from "../shops.js";
+import type { Marked, OrdersStore } from "./store.js";
 
 export type OrderDeps = {
   db: AppDb;
@@ -52,6 +55,8 @@ export type OrderDeps = {
   categorizers: Categorizer[];
   /** The book's imported history, for the AI's reference, if its migration turned it on. */
   reference?: (book: string) => Seen[] | undefined;
+  /** The shops service as a user: an order's invoice, to attach (HSA tracking). */
+  shopsFor?: (user: string) => ShopsPort;
 };
 
 /** Something the person can fix (assigning by hand). */
@@ -269,6 +274,9 @@ export async function readCharge(
         tags
       ),
     ]);
+  await attachInvoices(deps, book, charge, id).catch((error) =>
+    console.warn(`orders: ${book}'s charge ${charge.id}: its invoice couldn't be attached:`, error)
+  );
   const how = target
     ? "Read into its transaction from the bank."
     : "Made as its own transaction; the bank's copy is matched to it when it comes in.";
@@ -280,6 +288,40 @@ export async function readCharge(
 }
 
 const waiting = (detail: string): Outcome => ({ state: "waiting", detail, transaction_id: null });
+
+/**
+ * Attach the invoices the shop's reader keeps for a charge's orders, when one of its lines is HSA
+ * or FSA eligible and its transaction holds no file yet (HSA tracking: the documentation a claim
+ * needs; a file already there, a receipt say, documents it too). One that can't be fetched is
+ * left: the transaction still shows as without a receipt. Returns how many were attached.
+ */
+export async function attachInvoices(
+  deps: OrderDeps,
+  book: string,
+  charge: OrderCharge & { user_id: string },
+  transaction: string
+): Promise<number> {
+  const orders = charge.orders.filter((o) => o.invoice);
+  if (!deps.shopsFor || !orders.length || !charge.lines.some((l) => l.hsa_fsa_eligible)) return 0;
+  const ledger = deps.ledgerFor(charge.user_id);
+  if ((await ledger.transaction(book, transaction)).attachments) return 0;
+  const shops = deps.shopsFor(charge.user_id);
+  let attached = 0;
+  for (const o of orders) {
+    const file = await shops.invoice(book, charge.shop, o.number);
+    if (!file) continue;
+    await ledger.attach(book, transaction, file);
+    attached++;
+  }
+  return attached;
+}
+
+/** A charge already read that came again with what's new (HSA tracking): its newly marked lines'
+ * splits tagged, then its invoice attached. */
+export async function refresh(deps: OrderDeps, book: string, { charge, lines }: Marked) {
+  await retag(deps, book, charge, lines);
+  if (charge.transaction_id) await attachInvoices(deps, book, charge, charge.transaction_id);
+}
 
 /**
  * Tag the splits of a charge already read that its shop now marks HSA or FSA eligible (HSA

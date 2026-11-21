@@ -2,10 +2,11 @@
 on Emmer (2026-11-19): no real orders here."""
 
 import json
+import os
 
 from bs4 import BeautifulSoup
 
-from shops.amazon import eligible_amount, marked_eligible
+from shops.amazon import _only_looks, eligible_amount, invoice_path, invoiced, marked_eligible
 from shops.db import Db
 from shops.lines import for_app
 
@@ -87,3 +88,53 @@ def test_orders_kept_before_marks_were_read_are_read_again_once(tmp_path) -> Non
     assert db.unmarked_orders("b1") == {"111-old"}
     db.put_order("b1", "111-old", "2026-03-01", json.loads(json.dumps(order("111-old", [eligible("Coffee", "6.00")]))))
     assert db.unmarked_orders("b1") == set()
+
+
+class Route:
+    """A Playwright route, as `_only_looks` sees it."""
+
+    def __init__(self, kind: str, url: str) -> None:
+        self.request = type("Request", (), {"resource_type": kind, "url": url})()
+        self.went = ""
+
+    def continue_(self) -> None:
+        self.went = "continued"
+
+    def abort(self) -> None:
+        self.went = "aborted"
+
+
+def test_an_invoice_loads_only_pictures_and_styles_from_amazons_image_hosts() -> None:
+    def went(kind: str, url: str) -> str:
+        route = Route(kind, url)
+        _only_looks(route)
+        return route.went
+
+    assert went("image", "https://m.media-amazon.com/images/I/x.jpg") == "continued"
+    assert went("stylesheet", "https://images-na.ssl-images-amazon.com/a.css") == "continued"
+    assert went("script", "https://m.media-amazon.com/a.js") == "aborted"
+    assert went("image", "https://fls-na.amazon.com/pixel") == "aborted"
+    assert went("image", "https://media-amazon.com.example.net/x.jpg") == "aborted"
+
+
+def test_an_eligible_orders_invoice_is_kept_by_its_number_and_said_to_app(tmp_path) -> None:
+    db = Db(str(tmp_path / "shops.sqlite"))
+    db.put_order("b1", "111-2", "2026-03-02", order("111-2", [eligible("Thermometer", "20.00")]))
+    db.put_order("b1", "111-3", "2026-03-02", order("111-3", [{**item("Tea", "4.00"), "hsa_fsa_eligible": False}]))
+    assert db.eligible_orders("b1") == {"111-2"}
+
+    data = str(tmp_path / "shops")
+    assert invoice_path(data, "b1", "../../etc/passwd") is None
+    path = invoice_path(data, "b1", "111-2")
+    assert path.endswith("amazon/b1/invoices/111-2.pdf")
+    assert invoiced(data, "b1", {"111-2", "111-3"}) == set()
+    os.makedirs(os.path.dirname(path))
+    with open(path, "wb") as f:
+        f.write(b"%PDF-1.4")
+    assert invoiced(data, "b1", {"111-2", "111-3"}) == {"111-2"}
+
+    o = order("111-2", [eligible("Thermometer", "20.00")], grand_total="20.00")
+    [c] = for_app([charge("c1", "-20.00", o)], "Income:Gifts", None, {"111-2"})
+    assert c["orders"] == [{"number": "111-2", "url": "https://www.amazon.com/order", "invoice": True}]
+    [c] = for_app([charge("c1", "-20.00", o)], "Income:Gifts", None)
+    assert "invoice" not in c["orders"][0]

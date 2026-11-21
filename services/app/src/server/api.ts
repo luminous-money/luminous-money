@@ -1653,7 +1653,15 @@ export function createApi({
   migrationRoutes(api, { db, migrations, ledgerFor, chainFor, roleIn });
   orderRoutes(
     api,
-    { db, orders: new OrdersStore(db.db), ledgerFor, aiFor, categorizers, reference: referenceFor },
+    {
+      db,
+      orders: new OrdersStore(db.db),
+      ledgerFor,
+      aiFor,
+      categorizers,
+      reference: referenceFor,
+      shopsFor,
+    },
     roleIn
   );
 

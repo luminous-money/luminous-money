@@ -1,7 +1,8 @@
 HSA tracking: plan
 ==================================================================================================
 
-> **Status: built (2026-11-19), released as `v1.3.0` (2026-11-20).** Noted by Kael 2026-11-07; his answers are
+> **Status: built (2026-11-19), released as `v1.3.0` (2026-11-20); its documentation (invoices
+> attached, "No receipt") built the same day, `v1.4.0`: [below](#documentation-kael-2026-11-20-built-v140).** Noted by Kael 2026-11-07; his answers are
 > [below](#kaels-answers-2026-11-19), and Amazon's mark was read from his real orders on Emmer
 > the same day ([what Amazon shows](#what-amazon-shows-read-on-emmer-2026-11-19)). Kael asked
 > for the plan and the build at once: the calls made without asking are under [Calls to
@@ -164,6 +165,51 @@ As designed, in the steps below, with these differences:
   instructions, the answer's tags read); API 2 (`orders.test.ts`, `hsa.test.ts`); browser 2
   (`hsa.spec.ts`: review's "from Amazon's order", the AI page's Suggest tags). `pnpm test`
   passed; `pnpm e2e` passed (API 124 of 124, browser 152 of 152).
+
+## Documentation (Kael, 2026-11-20; built, `v1.4.0`)
+
+Kael, after `v1.3.0`: "HSA and FSA purchases require documentation. For Amazon, let's make sure to
+save a hard copy of the invoice or order to the transaction. For other transactions, most will
+come from reading a receipt so we're set there, and any that don't, maybe we add a
+`needs-receipt` tag that we remove if a receipt is uploaded?"
+
+**His answers:** invoices for eligible charges only (each is one more Amazon page, toward its bot
+score); needing a receipt **worked out, not stored** (an `#hsa-fsa-eligible` split and no file),
+over the tag, since a tag has to be kept right by every path that tags, attaches or deletes a
+file; only eligible spending flagged; released once green.
+
+**Proven on Emmer first** (with the session `shops` keeps, no sign-in; nothing of it kept here):
+Amazon's printable invoice (`ORDER_INVOICE_URL`), read with the session and printed in headless
+Chromium with only Amazon's image hosts' pictures and styles loaded, is a one-page PDF of about
+85 KB: the order's date and number, its items each marked "FSA or HSA eligible", the totals and
+Amazon's eligible amount. About 3 seconds to read, 5 to start the browser (once a sync), 4 to
+print.
+
+**As built:**
+
+- **`shops`:** `save_invoices` at the end of each sync, for every kept order with an eligible
+  item and no invoice yet (`Db.eligible_orders`, `invoiced`), kept as
+  `/data/shops/amazon/<book>/invoices/<order>.pdf` (`invoice_path`; forgotten with the
+  connection); `GET /books/{book}/amazon/orders/{number}/invoice`; `for_app` says
+  `invoice: true` on the charge's order. The sync's status counts "invoices saved".
+- **`app`:** `OrderCharge.orders[].invoice`; `ShopsPort.invoice`; `attachInvoices` when a charge
+  with an eligible line is read, and `refresh` (tags, then the invoice) for one already read
+  whose lines or invoice are new (`OrdersStore.receive`'s `Marked.invoices`). Only into a
+  transaction holding no file yet.
+- **No receipt:** the ledger's journal `attached` (`pnpm generate`); `JournalFilter.attached`,
+  Receipt in Transactions' and review's filter (`?receipt=yes|no`, the pill "no receipt"); a
+  review card's "HSA or FSA eligible, without a receipt to claim it with", linking to the
+  transaction (to attach one) and to `?tag=hsa-fsa-eligible&receipt=no`; MCP's
+  `read_transactions` `attached`, and its base skill saying so.
+- **Tests:** `shops` 2 (only pictures and styles from the image hosts; an eligible order's
+  invoice kept by its number and said to `app`); `app` 4 (attached once to an eligible charge's
+  transaction; not for one with nothing eligible or a file already; attached to one already
+  read once kept; the filter keeping by files); ledger 1 (`attached`); API (`hsa.test.ts`: the
+  tag with `attached` false and true); browser (`hsa.spec.ts`: the card's note, and All without
+  one listing it). The Amazon invoice's own printing is only proven on Emmer: the e2e stack has
+  no Amazon.
+- **Not built:** Receipt on an account's ledger (its filter is Transactions' and review's); an
+  invoice for every Amazon charge (M99).
 
 ## Building it
 

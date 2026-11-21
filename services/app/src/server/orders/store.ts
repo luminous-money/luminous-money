@@ -23,8 +23,13 @@ const stored = (r: Row): StoredCharge & { user_id: string } => ({
   user_id: r.user_id,
 });
 
-/** A charge already read whose lines came newly marked HSA or FSA eligible, with those lines. */
-export type Marked = { charge: StoredCharge & { user_id: string }; lines: OrderLine[] };
+/** A charge already read that came again with lines newly marked HSA or FSA eligible, or with
+ * orders whose invoice is newly kept (HSA tracking): those lines, and those orders' numbers. */
+export type Marked = {
+  charge: StoredCharge & { user_id: string };
+  lines: OrderLine[];
+  invoices: string[];
+};
 
 /** The lines of `sent` marked HSA or FSA eligible that weren't in `kept` (by text and amount). */
 function newlyMarked(kept: OrderCharge, sent: OrderCharge): OrderLine[] {
@@ -33,14 +38,20 @@ function newlyMarked(kept: OrderCharge, sent: OrderCharge): OrderLine[] {
   return sent.lines.filter((l) => l.hsa_fsa_eligible && !was(l));
 }
 
+/** The orders of `sent` whose invoice is kept that weren't so in `kept`. */
+function newlyInvoiced(kept: OrderCharge, sent: OrderCharge): string[] {
+  const had = new Set(kept.orders.filter((o) => o.invoice).map((o) => o.number));
+  return sent.orders.filter((o) => o.invoice && !had.has(o.number)).map((o) => o.number);
+}
+
 export class OrdersStore {
   constructor(private readonly db: DatabaseSync) {}
 
   /** Keep what a reader sent: new charges wait to be read; one still waiting takes what was
    * sent (its lines may be better now its order's been read); one already read is left as it is,
-   * unless its lines come newly marked HSA or FSA eligible (HSA tracking): it takes what was
-   * sent, and is returned with those lines, for its splits to be tagged (`retag`). Returns how
-   * many were new, and those. */
+   * unless its lines come newly marked HSA or FSA eligible, or its order's invoice newly kept
+   * (HSA tracking): it takes what was sent, and is returned with what's new, for its splits to be
+   * tagged and the invoice attached (`refresh`). Returns how many were new, and those. */
   receive(book: string, user: string, charges: OrderCharge[]): { added: number; marked: Marked[] } {
     const stamp = now();
     let added = 0;
@@ -62,10 +73,12 @@ export class OrdersStore {
         } else if (found.state === "waiting" && found.data !== data)
           this.update(book, user, c, data, stamp);
         else if (found.state === "read" && found.data !== data) {
-          const lines = newlyMarked(JSON.parse(found.data) as OrderCharge, c);
-          if (!lines.length) continue;
+          const kept = JSON.parse(found.data) as OrderCharge;
+          const lines = newlyMarked(kept, c);
+          const invoices = newlyInvoiced(kept, c);
+          if (!lines.length && !invoices.length) continue;
           this.update(book, user, c, data, stamp);
-          marked.push({ charge: this.charge(book, c.shop, c.id)!, lines });
+          marked.push({ charge: this.charge(book, c.shop, c.id)!, lines, invoices });
         }
       }
     });

@@ -25,7 +25,8 @@ import { Crumbs } from "../components/Crumbs.js";
  * Every account's transactions together, newest first, paged as an account's ledger is: 200 at
  * a time as you scroll, or from a date back (`?date=`) with Load more above; searched (`?q=`:
  * payees, descriptions and splits' items) and filtered by reconciliation (`?reconciled=`), tags
- * (`?tag=`, M17) and accounts (`?account=`, any of them). Select mode's actions confirm,
+ * (`?tag=`, M17), accounts (`?account=`, any of them) and receipts (`?receipt=`: HSA tracking's
+ * eligible spending still needing one is `?tag=hsa-fsa-eligible&receipt=no`). Select mode's actions confirm,
  * categorize, tag or suggest categories for several at once.
  */
 export function Transactions({ book }: { book: string }) {
@@ -76,6 +77,7 @@ export function Transactions({ book }: { book: string }) {
         onChange={(view, options) => navigate(href(view), options)}
         byAccount
         reconciliation
+        byReceipt
         onSelect={canWrite ? selection.start : undefined}
         selecting={
           selection.selecting ? (

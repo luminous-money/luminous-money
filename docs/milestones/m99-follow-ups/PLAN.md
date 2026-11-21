@@ -152,8 +152,10 @@ Mobile usability is [M20](../m20-design-polish/PLAN.md)'s.
   payback is recorded (Kael: when the first one comes; a second tag and a "without this tag"
   filter, or Funds B's restricted money); a mixed Amazon charge's tax split by Amazon's eligible
   amount (kept by `shops`, `totals.hsa_fsa_eligible`), if Reports' totals should match it; an
-  in-app "find eligible spending" over past transactions, if the MCP server isn't enough; and
-  tuning what the AI is told is eligible, by what it proposes.
+  in-app "find eligible spending" over past transactions, if the MCP server isn't enough;
+  tuning what the AI is told is eligible, by what it proposes; and, from its documentation
+  (2026-11-20), an invoice for every Amazon charge, not only eligible ones (Kael: only eligible
+  for now), and Receipt in an account's ledger's filter.
 
 ### Reports and budgets
 

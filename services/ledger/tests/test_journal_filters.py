@@ -138,3 +138,17 @@ def test_an_account_ledger_searches_as_the_journal_does_and_keeps_its_balances(l
         f"/api/ledger/v1/books/{book}/accounts/Assets:Bank:Checking/ledger", params={"q": "hose"}
     )
     assert [r["id"] for r in over_http.json()["rows"]] == [made["barn"]]
+
+
+def test_attached_keeps_those_holding_a_file_or_those_holding_none(ledger, book, made):
+    """HSA tracking: eligible spending still needing its receipt is the tag with `attached=false`."""
+    ledger.attach(book, made["megamart"], "receipt.pdf", "application/pdf", b"%PDF-1.4 made up")
+
+    def found(attached):
+        return [r.id for r in ledger.journal(book, attached=attached, accounts=["Expenses:Home"]).rows]
+
+    assert found(None) == [made["megamart"], made["barn"]]
+    assert found(True) == [made["megamart"]]
+    assert found(False) == [made["barn"]]
+    rows = http(ledger).get(f"/api/ledger/v1/books/{book}/journal", params={"attached": "false"}).json()["rows"]
+    assert made["megamart"] not in [r["id"] for r in rows]

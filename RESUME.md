@@ -4,7 +4,42 @@ Where We Left Off
 _Updated 2026-11-20._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-19, later): HSA tracking, released as `v1.3.0` (2026-11-20)
+## Latest (2026-11-20): HSA tracking's documentation: invoices attached, "No receipt"
+
+Kael saw the 7 calls (no changes yet) and added: HSA and FSA purchases need documentation. Amazon's
+should have a hard copy of the invoice on the transaction; others mostly come from a read
+receipt, and for the rest he suggested a `needs-receipt` tag. His answers: invoices for eligible
+charges only; needing a receipt **worked out, not stored** (an `#hsa-fsa-eligible` split and no
+file); only eligible spending flagged; release once green. [The
+plan](docs/milestones/.archived/hsa-tracking/PLAN.md#documentation-kael-2026-11-20-built-v140) has
+it as built; design.md ("Where tags come from: HSA tracking") the reasons.
+
+- **Proven on Emmer first** (the kept session, no sign-in; nothing of it kept here or locally):
+  Amazon's printable invoice, read with the session and printed in headless Chromium (no
+  scripts; only pictures and styles from Amazon's image hosts) is a one-page PDF, about 85 KB,
+  with the items' "FSA or HSA eligible" marks and Amazon's eligible amount.
+- **`shops`:** `save_invoices` after each sync for every kept order with an eligible item and no
+  invoice yet (`/data/shops/amazon/<book>/invoices/<order>.pdf`); `GET
+  /books/{book}/amazon/orders/{number}/invoice`; charges say `invoice: true` on their order.
+- **`app`:** `ShopsPort.invoice`, `attachInvoices` (a charge with an eligible line, into a
+  transaction holding no file yet) on read, and `refresh` for one already read whose lines or
+  invoice are new.
+- **No receipt:** the ledger's journal takes `attached` (`pnpm generate` run); Transactions' and
+  review's filter have Receipt (`?receipt=no`); a review card on eligible spending without a
+  file says so, linking to the transaction and to all without one
+  (`/transactions?tag=hsa-fsa-eligible&receipt=no`); MCP's `read_transactions` has `attached`.
+- **Tests:** `pnpm test` passed (app 368, ledger 275, shops 23, ai 19, mcp 10); `pnpm e2e`
+  passed (API 124 of 124, browser 152 of 152; the new checks are in `hsa.test.ts` and
+  `hsa.spec.ts`).
+
+**Kael, on Emmer:** `./luminous-money upgrade` (to `v1.4.0` once it's out, below). The next sync
+re-reads the 69 kept orders (from `v1.3.0`), saves the invoices of those with an eligible item,
+and the book's eligible charges get their tag and invoice; `docker logs -t
+luminous-money-shops-1` shows it, and the sync's status counts "invoices saved".
+
+**Next:** Kael reviews the 7 calls (M99); then docs/PLAN.md's Ahead (Funds B first).
+
+## Before that (2026-11-19, later): HSA tracking, released as `v1.3.0` (2026-11-20)
 
 Kael skipped the pharmacy receipt check (none to look at) and asked to explore his Amazon orders
 on Emmer, then write the detailed plan and build it. [The
@@ -1350,7 +1385,8 @@ How it's put together:
    Fidelity accounts up in funds.
 4. **MCP Server is out** (`v1.2.0`, [its plan](docs/milestones/.archived/mcp-server/PLAN.md)),
    and works from Claude on the phone (Kael, 2026-11-19). **HSA tracking is out**
-   ([its plan](docs/milestones/.archived/hsa-tracking/PLAN.md), `v1.3.0`); Kael upgrades Emmer.
+   ([its plan](docs/milestones/.archived/hsa-tracking/PLAN.md), `v1.3.0`, its documentation
+   `v1.4.0`); Kael upgrades Emmer.
    **Next to build:** the order in [docs/PLAN.md](docs/PLAN.md)'s "Ahead" (Funds B first).
 5. Later, not pressing: [M99: Follow-ups](docs/milestones/m99-follow-ups/PLAN.md) (email,
    ownership transfer, the rest of M8's auth questions, and the rest of what's left over).

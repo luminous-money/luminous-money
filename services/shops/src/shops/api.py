@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import threading
 import urllib.error
 import urllib.parse
@@ -25,7 +26,7 @@ from typing import Any, Callable
 import pyotp
 from amazonorders.exception import AmazonOrdersAuthError, AmazonOrdersError
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from . import amazon, bodies, lines, seal
@@ -198,6 +199,7 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf, send_orders: SendOrders |
         jar = os.path.join(data_dir, "amazon", book, "cookies.json")
         if os.path.exists(jar):
             os.remove(jar)
+        shutil.rmtree(os.path.join(data_dir, "amazon", book, "invoices"), ignore_errors=True)
 
     def hand_over(book: str, caller: str) -> str:
         """Hand the book's charges, with their lines, to `app`; say how it went."""
@@ -208,7 +210,10 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf, send_orders: SendOrders |
         exclude = set(card_list(connection.get("exclude_cards")))
         mine = [c for c in db.charges(book, limit=100_000) if amazon.belongs(c["last4"], include, exclude)]
         charges = lines.for_app(
-            mine, connection.get("other_payments") or "Income:Uncategorized", connection.get("rewards")
+            mine,
+            connection.get("other_payments") or "Income:Uncategorized",
+            connection.get("rewards"),
+            amazon.invoiced(data_dir, book, {c["order_number"] for c in mine if c["order_number"]}),
         )
         try:
             sent = send_orders(book, caller, charges)
@@ -227,13 +232,14 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf, send_orders: SendOrders |
         try:
             result = amazon.sync(db, data_dir, book, step)
             failed = f"; {len(result['failed'])} orders couldn't be read" if result["failed"] else ""
+            invoices = f", {result['invoices']} invoices saved" if result["invoices"] else ""
             others = f" ({result['other_cards']} on other cards left out)" if result["other_cards"] else ""
             step("Handing the charges to the book…")
             handed = hand_over(book, caller)
             db.set_status(
                 book,
                 "ok",
-                f"{result['charges']} charges{others} and {result['orders']} orders read{failed}.{handed}",
+                f"{result['charges']} charges{others} and {result['orders']} orders read{invoices}{failed}.{handed}",
                 synced=True,
             )
             job.update(state="done", step="Done", result=result)
@@ -266,6 +272,16 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf, send_orders: SendOrders |
     def sync_state(book: str, caller: str = Depends(user)) -> dict[str, Any]:
         need(caller, book, "read")
         return jobs.get(book, {"state": "none"})
+
+    @api.get("/books/{book}/amazon/orders/{number}/invoice")
+    def invoice(book: str, number: str, caller: str = Depends(user)) -> FileResponse:
+        """An order's invoice, kept as a PDF (HSA tracking), for `app` to attach to its charge's
+        transaction."""
+        need(caller, book, "read")
+        path = amazon.invoice_path(data_dir, book, number)
+        if path is None or not os.path.exists(path):
+            raise HTTPException(404, "that order's invoice isn't kept")
+        return FileResponse(path, media_type="application/pdf", filename=f"Amazon order {number}.pdf")
 
     @api.get("/books/{book}/amazon/charges")
     def charges(book: str, caller: str = Depends(user)) -> list[dict[str, Any]]:

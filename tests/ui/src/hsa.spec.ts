@@ -58,6 +58,16 @@ test("an item Amazon marks eligible is tagged, and review says it came from Amaz
   await expect(card.getByRole("list", { name: "Where its tags came from" })).toHaveText(
     "#hsa-fsa-eligible on Digital thermometer from Amazon's order"
   );
+
+  // No invoice came with it (this stack's shops has none), so it says it needs a receipt, and
+  // lists every one without.
+  await expect(card.getByText("HSA or FSA eligible, without a receipt")).toBeVisible();
+  await card.getByRole("link", { name: "All without one" }).click();
+  await expect(page).toHaveURL(/\/transactions\?tag=hsa-fsa-eligible&receipt=no/);
+  await expect(page.getByRole("button", { name: "Remove no receipt" })).toBeVisible();
+  const rows = page.getByRole("list", { name: "Transactions" }).getByRole("listitem");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText("Amazon");
 });
 
 test("the AI page's Suggest tags is on by default, and can be turned off", async ({ page }) => {

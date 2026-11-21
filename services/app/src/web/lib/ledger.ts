@@ -70,6 +70,9 @@ export type JournalFilter = {
   q?: string;
   accounts?: string[];
   budgeted?: boolean;
+  /** Only those holding a file, a receipt say (true), or none (false): HSA tracking's "No
+   * receipt", with the `hsa-fsa-eligible` tag. */
+  attached?: boolean;
 };
 
 /** An API error with its status, so callers can tell a conflict (409) from a rejection (422),
@@ -240,7 +243,7 @@ export const api = {
   journal: (
     book_id: string,
     page: LedgerPageAt = {},
-    { reconciled, tags = [], q, accounts = [], budgeted }: JournalFilter = {}
+    { reconciled, tags = [], q, accounts = [], budgeted, attached }: JournalFilter = {}
   ): Promise<JournalPage> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/journal", {
@@ -254,6 +257,7 @@ export const api = {
             q: q?.trim() || undefined,
             account: accounts.length ? accounts : undefined,
             budgeted,
+            attached,
           },
         },
       })

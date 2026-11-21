@@ -3288,6 +3288,11 @@ details.divide summary {
   margin-bottom: 0.25rem;
 }
 
+/* A review card's HSA- or FSA-eligible spending without its receipt (HSA tracking). */
+.needs-receipt {
+  margin: 0.25rem 0 0;
+}
+
 /* Where a review card's tags came from (HSA tracking): a quiet line each. */
 .tag-sources {
   list-style: none;

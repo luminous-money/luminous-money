@@ -236,8 +236,11 @@ def order_charges(
     return out
 
 
-def for_app(charges: list[dict[str, Any]], other: str, rewards: str | None) -> list[dict[str, Any]]:
-    """The book's charges (as `Db.charges` gives them, each with its order) in `app`'s shape."""
+def for_app(
+    charges: list[dict[str, Any]], other: str, rewards: str | None, invoiced: set[str] | frozenset[str] = frozenset()
+) -> list[dict[str, Any]]:
+    """The book's charges (as `Db.charges` gives them, each with its order) in `app`'s shape; an
+    order whose invoice is kept (`invoiced`) says so, for `app` to fetch and attach."""
     rewards = rewards or other
     by_order: dict[str, list[dict[str, Any]]] = {}
     for c in charges:
@@ -261,7 +264,15 @@ def for_app(charges: list[dict[str, Any]], other: str, rewards: str | None) -> l
                 "date": c["date"],
                 "amount": str(cents(amount)),
                 "card": {"last_four": c["last4"], "brand": None} if c["last4"] else None,
-                "orders": [{"number": c["order_number"], "url": c["order_link"]}] if c["order_number"] else [],
+                "orders": [
+                    {
+                        "number": c["order_number"],
+                        "url": c["order_link"],
+                        **({"invoice": True} if c["order_number"] in invoiced else {}),
+                    }
+                ]
+                if c["order_number"]
+                else [],
                 "lines": lines,
                 "note": note,
             }

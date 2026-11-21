@@ -10,7 +10,7 @@ import type { OrderCharge } from "../../shared/orders.js";
 import type { AiPort } from "../ai.js";
 import { AppDb } from "../db.js";
 import { FakeLedger } from "../testing.js";
-import { readCharge, readWaiting, retag, type OrderDeps } from "./read.js";
+import { readCharge, readWaiting, refresh, retag, type OrderDeps } from "./read.js";
 import { chargeProblem } from "./routes.js";
 import { shopNotifications, type ShopConnection, type ShopsPort } from "../shops.js";
 import { OrdersStore } from "./store.js";
@@ -272,6 +272,7 @@ describe("the morning's shop sync, and Amazon wanting a person", () => {
           ...connection,
         },
       sync: async (book) => void synced.push(book),
+      invoice: async () => null,
     };
     return { port, synced };
   };
@@ -417,6 +418,77 @@ describe("HSA tracking: a line the shop marks HSA or FSA eligible", () => {
     expect(db.proposal("b", t!.id)?.tags).toEqual([
       { index: 2, tag: "hsa-fsa-eligible", by: "ai" },
     ]);
+  });
+
+  describe("its order's invoice (documentation)", () => {
+    const PDF = new TextEncoder().encode("%PDF-1.4 made up");
+    const withShops = (deps: OrderDeps, kept: Set<string>) => {
+      const asked: string[] = [];
+      deps.shopsFor = () => ({
+        amazon: async () => null,
+        sync: async () => undefined,
+        invoice: async (_book, _shop, order) => {
+          asked.push(order);
+          return kept.has(order)
+            ? { name: `Amazon order ${order}.pdf`, type: "application/pdf", bytes: PDF }
+            : null;
+        },
+      });
+      return asked;
+    };
+    const invoiced = (c: OrderCharge): OrderCharge => ({
+      ...c,
+      orders: c.orders.map((o) => ({ ...o, invoice: true })),
+    });
+
+    it("is attached to an eligible charge's transaction, once", async () => {
+      const { ledger, orders, deps } = setUp();
+      withShops(deps, new Set(["111-0000000-0000001"]));
+      orders.receive("b", "u", [invoiced(marked())]);
+      await readWaiting(deps, "b");
+
+      const [t] = ledger.transactions;
+      expect(ledger.attachments).toEqual([
+        {
+          transaction: t!.id,
+          name: "Amazon order 111-0000000-0000001.pdf",
+          type: "application/pdf",
+          size: PDF.length,
+        },
+      ]);
+      expect(t!.attachments).toBe(1);
+    });
+
+    it("isn't, for a charge with nothing eligible, or a transaction already holding a file", async () => {
+      const { ledger, orders, deps } = setUp();
+      const asked = withShops(deps, new Set(["111-0000000-0000001"]));
+      orders.receive("b", "u", [invoiced(charge())]);
+      await readWaiting(deps, "b");
+      expect([asked, ledger.attachments]).toEqual([[], []]);
+
+      const bank = bankCopy(ledger, { amount: "-30.00" });
+      ledger.transactions.find((t) => t.id === bank.id)!.attachments = 1;
+      orders.receive("b", "u", [invoiced(marked({ id: "c2" }))]);
+      await readWaiting(deps, "b");
+      expect(ledger.attachments).toEqual([]);
+    });
+
+    it("is attached to one already read once its shop's reader keeps it", async () => {
+      const { ledger, orders, deps } = setUp();
+      withShops(deps, new Set(["111-0000000-0000001"]));
+      orders.receive("b", "u", [marked()]);
+      await readWaiting(deps, "b");
+      expect(ledger.attachments).toEqual([]);
+
+      const { marked: again } = orders.receive("b", "u", [invoiced(marked())]);
+      expect(again.map((m) => [m.lines.length, m.invoices])).toEqual([
+        [0, ["111-0000000-0000001"]],
+      ]);
+      await refresh(deps, "b", again[0]!);
+      expect(ledger.attachments.map((a) => a.name)).toEqual([
+        "Amazon order 111-0000000-0000001.pdf",
+      ]);
+    });
   });
 
   it("must be true or false", () => {

@@ -18,6 +18,7 @@ image is large.
 | `DELETE /books/{book}/amazon?updated_at=` | Forget it, what was read, and Amazon's session. Manage. |
 | `POST /books/{book}/amazon/sync` | Start reading Amazon (202); `GET` says how it's going. Write. |
 | `GET /books/{book}/amazon/charges` | What was read, newest first, each charge with its order. Read. |
+| `GET /books/{book}/amazon/orders/{number}/invoice` | An order's invoice, kept as a PDF (HSA tracking), for `app` to attach. Read. |
 
 Roles are the ledger's, asked as the caller (`X-User-Id`, set by the gateway).
 
@@ -40,10 +41,15 @@ Roles are the ledger's, asked as the caller (`X-User-Id`, set by the gateway).
    again, one at a time, a second apart: its items, totals, shipments and payment, and which
    items Amazon marks "FSA or HSA eligible" (each item's `healthBenefitAccountInformation`
    block; HSA tracking). Orders kept before that mark was read are read again once.
-4. Hand the book's charges to `app` (`POST /api/app/v1/books/{book}/orders`, as whoever
+4. Keep the invoice of each order with an eligible item, once (HSA tracking: what an HSA or FSA
+   asks for): Amazon's printable invoice read with the session, printed to a PDF in a headless
+   Chromium that runs none of its scripts and loads only its pictures and styles (from Amazon's
+   image hosts), kept as `/data/shops/amazon/<book>/invoices/<order>.pdf`.
+5. Hand the book's charges to `app` (`POST /api/app/v1/books/{book}/orders`, as whoever
    synced), each with its lines (`shops.lines`: items, tax, shipping, a gift card or points from
    their accounts; an eligible item's line says so, `hsa_fsa_eligible`, and so do the tax and
-   shipping when every item is), for it to itemize them into the book as receipts. `app` starts the morning's
+   shipping when every item is; an order whose invoice is kept, `invoice: true`), for it to
+   itemize them into the book as receipts, attaching the invoice to an eligible one. `app` starts the morning's
    sync itself (09:00 in the book's zone).
 
 ## Configuration

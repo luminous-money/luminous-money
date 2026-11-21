@@ -92,5 +92,39 @@ describe("HSA tracking", () => {
     const thermometer = await bought("DIGITAL THERMOMETER");
     assert.equal((await suggest(thermometer.id)).status, 200);
     assert.deepEqual(await tagsOf(thermometer.id), [[], []]);
+
+    // Which eligible spending still needs its receipt: the tag, and no file attached.
+    const gauze = await bought("GAUZE PADS");
+    assert.equal((await suggest(gauze.id)).status, 200); // Suggest tags is off: tag it by hand
+    const { data: full } = await user.ledger.GET(
+      "/api/ledger/v1/books/{book_id}/transactions/{directive_id}",
+      { params: { path: { book_id: id, directive_id: gauze.id } } }
+    );
+    await user.ledger.PATCH("/api/ledger/v1/books/{book_id}/transactions/{directive_id}", {
+      params: { path: { book_id: id, directive_id: gauze.id } },
+      body: {
+        updated_at: full!.updated_at,
+        postings: full!.postings.map((p, i) =>
+          i === 1 ? { ...p, tags: ["hsa-fsa-eligible"] } : p
+        ),
+      } as never,
+    });
+    const attached = await fetch(
+      `${BASE_URL}/api/ledger/v1/books/${id}/transactions/${bandages.id}/attachments?filename=receipt.pdf`,
+      {
+        method: "POST",
+        headers: { authorization: `Bearer ${user.token}`, "content-type": "application/pdf" },
+        body: new TextEncoder().encode("%PDF-1.4 made up"),
+      }
+    );
+    assert.equal(attached.status, 201);
+    const without = async (value: boolean) =>
+      (
+        await user.ledger.GET("/api/ledger/v1/books/{book_id}/journal", {
+          params: { path: { book_id: id }, query: { tag: ["hsa-fsa-eligible"], attached: value } },
+        })
+      ).data!.rows.map((r) => r.id);
+    assert.deepEqual(await without(false), [gauze.id]);
+    assert.deepEqual(await without(true), [bandages.id]);
   });
 });

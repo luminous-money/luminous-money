@@ -24,7 +24,10 @@ export type OrderCharge = {
   date: string;
   amount: string;
   card: { last_four: string; brand?: string | null } | null;
-  orders: { number: string; url?: string | null }[];
+  /** Its orders; `invoice`: the shop's reader keeps a copy of the order's invoice (a PDF), for
+   * `app` to fetch and attach to a charge with an HSA or FSA eligible line (HSA tracking: the
+   * documentation a claim needs). */
+  orders: { number: string; url?: string | null; invoice?: boolean }[];
   lines: OrderLine[];
   /** Anything worth saying about its lines (they're a guess, its order wasn't read…). */
   note?: string | null;

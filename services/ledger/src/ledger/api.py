@@ -463,6 +463,10 @@ def create_app(ledger: Ledger) -> FastAPI:
             bool | None,
             Query(description="Only those counted in budgets (true), or only those kept out of them (false)."),
         ] = None,
+        attached: Annotated[
+            bool | None,
+            Query(description="Only those holding a file, a receipt say (true), or only those holding none (false)."),
+        ] = None,
     ) -> models.JournalPage:
         """Every transaction in the book (every account's), newest first, paged as an account's
         ledger is."""
@@ -479,6 +483,7 @@ def create_app(ledger: Ledger) -> FastAPI:
             search=q,
             accounts=account,
             budgeted=budgeted,
+            attached=attached,
         )
 
     @api.get("/books/{book_id}/tags")
