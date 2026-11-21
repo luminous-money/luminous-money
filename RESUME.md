@@ -29,7 +29,8 @@ design.md ("Shops: reading Amazon") has the decision.
   charges' app records go at the next sync after the upgrade.
 - **M99, a bug noted:** a proposed match keeps a candidate deleted since, and offers it.
 
-**Released** as `v1.5.1` (see below for its state). **Kael, on Emmer:** `./luminous-money upgrade`.
+**Released** as `v1.5.1` (the workflow and CI green; all seven images pulled anonymously from
+ghcr.io). **Kael, on Emmer:** `./luminous-money upgrade`.
 **Next:** unchanged: Kael reviews HSA tracking's 7 calls (M99); then docs/PLAN.md's Ahead.
 
 ## Before that (2026-11-21, later): a Receipt filter on every list, released as `v1.5.0`
