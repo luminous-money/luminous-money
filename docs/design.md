@@ -1920,6 +1920,11 @@ The default chain:
      amount within a scheduled split's tolerance as confirming would; one that can't is left
      proposed. So two coffees typed by hand and matched crossed stay crossed (the same amounts,
      a day apart), and a wrong match with a confirmed transaction isn't offered for undoing.
+   - **A candidate deleted since isn't offered** (Kael, 2026-11-21: "just fix that now"): a
+     row's candidates are kept as its import found them, so review asks the ledger which it
+     still has (`proposedMatches`) and leaves the rest out, and moving a row to one is refused.
+     Checked when read, not kept up to date on each delete: a delete can come from anywhere (a
+     transaction's page, the MCP server, the ledger's API), and a review has few rows proposed.
    - **Known miss:** pairing is by proximity, not order (two coffees entered on the 5th and 7th,
      imported on the 7th and 8th, pair crossed). Swapping fixes it; order-aware assignment is a
      Polish to-do.

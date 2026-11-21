@@ -13,6 +13,9 @@
  * becomes new, one is staged from its date, amount, description and payee. The ledger changes
  * are one atomic write; then the rows are updated. Every row touched is left proposed, since it
  * changed, until it's confirmed in review.
+ *
+ * A row's candidates are kept as its import found them, so one deleted since (by hand, say) is
+ * left out of what's proposed, and can't be taken.
  */
 import type { TransactionIn } from "@luminous-money/ledger-client";
 
@@ -24,7 +27,7 @@ import {
   takeBankAmount,
   type Stageable,
 } from "./imports.js";
-import { STAGING, type LedgerPort } from "./ledger.js";
+import { LedgerError, STAGING, type LedgerPort } from "./ledger.js";
 
 export type RowRef = { batch: string; line: number };
 
@@ -47,9 +50,35 @@ const stageable = (row: HeldRow): Stageable => ({
   fingerprint: row.fingerprint!,
 });
 
-/** Rows with a proposed match, each candidate with the row holding it, if another does. */
-export function proposedMatches(db: AppDb, book: string): ProposedMatch[] {
-  return db.proposed(book).map((row) => ({
+/** Which of `ids` the book still has. */
+async function present(ledger: LedgerPort, book: string, ids: string[]): Promise<Set<string>> {
+  const found = await Promise.all(
+    [...new Set(ids)].map((id) =>
+      ledger.transaction(book, id).then(
+        () => id,
+        (error) => {
+          if (error instanceof LedgerError && error.status === 404) return null;
+          throw error;
+        }
+      )
+    )
+  );
+  return new Set(found.filter((id) => id !== null));
+}
+
+/** Rows with a proposed match, each candidate the book still has with the row holding it, if
+ * another does. */
+export async function proposedMatches(
+  db: AppDb,
+  ledger: LedgerPort,
+  book: string
+): Promise<ProposedMatch[]> {
+  const rows = db.proposed(book);
+  const others = rows.flatMap((row) =>
+    row.candidates.map((c) => c.transaction_id).filter((id) => id !== row.transaction_id)
+  );
+  const there = await present(ledger, book, others);
+  return rows.map((row) => ({
     batch_id: row.batch_id,
     account: row.account,
     filename: row.filename,
@@ -60,23 +89,25 @@ export function proposedMatches(db: AppDb, book: string): ProposedMatch[] {
     payee: row.payee,
     outcome: row.outcome,
     transaction_id: row.transaction_id,
-    candidates: row.candidates.map((c) => {
-      const holder =
-        c.transaction_id === row.transaction_id
-          ? undefined
-          : db.holder(book, row.account, c.transaction_id, ref(row));
-      return {
-        ...c,
-        holder: holder
-          ? {
-              batch_id: holder.batch_id,
-              line: holder.line,
-              date: holder.date,
-              description: holder.description,
-            }
-          : null,
-      };
-    }),
+    candidates: row.candidates
+      .filter((c) => c.transaction_id === row.transaction_id || there.has(c.transaction_id))
+      .map((c) => {
+        const holder =
+          c.transaction_id === row.transaction_id
+            ? undefined
+            : db.holder(book, row.account, c.transaction_id, ref(row));
+        return {
+          ...c,
+          holder: holder
+            ? {
+                batch_id: holder.batch_id,
+                line: holder.line,
+                date: holder.date,
+                description: holder.description,
+              }
+            : null,
+        };
+      }),
   }));
 }
 
@@ -104,6 +135,8 @@ export async function assignRow({
       "that transaction isn't one of this row's candidates"
     );
   if (to === row.transaction_id || (to === null && row.outcome === "staged")) return;
+  if (to !== null && !(await present(ledger, book, [to])).has(to))
+    throw new MatchProblem("not-a-candidate", "that transaction isn't in the book any more");
 
   const holder = to === null ? undefined : db.holder(book, row.account, to, at);
   const create: TransactionIn[] = [];

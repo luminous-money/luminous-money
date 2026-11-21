@@ -42,8 +42,10 @@ const run = (rows: string) =>
   });
 
 /** Each proposed row's description (with its line) and the transaction it holds. */
-const holding = () =>
-  Object.fromEntries(proposedMatches(db, "b").map((m) => [m.line, m.transaction_id]));
+const holding = async () =>
+  Object.fromEntries(
+    (await proposedMatches(db, ledger, "b")).map((m) => [m.line, m.transaction_id])
+  );
 
 beforeEach(() => {
   db = new AppDb(join(mkdtempSync(join(tmpdir(), "app-")), "app.sqlite"));
@@ -62,8 +64,8 @@ describe("the coffee example", () => {
     batch = (await run("03/07/2024,CAFE,-5.00,1\n03/08/2024,CAFE,-5.00,1\n")).batch.id;
   });
 
-  it("proposes both rows, each candidate showing which row holds it", () => {
-    const [r7, r8] = proposedMatches(db, "b");
+  it("proposes both rows, each candidate showing which row holds it", async () => {
+    const [r7, r8] = await proposedMatches(db, ledger, "b");
 
     expect([r7!.transaction_id, r8!.transaction_id]).toEqual([seventh, fifth]);
     expect(r7!.candidates.map((c) => [c.transaction_id, c.holder?.line ?? null])).toEqual([
@@ -77,7 +79,7 @@ describe("the coffee example", () => {
 
     await assignRow({ db, ledger, book: "b", row: { batch, line: 2 }, to: fifth });
 
-    expect(holding()).toEqual({ 2: fifth, 3: seventh });
+    expect(await holding()).toEqual({ 2: fifth, 3: seventh });
     expect(ledger.transactions).toHaveLength(before);
   });
 
@@ -99,10 +101,22 @@ describe("the coffee example", () => {
   it("confirming leaves review; a confirmed row can't be reassigned", async () => {
     await confirmRow(db, ledger, "b", { batch, line: 2 });
 
-    expect(Object.keys(holding())).toEqual(["3"]);
+    expect(Object.keys(await holding())).toEqual(["3"]);
     await expect(
       assignRow({ db, ledger, book: "b", row: { batch, line: 2 }, to: fifth })
     ).rejects.toMatchObject({ code: "not-proposed" });
+  });
+
+  it("leaves out a candidate deleted since, and refuses it", async () => {
+    const [, other] = (await proposedMatches(db, ledger, "b"))[0]!.candidates;
+    const gone = ledger.transactions.find((t) => t.id === other!.transaction_id)!;
+    await ledger.applyChanges("b", { create: [], delete: [gone] });
+
+    const [row] = await proposedMatches(db, ledger, "b");
+    expect(row!.candidates.map((c) => c.transaction_id)).toEqual([row!.transaction_id]);
+    await expect(
+      assignRow({ db, ledger, book: "b", row: { batch, line: 2 }, to: gone.id })
+    ).rejects.toMatchObject({ code: "not-a-candidate" });
   });
 
   it("refuses a transaction that isn't one of the row's candidates", async () => {
@@ -139,7 +153,7 @@ it("a match with a confirmed transaction is final at once: it stays confirmed, o
   expect(rows.map((r) => [r.outcome, r.transaction_id, r.match])).toEqual([
     ["matched", typed, "confirmed"],
   ]);
-  expect(holding()).toEqual({});
+  expect(await holding()).toEqual({});
   expect(ledger.transactions.find((t) => t.id === typed)!.flag).toBe("*");
   await expect(
     assignRow({ db, ledger, book: "b", row: { batch: batch.id, line: 2 }, to: null })

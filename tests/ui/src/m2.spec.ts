@@ -83,3 +83,49 @@ test("the coffee example: both rows matched, swapped in review, confirmed, and o
   // The row as its own, and the 7th's coffee, no longer matched but still unconfirmed.
   await expect(cards).toHaveCount(2);
 });
+
+test("a candidate deleted since isn't offered", async ({ page }) => {
+  const { session, book, account } = await setUpUser(page);
+  const added = [];
+  for (const date of ["2024-03-07", "2024-03-08"]) {
+    const { data } = await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+      params: { path: { book_id: book.id } },
+      body: {
+        date,
+        flag: "!",
+        payee: "Corner Cafe",
+        narration: "Coffee",
+        postings: [
+          { account, units: { number: "-5.00", currency: "USD" } },
+          { account: "Equity:Opening-Balances" },
+        ],
+      },
+    });
+    added.push(data!);
+  }
+  await app(`/books/${book.id}/profiles/${encodeURIComponent(account)}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify([PROFILE]),
+  });
+  const form = new FormData();
+  form.set("account", account);
+  form.set("file", new Blob(["Date,Description,Amount\n03/08/2024,CAFE,-5.00\n"]), "cafe.csv");
+  await app(`/books/${book.id}/imports`, { method: "POST", body: form });
+
+  await page.goto(`/ui/books/${book.id}/review`);
+  const match = page
+    .getByRole("article")
+    .filter({ hasText: /^Mar 8, 2024 · Bank/ })
+    .getByRole("region", { name: "Match" });
+  await expect(match.getByRole("button", { name: "Match with this instead" })).toBeVisible();
+
+  const [seventh] = added;
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions/changes", {
+    params: { path: { book_id: book.id } },
+    body: { create: [], delete: [{ id: seventh!.id, updated_at: seventh!.updated_at }] },
+  });
+  await page.reload();
+  await expect(match).toContainText("Matches: CAFE · 2024-03-08");
+  await expect(match.getByRole("button", { name: "Match with this instead" })).toHaveCount(0);
+});

@@ -339,7 +339,7 @@ export class FakeLedger implements LedgerPort {
 
   async transaction(_book: string, id: string) {
     const found = this.transactions.find((t) => t.id === id);
-    if (!found) throw new Error(`no transaction ${id}`);
+    if (!found) throw new LedgerError(404, `no transaction ${id}`);
     return found;
   }
 

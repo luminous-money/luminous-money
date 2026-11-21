@@ -606,7 +606,7 @@ export function createApi({
   api.get("/books/:book/matches", async (c) => {
     const { book } = c.req.param();
     if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
-    return c.json(proposedMatches(db, book));
+    return c.json(await proposedMatches(db, ledgerFor(c.get("user")), book));
   });
 
   const matchError = (error: unknown) => {
@@ -631,7 +631,7 @@ export function createApi({
         row: { batch, line: Number(line) },
         to: body.transaction,
       });
-      return c.json(proposedMatches(db, book));
+      return c.json(await proposedMatches(db, ledgerFor(c.get("user")), book));
     } catch (error) {
       return c.json(...matchError(error));
     }
@@ -643,7 +643,7 @@ export function createApi({
     if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
     try {
       await confirmRow(db, ledgerFor(c.get("user")), book, { batch, line: Number(line) });
-      return c.json(proposedMatches(db, book));
+      return c.json(await proposedMatches(db, ledgerFor(c.get("user")), book));
     } catch (error) {
       return c.json(...matchError(error));
     }

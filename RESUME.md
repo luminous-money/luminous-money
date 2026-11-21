@@ -4,7 +4,26 @@ Where We Left Off
 _Updated 2026-11-21._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-21, evening): an Amazon charge Amazon dates anew is one charge, `v1.5.1`
+## Latest (2026-11-21, night): a candidate deleted since isn't offered, `v1.5.2`
+
+Kael: "Just fix that now and publish a new release": M99's bug from `v1.5.1` below. A row's
+candidates are kept as its import found them, so one deleted later was still offered as "Match
+with this instead", and taking it pointed the row at nothing.
+
+- **`app`:** `proposedMatches` (now async, with the ledger) leaves out a candidate the ledger
+  answers 404 for; `assignRow` refuses one (`not-a-candidate`, 422). design.md (Matching, "As
+  built in M2") has why it's checked on read. The fake ledger's `transaction` throws a
+  `LedgerError` 404, as the real one does.
+- **Tests:** app `matches.test.ts`; browser `m2.spec.ts` ("a candidate deleted since isn't
+  offered"). `pnpm test` and `pnpm e2e` passed (API 124 of 124, browser 154 of 154). The
+  ledger's API didn't change.
+- **M99:** the bug is gone from its list.
+
+**Released** as `v1.5.2` (see below for its state). **Kael, on Emmer:** `./luminous-money upgrade`
+(straight from `v1.5.0` takes `v1.5.1`'s fix too). **Next:** unchanged: Kael reviews HSA
+tracking's 7 calls (M99); then docs/PLAN.md's Ahead.
+
+## Before that (2026-11-21, evening): an Amazon charge Amazon dates anew is one charge, `v1.5.1`
 
 Kael, from review: "Match with this instead" on an Amazon charge, which he took for an order
 charged in two parts, both fighting over the order. It wasn't: read on Emmer (`shops.sqlite`, read
@@ -27,7 +46,8 @@ design.md ("Shops: reading Amazon") has the decision.
   kept; one bank row moved onto it and confirmed, another's match confirmed (its transaction
   still `!`, for Kael), so review offers no "Match with this instead" for them. The folded
   charges' app records go at the next sync after the upgrade.
-- **M99, a bug noted:** a proposed match keeps a candidate deleted since, and offers it.
+- **M99, a bug noted:** a proposed match keeps a candidate deleted since, and offers it (fixed
+  in `v1.5.2`, above).
 
 **Released** as `v1.5.1` (the workflow and CI green; all seven images pulled anonymously from
 ghcr.io). **Kael, on Emmer:** `./luminous-money upgrade`.
