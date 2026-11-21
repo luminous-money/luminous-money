@@ -19,7 +19,8 @@ with this instead", and taking it pointed the row at nothing.
   ledger's API didn't change.
 - **M99:** the bug is gone from its list.
 
-**Released** as `v1.5.2` (see below for its state). **Kael, on Emmer:** `./luminous-money upgrade`
+**Released** as `v1.5.2` (the workflow and CI green; all seven images pulled anonymously from
+ghcr.io). **Kael, on Emmer:** `./luminous-money upgrade`
 (straight from `v1.5.0` takes `v1.5.1`'s fix too). **Next:** unchanged: Kael reviews HSA
 tracking's 7 calls (M99); then docs/PLAN.md's Ahead.
 
