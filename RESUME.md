@@ -38,7 +38,7 @@ release when you're done."
   in view at the bottom of 23, tagging them all), the others reading toasts (`toasts()` in
   `support.ts`). `pnpm test` and `pnpm e2e` passed (API 125 of 125, browser 155 of 155).
 
-**Released** as `v1.6.0` (the workflow and CI pending at commit). **Kael, on Emmer:** `./luminous-money upgrade`.
+**Released** as `v1.6.0` (the workflow and CI green; all seven images public on ghcr.io, read anonymously). **Kael, on Emmer:** `./luminous-money upgrade`.
 **Next:** unchanged: Kael reviews HSA tracking's 7 calls (M99); then docs/PLAN.md's Ahead.
 
 ## Before that (2026-11-22, later): daily jobs on time on a laptop that sleeps, `v1.5.4`
