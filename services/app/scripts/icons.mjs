@@ -3,8 +3,9 @@
  *
  * - icon-192.png, icon-512.png: the icon as it is, a rounded square
  * - apple-touch-icon.png (180): full bleed, since iOS rounds the corners itself
- * - maskable-512.png: full bleed, "Lu" centered and kept inside the safe zone (the middle 80%),
- *   so a launcher's mask never cuts into it
+ * - maskable-512.png: full bleed, "Lu" centered and kept, with a margin, inside the circle
+ *   Android's launcher shows (an adaptive icon's middle 72dp of 108dp), so its mask never cuts
+ *   into it. That's tighter than the spec's safe zone (the middle 80%), which still clipped it.
  *
  * Run from the repo with `pnpm icons` (scripts/icons.sh), after changing icon.svg.
  */
@@ -54,9 +55,10 @@ async function render(source, size, file) {
 await render(svg, 192, "icon-192.png");
 await render(svg, 512, "icon-512.png");
 await render(await fullBleed(1), 180, "apple-touch-icon.png");
-// The safe zone is a circle of 40% of the size around the middle: keep the glyphs' corners in it.
+// Android shows a circle of a third of the size around the middle: keep the glyphs' corners well
+// inside it.
 await render(
-  await fullBleed((b) => Math.min(1, (0.4 * 0.92 * VIEW.size) / Math.hypot(b.width / 2, b.height / 2))),
+  await fullBleed((b) => Math.min(1, ((0.85 * VIEW.size) / 3) / Math.hypot(b.width / 2, b.height / 2))),
   512,
   "maskable-512.png"
 );

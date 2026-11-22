@@ -2158,7 +2158,9 @@ Reskinned from the original Luminous Money app (2026-10-23; its files are in
   the SVG switches itself by color scheme, so the favicon follows too. "Lu" is the Dongle font
   (SIL Open Font License) turned into paths, so nothing depends on the font being there. The
   PNG icons are rendered from it (`pnpm icons`): full bleed for iOS and Android's masks, which
-  round and crop them.
+  round and crop them. The maskable one keeps "Lu" inside the circle Android's launcher shows
+  (an adaptive icon's middle 72dp of 108dp, a radius of a third), not just the spec's safe zone
+  (a radius of 40%): sized for the safe zone, the installed app's icon was cut at the corners.
 - **On a phone, signed in, the logo stands alone:** "Luminous Money" is long, and the camera,
   the book switcher and the menu need the room.
 - **The footer is the brand,** the Lu logo small beside "Luminous Money" (Kael, 2026-11-06). It

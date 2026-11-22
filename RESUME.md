@@ -1,10 +1,26 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-21._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-22._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-21, night): a candidate deleted since isn't offered, `v1.5.2`
+## Latest (2026-11-22): the installed app's icon fits Android's circle
+
+Kael, with a screenshot: on Android the installed app's "Lu" was cut off at the corners. The
+maskable icon kept "Lu" inside the spec's safe zone (a radius of 40%), but Android's launcher
+shows only an adaptive icon's middle 72dp of 108dp (a radius of a third).
+
+- **`app`:** `scripts/icons.mjs` sizes "Lu" in `maskable-512.png` to fit that circle, with a
+  margin; `pnpm icons` re-rendered it (the other icons came out unchanged, and the logo in the
+  app is untouched). design.md ("The Lu logo") has why.
+- **Tests:** `pnpm test` passed; there's nothing new to test in a browser.
+
+**Released** as `v1.5.3` (see below for its state). **Kael, on Emmer:** `./luminous-money upgrade`;
+then, on the phone, an icon already on the home screen keeps the old one: remove it and install
+the app again from Brave. **Next:** unchanged: Kael reviews HSA tracking's 7
+calls (M99); then docs/PLAN.md's Ahead.
+
+## Before that (2026-11-21, night): a candidate deleted since isn't offered, `v1.5.2`
 
 Kael: "Just fix that now and publish a new release": M99's bug from `v1.5.1` below. A row's
 candidates are kept as its import found them, so one deleted later was still offered as "Match
