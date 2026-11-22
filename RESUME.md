@@ -21,7 +21,7 @@ startup run could come before `ledger` and `shops` answered.
   due, waiting for the services, no retry every tick). `pnpm test` and `pnpm e2e` passed
   (API 124 of 124, browser 154 of 154). The ledger's API didn't change.
 
-**Released** as `v1.5.4` (the workflow and CI pending at commit). **Kael, on Emmer:** `./luminous-money upgrade`.
+**Released** as `v1.5.4` (the workflow and CI green; all seven images public on ghcr.io, read anonymously). **Kael, on Emmer:** `./luminous-money upgrade`.
 **Next:** unchanged: Kael reviews HSA tracking's 7 calls (M99); then docs/PLAN.md's Ahead.
 
 ## Before that (2026-11-22): the installed app's icon fits Android's circle
