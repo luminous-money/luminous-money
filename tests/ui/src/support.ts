@@ -238,6 +238,9 @@ export async function linkMailedTo(to: string, kind: "reset" | "verify"): Promis
   throw new Error(`no ${kind} email to ${to}`);
 }
 
+/** The toasts: what a bulk action is doing, and then did (sonner's list of them). */
+export const toasts = (page: Page) => page.locator("ol[data-sonner-toaster]");
+
 /** A transaction's (or a schedule's) splits, each opening the split editor (a button, or in
  * Select mode a checkbox). */
 export const splitRows = (page: Page) =>

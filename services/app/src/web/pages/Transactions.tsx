@@ -16,7 +16,7 @@ import {
   useCanWrite,
   useJournal,
 } from "../lib/queries.js";
-import { simple, unresolved, withCounterpart } from "../lib/split.js";
+import { unresolved } from "../lib/split.js";
 import { useSelection } from "../lib/selection.js";
 import { Loading } from "../components/Loading.js";
 import { Crumbs } from "../components/Crumbs.js";
@@ -45,8 +45,7 @@ export function Transactions({ book }: { book: string }) {
     chosen,
     accounts: accounts.data ? postable(accounts.data, today()) : [],
     create,
-    categorize: (t, account) =>
-      simple(t) ? { postings: withCounterpart(t, account).postings } : null,
+    categorize: {},
     confirmBlocked:
       chosen.some((r) => r.postings.some((p) => unresolved(p.account))) &&
       "choose their accounts first",
@@ -87,7 +86,6 @@ export function Transactions({ book }: { book: string }) {
               onSelectAll={() => selection.selectAll(rows.map((r) => r.id))}
               actions={bulkActions.actions}
               busy={bulkActions.busy}
-              note={bulkActions.note}
               onDone={selection.stop}
             />
           ) : null

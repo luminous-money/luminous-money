@@ -51,7 +51,7 @@ test("splits are edited one at a time in the split editor, and tagged or deleted
   await expect(editor).toBeHidden();
   await expect(rows.nth(1)).toContainText("Plantains");
 
-  // A click with Shift starts Select mode; then a click selects. Add tag… tags them all.
+  // A click with Shift starts Select mode; then a click selects. Edit tags… tags them all.
   const bar = page.getByRole("toolbar", { name: "Selected" });
   await rows.nth(1).click({ modifiers: ["Shift"] });
   await expect(bar).toContainText("1 selected");
@@ -59,10 +59,11 @@ test("splits are edited one at a time in the split editor, and tagged or deleted
   await rows.nth(2).click();
   await expect(bar).toContainText("2 selected");
   await bar.getByRole("button", { name: "Actions ▾" }).click();
-  await page.getByRole("menuitem", { name: "Add tag…" }).click();
-  const tag = bar.getByRole("combobox", { name: "Add tag" });
+  await page.getByRole("menuitem", { name: "Edit tags…" }).click();
+  const tag = bar.getByRole("searchbox", { name: "Find or add a tag" });
   await tag.fill("party");
   await tag.press("Enter");
+  await bar.getByRole("button", { name: "Save" }).click();
   await expect(rows.nth(1)).toContainText("#party");
   await expect(rows.nth(2)).toContainText("#party");
   await expect(rows.nth(3)).not.toContainText("#party");

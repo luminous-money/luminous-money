@@ -110,6 +110,8 @@ export interface LedgerPort {
     options?: Staging
   ): Promise<Transaction[]>;
   transaction(book: string, id: string): Promise<Transaction>;
+  /** These transactions, in ledger order; one that's gone is left out. */
+  transactionsById(book: string, ids: string[]): Promise<Transaction[]>;
   /** Every transaction from `from` on (or every one), oldest first, compactly: categorizers'
    * context and reports' stream. With `tags`, only those with a split that has every one (M17),
    * every split kept, each with its own tags. */
@@ -199,6 +201,9 @@ export type Staging = { staging?: boolean };
 export const STAGING: Staging = { staging: true };
 
 const stagingQuery = (options?: Staging) => (options?.staging ? { staging: true } : {});
+
+/** How many transactions one read by ID asks for. */
+const BY_ID = 100;
 
 export function httpLedger(baseUrl: string, userId: string): LedgerPort {
   const client = createLedgerClient({ baseUrl, headers: { "X-User-Id": userId } });
@@ -346,6 +351,22 @@ export function httpLedger(baseUrl: string, userId: string): LedgerPort {
           params: { path: { book_id: book, directive_id: id } },
         })
       ),
+    transactionsById: async (book, ids) => {
+      // In chunks, to keep each request's URL short.
+      const chunks = Array.from({ length: Math.ceil(ids.length / BY_ID) }, (_, i) =>
+        ids.slice(i * BY_ID, (i + 1) * BY_ID)
+      );
+      const found = await Promise.all(
+        chunks.map((id) =>
+          unwrap(
+            client.GET("/api/ledger/v1/books/{book_id}/transactions", {
+              params: { path: { book_id: book }, query: { id, limit: id.length } },
+            })
+          )
+        )
+      );
+      return found.flat();
+    },
     members: (book) =>
       unwrap(
         client.GET("/api/ledger/v1/books/{book_id}/members", {

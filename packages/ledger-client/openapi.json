@@ -7679,6 +7679,27 @@
             }
           },
           {
+            "description": "Only these, by ID (repeat it: `id=a&id=b`); one missing is left out.",
+            "in": "query",
+            "name": "id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only these, by ID (repeat it: `id=a&id=b`); one missing is left out.",
+              "title": "Id"
+            }
+          },
+          {
             "in": "query",
             "name": "limit",
             "required": false,
@@ -9669,6 +9690,27 @@
                 }
               ],
               "title": "To"
+            }
+          },
+          {
+            "description": "Only these, by ID (repeat it: `id=a&id=b`); one missing is left out.",
+            "in": "query",
+            "name": "id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only these, by ID (repeat it: `id=a&id=b`); one missing is left out.",
+              "title": "Id"
             }
           },
           {

@@ -15,7 +15,7 @@
  * - **Default funds:** each balance-sheet split counts for its account's default fund (else
  *   Unallocated); a line takes over from the side it's on, and the rest stays with the defaults.
  */
-import { add, isMoney, isNegative, isZero, negate } from "./decimal.js";
+import { add, isMoney, isNegative, isZero, negate, sameDecimal } from "./decimal.js";
 
 /** a − b, compared with 0. */
 const compare = (a: string, b: string) => {
@@ -114,6 +114,20 @@ export function shapesOf(postings: PostingLike[], operating: string): FundShape[
       ? { kind: "out", size: negate(delta), currency }
       : { kind: "in", size: delta, currency };
   });
+}
+
+/** A transaction's shapes for funds, or null if its amounts don't read (or there's no currency):
+ * `shapesOf`, never throwing. */
+export function shapesFor(
+  postings: PostingLike[] | null,
+  currency: string | undefined
+): FundShape[] | null {
+  if (!postings || !currency) return null;
+  try {
+    return shapesOf(postings, currency);
+  } catch {
+    return null; // an amount being typed that isn't one yet
+  }
 }
 
 /** One commodity's shape, from the list (the operating currency's, with no commodity given). */
@@ -289,4 +303,21 @@ export function fundName(name: string): { name: string } | { problem: string } {
   if (clean.toLowerCase() === UNALLOCATED.toLowerCase())
     return { problem: "Unallocated is what isn't in a fund: it can't be a fund's name" };
   return { name: clean };
+}
+
+/** Two sets of lines are the same (in any order, however their numbers are written). */
+export function sameLines(a: FundLine[] | null | undefined, b: FundLine[] | null | undefined) {
+  const x = a ?? [];
+  const y = b ?? [];
+  return (
+    x.length === y.length &&
+    x.every((l) =>
+      y.some(
+        (m) =>
+          m.fund === l.fund &&
+          m.amount.currency === l.amount.currency &&
+          sameDecimal(m.amount.number, l.amount.number)
+      )
+    )
+  );
 }

@@ -908,6 +908,7 @@ class Store:
         flag: str | None = None,
         date_from: datetime.date | None = None,
         date_to: datetime.date | None = None,
+        ids: list[str] | None = None,
         limit: int | None = 500,
     ) -> list[Row]:
         """The app's read path: plain SQL over the derived columns, no Beancount involved."""
@@ -929,6 +930,9 @@ class Store:
         if date_to is not None:
             where.append("d.date <= ?")
             args.append(date_to.isoformat())
+        if ids is not None:
+            where.append(f"d.id IN ({', '.join('?' for _ in ids)})" if ids else "0")
+            args += ids
         sql.append("WHERE " + " AND ".join(where) + " ORDER BY d.date, d.ordinal LIMIT ?")
         args.append(-1 if limit is None else limit)
         return [_row(r) for r in self._conn.execute(" ".join(sql), args)]

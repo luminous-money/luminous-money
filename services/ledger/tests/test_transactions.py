@@ -183,6 +183,18 @@ def test_json_api_over_http(book):
     assert client.get("/api/ledger/v1/books/book/transactions/missing").status_code == 404
 
 
+def test_transactions_listed_by_id(book):
+    client = http(book)
+    ids = [client.post("/api/ledger/v1/books/book/transactions", json=COFFEE).json()["id"] for _ in range(3)]
+
+    def listed(params):
+        return [t["id"] for t in client.get("/api/ledger/v1/books/book/transactions", params=params).json()]
+
+    assert listed({"id": [ids[2], ids[0], "missing"]}) == [ids[0], ids[2]]  # in ledger order
+    assert listed({"id": ids, "flag": "*"}) == []
+    assert len(listed({})) > len(ids)  # the book's others too, without it
+
+
 def test_changes_create_and_delete_in_one_write_or_not_at_all(book):
     client = http(book)
     url = "/api/ledger/v1/books/book/transactions"

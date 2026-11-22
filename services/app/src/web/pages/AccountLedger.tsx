@@ -23,7 +23,7 @@ import { useBulkActions } from "../lib/bulk.js";
 import { postable } from "../lib/accounts.js";
 import { today } from "../lib/format.js";
 import { selectClick, useSelection } from "../lib/selection.js";
-import { unresolved, withOtherSide } from "../lib/split.js";
+import { unresolved } from "../lib/split.js";
 import {
   explain,
   useAccountCreation,
@@ -119,10 +119,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
     chosen,
     accounts: accounts.data ? postable(accounts.data, today()) : [],
     create,
-    categorize: (t, category) => {
-      const moved = withOtherSide(t, account, category);
-      return moved && { postings: moved.postings };
-    },
+    categorize: { own: account },
     confirmBlocked:
       (unresolved(account) || chosen.some((r) => !!r.counterpart && unresolved(r.counterpart))) &&
       "choose their accounts first",
@@ -244,7 +241,6 @@ export function AccountLedger({ book, account }: { book: string; account: string
               onSelectAll={() => selection.selectAll(rows.map((r) => r.id))}
               actions={bulkActions.actions}
               busy={bulkActions.busy}
-              note={bulkActions.note}
               onDone={selection.stop}
             />
           ) : null

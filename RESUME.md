@@ -4,7 +4,44 @@ Where We Left Off
 _Updated 2026-11-22._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-22, later): daily jobs on time on a laptop that sleeps, `v1.5.4`
+## Latest (2026-11-22, evening): bulk actions in one request, Edit tags…, toasts, `v1.6.0`
+
+Kael: tagging 46 in review "took forever". Each bulk action read and PATCHed one transaction at a
+time (two requests each, through the gateway), and confirmed review's matches one at a time
+after that. He asked for real bulk actions, Sonner toasts for them, Edit tags… as a tri-state
+checklist sending `add` and `remove`, and the bar to stay at the top of review. "Publish the
+release when you're done."
+
+- **The ledger:** `GET …/transactions` (and `…/directives`) take `id`, repeated, for a read by
+  ID (`Store.find(ids=…)`); `pnpm generate` run.
+- **`app`, server:** `POST /books/:book/transactions/bulk` (`server/bulk.ts`, types in
+  `shared/bulk.ts`): the selection with its versions, and `confirm` (with review's matches, the
+  bank's amount taken as `confirmRow` does: `withBankAmount`), `categorize` (`own` for a
+  ledger), `tags` (`add`, `remove`) or `fund`. It reads them in one go
+  (`LedgerPort.transactionsById`), works out each change, and makes one `applyChanges` write.
+  A version that's moved on refuses all of it (409 `stale`). The rules it uses moved to `shared/`:
+  `split.ts` (`web/lib/split.ts` re-exports it), and `shapesFor` and `sameLines` in `funds.ts`
+  (`sameDecimal` in `decimal.ts`).
+- **`app`, PWA:** `lib/bulk.ts` makes every action one `useBulk` request, run as a Sonner toast
+  (`useBulkRun`: loading, then done or failed); the `<Toaster>` is in `App.tsx`, in the app's
+  colors. Review's "categorize N similar" uses it too. **Edit tags…** (`TagChecklist` in
+  `Tags.tsx`) replaces Add tag… and Remove tag…, in the splits editor too. Selecting, the whole
+  `ListTools` is sticky (`.list-tools.selecting`): the bar inside it couldn't stick past its box.
+  The note line under the bar is gone. design.md (the resolver pipeline's "Each bulk action is one request",
+  Tags' "Edit tags… is a checklist", ListTools) has the reasons.
+- **Measured:** in the ledger alone, on a 7,800-transaction book, 46 tag writes one at a time
+  took 0.88 s, one batch 0.08 s. The browser's 92 round trips through forwardAuth were most of
+  Kael's wait.
+- **Tests:** app `bulk.test.ts`; ledger `test_transactions_listed_by_id`; e2e `m17.test.ts` (the
+  endpoint against the real ledger, `id` reads, a stale refusal); browser `m17.spec.ts` (the
+  checklist: `–`, its cycle, adding, a tap outside saving, Cancel) and `review.spec.ts` (the bar
+  in view at the bottom of 23, tagging them all), the others reading toasts (`toasts()` in
+  `support.ts`). `pnpm test` and `pnpm e2e` passed (API 125 of 125, browser 155 of 155).
+
+**Released** as `v1.6.0` (the workflow and CI pending at commit). **Kael, on Emmer:** `./luminous-money upgrade`.
+**Next:** unchanged: Kael reviews HSA tracking's 7 calls (M99); then docs/PLAN.md's Ahead.
+
+## Before that (2026-11-22, later): daily jobs on time on a laptop that sleeps, `v1.5.4`
 
 Kael asked whether the daily syncs work on a laptop, including one brought up and down to save
 power. Up and down was already fine: every job runs at startup and checks whether it's due.

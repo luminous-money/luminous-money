@@ -7,7 +7,7 @@
 import { expect, type Page } from "@playwright/test";
 
 import { test } from "./fixtures.js";
-import { addAccount, app, crumb, logIn, openMore, stored } from "./support.js";
+import { addAccount, app, crumb, logIn, openMore, stored, toasts } from "./support.js";
 
 const PNC = "Assets:Bank:PNC";
 const FIDELITY = "Assets:Fidelity:Cash";
@@ -281,7 +281,7 @@ test("Select mode's Fund… sets a fund on several at once, and clears them", as
   await bar.getByRole("button", { name: "Actions ▾" }).click();
   await page.getByRole("menuitem", { name: "Fund…" }).click();
   await bar.getByRole("combobox", { name: "Fund" }).selectOption("Emergency");
-  await expect(bar).toContainText("Set the fund of 2 transactions to Emergency.");
+  await expect(toasts(page)).toContainText("Set the fund of 2 transactions to Emergency.");
   expect(await lines(a)).toEqual([["Emergency", "-20.00"]]);
   expect(await lines(b)).toEqual([["Emergency", "-30.00"]]);
   await expect(rows.getByLabel("from Emergency")).toHaveCount(2);
@@ -289,7 +289,7 @@ test("Select mode's Fund… sets a fund on several at once, and clears them", as
   await bar.getByRole("button", { name: "Actions ▾" }).click();
   await page.getByRole("menuitem", { name: "Fund…" }).click();
   await bar.getByRole("combobox", { name: "Fund" }).selectOption("Unallocated");
-  await expect(bar).toContainText("Cleared the funds of 2 transactions.");
+  await expect(toasts(page)).toContainText("Cleared the funds of 2 transactions.");
   await expect(rows.getByLabel("from Emergency")).toHaveCount(0);
 });
 

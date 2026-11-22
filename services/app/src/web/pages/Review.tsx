@@ -7,17 +7,17 @@ import { SelectBar } from "../components/SelectBar.js";
 import { BrokerageNote, ReceiptNote } from "../components/ReceiptNote.js";
 import { TagChips, TagInput } from "../components/Tags.js";
 import { filteredLabel, ListTools, useLedgerView } from "../components/LedgerFilter.js";
-import { useBulkActions } from "../lib/bulk.js";
+import { useBulkActions, useBulkRun } from "../lib/bulk.js";
 import { ExcludeFromBudget, excludedFromBudget } from "../components/ExcludeFromBudget.js";
 import { More, moreSummary } from "../components/More.js";
-import { FundChoice, shapesFor } from "../components/Funds.js";
+import { FundChoice } from "../components/Funds.js";
 import { PairedTransfer } from "../components/PairedTransfer.js";
 import { BaseChoice } from "../components/BaseChoice.js";
 import { PartChoice } from "../components/PartChoice.js";
 import { Swipeable, type SwipeHandle } from "../components/Swipeable.js";
 import { postable, preferredRoots, shortName } from "../lib/accounts.js";
 import { add, formatMoney, isNegative, isZero, negate } from "../lib/decimal.js";
-import { appApi, type ProposalSummary, type ProposedMatch } from "../lib/appApi.js";
+import type { ProposalSummary, ProposedMatch } from "../lib/appApi.js";
 import { formatDay, today } from "../lib/format.js";
 import { filtering, kept } from "../lib/filters.js";
 import { useBack, useParam, withBack } from "../lib/navigation.js";
@@ -30,7 +30,6 @@ import {
   useAccountCreation,
   useAccounts,
   useAssign,
-  useBulkEdit,
   useConfirmMatch,
   useDropOccurrence,
   useEditTransaction,
@@ -55,7 +54,7 @@ import {
 import { HSA_FSA_ELIGIBLE, tagsOf, withTags, type TagSource } from "../../shared/tags.js";
 import { aiCostSentence } from "../lib/ai.js";
 import { holdingsOf, suggestedFund } from "../lib/funds.js";
-import { wholeLines } from "../../shared/funds.js";
+import { shapesFor, wholeLines } from "../../shared/funds.js";
 import type { ShortTransaction } from "../lib/ledger.js";
 import { Loading } from "../components/Loading.js";
 import { Crumbs } from "../components/Crumbs.js";
@@ -96,7 +95,7 @@ export function Review({ book }: { book: string }) {
   const bank = useBankStatus(book);
   const notAtBank = new Set(Object.values(bank.data ?? {}).flatMap((s) => s.not_at_bank));
   const proposals = useProposals(book);
-  const bulk = useBulkEdit(book);
+  const bulk = useBulkRun(book);
   const selection = useSelection();
   const [skipped, setSkipped] = useState(() => readSkipped(book));
   useEffect(() => writeSkipped(book, skipped), [book, skipped]);
@@ -129,14 +128,11 @@ export function Review({ book }: { book: string }) {
     chosen: chosen.map((i) => i.transaction),
     accounts: accounts.data ? postable(accounts.data, today()) : [],
     create,
-    categorize: (t, account) =>
-      simple(t) ? { postings: withCounterpart(t, account).postings } : null,
+    categorize: {},
     confirmBlocked:
       chosen.some((i) => i.transaction.postings.some((p) => unresolved(p.account))) &&
       "choose their accounts first",
-    afterConfirm: async () => {
-      for (const m of chosen.flatMap((i) => i.matches)) await appApi.confirmMatch(book, m);
-    },
+    confirmMatches: true,
   });
 
   const selectBar = (
@@ -146,7 +142,6 @@ export function Review({ book }: { book: string }) {
       onSelectAll={() => selection.selectAll(shown.map((i) => i.transaction.id))}
       actions={bulkActions.actions}
       busy={bulkActions.busy}
-      note={bulkActions.note}
       onDone={selection.stop}
     />
   );
@@ -232,10 +227,13 @@ export function Review({ book }: { book: string }) {
                 others: similarUnconfirmed(t, queued, proposals.data),
               })}
               onCategorizeSimilar={(others, account) =>
-                bulk.mutate({
-                  transactions: others,
-                  change: (o) => ({ postings: withCounterpart(o, account).postings }),
-                })
+                bulk.run(
+                  others,
+                  { op: "categorize", account },
+                  `Categorizing ${others.length} more as ${account}…`,
+                  ({ changed, unchanged }) =>
+                    `Categorized ${changed + unchanged} more as ${account}.`
+                )
               }
               selecting={selection.selecting}
               selected={selection.has(t.id)}

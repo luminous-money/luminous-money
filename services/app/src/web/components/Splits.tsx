@@ -7,7 +7,8 @@ import { useLongPress, useSelection } from "../lib/selection.js";
 import { checkBalance, memoOf, unresolved } from "../lib/split.js";
 import { AccountPicker, type AccountCreation } from "./AccountPicker.js";
 import { SelectBar, type BulkAction } from "./SelectBar.js";
-import { TagChips, TagInput, tagList, type TagChoice } from "./Tags.js";
+import { tagChangeSaid, TagChips, TagInput, type TagChoice } from "./Tags.js";
+import { toast } from "sonner";
 
 /** A posting being edited. The amount stays a raw string until it's valid; anything the form
  * doesn't edit (cost, price, flag, other metadata) rides along untouched in `original`, except
@@ -141,33 +142,40 @@ export function SplitsFieldset({
   // The split being edited: one of the rows, or a new one ("+ Add split").
   const [editing, setEditing] = useState<{ row: Row; isNew: boolean } | null>(null);
   const selection = useSelection();
-  const [note, setNote] = useState<string | null>(null);
   const select = (key: string) => {
     if (disabled) return;
     if (!selection.selecting) selection.start();
     selection.toggle(key);
-    setNote(null);
   };
   const press = useLongPress(select);
   // The blank amount's, when it balances: what it'll be.
   const auto = balance.state === "balanced" && balance.auto.length === 1 ? balance.auto[0] : null;
 
   const chosen = rows.filter((r) => selection.has(String(r.key)));
+  const counts = new Map<string, number>();
+  for (const r of chosen) for (const tag of r.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
   const actions: BulkAction[] = [
     {
-      label: "Add tag…",
-      pickTag: { choices: [...tags], allowNew: true },
-      run: (tag) => {
+      label: "Edit tags…",
+      editTags: {
+        total: chosen.length,
+        have: [...counts].map(([name, transactions]) => ({ name, transactions })),
+        choices: [...tags],
+      },
+      run: (change) => {
+        const { add, remove } = change;
         setRows((all) =>
           all.map((r) =>
-            selection.has(String(r.key)) && !r.tags.includes(tag)
-              ? { ...r, tags: [...r.tags, tag].sort() }
+            selection.has(String(r.key))
+              ? {
+                  ...r,
+                  tags: [...new Set([...r.tags.filter((t) => !remove.includes(t)), ...add])].sort(),
+                }
               : r
           )
         );
-        setNote(
-          `Tagged ${chosen.length === 1 ? "1 split" : `${chosen.length} splits`} ${tagList([tag])}.`
-        );
+        const splits = chosen.length === 1 ? "1 split" : `${chosen.length} splits`;
+        toast(`${tagChangeSaid(change)} on ${splits}.`);
       },
     },
     {
@@ -176,7 +184,6 @@ export function SplitsFieldset({
       run: () => {
         setRows((all) => all.filter((r) => !selection.has(String(r.key))));
         selection.stop();
-        setNote(null);
       },
     },
   ];
@@ -191,8 +198,7 @@ export function SplitsFieldset({
           onSelectAll={() => selection.selectAll(rows.map((r) => String(r.key)))}
           actions={actions}
           busy={false}
-          note={note}
-          onDone={() => (selection.stop(), setNote(null))}
+          onDone={selection.stop}
         />
       )}
       <ul className="split-list" aria-label="Splits">

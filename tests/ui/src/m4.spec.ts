@@ -2,7 +2,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 import { test } from "./fixtures.js";
-import { setUpUser } from "./support.js";
+import { setUpUser, toasts } from "./support.js";
 
 const usd = (number: string) => ({ number, currency: "USD" });
 
@@ -46,7 +46,7 @@ test("Suggest categories fills in a category and says where it came from", async
   await bar.getByRole("button", { name: "Select all" }).click();
   await act(bar, "Suggest categories");
 
-  await expect(bar).toContainText(
+  await expect(toasts(page)).toContainText(
     "Suggested categories for 1 of 1: from rules and history (the book's AI isn't set up)."
   );
   await bar.getByRole("button", { name: "Done" }).click();
@@ -141,7 +141,7 @@ test("an account's ledger suggests categories, and categorizes and confirms in b
   const bar = page.getByRole("toolbar", { name: "Selected" });
   await list.getByRole("checkbox", { name: /CORNER CAFE #9/ }).click();
   await act(bar, "Suggest categories");
-  await expect(bar).toContainText("Suggested categories for 1 of 1");
+  await expect(toasts(page)).toContainText("Suggested categories for 1 of 1");
   // Now with history's clean payee, and its category.
   await expect(list.getByRole("checkbox", { name: /Corner Cafe.*unconfirmed/ })).toContainText(
     "Food:Coffee"
@@ -184,7 +184,7 @@ test("Transactions' Select mode suggests categories for what's chosen, the book'
   await act(bar, "Suggest categories");
 
   // One batch asked of the AI: the fake's made-up $0.0042.
-  await expect(bar).toContainText(
+  await expect(toasts(page)).toContainText(
     "Suggested categories for 2 of 2, the book's AI included. The AI's part cost about $0.0042."
   );
   await expect(page.getByRole("checkbox", { name: /KIOSK ONE/ })).toContainText("Coffee");

@@ -9,6 +9,7 @@ import {
   splitRows,
   stageMany,
   stored,
+  toasts,
   type Seeded,
   crumb,
 } from "./support.js";
@@ -166,6 +167,33 @@ test("Back or Confirm on a transaction opened from the queue comes back to where
   await expect(queue(page)).toHaveCount(22);
   await expect(item(page, "Shop 7")).toBeInViewport();
   await expect.poll(async () => Math.abs((await topOf(page, "Shop 7")) - before)).toBeLessThan(4);
+});
+
+test("Select mode's bar stays at the top all the way down, and edits them all at once", async ({
+  page,
+}) => {
+  await stageMany(seeded.book, 20);
+  await page.goto(`/ui/books/${seeded.book}/review`);
+  await expect(queue(page)).toHaveCount(23);
+  await page.getByRole("button", { name: "Select", exact: true }).click();
+  const bar = page.getByRole("toolbar", { name: "Selected" });
+  await bar.getByRole("button", { name: "Select all" }).click();
+  await expect(bar).toContainText("23 selected");
+
+  await queue(page).last().scrollIntoViewIfNeeded();
+  await expect(queue(page).first()).not.toBeInViewport();
+  await expect(bar).toBeInViewport();
+
+  await bar.getByRole("button", { name: "Actions ▾" }).click();
+  await page.getByRole("menuitem", { name: "Edit tags…" }).click();
+  const search = bar.getByRole("searchbox", { name: "Find or add a tag" });
+  await search.fill("errands");
+  await search.press("Enter");
+  await bar.getByRole("button", { name: "Save" }).click();
+  await expect(toasts(page)).toContainText("Added #errands: 23 transactions changed.");
+  expect(
+    (await stored(seeded.book, seeded.ids["Costco"]!)).postings.flatMap((p) => p.tags ?? [])
+  ).toContain("errands");
 });
 
 test("a search and a filter by accounts narrow the queue, and Back keeps them", async ({

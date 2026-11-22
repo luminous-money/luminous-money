@@ -4895,6 +4895,8 @@ export interface operations {
         flag?: string | null;
         from?: string | null;
         to?: string | null;
+        /** @description Only these, by ID (repeat it: `id=a&id=b`); one missing is left out. */
+        id?: string[] | null;
         limit?: number;
       };
       header?: never;
@@ -6197,6 +6199,8 @@ export interface operations {
         flag?: string | null;
         from?: string | null;
         to?: string | null;
+        /** @description Only these, by ID (repeat it: `id=a&id=b`); one missing is left out. */
+        id?: string[] | null;
         limit?: number;
       };
       header?: never;

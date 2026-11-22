@@ -774,7 +774,7 @@ Kael's concern: an AI that categorizes hundreds of transactions shouldn't spend 
 - **Every operation's total is kept** (`ai_usage`, failed ones too: their calls still cost) and
   returned with its answer as `cost`. `app` adds an operation's up (a receipt: reading, then
   categorizing; Suggest categories: every batch) and says it after it runs: in Select mode's
-  note, in review after a receipt (`?ai_cost=`, not stored), and on the migration's suggestions.
+  toast, in review after a receipt (`?ai_cost=`, not stored), and on the migration's suggestions.
 - **The AI page shows the month so far** (UTC), by operation. Per book, since each book has its
   own key.
 - **The fake provider's calls are made up** ($0.0042 each), so tests can see costs shown and
@@ -1290,14 +1290,24 @@ pages: a shop's reader hands it charges (`shared/orders.ts`), and `server/orders
   page's list of splits, each shown with its memo and tags; saved with the page), and Select
   mode there tags several at once. A schedule's template uses the same splits, so its splits'
   tags are seen and every occurrence carries them.
-- **Tagging a whole transaction** (a review card's Tags, Select mode's **Add tag…** and **Remove
-  tag…**): its tags read as its splits' together. **A tag added goes on what the money was
-  for,** the splits off the balance sheet (the expense, the income), or on every split when all
-  are on it (a transfer, a trade): the bank's side of a purchase is the same money, and Reports
-  never count it. **A tag removed comes off every split,** so what Remove tag… offers (the
-  selection's tags) is what it can remove. One rule (`shared/tags.ts`), each a versioned PATCH
-  of the postings like the other bulk actions; a card's edit is made from the latest copy, so a
-  category picked a moment before isn't undone. Changing tags doesn't ask about a reconciled
+- **Tagging a whole transaction** (a review card's Tags, Select mode's **Edit tags…**): its tags
+  read as its splits' together. **A tag added goes on what the money was for,** the splits off
+  the balance sheet (the expense, the income), or on every split when all are on it (a transfer,
+  a trade): the bank's side of a purchase is the same money, and Reports never count it. **A tag
+  removed comes off every split.** One rule (`shared/tags.ts`), which the server applies to a
+  bulk edit (`server/bulk.ts`); a card's edit is made from the latest copy, so a category picked
+  a moment before isn't undone.
+- **Edit tags… is a checklist with a third state** (Kael, 2026-11-22; it was Add tag… and Remove
+  tag…, one tag at a time). Each tag's box is checked when all of the selection have it, `–`
+  when only some do, empty when none do. The selection's tags come first, most common first,
+  then the book's others, in the order the list opened with, so a row doesn't move when it's
+  tapped. A tap puts a tag on all of them or takes it off all of them. A `–` goes to checked,
+  then empty, then back to `–`, which undoes the tap: Kael asked for `–` to checked, and the way
+  back is what Gmail's labels do. **Only what changed is sent:** the bulk edit takes `add` and
+  `remove` lists, so a `–` left alone stays as it is on each one, rather than being made all or
+  none. A tap outside the list saves, as Kael asked; Cancel or Escape doesn't. Typing filters
+  the list, and a tag the book doesn't have yet is offered at its end, to add (Enter takes a
+  match first, as `TagInput` does). Changing tags doesn't ask about a reconciled
   transaction: amounts and accounts don't change.
 - **Kept when splits are rewritten:** every edit to a split spreads the posting it had, so its
   tags stay. Itemizing passes them on: a receipt or a shop's order read into a transaction
@@ -1965,10 +1975,29 @@ user's rule confirms automatically. Review also has "Also categorize N similar" 
 same account), "Remember as a rule", and Select mode for doing many at once.
 
 **Select mode's bulk actions are one menu** (Actions ▾, `lib/bulk.ts`), the same in review, an
-account's ledger and Transactions: Confirm, Categorize as… (an account picker in the bar), and
-Suggest categories, which asks the book's AI too, when it's set up (M19's categorizer, already
-there for receipts). Each says why it can't run when it can't; a new bulk action is one more
-entry. **Suggest categories is only a bulk action** (Kael, 2026-10-24): a button over every
+account's ledger and Transactions: Confirm, Categorize as… (an account picker in the bar), Edit
+tags…, Fund…, and Suggest categories, which asks the book's AI too, when it's set up (M19's
+categorizer, already there for receipts). Each says why it can't run when it can't; a new bulk
+action is one more entry.
+
+**Each bulk action is one request and one write** (`POST …/transactions/bulk`, `server/bulk.ts`,
+2026-11-22). The PWA sends the selection with the versions it read, and what to do (`confirm`,
+with review's proposed matches; `categorize`; `tags`, as `add` and `remove`; `fund`). `app`
+reads them all at once (the ledger's list takes `id`s), works out each one's change with the
+rules the PWA used to apply (`shared/split.ts`, `shared/funds.ts`, `shared/tags.ts`), and writes
+them in the ledger's one atomic `transactions/changes`. Before, the PWA read and PATCHed each
+transaction in turn, two requests each through the gateway and its auth check, and a match at a
+time after that: tagging 46 in review took most of a minute (Kael). In the ledger alone, 46
+writes one at a time took 0.88 s on a 7,800-transaction book, and 0.08 s as one batch. **One
+that's changed since it was read refuses all of it** (409, `stale`): every edit is versioned,
+and half a bulk edit is harder to see than none. The mutation settles only once the lists are
+read again, so the next action sends their new versions. A transaction that can't take the
+change (more than two splits, say) is skipped and counted, as before; a sale that needs a fund
+is skipped by the server too, its matches with it.
+
+**What a bulk action did is a toast** (sonner, 2026-11-22): it shows while the request runs, then
+turns into what it did or why it couldn't. It used to be a line under the bar, which the bar
+being sticky made easy to miss, and which said nothing while it ran. **Suggest categories is only a bulk action** (Kael, 2026-10-24): a button over every
 unconfirmed transaction ran rules and history alone, which had already run on import, so it
 rarely found anything and seemed to do nothing. Select all, then Suggest categories, does that
 and asks the AI.
@@ -2268,7 +2297,10 @@ offline; picking up a new version).
 - **A list's header is one row** (`ListTools`): Search, Select, the filter. Filters live in the
   filter's panel and show, when it's closed, as pills that remove themselves; the search is a
   filter too, only more prominent. Select mode replaces the row but not the filter, so a
-  filtered set can be selected, and an action leaves the selection as it was.
+  filtered set can be selected, and an action leaves the selection as it was. **Selecting, the
+  whole of `ListTools` sticks under the masthead** (Kael, 2026-11-22): the bar was sticky
+  itself, but a sticky element can't leave its parent, and inside ListTools' box it scrolled
+  away with the top of the list.
 - **A choice of three or more stacks on a phone** (`.segmented`), by the viewport: side by side
   they squeezed past reading. (A container query was tried first; it made the control
   size-contained, which collapses it in a flex row.)
@@ -2397,8 +2429,8 @@ case without hiding the general one.
     account. The editor has no fund: funds are still the transaction's (its Funds section),
     until [split-level tags and funds](milestones/split-level-tags-and-funds/PLAN.md)' step 2.
   - **Select mode for splits:** a long press, or a click with Shift, Ctrl, ⌘ or Option, starts
-    it, with the bar every list has; its actions are **Add tag…** and **Delete** (not every
-    split: a transaction keeps one). A schedule's template uses the same splits.
+    it, with the bar every list has; its actions are **Edit tags…** (the same checklist, applied
+    to the rows in the editor) and **Delete** (not every split: a transaction keeps one). A schedule's template uses the same splits.
   - One amount can be left blank, and Beancount balances it; the list shows the value it will
     get ("$50.00 auto").
   - A live balance check (exact decimal arithmetic, no floats) blocks saving while the

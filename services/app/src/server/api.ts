@@ -12,6 +12,7 @@ import type { AppDb, Invite } from "./db.js";
 import { ImportProblem, importFile } from "./imports.js";
 import { fetchPrices } from "./prices.js";
 import { assignRow, confirmRow, MatchProblem, proposedMatches } from "./matches.js";
+import { bulkEdit, bulkEditFrom, BulkProblem } from "./bulk.js";
 import {
   breakdownReport,
   cashFlowReport,
@@ -646,6 +647,30 @@ export function createApi({
       return c.json(await proposedMatches(db, ledgerFor(c.get("user")), book));
     } catch (error) {
       return c.json(...matchError(error));
+    }
+  });
+
+  /** Select mode's bulk edits: the selection, with the versions read, and what to do to it
+   * (`shared/bulk.ts`), in one write. */
+  api.post("/books/:book/transactions/bulk", async (c) => {
+    const { book } = c.req.param();
+    const user = c.get("user");
+    if (!(await owned(user, book))) return c.json({ detail: "not found" }, 404);
+    const edit = bulkEditFrom(await c.req.json().catch(() => null));
+    if (typeof edit === "string") return c.json({ detail: edit }, 422);
+    try {
+      return c.json(await bulkEdit(db, ledgerFor(user), book, edit));
+    } catch (error) {
+      if (error instanceof BulkProblem)
+        return c.json(
+          error.status === 409
+            ? { detail: error.message, code: "stale" }
+            : { detail: error.message },
+          error.status
+        );
+      if (error instanceof LedgerError && [404, 409, 422].includes(error.status))
+        return c.json(errorBody(error), error.status as 404 | 409 | 422);
+      throw error;
     }
   });
 

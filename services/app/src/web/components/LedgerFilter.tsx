@@ -158,7 +158,9 @@ export function ListTools({
   const filtered = pills.length > 0;
 
   return (
-    <div className="list-tools">
+    // Selecting, the whole of it sticks under the masthead (the bar's own stickiness can't take
+    // it out of this box): the bar stays in reach all the way down the list.
+    <div className={`list-tools${selecting ? " selecting" : ""}`}>
       {selecting || (
         <div className="list-tools-row">
           <SearchBox value={q} onChange={(text) => set({ q: text }, { replace: true })} />

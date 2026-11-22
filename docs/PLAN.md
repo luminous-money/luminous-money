@@ -447,3 +447,9 @@ Smaller improvements picked up between milestones. Those still open are in
       page on GitHub Pages (https://luminous-money.github.io/luminous-money/) with an 83-second
       video of the features, both made from nine Stageshow scenes in the app's look
       ([site/README.md](../site/README.md)).
+- [x] **Bulk actions in one request, Edit tags…, toasts, a bar that stays** (Kael, 2026-11-22,
+      `v1.6.0`; design.md has the decisions): every Select mode action is one request and one
+      write (`POST …/transactions/bulk`), not two requests per transaction; Add tag… and Remove
+      tag… are one Edit tags… checklist with `–` for a tag on only some; what an action is doing,
+      then did, is a toast; and the bar stays at the top of review, and of every list, while
+      selecting.

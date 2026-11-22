@@ -24,7 +24,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { applyProfile, fits, type CsvProfile, type Row } from "@luminous-money/csv-import";
 import { now } from "@luminous-money/db";
-import type { Account, TransactionIn } from "@luminous-money/ledger-client";
+import type { Account, Transaction, TransactionIn } from "@luminous-money/ledger-client";
 
 import type {
   ImportResult,
@@ -73,17 +73,21 @@ export async function takeBankAmount(
   amount: string
 ): Promise<void> {
   const t = await ledger.transaction(book, transactionId);
-  const split = t.postings.find((p) => p.account === account);
-  if (!split?.units || sameNumber(split.units.number, amount)) return;
-  await ledger.patch(
-    book,
-    t.id,
-    {
-      postings: t.postings.map((p) =>
-        p === split ? { ...p, units: { ...split.units!, number: amount } } : p
-      ),
-    },
-    t.updated_at
+  const postings = withBankAmount(t.postings, account, amount);
+  if (postings) await ledger.patch(book, t.id, { postings }, t.updated_at);
+}
+
+/** `postings` with `account`'s split at the bank's `amount`, or null if it has it already (or
+ * has no amount to change). */
+export function withBankAmount<P extends Transaction["postings"][number]>(
+  postings: P[],
+  account: string,
+  amount: string
+): P[] | null {
+  const split = postings.find((p) => p.account === account);
+  if (!split?.units || sameNumber(split.units.number, amount)) return null;
+  return postings.map((p) =>
+    p === split ? { ...p, units: { ...split.units!, number: amount } } : p
   );
 }
 

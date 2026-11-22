@@ -56,9 +56,13 @@ class Filters:
         flag: str | None = None,
         date_from: Annotated[datetime.date | None, Query(alias="from")] = None,
         date_to: Annotated[datetime.date | None, Query(alias="to")] = None,
+        ids: Annotated[
+            list[str] | None,
+            Query(alias="id", description="Only these, by ID (repeat it: `id=a&id=b`); one missing is left out."),
+        ] = None,
         limit: int = 500,
     ):
-        self.values = dict(account=account, flag=flag, date_from=date_from, date_to=date_to, limit=limit)
+        self.values = dict(account=account, flag=flag, date_from=date_from, date_to=date_to, ids=ids, limit=limit)
 
 
 def current_user(x_user_id: Annotated[str | None, Header(include_in_schema=False)] = None) -> str:

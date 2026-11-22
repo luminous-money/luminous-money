@@ -56,6 +56,7 @@ import {
   type SchedulePatch,
 } from "./appApi.js";
 import { sentence, today } from "./format.js";
+import type { BulkEdit } from "../../shared/bulk.js";
 import type { Migration } from "../../shared/migration.js";
 import type { LoanIn, LoanPatch, LoanRebaseIn, LoanView } from "../../shared/loans.js";
 import type { CategoryRulePatch } from "../../shared/rules.js";
@@ -831,24 +832,12 @@ export function useProposals(book: string) {
   return useQuery({ queryKey: keys.proposals(book), queryFn: () => appApi.proposals(book) });
 }
 
-/** Apply the same change to several transactions, each a versioned PATCH, in turn: "also
- * categorize N similar", and Select mode. */
-export function useBulkEdit(book: string) {
+/** Select mode's bulk edits ("also categorize N similar" too): the selection and what to do to
+ * it, in one request and one write (`shared/bulk.ts`). Settles once what shows them is read again,
+ * so the next edit is made against their new versions. */
+export function useBulk(book: string) {
   return useMutation({
-    mutationFn: async ({
-      transactions,
-      change,
-    }: {
-      /** Each one's current version is read before it's changed. */
-      transactions: { id: string }[];
-      change: (t: Transaction) => TransactionChanges | null;
-    }) => {
-      for (const t of transactions) {
-        const current = await latest(book, t.id);
-        const changes = change(current);
-        if (changes) remember(book, await api.patch(book, t.id, changes, current.updated_at));
-      }
-    },
+    mutationFn: (edit: BulkEdit) => appApi.bulk(book, edit),
     onSettled: () => queryClient.invalidateQueries({ queryKey: keys.book(book) }),
   });
 }

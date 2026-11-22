@@ -1,30 +1,59 @@
 /**
  * Select mode's bulk actions, built once for every page that selects transactions (review, an
  * account's ledger, Transactions), so they all offer the same: **Confirm** the selection,
- * **Categorize as…** an account (where the page knows how), **Add tag…** and **Remove tag…**
- * (M17), and **Suggest categories** (rules, history, and the book's AI when it's set up). Each
- * says why it can't run, when it can't. Tags are splits': Add tag… tags what the money was for,
- * Remove tag… untags every split (`shared/tags.ts`).
+ * **Categorize as…** an account (where the page knows how), **Edit tags…** (M17; a checklist
+ * since 2026-11-22), **Fund…**, and **Suggest categories** (rules, history, and the book's AI when
+ * it's set up). Each says why it can't run, when it can't. Each is one request for the whole
+ * selection (`shared/bulk.ts`), shown as a toast while it runs that says what it did, or why it
+ * couldn't, when it's done.
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-
-import type { Transaction } from "@luminous-money/ledger-client";
+import { toast } from "sonner";
 
 import type { AccountCreation } from "../components/AccountPicker.js";
-import { shapesFor } from "../components/Funds.js";
 import type { BulkAction } from "../components/SelectBar.js";
-import { UNALLOCATED, wholeLines } from "../../shared/funds.js";
-import { tagsOf, withoutTag, withTag } from "../../shared/tags.js";
+import { tagChangeSaid, type TagChange } from "../components/Tags.js";
+import type { BulkChange, BulkResult } from "../../shared/bulk.js";
+import { UNALLOCATED } from "../../shared/funds.js";
+import { tagsOf } from "../../shared/tags.js";
+import { aiCostSentence } from "./ai.js";
 import { appApi } from "./appApi.js";
 import { formatMoney } from "./decimal.js";
-import { sameLines } from "./funds.js";
-import type { TransactionChanges } from "./ledger.js";
-import { explain, useBulkEdit, useFunds, useShort, useTags } from "./queries.js";
-import { tagList } from "../components/Tags.js";
-import { aiCostSentence } from "./ai.js";
+import { explain, useBulk, useFunds, useShort, useTags } from "./queries.js";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+type Picked = { id: string; updated_at: string };
+
+/** Run a bulk edit as a toast: `doing` while it runs, then what `done` says it did, or the error. */
+export function useBulkRun(book: string) {
+  const bulk = useBulk(book);
+  const run = (
+    transactions: Picked[],
+    change: BulkChange,
+    doing: string,
+    done: (result: BulkResult) => string,
+    then?: (result: BulkResult) => void
+  ) => {
+    const id = toast.loading(doing);
+    bulk.mutate(
+      { ...change, transactions: transactions.map(({ id, updated_at }) => ({ id, updated_at })) },
+      {
+        onSuccess: (result) => {
+          toast.success(done(result), { id });
+          then?.(result);
+        },
+        onError: (e) => toast.error(explain(e), { id }),
+      }
+    );
+  };
+  return { run, busy: bulk.isPending };
+}
+
+/** What a tag change did, in words: "Added #italy and removed #work: 3 transactions changed." */
+export const tagsSaid = (change: TagChange, result: BulkResult): string =>
+  `${tagChangeSaid(change)}: ${plural(result.changed, "transaction")} changed` +
+  (result.unchanged ? `, ${result.unchanged} already that way.` : ".");
 
 export function useBulkActions({
   book,
@@ -33,104 +62,44 @@ export function useBulkActions({
   create,
   categorize,
   confirmBlocked,
-  afterConfirm,
+  confirmMatches,
   onConfirmed,
 }: {
   book: string;
-  /** What's selected, with its tags: a row's, or a transaction's splits'. */
+  /** What's selected, with its version and tags: a row's, or a transaction's splits'. */
   chosen: {
     id: string;
     flag: string;
+    updated_at: string;
     tags?: string[];
     postings?: { account: string; tags?: string[] | null }[];
   }[];
   /** Accounts to categorize as. */
   accounts?: string[];
   create?: AccountCreation;
-  /** How to put one transaction in a category: its new postings, or null if it can't be (more
-   * than two splits). Without it, the page doesn't categorize. */
-  categorize?: (t: Transaction, account: string) => TransactionChanges | null;
+  /** How the page categorizes: the other side of `own` (an account's ledger), or a two-split
+   * transaction's category. Without it, the page doesn't. */
+  categorize?: { own?: string };
   /** Why the selection can't be confirmed yet, if it can't. */
   confirmBlocked?: string | false;
-  /** More to do once they're confirmed (review: their proposed matches). */
-  afterConfirm?: () => Promise<void>;
+  /** Confirm their proposed matches too (review). */
+  confirmMatches?: boolean;
   onConfirmed?: () => void;
 }) {
   const client = useQueryClient();
-  const bulk = useBulkEdit(book);
-  const [note, setNote] = useState<string | null>(null);
+  const { run, busy } = useBulkRun(book);
+  const n = chosen.length;
   const unconfirmed = chosen.filter((t) => t.flag === "!");
   const bookTags = useTags(book);
-  // The tags the selection has, most common first: what Remove tag… offers.
+  // The tags the selection has, each with how many of them have it.
   const counts = new Map<string, number>();
   for (const t of chosen)
     for (const tag of t.tags ?? tagsOf(t.postings ?? []))
       counts.set(tag, (counts.get(tag) ?? 0) + 1);
   const theirTags = [...counts].map(([name, transactions]) => ({ name, transactions }));
-  /** Change each selected transaction's splits' tags as `edit` does; one it leaves as it was is
-   * left alone. */
-  const retag = (
-    edit: (postings: Transaction["postings"]) => Transaction["postings"],
-    said: (changed: number) => string
-  ) => {
-    let changed = 0;
-    setNote(null);
-    bulk.mutate(
-      {
-        transactions: chosen,
-        change: (t) => {
-          const postings = edit(t.postings);
-          if (postings.every((p, i) => p === t.postings[i])) return null;
-          changed++;
-          return { postings };
-        },
-      },
-      { onSuccess: () => setNote(said(changed)), onError: (e) => setNote(explain(e)) }
-    );
-  };
   const listing = useFunds(book).data;
   const activeFunds = listing?.funds.filter((f) => !f.archived) ?? [];
-  /** Give each selected transaction `fund` for all of it (the way it goes, each commodity: a
-   * trade's both sides), or clear its funds (Unallocated). One whose amounts don't read is left. */
-  const setFund = (fund: string) => {
-    const currency = listing?.currency ?? "USD";
-    let changed = 0;
-    let had = 0;
-    let unread = 0;
-    setNote(null);
-    bulk.mutate(
-      {
-        transactions: chosen,
-        change: (t) => {
-          const whole =
-            fund === UNALLOCATED ? [] : wholeLines(shapesFor(t.postings, currency), fund);
-          const funds = fund === UNALLOCATED ? [] : whole.length ? whole : null;
-          if (!funds) {
-            unread++;
-            return null;
-          }
-          if (sameLines(t.funds, funds)) {
-            had++;
-            return null;
-          }
-          changed++;
-          return { funds };
-        },
-      },
-      {
-        onSuccess: () =>
-          setNote(
-            (fund === UNALLOCATED
-              ? `Cleared the funds of ${plural(changed, "transaction")}` +
-                (had ? `; ${had} had none` : "")
-              : `Set the fund of ${plural(changed, "transaction")} to ${fund}` +
-                (had ? `; ${had} had it already` : "")) +
-              (unread ? `; skipped ${unread} whose amounts don't read.` : ".")
-          ),
-        onError: (e) => setNote(explain(e)),
-      }
-    );
-  };
+
   const suggest = useMutation({
     mutationFn: () =>
       appApi.suggest(
@@ -138,21 +107,25 @@ export function useBulkActions({
         undefined,
         unconfirmed.map((t) => t.id)
       ),
-    onSuccess: ({ suggested, ai, ai_error, ai_cost }) => {
-      const of = `${suggested} of ${unconfirmed.length}`;
-      const cost = typeof ai_cost === "number" ? ` ${aiCostSentence(ai_cost)}` : "";
-      setNote(
-        (ai_error
-          ? `The book's AI couldn't answer: ${ai_error}. From rules and history: suggested categories for ${of}.`
-          : ai
-            ? `Suggested categories for ${of}, the book's AI included.`
-            : `Suggested categories for ${of}: from rules and history (the book's AI isn't set up).`) +
-          cost
-      );
-      return client.invalidateQueries({ queryKey: ["book", book] });
-    },
-    onError: (e) => setNote(explain(e)),
+    onSettled: () => client.invalidateQueries({ queryKey: ["book", book] }),
   });
+  const suggestSaid = ({
+    suggested,
+    ai,
+    ai_error,
+    ai_cost,
+  }: Awaited<ReturnType<typeof appApi.suggest>>) => {
+    const of = `${suggested} of ${unconfirmed.length}`;
+    const cost = typeof ai_cost === "number" ? ` ${aiCostSentence(ai_cost)}` : "";
+    return (
+      (ai_error
+        ? `The book's AI couldn't answer: ${ai_error}. From rules and history: suggested categories for ${of}.`
+        : ai
+          ? `Suggested categories for ${of}, the book's AI included.`
+          : `Suggested categories for ${of}: from rules and history (the book's AI isn't set up).`) +
+      cost
+    );
+  };
 
   // A sale that takes shares no fund has can't be confirmed until it's given one (Funds B).
   const short = new Set((useShort(book).data ?? []).map((t) => t.id));
@@ -160,83 +133,49 @@ export function useBulkActions({
   const flagged = unconfirmed.length - confirmable.length;
   const actions: BulkAction[] = [
     {
-      label: `Confirm ${chosen.length}`,
+      label: `Confirm ${n}`,
       disabled:
         confirmBlocked ||
-        (!unconfirmed.length && !afterConfirm && "confirmed already") ||
+        (!unconfirmed.length && !confirmMatches && "confirmed already") ||
         (unconfirmed.length > 0 &&
           !confirmable.length &&
           (flagged === 1 ? "it needs a fund first" : "they need a fund first")),
-      run: () => {
-        setNote(null);
-        bulk.mutate(
-          { transactions: confirmable, change: () => ({ flag: "*" }) },
-          {
-            onSuccess: async () => {
-              await afterConfirm?.();
-              if (flagged) {
-                setNote(
-                  `Confirmed ${confirmable.length}; skipped ${flagged} that ${flagged === 1 ? "needs" : "need"} a fund.`
-                );
-                return;
-              }
-              onConfirmed?.();
-            },
-            onError: (e) => setNote(explain(e)),
-          }
-        );
-      },
+      run: () =>
+        run(
+          chosen,
+          { op: "confirm", matches: !!confirmMatches },
+          `Confirming ${n}…`,
+          ({ skipped }) =>
+            `Confirmed ${plural(n - skipped, "transaction")}` +
+            (skipped
+              ? `; skipped ${skipped} that ${skipped === 1 ? "needs" : "need"} a fund.`
+              : "."),
+          ({ skipped }) => !skipped && onConfirmed?.()
+        ),
     },
     ...(categorize && accounts
       ? [
           {
             label: "Categorize as…",
             pick: { accounts, create },
-            run: (account: string) => {
-              let skipped = 0;
-              setNote(null);
-              bulk.mutate(
-                {
-                  transactions: chosen,
-                  change: (t) => {
-                    const changes = categorize(t, account);
-                    if (!changes) skipped++;
-                    return changes;
-                  },
-                },
-                {
-                  onSuccess: () =>
-                    setNote(
-                      skipped
-                        ? `Skipped ${plural(skipped, "one")} with more than two splits.`
-                        : null
-                    ),
-                  onError: (e) => setNote(explain(e)),
-                }
-              );
-            },
+            run: (account: string) =>
+              run(
+                chosen,
+                { op: "categorize", account, ...categorize },
+                `Categorizing ${n} as ${account}…`,
+                ({ changed, unchanged, skipped }) =>
+                  `Categorized ${plural(changed + unchanged, "transaction")} as ${account}` +
+                  (skipped ? `; skipped ${plural(skipped, "one")} with more than two splits.` : ".")
+              ),
           } satisfies BulkAction,
         ]
       : []),
     {
-      label: "Add tag…",
-      pickTag: { choices: bookTags.data ?? [], allowNew: true },
-      run: (tag: string) =>
-        retag(
-          (postings) => withTag(postings, tag),
-          (changed) =>
-            `Tagged ${plural(changed, "transaction")} ${tagList([tag])}` +
-            (changed < chosen.length ? `; ${chosen.length - changed} had it already.` : ".")
-        ),
-    } satisfies BulkAction,
-    {
-      label: "Remove tag…",
-      disabled: !theirTags.length && "none of them has a tag",
-      pickTag: { choices: theirTags, allowNew: false },
-      run: (tag: string) =>
-        retag(
-          (postings) => withoutTag(postings, tag),
-          (changed) => `Removed ${tagList([tag])} from ${plural(changed, "transaction")}.`
+      label: "Edit tags…",
+      editTags: { total: n, have: theirTags, choices: bookTags.data ?? [] },
+      run: (change: TagChange) =>
+        run(chosen, { op: "tags", ...change }, `Saving the tags of ${n}…`, (result) =>
+          tagsSaid(change, result)
         ),
     } satisfies BulkAction,
     ...(activeFunds.length
@@ -249,7 +188,19 @@ export function useBulkActions({
                 label: `${f.name} · ${formatMoney(f.value.number, f.value.currency)}`,
               })),
             },
-            run: setFund,
+            run: (fund: string) =>
+              run(
+                chosen,
+                { op: "fund", fund },
+                fund === UNALLOCATED ? `Clearing the funds of ${n}…` : `Setting the fund of ${n}…`,
+                ({ changed, unchanged, skipped }) =>
+                  (fund === UNALLOCATED
+                    ? `Cleared the funds of ${plural(changed, "transaction")}` +
+                      (unchanged ? `; ${unchanged} had none` : "")
+                    : `Set the fund of ${plural(changed, "transaction")} to ${fund}` +
+                      (unchanged ? `; ${unchanged} had it already` : "")) +
+                  (skipped ? `; skipped ${skipped} whose amounts don't read.` : ".")
+              ),
           } satisfies BulkAction,
         ]
       : []),
@@ -257,10 +208,13 @@ export function useBulkActions({
       label: "Suggest categories",
       disabled: !unconfirmed.length && "only unconfirmed ones are categorized",
       run: () => {
-        setNote(null);
-        suggest.mutate();
+        const id = toast.loading(`Suggesting categories for ${unconfirmed.length}…`);
+        suggest.mutate(undefined, {
+          onSuccess: (result) => toast.success(suggestSaid(result), { id }),
+          onError: (e) => toast.error(explain(e), { id }),
+        });
       },
     },
   ];
-  return { actions, busy: bulk.isPending || suggest.isPending, note, setNote };
+  return { actions, busy: busy || suggest.isPending };
 }

@@ -3,7 +3,7 @@
 import { expect } from "@playwright/test";
 
 import { test } from "./fixtures.js";
-import { addTransactions, setUpUser, splitRows } from "./support.js";
+import { addTransactions, setUpUser, splitRows, toasts } from "./support.js";
 
 test("a split is tagged on its page; rows show it and the ledger filters by it", async ({
   page,
@@ -49,7 +49,9 @@ test("a split is tagged on its page; rows show it and the ledger filters by it",
   await expect(transactions.getByRole("button", { name: /Shop 3/ })).toBeVisible();
 });
 
-test("Select mode adds a tag to several at once, and removes it", async ({ page }) => {
+test("Select mode's Edit tags…: a checklist, `–` for some, adding and removing in one go", async ({
+  page,
+}) => {
   const { book, account } = await setUpUser(page);
   await addTransactions(book.id, account, 3);
   await page.goto(`/ui/books/${book.id}/transactions`);
@@ -57,38 +59,64 @@ test("Select mode adds a tag to several at once, and removes it", async ({ page 
   await expect(transactions.getByRole("button", { name: /Shop 3/ })).toBeVisible();
 
   const bar = page.getByRole("toolbar", { name: "Selected" });
-  const act = async (label: string) => {
+  const editTags = async () => {
     await bar.getByRole("button", { name: "Actions ▾" }).click();
-    await page.getByRole("menuitem", { name: label }).click();
+    await page.getByRole("menuitem", { name: "Edit tags…" }).click();
+    return bar.getByRole("group", { name: "Edit tags" });
   };
+  const tag = (list: ReturnType<typeof bar.getByRole>, name: string) =>
+    list.getByRole("checkbox", { name: new RegExp(`^#${name}\\b`) });
+  const tagged = (name: string) => transactions.getByText(`#${name}`, { exact: true });
+
+  // A new tag, typed, goes on the two chosen.
   await page.getByRole("button", { name: "Select", exact: true }).click();
-  // Nothing has a tag yet, so there's nothing to remove.
   await transactions.getByRole("checkbox", { name: /Shop 1/ }).click();
-  await bar.getByRole("button", { name: "Actions ▾" }).click();
-  await expect(page.getByRole("menuitem", { name: /Remove tag…/ })).toBeDisabled();
-  await bar.getByRole("button", { name: "Actions ▾" }).click();
   await transactions.getByRole("checkbox", { name: /Shop 2/ }).click();
+  let list = await editTags();
+  await list.getByRole("searchbox", { name: "Find or add a tag" }).fill("Trip");
+  await list.getByRole("button", { name: "Add #trip" }).click();
+  await expect(tag(list, "trip")).toHaveAttribute("aria-checked", "true");
+  await list.getByRole("button", { name: "Save" }).click();
+  await expect(toasts(page)).toContainText("Added #trip: 2 transactions changed.");
+  await expect(tagged("trip")).toHaveCount(2);
+
+  // All three: #trip is on some of them (–). Tapped, it goes on all, off all, then back to –;
+  // left at –, it stays as it is on each. A tap outside the list saves.
   await transactions.getByRole("checkbox", { name: /Shop 3/ }).click();
+  await expect(bar).toContainText("3 selected");
+  list = await editTags();
+  await expect(tag(list, "trip")).toHaveAttribute("aria-checked", "mixed");
+  await expect(tag(list, "trip")).toContainText("2 of 3");
+  for (const state of ["true", "false", "mixed"]) {
+    await tag(list, "trip").click();
+    await expect(tag(list, "trip")).toHaveAttribute("aria-checked", state);
+  }
+  const search = list.getByRole("searchbox", { name: "Find or add a tag" });
+  await search.fill("work");
+  await search.press("Enter");
+  await page.getByRole("heading", { name: "Transactions" }).click();
+  await expect(toasts(page)).toContainText("Added #work: 3 transactions changed.");
+  await expect(tagged("work")).toHaveCount(3);
+  await expect(tagged("trip")).toHaveCount(2);
 
-  await act("Add tag…");
-  const pick = bar.getByRole("combobox", { name: "Add tag" });
-  await pick.fill("reimbursable");
-  await pick.press("Enter");
-  await expect(bar).toContainText("Tagged 3 transactions #reimbursable.");
-  await expect(transactions.getByText("#reimbursable")).toHaveCount(3);
-
-  await page.getByRole("button", { name: "Done" }).click();
-  await page.getByRole("button", { name: "Select", exact: true }).click();
-  await transactions.getByRole("checkbox", { name: /Shop 2/ }).click();
-  await act("Remove tag…");
-  const remove = bar.getByRole("combobox", { name: "Remove tag" });
-  await remove.fill("reim");
-  await remove.press("Enter");
-  await expect(bar).toContainText("Removed #reimbursable from 1 transaction.");
-  await expect(transactions.getByText("#reimbursable")).toHaveCount(2);
-  await expect(transactions.getByRole("checkbox", { name: /Shop 2/ })).not.toContainText(
-    "#reimbursable"
+  // The selection's tags come first; one change adds and removes.
+  list = await editTags();
+  await expect(list.getByRole("checkbox")).toHaveText([/#work/, /#trip/]);
+  await tag(list, "trip").click();
+  await tag(list, "work").click();
+  await list.getByRole("button", { name: "Save" }).click();
+  await expect(toasts(page)).toContainText(
+    "Added #trip and removed #work: 3 transactions changed."
   );
+  await expect(tagged("trip")).toHaveCount(3);
+  await expect(tagged("work")).toHaveCount(0);
+
+  // Cancel leaves them as they were.
+  list = await editTags();
+  await tag(list, "trip").click();
+  await list.getByRole("button", { name: "Cancel" }).click();
+  await expect(list).toBeHidden();
+  await expect(tagged("trip")).toHaveCount(3);
 });
 
 test("Reports filter by tag: All time, the largest tagged, and net worth set aside", async ({

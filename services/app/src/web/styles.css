@@ -1648,6 +1648,112 @@ button.plain {
   right: auto;
 }
 
+/* Selecting, a list's tools stick whole under the masthead (LedgerFilter.tsx): the bar inside
+   them can't stick past the box it's in. */
+.list-tools.selecting {
+  position: sticky;
+  top: var(--masthead-height);
+  z-index: 9;
+  background: var(--paper);
+}
+
+.list-tools.selecting > .select-bar {
+  position: static;
+  margin-bottom: 0;
+}
+
+/* Edit tags…: the selection's tags as a checklist (Tags.tsx). */
+.tag-checklist {
+  flex: 1 1 18rem;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-pop);
+}
+
+.tag-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(18rem, 45vh);
+  overflow: auto;
+}
+
+.tag-checks li.tag-checks-break {
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.tag-checks li.none {
+  padding: 0.6rem;
+}
+
+button.tag-check {
+  justify-content: flex-start;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0 0.6rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: none;
+  box-shadow: none;
+  font-weight: 500;
+  text-align: left;
+}
+
+button.tag-check:hover {
+  background: var(--accent-soft);
+}
+
+.tag-box {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 1.5px solid var(--edge);
+  border-radius: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tag-check[aria-checked="true"] .tag-box,
+.tag-check[aria-checked="mixed"] .tag-box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.tag-check.create {
+  color: var(--accent);
+}
+
+.tag-check-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-checklist-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Toasts (sonner: lib/bulk.ts) in the app's colors, light and dark. */
+html [data-sonner-toaster][data-sonner-theme] {
+  --normal-bg: var(--card);
+  --normal-border: var(--line);
+  --normal-text: var(--ink);
+  --border-radius: var(--radius-card);
+  font-family: var(--font-sans);
+}
+
 /* A card or row being selected: tapping anywhere toggles it. */
 .item.selecting {
   position: relative;

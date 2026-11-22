@@ -47,6 +47,9 @@ export function isZero(value: string): boolean {
   return parse(value).units === 0n;
 }
 
+/** Whether `a` is a number equal to `b`, however each is written ("5" and "5.00"). */
+export const sameDecimal = (a: string, b: string) => isDecimal(a) && isZero(add(a, negate(b)));
+
 export function isNegative(value: string): boolean {
   return parse(value).units < 0n;
 }

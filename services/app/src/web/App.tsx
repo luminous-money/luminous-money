@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Toaster } from "sonner";
 import { Link, Redirect, Route, Router, Switch, useLocation } from "wouter";
 
 import { Banners } from "./components/Banners.js";
@@ -69,6 +70,8 @@ export function App() {
           <img src="/ui/icon.svg" alt="" className="footer-logo" />
           Luminous Money
         </footer>
+        {/* What a bulk action is doing, and then did (lib/bulk.ts). */}
+        <Toaster position="bottom-center" theme="system" closeButton />
       </div>
     </Router>
   );

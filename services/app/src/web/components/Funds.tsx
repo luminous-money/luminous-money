@@ -25,6 +25,7 @@ import {
   fundName,
   isTrade,
   linesProblem,
+  shapesFor,
   shapesOf,
   UNALLOCATED,
   wholeLines,
@@ -83,19 +84,6 @@ import {
 import { BudgetBar, leftWords } from "./Budget.js";
 
 type PostingLike = Parameters<typeof shapesOf>[0][number];
-
-/** A transaction's shapes for funds (one per commodity), or null if its amounts don't read. */
-export function shapesFor(
-  postings: PostingLike[] | null,
-  currency: string | undefined
-): FundShape[] | null {
-  if (!postings || !currency) return null;
-  try {
-    return shapesOf(postings, currency);
-  } catch {
-    return null; // an amount being typed that isn't one yet
-  }
-}
 
 const unknownShape = (currency: string): FundShape => ({ kind: null, size: "0", currency });
 

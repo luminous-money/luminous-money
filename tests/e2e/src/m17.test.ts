@@ -51,7 +51,13 @@ async function setUp() {
     });
   const report = async <T>(name: string, query = "") =>
     (await (await me.app(`/books/${book}/reports/${name}?on=${ON}${query}`)).json()) as T;
-  return { ledger, report };
+  const bulk = (body: unknown) =>
+    me.app(`/books/${book}/transactions/bulk`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  return { ledger, report, bulk };
 }
 
 type Posting = { account: string; units?: unknown; tags?: string[] };
@@ -130,6 +136,41 @@ describe("M17: tags, per split", () => {
       untagged.postings.map((p) => p.tags),
       [[], []]
     );
+  });
+
+  it("edits many at once in one request: a tag in neither list is left as it was on each", async () => {
+    const { ledger, bulk } = await setUp();
+    const all = (await (await ledger("/transactions")).json()) as Transaction[];
+    const trip = all.filter((t) => ["Airline", "Trattoria", "Mercato"].includes(t.payee ?? ""));
+    const picked = trip.map(({ id, updated_at }) => ({ id, updated_at }));
+
+    const done = await bulk({
+      op: "tags",
+      add: ["#Italy"],
+      remove: ["trip-2025"],
+      transactions: picked,
+    });
+    assert.equal(done.status, 200);
+    assert.deepEqual(await done.json(), { changed: 3, unchanged: 0, skipped: 0, matches: 0 });
+
+    // Read back by ID: the ledger's `id` filter.
+    const query = trip.map((t) => `id=${t.id}`).join("&");
+    const after = (await (await ledger(`/transactions?${query}`)).json()) as Transaction[];
+    assert.deepEqual(
+      after.map((t) => [t.payee, t.postings.map((p) => p.tags ?? [])]),
+      [
+        ["Airline", [[], ["italy", "reimbursable"]]],
+        ["Trattoria", [[], ["italy"]]],
+        ["Mercato", [[], ["italy"], ["gift", "italy"]]],
+      ]
+    );
+
+    // The versions read before: they've moved on, so none of it is done.
+    const stale = await bulk({ op: "tags", add: ["again"], remove: [], transactions: picked });
+    assert.equal(stale.status, 409);
+    assert.equal(((await stale.json()) as { code: string }).code, "stale");
+    const unchanged = (await (await ledger(`/transactions?${query}`)).json()) as Transaction[];
+    assert.ok(unchanged.every((t) => !t.postings.some((p) => p.tags?.includes("again"))));
   });
 
   it("reports only the tagged splits: the breakdown of all time and the largest", async () => {

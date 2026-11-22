@@ -12,7 +12,16 @@
  *   transaction has left on that side (all of it, alone). So choosing a fund puts the whole
  *   amount there, and typing $300 into a second one leaves $700 in the first.
  */
-import { add, formatMoney, isDecimal, isMoney, isNegative, isZero, negate } from "./decimal.js";
+import {
+  add,
+  formatMoney,
+  isDecimal,
+  isMoney,
+  isNegative,
+  isZero,
+  negate,
+  sameDecimal,
+} from "./decimal.js";
 import {
   UNALLOCATED,
   effectsOf,
@@ -20,6 +29,8 @@ import {
   type FundLine,
   type FundShape,
 } from "../../shared/funds.js";
+
+export { sameLines } from "../../shared/funds.js";
 
 export type Side = "into" | "from";
 
@@ -94,14 +105,12 @@ export function rowsFrom(
     }));
     for (const side of ["into", "from"] as const) {
       const theirs = rows.filter((r) => r.side === side);
-      if (theirs.length === 1 && shape.kind && same(theirs[0]!.amount, shape.size))
+      if (theirs.length === 1 && shape.kind && sameDecimal(theirs[0]!.amount, shape.size))
         theirs[0]!.follows = true;
     }
     return rows;
   });
 }
-
-const same = (a: string, b: string) => isDecimal(a) && isZero(add(a, negate(b)));
 
 /** An amount as typed, without what people type around one ("$1,000.00"). */
 const clean = (amount: string) => amount.replace(/[$,\s]/g, "");
@@ -164,23 +173,6 @@ export function rowsProblem(rows: FundRow[], shape: FundShape): string | null {
     if (r.fund && (!amount || isZero(amount))) return `Give ${r.fund} an amount, or remove it`;
   }
   return null;
-}
-
-/** Two sets of lines are the same (in any order, however their numbers are written). */
-export function sameLines(a: FundLine[] | null | undefined, b: FundLine[] | null | undefined) {
-  const x = a ?? [];
-  const y = b ?? [];
-  return (
-    x.length === y.length &&
-    x.every((l) =>
-      y.some(
-        (m) =>
-          m.fund === l.fund &&
-          m.amount.currency === l.amount.currency &&
-          same(m.amount.number, l.amount.number)
-      )
-    )
-  );
 }
 
 /** An amount with its sign, always: "+$500.00", "−$300.00", "+$0.00", "+10 VTI". */
@@ -280,7 +272,7 @@ export function wholeFund(
   const ok = shapes.every((s) => {
     if (isZero(s.size)) return true;
     const line = lines.find((l) => l.amount.currency === s.currency);
-    return !!line && same(line.amount.number, s.kind === "out" ? negate(s.size) : s.size);
+    return !!line && sameDecimal(line.amount.number, s.kind === "out" ? negate(s.size) : s.size);
   });
   return ok ? [...funds][0]! : null;
 }
@@ -291,7 +283,7 @@ export function wholeSide(lines: FundLine[] | null | undefined, shape: FundShape
   const mine = (lines ?? []).filter((l) => l.amount.currency === shape.currency);
   if (!mine.length) return "";
   if (mine.length !== 1 || !shape.kind) return null;
-  return same(mine[0]!.amount.number, shape.kind === "out" ? negate(shape.size) : shape.size)
+  return sameDecimal(mine[0]!.amount.number, shape.kind === "out" ? negate(shape.size) : shape.size)
     ? mine[0]!.fund
     : null;
 }

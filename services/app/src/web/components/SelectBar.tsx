@@ -3,7 +3,7 @@ import { useState } from "react";
 import { UNALLOCATED } from "../../shared/funds.js";
 import { usePopover } from "../lib/popover.js";
 import { AccountPicker, type AccountCreation } from "./AccountPicker.js";
-import { TagInput, type TagChoice } from "./Tags.js";
+import { TagChecklist, type TagChange, type TagChoice } from "./Tags.js";
 
 /** Something Select mode can do to what's selected. Disabled, it says why. */
 export type BulkAction = {
@@ -11,27 +11,28 @@ export type BulkAction = {
   /** Why it can't be done now, if it can't. */
   disabled?: string | false;
 } & (
-  | { run: () => void; pick?: undefined; pickTag?: undefined; pickFund?: undefined }
+  | { run: () => void; pick?: undefined; editTags?: undefined; pickFund?: undefined }
   /** One that needs an account first ("Categorize as…"): the bar shows a picker. */
   | {
       pick: { accounts: string[]; create?: AccountCreation; prefer?: string[] };
-      pickTag?: undefined;
+      editTags?: undefined;
       pickFund?: undefined;
       run: (account: string) => void;
     }
-  /** One that needs a tag first ("Add tag…", M17): the bar shows a tag picker. */
+  /** Edit tags…: the bar shows the selection's tags as a checklist (`TagChecklist`), the book's
+   * others below them. */
   | {
-      pickTag: { choices: TagChoice[]; allowNew: boolean };
+      editTags: { total: number; have: TagChoice[]; choices: TagChoice[] };
       pick?: undefined;
       pickFund?: undefined;
-      run: (tag: string) => void;
+      run: (change: TagChange) => void;
     }
   /** One that needs a fund first ("Fund…", Funds A): the bar shows a select of Unallocated and
    * the funds. Unallocated is run as UNALLOCATED. */
   | {
       pickFund: { funds: { name: string; label: string }[] };
       pick?: undefined;
-      pickTag?: undefined;
+      editTags?: undefined;
       run: (fund: string) => void;
     }
 );
@@ -40,7 +41,8 @@ export type BulkAction = {
  * Select mode's bar, sticky across the top of review and ledgers: how many are selected,
  * "Select all" (what's shown: a filtered list's rows, loaded so far), the **Actions** menu (what
  * the page can do in bulk: confirm, categorize, tag, fund, suggest categories…), and "Done". An
- * action that needs an account, a tag or a fund opens a picker in the bar.
+ * action that needs an account or a fund opens a picker in the bar; Edit tags… a checklist. What
+ * an action did (or why it couldn't) is a toast (`lib/bulk.ts`).
  */
 export function SelectBar({
   count,
@@ -48,7 +50,6 @@ export function SelectBar({
   onSelectAll,
   actions,
   busy,
-  note,
   onDone,
 }: {
   count: number;
@@ -58,8 +59,6 @@ export function SelectBar({
   onSelectAll: () => void;
   actions: BulkAction[];
   busy: boolean;
-  /** A line under the bar: what the last action did or skipped, or an error. */
-  note?: string | null;
   onDone: () => void;
 }) {
   const menu = usePopover();
@@ -93,7 +92,7 @@ export function SelectBar({
                   title={action.disabled || undefined}
                   onClick={() => {
                     menu.setOpen(false);
-                    if (action.pick || action.pickTag || action.pickFund) setPicking(action);
+                    if (action.pick || action.editTags || action.pickFund) setPicking(action);
                     else action.run();
                   }}
                 >
@@ -108,22 +107,16 @@ export function SelectBar({
           Done
         </button>
       </div>
-      {picking?.pickTag && (
+      {picking?.editTags && (
         <div className="select-bar-row">
-          <TagInput
-            label={picking.label.replace(/…$/, "")}
-            value={[]}
-            choices={picking.pickTag.choices}
-            allowNew={picking.pickTag.allowNew}
-            autoFocus
-            onChange={([tag]) => {
+          <TagChecklist
+            {...picking.editTags}
+            onSave={(change) => {
               setPicking(null);
-              if (tag) picking.run(tag);
+              picking.run(change);
             }}
+            onCancel={() => setPicking(null)}
           />
-          <button type="button" className="plain" onClick={() => setPicking(null)}>
-            Cancel
-          </button>
         </div>
       )}
       {picking?.pickFund && (
@@ -171,11 +164,6 @@ export function SelectBar({
             Cancel
           </button>
         </div>
-      )}
-      {note && (
-        <p className="small muted" aria-live="polite">
-          {note}
-        </p>
       )}
     </div>
   );

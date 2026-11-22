@@ -1,4 +1,5 @@
 /** The app API (imports and CSV profiles), at /api/app/v1 on the same origin. */
+import type { BulkEdit, BulkResult } from "../../shared/bulk.js";
 import type { Notification } from "../../shared/notifications.js";
 import type { StoredCharge } from "../../shared/orders.js";
 import type { CsvProfile, ImportBatch, ImportResult, ProposedMatch } from "../../shared/imports.js";
@@ -976,6 +977,10 @@ export const appApi = {
         transactions ? post({ transactions }) : { method: "POST" }
       )
     ),
+
+  /** Select mode's bulk edits: the selection, with the versions read, in one write. */
+  bulk: async (book: string, edit: BulkEdit): Promise<BulkResult> =>
+    json(await apiFetch(`${base(book)}/transactions/bulk`, post(edit))),
 
   categorizers: async (
     book: string

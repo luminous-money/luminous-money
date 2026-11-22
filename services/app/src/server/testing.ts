@@ -343,6 +343,10 @@ export class FakeLedger implements LedgerPort {
     return found;
   }
 
+  async transactionsById(_book: string, ids: string[]) {
+    return this.transactions.filter((t) => ids.includes(t.id));
+  }
+
   /** The lenses each compact read asked for (the fake doesn't apply them). */
   lenses: (string | undefined)[] = [];
 
