@@ -261,6 +261,20 @@ finding it on GitHub to running it, on a laptop or a public server, in one comma
   only) rather than the certificate store, which holds the private key. Traefik renews at 30 days
   left, so under 14 is a renewal that's been failing for two weeks (`degraded`, time to fix it);
   expired or missing is `down`. `status` adds the last day's Let's Encrypt errors from the log.
+- **Daily jobs keep the wall clock's time, asleep or off** (`daily.ts`, 2026-11-22). The bank
+  feeds, Amazon, prices, schedules and the update check run in `app` at startup and at their
+  local times. Each one checks for itself whether it's due, so a stack started late, or brought
+  up and down all day on a laptop, catches up on its first run and doesn't repeat it after that.
+  The timer wakes every 10 minutes and runs a job once one of its times has passed since its last
+  run. It never sleeps until the next time outright, because a timer counts only the time the
+  machine is awake (Node's, on Linux and in Docker Desktop's VM). A laptop closed from 5pm to 9am
+  would otherwise have run the morning's syncs at 4pm. The timer, not the job, tracks when a job
+  is due: not every job skips its own work when it isn't due (the update check asks GitHub every
+  time), and a sync that failed would be retried every tick, spending SimpleFIN's daily requests.
+  **The first run waits** (up to 2 minutes) for `ledger` and `shops` to answer `/health`. Compose
+  starts the services together, and `app` is up first, so its startup run could reach neither:
+  that day's Amazon sync was lost, and the bank's rows were fetched but not imported until the
+  next day.
 - **Every service knows its version** (a build argument baked in), for `/health` and support.
 - **Admins are named, not made:** `LUMINOUS_MONEY_ADMINS` lists emails, and an admin is a
   signed-in user with one of them **confirmed** (auth forwards `X-User-Email-Verified` with the

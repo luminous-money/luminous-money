@@ -4,7 +4,27 @@ Where We Left Off
 _Updated 2026-11-22._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-22): the installed app's icon fits Android's circle
+## Latest (2026-11-22, later): daily jobs on time on a laptop that sleeps, `v1.5.4`
+
+Kael asked whether the daily syncs work on a laptop, including one brought up and down to save
+power. Up and down was already fine: every job runs at startup and checks whether it's due.
+Sleep wasn't. The timer slept until the next job's time, and timers count only the time the
+machine is awake, so a laptop closed overnight ran the morning's syncs hours late. Also, the
+startup run could come before `ledger` and `shops` answered.
+
+- **`app`:** `startDaily` (`daily.ts`) wakes every 10 minutes (`TICK`) and runs each job one of
+  whose times has passed, by the wall clock, since its last run (`nextRun`). The timer tracks
+  this, not the job: the update check asks GitHub on every run, and a failed sync would be retried
+  every tick. The first run waits up to 2 minutes for `ledger` and `shops` (`healthy`, in
+  `main.ts`). design.md ("Operating it") has why.
+- **Tests:** app `daily.test.ts` (startup, on time, a sleep through a job's time, only what's
+  due, waiting for the services, no retry every tick). `pnpm test` and `pnpm e2e` passed
+  (API 124 of 124, browser 154 of 154). The ledger's API didn't change.
+
+**Released** as `v1.5.4` (the workflow and CI pending at commit). **Kael, on Emmer:** `./luminous-money upgrade`.
+**Next:** unchanged: Kael reviews HSA tracking's 7 calls (M99); then docs/PLAN.md's Ahead.
+
+## Before that (2026-11-22): the installed app's icon fits Android's circle
 
 Kael, with a screenshot: on Android the installed app's "Lu" was cut off at the corners. The
 maskable icon kept "Lu" inside the spec's safe zone (a radius of 40%), but Android's launcher

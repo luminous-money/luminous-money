@@ -13,7 +13,7 @@ import { external, providersFrom } from "./categorize/external.js";
 import { historyCategorizer } from "./categorize/history.js";
 import { items } from "./categorize/items.js";
 import { rules } from "./categorize/rules.js";
-import { startDaily } from "./daily.js";
+import { healthy, startDaily } from "./daily.js";
 import { historyFrom } from "./migrate/history.js";
 import { MigrationStore } from "./migrate/store.js";
 import { readWaiting } from "./orders/read.js";
@@ -116,14 +116,17 @@ serve(
   },
   (info) => {
     console.log(`app listening on :${info.port} (${config.env}), serving the PWA from ${webRoot}`);
-    startDaily([
-      schedulesJob(db, ledgerFor),
-      pricesJob(db, ledgerFor),
-      ...(config.simplefin.mode === "daily"
-        ? [simplefinJob({ ...simplefin, db, ledgerFor, categorizers })]
-        : []),
-      shopsJob({ db, orders: orderDeps.orders, shopsFor }),
-      system.job,
-    ]);
+    startDaily(
+      [
+        schedulesJob(db, ledgerFor),
+        pricesJob(db, ledgerFor),
+        ...(config.simplefin.mode === "daily"
+          ? [simplefinJob({ ...simplefin, db, ledgerFor, categorizers })]
+          : []),
+        shopsJob({ db, orders: orderDeps.orders, shopsFor }),
+        system.job,
+      ],
+      healthy([config.ledgerUrl, config.shopsUrl])
+    );
   }
 );
