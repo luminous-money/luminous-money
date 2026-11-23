@@ -34,6 +34,10 @@ and a budget on home opening Reports filtered to its account.
   screenshots, light and dark. `pnpm test` and `pnpm e2e` passed (API 125 of 125, browser 157 of
   157).
 
+**Released** as `v1.7.0` (the workflow and CI green; all seven images public on ghcr.io, read
+anonymously). **Emmer upgraded over SSH** to 1.7.0, every service healthy (the first try's pull
+was reset by the network partway; nothing had changed, and the second went through; its backup
+is `backups/luminous-money-20261123T152129Z-1.6.0.tar.gz`).
 **Next:** unchanged: Kael reviews HSA tracking's 7 calls (M99); then docs/PLAN.md's Ahead.
 
 ## Before that (2026-11-22, evening): bulk actions in one request, Edit tags…, toasts, `v1.6.0`
