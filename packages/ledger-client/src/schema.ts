@@ -5827,6 +5827,8 @@ export interface operations {
         budgeted?: boolean | null;
         /** @description Only those holding a file, a receipt say (true), or only those holding none (false). */
         attached?: boolean | null;
+        /** @description `outflows`: each one's splits as outflows read them, as reports do (Loans): what's paid into an account that counts as spending is added as spending (`outflow_of`), and the expenses paid out of one are masked. What filters them is as booked. */
+        lens?: "outflows" | null;
       };
       header?: never;
       path: {

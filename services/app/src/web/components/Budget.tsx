@@ -105,7 +105,8 @@ export function BudgetGlance({ line, name }: { line: BudgetLine; name: string })
 }
 
 /** Home's Budgets card: the budgets the user starred (only when there are any), each over its
- * own period with what's left, opening its account; and All budgets ›. */
+ * own period with what's left, opening Reports drilled into its account (Kael, 2026-11-23), or
+ * for one that isn't an expense or income account, the account; and All budgets ›. */
 export function BudgetsCard({ book }: { book: string }) {
   const lines = useStarredBudgets(book);
   const tree = useAccountTree(book);
@@ -119,11 +120,17 @@ export function BudgetsCard({ book }: { book: string }) {
         {lines.map((line) => {
           const found = accounts.get(line.account);
           const name = displayName(found ?? { name: line.account });
-          const href = `/books/${book}/accounts/${encodeURIComponent(line.account)}`;
+          const account = `/books/${book}/accounts/${encodeURIComponent(line.account)}`;
+          const href =
+            line.type === "expense" || line.type === "income"
+              ? `/books/${book}/reports?${line.type === "income" ? "side=income&" : ""}of=${encodeURIComponent(line.account)}`
+              : // A node's budget is in its editor; a leaf's, on its ledger.
+                found?.kind === "node"
+                ? `${account}/edit`
+                : account;
           return (
             <li key={line.account}>
-              {/* A node's budget is in its editor; a leaf's, on its ledger. */}
-              <Link href={found?.kind === "node" ? `${href}/edit` : href} className="home-row">
+              <Link href={href} className="home-row">
                 <span className="home-row-top">
                   <span className="home-row-name">{name}</span>
                   <span className="num">

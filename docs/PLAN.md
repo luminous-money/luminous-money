@@ -453,3 +453,9 @@ Smaller improvements picked up between milestones. Those still open are in
       tag… are one Edit tags… checklist with `–` for a tag on only some; what an action is doing,
       then did, is a toast; and the bar stays at the top of review, and of every list, while
       selecting.
+- [x] **The breakdown over 3 to 12 months, as a donut or bars; its splits; budgets open it**
+      (Kael, 2026-11-23, `v1.7.0`; design.md has the decisions): Show is This month or 3, 6, 9
+      or 12 months; Pie or Bars (a bar a month, stacked by category: ledger-graphs 0.1.3's
+      `byMonth` and `BreakdownBarsChart`); the transactions under it are the splits there, each
+      with its own amount, read through the outflows lens as the report is; and a starred budget
+      on home opens Reports drilled into its account.

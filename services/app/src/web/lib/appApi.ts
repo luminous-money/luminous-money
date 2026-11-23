@@ -119,6 +119,8 @@ export type BreakdownOptions = {
   depth: number;
   /** "total": all of it, summed (offered when filtering by tag, M17). */
   window: "average" | "month" | "total";
+  /** The window "average": the complete months it's over (6 by default). */
+  months?: number;
   /** Drilled into: the accounts just under it. */
   of?: string;
 } & ReportReading;
@@ -730,6 +732,7 @@ export const appApi = {
             side: options.side,
             depth: String(options.depth),
             window: options.window,
+            ...(options.months ? { months: String(options.months) } : {}),
             ...(options.of ? { of: options.of } : {}),
           })}${readingQuery(options)}`
         )

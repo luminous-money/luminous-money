@@ -1,10 +1,42 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-22._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-23._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-22, evening): bulk actions in one request, Edit tags…, toasts, `v1.6.0`
+## Latest (2026-11-23): the breakdown over 3 to 12 months, as a donut or bars; its splits; budgets open it, `v1.7.0`
+
+Kael asked for three things, then "publish the release when you're done and update the app via
+SSH": the breakdown's Show as This month, 3, 6, 9 and 12 months (no "average" in it), and a
+Pie/Bars switch where the bars are a bar a month stacked by category, as amounts, not averages;
+the breakdown's transactions as each **split** under the account, not the transaction's total;
+and a budget on home opening Reports filtered to its account.
+
+- **ledger-graphs `0.1.3`** (its own repo, released with its `pnpm release`, published to npm by
+  its CI): `breakdown` has `byMonth`, each month of the window with every slice's and Other's
+  amount (not averaged); `BreakdownBarsChart` draws it, stacked in the donut's colors, a month
+  still going lighter, a tooltip per month. The app depends on `^0.1.3`.
+- **The ledger:** `GET …/journal` takes `lens=outflows`: each page's splits through the outflows
+  lens, as reports read them (what filters them, and reconciled, stay as booked). Its splits
+  now carry their `memo` and `flag`. `pnpm generate` run.
+- **`app`, server:** `/reports/breakdown` takes `months` (1–24, 6 by default) for the average;
+  the MCP's `read_report` says so.
+- **`app`, PWA:** Reports' breakdown: Show (`?period=`: `month`, `3`…`12`, `total` with tags),
+  Pie or Bars (`?chart=bars`), both in the address; with Bars, a "$X over the last N months"
+  line and the list summed over the months. The transactions under it (`BreakdownJournal`) are
+  one row per split under `of` (with the tags chosen), its account below `of`, memo, "paid into
+  …" for a counted outflow, its own amount (income positive), the journal read with the lens
+  unless the lens is Expenses. Home's Budgets card opens `reports?of=` (`side=income` for an
+  income budget); an asset's or liability's budget still opens its account.
+- **Tests:** ledger-graphs `reports.test.ts`; ledger `test_outflows.py` (the lensed journal); app
+  `reports.test.ts` (months, `byMonth`); browser `m12.spec.ts` (periods and bars; splits, not
+  totals; the mortgage's counted split) and `m11.spec.ts` (a budget opens Reports). Looked at in
+  screenshots, light and dark. `pnpm test` and `pnpm e2e` passed (API 125 of 125, browser 157 of
+  157).
+
+**Next:** unchanged: Kael reviews HSA tracking's 7 calls (M99); then docs/PLAN.md's Ahead.
+
+## Before that (2026-11-22, evening): bulk actions in one request, Edit tags…, toasts, `v1.6.0`
 
 Kael: tagging 46 in review "took forever". Each bulk action read and PATCHed one transaction at a
 time (two requests each, through the gateway), and confirmed review's matches one at a time

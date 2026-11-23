@@ -525,7 +525,8 @@ export function createApi({
     )
   );
   /** The largest categories: `side` expenses or income, `depth`, `slices`, `window` (average
-   * over 6 months, this month, or `total`: all of it), or the accounts just under `of`. */
+   * over `months` complete months, 6 by default, this month, or `total`: all of it), or the
+   * accounts just under `of`; with each month's amounts (`byMonth`). */
   api.get(
     "/books/:book/reports/breakdown",
     report((c, book, ledger) => {
@@ -536,6 +537,7 @@ export function createApi({
         depth: count(c.req.query("depth"), 1, 4, 1),
         slices: count(c.req.query("slices"), 2, 12, 6),
         window: window === "month" || window === "total" ? window : "average",
+        months: count(c.req.query("months"), 1, 24, 6),
         tags: tagsOf(c),
         lens: lensOf(c),
         budgeted: budgetedOf(c),

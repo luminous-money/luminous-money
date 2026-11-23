@@ -2,15 +2,22 @@ import type { Breakdown } from "@luminous-money/ledger-graphs-api";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
-import { BreakdownChart, CashFlowChart, NetWorthChart } from "../components/Charts.js";
-import { JournalList } from "../components/JournalList.js";
+import { hasTags } from "../../shared/tags.js";
+
+import {
+  BreakdownBarsChart,
+  BreakdownChart,
+  CashFlowChart,
+  NetWorthChart,
+} from "../components/Charts.js";
 import { countingAs } from "../components/Outflow.js";
 import { MoreBelow, usePaging } from "../components/Paged.js";
-import { tagList, TagInput } from "../components/Tags.js";
+import { TagChips, tagList, TagInput } from "../components/Tags.js";
 import { shortName } from "../lib/accounts.js";
 import type { BreakdownOptions, ReportReading } from "../lib/appApi.js";
 import { useChartTheme } from "../lib/chartTheme.js";
 import type { JournalFilter } from "../lib/ledger.js";
+import { formatMoney, negate } from "../lib/decimal.js";
 import { formatAmount } from "../lib/format.js";
 import { useParam, useParams, withBack } from "../lib/navigation.js";
 import {
@@ -52,8 +59,9 @@ const PALETTE = [
  * spending is spending, and what escrow pays for isn't counted again), or as the expense accounts
  * are booked (`?lens=expenses`), the traditional P&L view.
  *
- * Where the breakdown is (`?side=income`, `?of=` the account drilled into) is in the address, so
- * coming back from one of its transactions finds it where it was.
+ * Where the breakdown is (`?side=income`, `?of=` the account drilled into, `?period=` and
+ * `?chart=bars`) is in the address, so coming back from one of its transactions finds it where
+ * it was.
  */
 export function Reports({ book }: { book: string }) {
   const [, navigate] = useLocation();
@@ -63,6 +71,8 @@ export function Reports({ book }: { book: string }) {
     budgeted: useParam("budgeted") === "only",
     side: useParam("side") === "income" ? "income" : "expenses",
     of: useParam("of") ?? undefined,
+    period: periodOf(useParam("period")),
+    chart: useParam("chart") === "bars" ? "bars" : "pie",
   };
   const { tags, lens, budgeted } = where;
   const reading = { tags, lens, budgeted };
@@ -76,6 +86,8 @@ export function Reports({ book }: { book: string }) {
       ...(at.budgeted ? ["budgeted=only"] : []),
       ...(at.side === "income" ? ["side=income"] : []),
       ...(at.of ? [`of=${encodeURIComponent(at.of)}`] : []),
+      ...(at.period ? [`period=${at.period}`] : []),
+      ...(at.chart === "bars" ? ["chart=bars"] : []),
     ].join("&");
   };
   const go = (change: Partial<Where>) => {
@@ -131,14 +143,14 @@ export function Reports({ book }: { book: string }) {
             choices={bookTags.data ?? []}
             allowNew={false}
             placeholder={bookTags.data?.length ? "Filter by tag" : "No tags yet"}
-            onChange={(chosen) => go({ tags: chosen, of: undefined })}
+            onChange={(chosen) => go({ tags: chosen, of: undefined, period: undefined })}
           />
           {tags.length > 0 && (
             <p className="small muted">
               Only splits tagged {tagList(tags)}.{" "}
               <Link
                 href={withBack(
-                  `/books/${book}/transactions?${query({ lens: "outflows", budgeted: false, side: "expenses", of: undefined })}`,
+                  `/books/${book}/transactions?${query({ lens: "outflows", budgeted: false, side: "expenses", of: undefined, period: undefined, chart: "pie" })}`,
                   here
                 )}
               >
@@ -149,11 +161,10 @@ export function Reports({ book }: { book: string }) {
         </section>
         <CashFlowCard book={book} reading={reading} />
         <BreakdownCard
-          key={tags.join(" ")}
           book={book}
           reading={reading}
           view={where}
-          onView={(at) => go({ side: at.side, of: at.of })}
+          onView={(at) => go(at)}
           here={here}
         />
         <LargestCard book={book} reading={reading} here={here} />
@@ -216,15 +227,45 @@ function CashFlowCard({ book, reading }: { book: string; reading: ReportReading 
   );
 }
 
-// What each window covers, as the chart's caption and the empty card say it.
-const WINDOWS = {
-  average: { caption: "a month, on average", nothing: "in the last 6 months" },
-  month: { caption: "this month", nothing: "this month" },
-  total: { caption: "in all", nothing: "with these tags" },
-} as const;
+/** How long the breakdown covers: this month, the last 3 to 12 complete months (the donut
+ * their monthly average, the bars each month), or all time (offered with tags). */
+type Period = "month" | 3 | 6 | 9 | 12 | "total";
+const PERIODS = [3, 6, 9, 12] as const;
 
-/** Where the breakdown is: expenses or income, and the account drilled into, if any. */
-type BreakdownView = { side: BreakdownOptions["side"]; of?: string | undefined };
+const periodOf = (param: string | null): Period | undefined =>
+  param === "month" || param === "total" ? param : PERIODS.find((n) => String(n) === param);
+
+/** Where the breakdown is: expenses or income, the account drilled into, if any, how long it
+ * covers (by default, all time with tags, else 6 months), and as a donut or a bar a month. */
+type BreakdownView = {
+  side: BreakdownOptions["side"];
+  of?: string | undefined;
+  period?: Period | undefined;
+  chart: "pie" | "bars";
+};
+
+/** What a period covers, as the chart's caption and the empty card say it. */
+function covers(period: Period, chart: BreakdownView["chart"]) {
+  if (period === "month") return { caption: "this month", nothing: "this month" };
+  if (period === "total") return { caption: "in all", nothing: "with these tags" };
+  return {
+    caption: chart === "pie" ? "a month, on average" : `over the last ${period} months`,
+    nothing: `in the last ${period} months`,
+  };
+}
+
+/** A breakdown's slices and Other as each month's summed, not averaged: what the bars add up
+ * to. */
+function summed(data: Breakdown): Breakdown {
+  const sum = (amount: (m: Breakdown["byMonth"][number]) => number) =>
+    data.byMonth.reduce((n, m) => n + amount(m), 0);
+  return {
+    ...data,
+    total: sum((m) => m.total),
+    slices: data.slices.map((s, i) => ({ ...s, amount: sum((m) => m.amounts[i] ?? 0) })),
+    other: data.other && { ...data.other, amount: sum((m) => m.other) },
+  };
+}
 
 function BreakdownCard({
   book,
@@ -239,21 +280,30 @@ function BreakdownCard({
   onView: (view: BreakdownView) => void;
   here: string;
 }) {
-  const { side, of } = view;
+  const { side, of, chart } = view;
   const tags = reading.tags ?? [];
   const [depth, setDepth] = useState(1);
-  const [window, setWindow] = useState<BreakdownOptions["window"]>(
-    tags.length ? "total" : "average"
-  );
+  const period: Period =
+    view.period === "total" && !tags.length ? 6 : (view.period ?? (tags.length ? "total" : 6));
+  const window = typeof period === "number" ? "average" : period;
   // Drilled into: each level's account under the root, outermost first.
   const parts = of?.split(":") ?? [];
   const path = parts.slice(1).map((_, i) => parts.slice(0, i + 2).join(":"));
-  const setPath = (to: string[]) => onView({ side, of: to.at(-1) });
-  const report = useBreakdownReport(book, { side, depth, window, of, ...reading });
+  const setPath = (to: string[]) => onView({ ...view, of: to.at(-1) });
+  const report = useBreakdownReport(book, {
+    side,
+    depth,
+    window,
+    ...(typeof period === "number" ? { months: period } : {}),
+    of,
+    ...reading,
+  });
   const theme = useChartTheme();
   const d = report.data;
-  const drill = (account: string) => onView({ side, of: account });
-  const { caption } = WINDOWS[window];
+  const drill = (account: string) => onView({ ...view, of: account });
+  const { caption, nothing } = covers(period, chart);
+  // The bars, and the list under them, are each month's amounts as they were.
+  const listed = d && chart === "bars" ? summed(d) : d;
 
   return (
     <section className="card report" aria-label="Breakdown">
@@ -266,7 +316,7 @@ function BreakdownCard({
             role="radio"
             aria-checked={side === s}
             className={side === s ? "on" : ""}
-            onClick={() => onView({ side: s })}
+            onClick={() => onView({ ...view, side: s, of: undefined })}
           >
             {s === "expenses" ? "Expenses" : "Income"}
           </button>
@@ -277,14 +327,37 @@ function BreakdownCard({
           Show
           <select
             aria-label="Show"
-            value={window}
-            onChange={(e) => setWindow(e.target.value as BreakdownOptions["window"])}
+            value={period}
+            onChange={(e) => onView({ ...view, period: periodOf(e.target.value) })}
           >
             {tags.length > 0 && <option value="total">All time</option>}
-            <option value="average">The 6-month average</option>
             <option value="month">This month</option>
+            {PERIODS.map((n) => (
+              <option key={n} value={n}>
+                {n} months
+              </option>
+            ))}
           </select>
         </label>
+        <div className="segmented chart-kind" role="radiogroup" aria-label="Chart">
+          {(
+            [
+              ["pie", "Pie"],
+              ["bars", "Bars"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={chart === value}
+              className={chart === value ? "on" : ""}
+              onClick={() => onView({ ...view, chart: value })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         {path.length === 0 && (
           <label className="small">
             Level
@@ -325,52 +398,69 @@ function BreakdownCard({
           ))}
         </nav>
       )}
-      {!d ? (
+      {!d || !listed ? (
         <Pending error={report.error} height={420} />
       ) : d.slices.length === 0 ? (
-        <p className="muted">Nothing {WINDOWS[window].nothing}.</p>
+        <p className="muted">Nothing {nothing}.</p>
+      ) : chart === "bars" ? (
+        <>
+          <p className="small muted">
+            <strong className="num">{formatAmount(listed.total, d.currency)}</strong> {caption}
+            {period === "month" ? " so far" : ""}
+          </p>
+          <BreakdownBarsChart data={d} theme={theme} onSelect={drill} />
+          <BreakdownList data={listed} onSelect={drill} />
+        </>
       ) : (
         <>
           <BreakdownChart data={d} caption={caption} theme={theme} onSelect={drill} />
-          <BreakdownList data={d} onSelect={drill} />
+          <BreakdownList data={listed} onSelect={drill} />
         </>
       )}
-      {d && <BreakdownTransactions book={book} of={d.of} reading={reading} here={here} />}
+      {d && (
+        <BreakdownTransactions book={book} side={side} of={d.of} reading={reading} here={here} />
+      )}
     </section>
   );
 }
 
 /**
- * Every transaction under what's broken down (the root, or the account drilled into), in a
- * small window at the bottom of the card: the book's journal as Transactions lists it (newest
- * first, older pages as it scrolls), filtered to that account and those under it, as the
- * report reads: the tags chosen, and without what's kept out of budgets if it's left out. Read
- * as outflows, what's paid into an account that counts as spending here is listed too: Rent and
- * mortgage shows the mortgage's payments.
+ * Every split under what's broken down (the root, or the account drilled into), in a small
+ * window at the bottom of the card: the book's journal as Transactions lists it (newest first,
+ * older pages as it scrolls), each transaction's splits under that account, as the report reads
+ * them: with only the tags chosen, and without what's kept out of budgets if it's left out. A
+ * split, not the transaction: a receipt's groceries, not the whole receipt (Kael, 2026-11-23).
+ * Read as outflows, the journal is lensed as the report is: what's paid into an account that
+ * counts as spending here is a split here (Rent and mortgage shows the mortgage's payments), and
+ * what escrow pays for isn't one again. Income reads as earned, positive.
  */
 function BreakdownTransactions({
   book,
+  side,
   of,
   reading,
   here,
 }: {
   book: string;
+  side: BreakdownOptions["side"];
   of: string;
   reading: ReportReading;
   here: string;
 }) {
   const accounts = useAccounts(book);
   if (!accounts.data) return null;
-  const counted =
-    reading.lens !== "expenses" ? countingAs(accounts.data, of).map((a) => a.name) : [];
+  const outflows = reading.lens !== "expenses";
+  const counted = outflows ? countingAs(accounts.data, of).map((a) => a.name) : [];
   return (
     <BreakdownJournal
       book={book}
+      side={side}
       of={of}
       filter={{
         accounts: [of, ...counted],
         tags: reading.tags ?? [],
         ...(reading.budgeted ? { budgeted: true } : {}),
+        ...(outflows ? { lens: "outflows" as const } : {}),
       }}
       here={here}
     />
@@ -379,18 +469,29 @@ function BreakdownTransactions({
 
 function BreakdownJournal({
   book,
+  side,
   of,
   filter,
   here,
 }: {
   book: string;
+  side: BreakdownOptions["side"];
   of: string;
   filter: JournalFilter;
   here: string;
 }) {
+  const [, navigate] = useLocation();
   const pages = useJournal(book, undefined, filter);
   const { rows, list, end } = usePaging(pages);
   const name = of.split(":").at(-1)!;
+  const splits = rows.flatMap((row) =>
+    row.postings
+      .filter(
+        (p) =>
+          (p.account === of || p.account.startsWith(`${of}:`)) && hasTags(p.tags, filter.tags ?? [])
+      )
+      .map((p, i) => ({ row, split: p, key: `${row.id}:${i}` }))
+  );
   return (
     <section className="breakdown-transactions" aria-label={`Transactions under ${name}`}>
       <h3 className="small muted">Transactions under {name}</h3>
@@ -399,16 +500,44 @@ function BreakdownJournal({
           <p className="error small">{explain(pages.error)}</p>
         ) : !pages.data ? (
           <Loading />
-        ) : rows.length === 0 ? (
+        ) : splits.length === 0 && !pages.hasNextPage ? (
           <p className="muted small">None.</p>
         ) : (
-          <JournalList
-            book={book}
-            rows={rows}
-            here={here}
-            list={list}
-            label={`Transactions under ${name}`}
-          />
+          <ol className="ledger journal" aria-label={`Transactions under ${name}`} ref={list}>
+            {splits.map(({ row, split, key }) => (
+              <li key={key} data-row={row.id}>
+                <button
+                  type="button"
+                  className={`ledger-row${row.flag === "!" || split.flag === "!" ? " unconfirmed" : ""}`}
+                  onClick={() => navigate(withBack(`/books/${book}/transactions/${row.id}`, here))}
+                >
+                  <span className="ledger-date">{row.date}</span>
+                  <span className="ledger-what">
+                    <span className="ledger-payee">
+                      {row.payee ?? row.narration ?? "(no description)"}
+                      <TagChips tags={split.tags ?? []} />
+                    </span>
+                    <span className="ledger-account muted">
+                      {split.account === of ? name : split.account.slice(of.length + 1)}
+                      {split.memo && ` · ${split.memo}`}
+                      {split.outflow_of && ` · paid into ${shortName(split.outflow_of)}`}
+                      {row.flag === "!" && " · unconfirmed"}
+                    </span>
+                  </span>
+                  <span className="ledger-numbers">
+                    <span className="amount">
+                      {split.amount
+                        ? formatMoney(
+                            side === "income" ? negate(split.amount.number) : split.amount.number,
+                            split.amount.currency
+                          )
+                        : "?"}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
         )}
         <MoreBelow pages={pages} end={end} />
       </div>

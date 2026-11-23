@@ -9,6 +9,7 @@ const charts = () => import("@luminous-money/ledger-graphs-ui");
 const Spending = lazy(async () => ({ default: (await charts()).SpendingChart }));
 const CashFlow = lazy(async () => ({ default: (await charts()).CashFlowChart }));
 const Breakdown = lazy(async () => ({ default: (await charts()).BreakdownChart }));
+const BreakdownBars = lazy(async () => ({ default: (await charts()).BreakdownBarsChart }));
 const NetWorth = lazy(async () => ({ default: (await charts()).NetWorthChart }));
 
 const loading = (height: number | undefined, chart: ReactNode) => (
@@ -23,5 +24,7 @@ export const CashFlowChart = (props: ComponentProps<typeof Ui.CashFlowChart>) =>
   loading(props.height, <CashFlow {...props} />);
 export const BreakdownChart = (props: ComponentProps<typeof Ui.BreakdownChart>) =>
   loading(props.height, <Breakdown {...props} />);
+export const BreakdownBarsChart = (props: ComponentProps<typeof Ui.BreakdownBarsChart>) =>
+  loading(props.height, <BreakdownBars {...props} />);
 export const NetWorthChart = (props: ComponentProps<typeof Ui.NetWorthChart>) =>
   loading(props.height, <NetWorth {...props} />);

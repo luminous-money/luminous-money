@@ -476,6 +476,14 @@ def create_app(ledger: Ledger) -> FastAPI:
             bool | None,
             Query(description="Only those holding a file, a receipt say (true), or only those holding none (false)."),
         ] = None,
+        lens: Annotated[
+            Literal["outflows"] | None,
+            Query(
+                description="`outflows`: each one's splits as outflows read them, as reports do (Loans): what's paid "
+                "into an account that counts as spending is added as spending (`outflow_of`), and the expenses paid "
+                "out of one are masked. What filters them is as booked."
+            ),
+        ] = None,
     ) -> models.JournalPage:
         """Every transaction in the book (every account's), newest first, paged as an account's
         ledger is."""
@@ -493,6 +501,7 @@ def create_app(ledger: Ledger) -> FastAPI:
             accounts=account,
             budgeted=budgeted,
             attached=attached,
+            lens=lens,
         )
 
     @api.get("/books/{book_id}/tags")

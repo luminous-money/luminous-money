@@ -73,6 +73,9 @@ export type JournalFilter = {
   /** Only those holding a file, a receipt say (true), or none (false): HSA tracking's "No
    * receipt", with the `hsa-fsa-eligible` tag. */
   attached?: boolean;
+  /** "outflows": each one's splits as outflows read them, as Reports do (what's paid into an
+   * account that counts as spending added as spending, what's paid out of one masked). */
+  lens?: "outflows";
 };
 
 /** An API error with its status, so callers can tell a conflict (409) from a rejection (422),
@@ -242,7 +245,7 @@ export const api = {
   journal: (
     book_id: string,
     page: LedgerPageAt = {},
-    { reconciled, tags = [], q, accounts = [], budgeted, attached }: JournalFilter = {}
+    { reconciled, tags = [], q, accounts = [], budgeted, attached, lens }: JournalFilter = {}
   ): Promise<JournalPage> =>
     unwrap(
       ledger.GET("/api/ledger/v1/books/{book_id}/journal", {
@@ -257,6 +260,7 @@ export const api = {
             account: accounts.length ? accounts : undefined,
             budgeted,
             attached,
+            lens,
           },
         },
       })

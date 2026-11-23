@@ -879,6 +879,7 @@ class Ledger:
         accounts: list[str] | None = None,
         budgeted: bool | None = None,
         attached: bool | None = None,
+        lens: str | None = None,
     ) -> models.JournalPage:
         """Every transaction in the book, newest first, in keyset pages as an account's ledger
         has them (`cursor`: older than a row; `after`: just newer; `date`: from it back), read
@@ -887,7 +888,9 @@ class Ledger:
         has all of them (M17); with `search`, only those whose payee, narration or a split's memo has every word
         of it; with `accounts`, only those with a split in any of them or under one; with
         `budgeted`, only those counted in budgets (True) or kept out of them (False); with
-        `attached`, only those holding a file, a receipt say (True), or none (False)."""
+        `attached`, only those holding a file, a receipt say (True), or none (False). With `lens`
+        "outflows", each one's splits as outflows read them, as reports do (outflows.py): what
+        filters them and whether they're reconciled is as booked."""
         roots = self.reconciling_roots(self._header(book_id))
         filtered = None if reconciled is None else (reconciled, roots)
         search = (search or "").strip() or None
@@ -931,9 +934,32 @@ class Ledger:
             amount = models.Amount(number=p["amount"], currency=p["amount_currency"]) if p["amount"] is not None else None
             postings.setdefault(p["directive_id"], []).append(
                 models.CompactPosting(
-                    account=p["account"], amount=amount, reconciled=p["reconciled"], tags=split_tags(p["split_tags"])
+                    account=p["account"],
+                    amount=amount,
+                    reconciled=p["reconciled"],
+                    flag=p["posting_flag"],
+                    memo=p["memo"],
+                    tags=split_tags(p["split_tags"]),
                 )
             )
+        shown = postings
+        if lens == "outflows" and page:
+            read = self.outflows(
+                book_id,
+                [
+                    models.CompactTransaction(
+                        id=r["id"],
+                        date=datetime.date.fromisoformat(r["date"]),
+                        flag=r["flag"],
+                        payee=r["payee"],
+                        narration=r["narration"],
+                        opening=bool(r["opening"]),
+                        postings=postings.get(r["id"], []),
+                    )
+                    for r in page
+                ],
+            )
+            shown = {t.id: t.postings for t in read}
 
         def is_reconciled(mine: list[models.CompactPosting]) -> bool | None:
             reconciling = [p for p in mine if p.account.split(":")[0] in roots]
@@ -950,7 +976,7 @@ class Ledger:
                     budgeted=bool(r["budgeted"]),
                     tags=split_tags(r["tags"]),
                     funds=_funds(r["funds"]),
-                    postings=postings.get(r["id"], []),
+                    postings=shown.get(r["id"], []),
                     reconciled=is_reconciled(postings.get(r["id"], [])),
                     updated_at=r["updated_at"],
                 )

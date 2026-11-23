@@ -210,3 +210,28 @@ def test_through_the_api(book):
     assert [p["account"] for p in tax["postings"]] == ["Assets:Escrow:Mortgage"]
     plain = client.get(f"/api/ledger/v1/books/{BOOK}/transactions/compact?from=2026-10-01").json()
     assert len(next(t for t in plain if t["narration"] == "County tax bill, from escrow")["postings"]) == 2
+
+
+def test_the_journal_reads_each_transactions_splits_through_the_lens_when_asked(book):
+    count(book, "Liabilities:Loans:Mortgage", "Expenses:Housing:Mortgage-Principal")
+    count(book, "Assets:Escrow:Mortgage", "Expenses:Housing:Escrow")
+
+    def splits(**lens):
+        rows = book.journal(BOOK, accounts=["Expenses:Housing", "Liabilities:Loans", "Assets:Escrow"], **lens).rows
+        return {
+            r.payee or r.narration: [
+                (p.account, p.amount.number if p.amount else None, p.outflow_of) for p in r.postings
+            ]
+            for r in rows
+        }
+
+    lensed = splits(lens="outflows")
+    # The payment: what went into the loan and escrow counts as spending.
+    assert ("Expenses:Housing:Mortgage-Principal", "451.85", "Liabilities:Loans:Mortgage") in lensed["Mortgage payment"]
+    assert ("Expenses:Housing:Escrow", "450.00", "Assets:Escrow:Mortgage") in lensed["Mortgage payment"]
+    # The tax bill escrow paid isn't spending again: its split is gone.
+    assert not any(a.startswith("Expenses:") for a, _, _ in lensed["County tax bill, from escrow"])
+    # As booked, they're as they are; filtered and reconciled as booked either way.
+    booked = splits()
+    assert ("Expenses:Housing:Property-Tax", "2550.00", None) in booked["County tax bill, from escrow"]
+    assert set(lensed) == set(booked)

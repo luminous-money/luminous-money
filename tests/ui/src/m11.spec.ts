@@ -96,9 +96,15 @@ test("starred budgets are on home, in a card of their own; with none starred, th
     "$100.00 of $400.00"
   );
   await expect(card).toContainText("$300.00 left");
-  // A row opens its account, where its budget is.
+  // A row opens Reports, drilled into its account.
   await card.getByRole("link", { name: /^Groceries/ }).click();
-  await expect(page.getByRole("heading", { name: /^Groceries/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Reports" })).toBeVisible();
+  await expect(page).toHaveURL(/reports\?of=Expenses%3AFood%3AGroceries/);
+  const breakdown = page.getByRole("region", { name: "Breakdown" });
+  await expect(breakdown.getByRole("navigation", { name: "Drilled into" })).toContainText(
+    "Groceries"
+  );
+  await expect(breakdown.getByRole("list", { name: "Transactions under Groceries" })).toBeVisible();
 
   await page.goto(`/ui/books/${book}/budgets`);
   await star.click();

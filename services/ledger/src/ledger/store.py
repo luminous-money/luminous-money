@@ -792,7 +792,8 @@ class Store:
             args.append(through)
         order = "ASC" if newer_than is not None else "DESC"
         return self._conn.execute(
-            f"SELECT id, date, ordinal, flag, payee, narration, budgeted, updated_at, ({TAGS % 'directive'}) AS tags,"
+            f"SELECT id, date, ordinal, flag, payee, narration, budgeted, opening, updated_at,"
+            f" ({TAGS % 'directive'}) AS tags,"
             f" ({FUNDS % 'directive'}) AS funds"
             " FROM directive"
             f" WHERE {' AND '.join(where)} ORDER BY date {order}, ordinal {order} LIMIT ?",
@@ -801,10 +802,11 @@ class Store:
 
     def postings_of(self, directive_ids: list[str]) -> list[sqlite3.Row]:
         """The postings of these directives, in order: directive_id, account, amount, currency,
-        reconciled and tags (`split_tags`)."""
+        reconciled, flag (`posting_flag`), memo and tags (`split_tags`)."""
         marks = ",".join("?" * len(directive_ids))
         return self._conn.execute(
-            f"SELECT directive_id, account, amount, amount_currency, reconciled, ({SPLIT_TAGS % ('p', 'p')}) AS split_tags"
+            "SELECT directive_id, account, amount, amount_currency, reconciled, flag AS posting_flag, memo,"
+            f" ({SPLIT_TAGS % ('p', 'p')}) AS split_tags"
             f" FROM posting p WHERE directive_id IN ({marks}) ORDER BY directive_id, idx",
             directive_ids,
         ).fetchall()

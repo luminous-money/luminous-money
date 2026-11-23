@@ -2653,6 +2653,15 @@ a.budget-link {
   font-size: 1rem;
 }
 
+/* Pie or bars: beside Show and Level, only as wide as its two words. */
+.report-controls .chart-kind {
+  flex: 0 0 auto;
+}
+
+.report-controls .chart-kind button {
+  padding: 0.35rem 0.75rem;
+}
+
 .breadcrumb button.plain {
   min-height: 2.75rem;
 }

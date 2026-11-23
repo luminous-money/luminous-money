@@ -5,7 +5,8 @@
  *
  * - **Spent this month:** expenses under the highest-level expense budgets (or all of them
  *   without budgets) against those budgets per month, and a month simulated from the last 12.
- * - **Cash flow** (6 months), **breakdowns** (6-month averages, this month, or all time),
+ * - **Cash flow** (6 months), **breakdowns** (averages over the last 6, or 3 to 12, complete
+ *   months, this month, or all time; each with every month's amounts, for a bar a month),
  *   **largest transactions** (this month), **net worth** (24 month ends), and an account's
  *   **typical periods** (12 months for weeks and months, 5 years for years).
  * - **By tag** (M17): cash flow, breakdowns and the largest can count only the splits with every
@@ -152,6 +153,8 @@ export async function breakdownReport(
     slices?: number;
     /** "total": everything to date, summed (for a tag's trip or project). */
     window?: "average" | "month" | "total";
+    /** The window "average": the complete months it's over (6). */
+    months?: number;
     tags?: string[];
     lens?: Lens;
     /** Only what's counted in budgets. */
@@ -160,7 +163,8 @@ export async function breakdownReport(
 ) {
   const { tags = [], lens = "outflows", budgeted = false, ...rest } = options;
   const window = rest.window ?? "average";
-  const from = window === "total" ? undefined : monthsBefore(on, window === "average" ? 6 : 0);
+  const months = rest.months ?? 6;
+  const from = window === "total" ? undefined : monthsBefore(on, window === "average" ? months : 0);
   const [{ currency, roots }, postings] = await Promise.all([
     context(ledger, book),
     stream(ledger, book, from, tags, lens, budgeted),
@@ -168,7 +172,7 @@ export async function breakdownReport(
   const root = roots[rest.side];
   if (rest.of && !(rest.of === root || rest.of.startsWith(`${root}:`)))
     throw new ReportProblem(422, `${rest.of} isn't under ${root}`);
-  return breakdown({ postings, today: on, currency, roots, root, ...rest, window });
+  return breakdown({ postings, today: on, currency, roots, root, ...rest, window, months });
 }
 
 /** This month's largest expenses; with `tags`, the largest of all time, counting the splits with

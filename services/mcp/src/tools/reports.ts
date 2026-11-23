@@ -16,7 +16,10 @@ export const reportTools: Tool[] = [
       book: BOOK,
       kind: oneOf(KINDS, "Which report."),
       on: date("The day it's as of (default today)."),
-      months: int("cash_flow (1-24, default 6), net_worth (2-120, default 24): how many."),
+      months: int(
+        "cash_flow (1-24, default 6), net_worth (2-120, default 24): how many; breakdown " +
+          "(1-24, default 6): the complete months its average is over."
+      ),
       tag: strs("cash_flow, breakdown, largest: only splits with every one of these tags."),
       lens: oneOf(
         ["outflows", "expenses"],
@@ -27,7 +30,11 @@ export const reportTools: Tool[] = [
       of: str("breakdown: the accounts just under this one."),
       depth: int("breakdown: account levels (1-4)."),
       slices: int("breakdown: how many (2-12)."),
-      window: oneOf(["average", "month", "total"], "breakdown: 6-month average, this month, all."),
+      window: oneOf(
+        ["average", "month", "total"],
+        "breakdown: the average over `months` complete months, this month, or all; each with " +
+          "every month's amounts (byMonth)."
+      ),
       limit: int("largest: how many (1-50)."),
       account: { ...ACCOUNT, description: "typical: the expense or income account." },
     },

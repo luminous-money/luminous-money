@@ -478,6 +478,7 @@ export const useJournal = (book: string, date?: string, filter: JournalFilter = 
       filter.accounts ?? [],
       filter.budgeted ?? null,
       filter.attached ?? null,
+      filter.lens ?? null,
     ],
     (at) => api.journal(book, at, filter),
     date,

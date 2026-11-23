@@ -123,6 +123,49 @@ test("Reports break spending down, and drill into a category", async ({ page }) 
   );
 });
 
+test("the breakdown covers 3 to 12 months, as a donut of the average or a bar a month", async ({
+  page,
+}) => {
+  const { book } = await withHistory(page);
+  await page.goto(`/ui/books/${book}/reports`);
+
+  const breakdown = page.getByRole("region", { name: "Breakdown" });
+  const show = breakdown.getByLabel("Show");
+  await expect(show).toHaveValue("6");
+  await expect(show.getByRole("option")).toHaveText([
+    "This month",
+    "3 months",
+    "6 months",
+    "9 months",
+    "12 months",
+  ]);
+  const categories = breakdown.getByRole("list", { name: "Categories" });
+  await show.selectOption("12");
+  await expect(categories).toContainText("$450"); // six months' rent, over twelve
+  await show.selectOption("3");
+  await expect(categories).toContainText("$900");
+  await expect(breakdown.getByRole("img", { name: /a month, on average/ })).toBeVisible();
+
+  // Bars: each month as it was, and the list the months summed.
+  const chart = breakdown.getByRole("radiogroup", { name: "Chart" });
+  await chart.getByRole("radio", { name: "Bars" }).click();
+  await expect(page).toHaveURL(/period=3.*chart=bars/);
+  await expect(breakdown).toContainText("$3,150 over the last 3 months");
+  await expect(categories).toContainText("$2,700");
+  await expect(categories).toContainText("$450");
+  await expect(breakdown.getByRole("img", { name: /^By month: .*\$1,050/ })).toBeVisible();
+
+  // Drilling in keeps the bars and the months; this month is one bar.
+  await categories.getByRole("button", { name: /Food/ }).click();
+  await expect(breakdown.getByRole("navigation", { name: "Drilled into" })).toContainText("Food");
+  await expect(page).toHaveURL(/period=3.*chart=bars/);
+  await show.selectOption("month");
+  await expect(breakdown).toContainText("$42 this month so far");
+  await chart.getByRole("radio", { name: "Pie" }).click();
+  await expect(page).not.toHaveURL(/chart=bars/);
+  await expect(breakdown.getByRole("img", { name: /\$42 this month/ })).toBeVisible();
+});
+
 test("the breakdown lists every transaction under where it is, and keeps its place", async ({
   page,
 }) => {
@@ -163,6 +206,46 @@ test("the breakdown lists every transaction under where it is, and keeps its pla
   const groceries = breakdown.getByRole("list", { name: "Transactions under Groceries" });
   await expect(groceries).toContainText("Corner Grocer");
   await expect(page).toHaveURL(/of=Expenses%3AFood%3AGroceries/);
+});
+
+test("the breakdown's transactions are their splits under where it is, not their totals", async ({
+  page,
+}) => {
+  const { book, session, account } = await withHistory(page);
+  await session.ledger.POST("/api/ledger/v1/books/{book_id}/transactions", {
+    params: { path: { book_id: book } },
+    body: {
+      date: today(),
+      flag: "*",
+      payee: "Megamart",
+      narration: "",
+      postings: [
+        { account, units: { number: "-100.00", currency: "USD" } },
+        { account: GROCERIES, units: { number: "30.00", currency: "USD" }, meta: { memo: "Oats" } },
+        { account: RENT, units: { number: "70.00", currency: "USD" } },
+      ],
+    },
+  });
+  await page.goto(`/ui/books/${book}/reports?of=Expenses%3AFood`);
+  const food = page
+    .getByRole("region", { name: "Breakdown" })
+    .getByRole("list", { name: "Transactions under Food" });
+  const megamart = food.getByRole("listitem").filter({ hasText: "Megamart" });
+  await expect(megamart).toHaveCount(1);
+  await expect(megamart).toContainText("Groceries · Oats");
+  await expect(megamart).toContainText("$30.00");
+  await expect(megamart).not.toContainText("$100.00");
+
+  // At the top, each of its splits is a row of its own.
+  await page.goto(`/ui/books/${book}/reports`);
+  const all = page
+    .getByRole("region", { name: "Breakdown" })
+    .getByRole("list", { name: "Transactions under Expenses" })
+    .getByRole("listitem")
+    .filter({ hasText: "Megamart" });
+  await expect(all).toHaveCount(2);
+  await expect(all.filter({ hasText: "Housing:Rent" })).toContainText("$70.00");
+  await expect(all.filter({ hasText: "Food:Groceries" })).toContainText("$30.00");
 });
 
 test("what counts as spending shows on its expense account, and in the breakdown's transactions", async ({
@@ -212,6 +295,11 @@ test("what counts as spending shows on its expense account, and in the breakdown
     .getByRole("region", { name: "Breakdown" })
     .getByRole("list", { name: "Transactions under Housing" });
   await expect(housing).toContainText("Lender");
+  await expect(
+    housing.getByRole("button", {
+      name: /Lender.*Mortgage · paid into Loans:Mortgage.*\$1,200\.00/,
+    })
+  ).toBeVisible();
   await expect(housing).toContainText("Landlord");
   await page
     .getByRole("radiogroup", { name: "Spending as" })

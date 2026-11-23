@@ -831,7 +831,9 @@ bring in (a **goal**, for income, assets such as savings, and liabilities being 
   fund is. The card (under "Spent this month", above recent transactions: Kael, 2026-11-17;
   it was between the accounts and Funds, under their short rule) lists starred
   budgets in the order starred, each over its own period ("$312 of $400 this month", the bar,
-  what's left and the days), opening its account (a node's editor), with All budgets ›. A star
+  what's left and the days), opening Reports drilled into its account (Kael, 2026-11-23: the
+  breakdown and its splits are where "where did it go" is answered; it opened the account, a
+  node's editor, which an asset's budget still does), with All budgets ›. A star
   whose budget has ended, or whose account is archived, shows nothing; with none to show,
   there's no card. Budgets set through the API start unstarred: nothing says whose they'd be.
   "Spent this month" above stays the sum over the highest-level expense budgets.
@@ -878,17 +880,31 @@ same money in through another's, a day or so later. Both would sit in review, un
   percentile of 2,000 simulated months, each day drawn from the same day of one of the last 12
   (so rent on the 1st stays on the 1st), exclusions included.
 - **Reports page:** cash flow (6 months, this one so far), a breakdown of expenses or income
-  (6-month averages or this month, at a depth, 6 slices and Other, drilling in), this month's
+  (this month, or the last 3, 6, 9 or 12 complete months, at a depth, 6 slices and Other,
+  drilling in), this month's
   largest expenses, and net worth (24 month ends backed out from today's balances, holdings at
   each month end's price; what has no price is named, not counted).
-- **The breakdown's transactions** (Kael, 2026-11-14): under the donut, a small window of its own
-  lists every transaction under what's broken down (the root, or the account drilled into, and
-  those under it), the journal as Transactions lists it: newest first, paged as it scrolls,
-  the same rows. It follows the tag filter, and read as outflows it also lists what's paid into
-  an account that counts as spending there (Rent and mortgage lists the mortgage's payments).
-  It isn't limited to the donut's window (this month, the 6-month average): it's the list of
-  everything there, as an account's ledger is. Where the breakdown is (`?side=`, `?of=`) is in
-  the address, so coming back from one of its transactions finds it where it was.
+- **The breakdown as a donut or a bar a month** (Kael, 2026-11-23): Show is This month, 3, 6, 9
+  or 12 months (All time too, with tags), and Pie or Bars beside it. The donut is a month's
+  average over the complete months (this month as itself); the bars are each of those months as
+  it was, stacked in the donut's colors with Other on top, and the list under them is the months
+  summed, so nothing in the bars reads as an average and Show says no "average". One dataset
+  draws both: ledger-graphs' `breakdown` has each month's amounts beside its slices (`byMonth`,
+  0.1.3) and its `BreakdownBarsChart` draws them, so the slices and their colors are the same in
+  both and the list is the legend. Where the breakdown is (`?side=`, `?of=`, `?period=`,
+  `?chart=bars`) is in the address, so coming back from one of its transactions finds it where
+  it was; a change of tags goes back to the default period (All time with tags, else 6 months).
+- **The breakdown's transactions** (Kael, 2026-11-14): under the chart, a small window of its own
+  lists everything under what's broken down (the root, or the account drilled into, and those
+  under it), from the journal: newest first, paged as it scrolls. **Each row is a split, not a
+  transaction** (Kael, 2026-11-23): its account under what's drilled into, its memo, its own
+  amount (income as earned, positive), so a receipt's groceries read $30, not the receipt's
+  $100, and a receipt split under two categories is two rows. Only splits with every tag
+  chosen count. Read as outflows, the journal is lensed as the report is (its `lens=outflows`,
+  the ledger's outflows lens over each page): Rent and mortgage shows the mortgage payment's
+  share that counts there ("paid into Loans:Mortgage"), and the tax bill escrow paid isn't
+  there again. It isn't limited to the chart's window: it's the list of everything there, as
+  an account's ledger is.
 - **What's kept out of budgets can be left out** (Kael, 2026-11-14): Reports count it by default
   (`budget: FALSE`, a once-in-decades roof, is still spending), which made a category's average
   look wrong beside its budget. "Leave out what's excluded from budgets" (`?budgeted=only`, with

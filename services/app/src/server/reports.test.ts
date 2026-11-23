@@ -106,6 +106,44 @@ describe("reports", () => {
     expect(flow.totals.expenses).toBe(25);
   });
 
+  it("average the breakdown over the complete months asked for, with each month's amounts", async () => {
+    spend("2026-04-10", "Expenses:Food", "300.00"); // seven months back: only in 9 and 12
+    spend("2026-07-10", "Expenses:Food", "90.00");
+    spend("2026-09-10", "Expenses:Home", "60.00");
+    spend("2026-10-03", "Expenses:Food", "40.00"); // this month: not averaged
+
+    const three = await breakdownReport(ledger, "b", "2026-10-15", {
+      side: "expenses",
+      months: 3,
+    });
+    expect(three.months).toBe(3);
+    expect(three.slices.map((s) => [s.label, s.amount])).toEqual([
+      ["Food", 30],
+      ["Home", 20],
+    ]);
+    expect(three.byMonth).toEqual([
+      { month: "2026-07", partial: false, amounts: [90, 0], other: 0, total: 90 },
+      { month: "2026-08", partial: false, amounts: [0, 0], other: 0, total: 0 },
+      { month: "2026-09", partial: false, amounts: [0, 60], other: 0, total: 60 },
+    ]);
+    const nine = await breakdownReport(ledger, "b", "2026-10-15", {
+      side: "expenses",
+      months: 9,
+    });
+    expect(nine.total).toBe(50); // (300 + 90 + 60) / 9
+    expect(nine.byMonth.map((m) => m.month)).toEqual([
+      "2026-01",
+      "2026-02",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09",
+    ]);
+  });
+
   it("count what's kept out of budgets unless asked to leave it out", async () => {
     spend("2026-10-02", "Expenses:Home", "9000.00", { budget: false }); // a new roof
     spend("2026-10-03", "Expenses:Food", "40.00");
