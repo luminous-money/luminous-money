@@ -39,3 +39,8 @@ node scripts/stageshow/film.mjs "http://127.0.0.1:5190/reel.html?scene=review&ba
 ```
 
 `REHEARSAL.md` says what was checked and what wasn't.
+
+**Keeping it current:** the `update-marketing` skill (`.agents/skills/update-marketing/SKILL.md`)
+has the whole routine: where every asset is, what changed since each was published
+(`./scripts/since-published.sh`), regenerating and publishing, the voice, and the words that
+don't change.

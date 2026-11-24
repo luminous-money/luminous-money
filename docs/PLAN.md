@@ -472,3 +472,10 @@ Smaller improvements picked up between milestones. Those still open are in
       gone), "Jun 2026 – Nov 2026" or "Nov 2026"; a tap on a bar narrows to its month, and at one
       month opens the category tapped; Expenses or Income, then the months beside Pie or Bars,
       then Level across; tags average like the rest. ledger-graphs is 1.0.0.
+- [x] **The site and video brought up to date, and a skill for it** (Kael, 2026-11-24;
+      design.md's "The site and its demo video"): a tenth scene, "Your books, in Claude" (the MCP
+      server), and the copy for everything since 2026-11-15 (HSA and FSA tagging, shared
+      connections, the breakdown's months, bulk tagging, starred budgets); the video recorded
+      again (95 seconds, the current intro card and loans title). How to do it next time is
+      `.agents/skills/update-marketing/SKILL.md`, with `site/scripts/since-published.sh`
+      saying what changed since the page and the video were each published.

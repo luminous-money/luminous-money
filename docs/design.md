@@ -2135,6 +2135,17 @@ on GitHub Pages: https://luminous-money.github.io/luminous-money/. All of it is 
   every re-recording; `publish.sh` takes the published ones when none were recorded locally.
 - **A relative base** (`base: './'`), so the build works under Pages' `/luminous-money/` and
   anywhere else.
+- **Kept current by a skill** (Kael, 2026-11-24): `.agents/skills/update-marketing/SKILL.md` lists
+  every asset (the page, the video, the poster that is also the app's link preview, the README,
+  the repository's description, the app's pitch), how to find what changed since each was
+  published (`site/scripts/since-published.sh`, from the `gh-pages` commits' "The site, from
+  <commit>"), how to regenerate and publish, the voice, and the words below that don't change.
+  The page and the video are published separately, so each has its own baseline.
+- **The MCP server is its own scene** ("Your books, in Claude", 2026-11-24), not a point under
+  Bring your own AI: that one is the app's AI on your API key, this one is Claude (your own
+  subscription) working in the books as you. It's claude.ai in a browser on the wide design and
+  the phone on the compact one, Claude's look kept neutral (no logo of theirs), our blue only on
+  our tools; its figures are the reports scene's October.
 - **The pitch, in Kael's words (2026-11-16):** "Household accounting for modern life." (the
   second line keeps the white-to-cyan glow), then "Double-entry accounting to manage your
   assets, expenses, goals, budgets and loans on mobile or desktop. Open source and

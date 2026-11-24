@@ -18,8 +18,10 @@ books, each independent: switching books is like switching profiles.
 ## What it does
 
 - **Books:** any number per server, each independent, each shareable with other people who can
-  view, edit or manage it. Every book exports to a Beancount file, and a new book can start from
-  one.
+  view, edit or manage it. Bank connections, AI keys and Amazon sign-ins are each person's,
+  shared with the books they choose (a connection's accounts all, or some), so one connection
+  serves a household book and a personal one. Every book exports to a Beancount file, and a new
+  book can start from one.
 - **Getting transactions in:**
   - CSV imports that learn each bank's file format
   - bank feeds through [SimpleFIN Bridge](https://bridge.simplefin.org/), synced every
@@ -27,13 +29,14 @@ books, each independent: switching books is like switching profiles.
     dividends and transfers of shares
   - receipts photographed or uploaded and read by the AI, itemized into splits
   - Amazon orders, each charge itemized into the bank's or card's transaction (the server signs
-    in to Amazon for you, its credentials sealed)
+    in to Amazon for you, its credentials sealed); items Amazon marks HSA or FSA eligible are
+    tagged, with the order's invoice attached
   - scheduled transactions, staged as they come due
   - all of it matched against what's already in the books, so nothing comes in twice, and
     transfers between your own accounts paired into one
 - **Review:** a mobile-first queue to confirm, categorize (swipe right to confirm, left to skip),
   tag and assign to funds, with search and filters. Bulk actions in Select mode work on any
-  ledger as well.
+  ledger as well, in one go however many are selected.
 - **Categorization:** your rules, then what each payee and each item went to before, then
   optional external categorizers ([their API](docs/categorizer-api.md)), then the book's AI
   (Claude, with your own API key), split by split. What the AI costs is shown as it goes.
@@ -48,10 +51,13 @@ books, each independent: switching books is like switching profiles.
   - funds for what money is *for*, a ledger beside the accounts, holding dollars or shares
   - loans managed from their amortization table, with escrow and its bills, and their payments
     counted as spending if you like
-  - tags on splits (a receipt's one item, say), counted in reports by what's tagged
+  - tags on splits (a receipt's one item, say), counted in reports by what's tagged, and
+    proposed by your history and the AI; HSA and FSA eligible spending is tagged as it comes in,
+    and listed when it has no receipt yet
   - reconciliation against a statement, and bank-fed accounts that reconcile themselves
 - **Reports:** this month's spending against the budget and a projection, cash flow, breakdowns
-  by account, the largest transactions, net worth, and what an account typically comes to.
+  by account over any range of months (as a donut, or a bar a month), down to each split, the
+  largest transactions, net worth, and what an account typically comes to.
 - **Claude, or any AI assistant:** an MCP server, so Claude (claude.ai, its apps, Claude Code)
   can find, categorize, enter and report on your books as you, after you allow it.
 - **Running it:** one command installs, upgrades (backing up first), backs up and restores

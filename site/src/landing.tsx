@@ -93,7 +93,8 @@ function Landing() {
               <div className="lp-step__title">Connect what you like</div>
               <div className="lp-step__text">
                 A SimpleFIN Bridge token for bank feeds, an Anthropic API key for the AI, your Amazon account for
-                itemized orders. Each is optional, and stored sealed.
+                itemized orders. Each is optional, stored sealed, and yours to share with the books you choose. For
+                Claude, <a href={`${REPO}/blob/main/docs/deploying.md#connecting-claude-the-mcp-server`}>add your server as a connector</a>.
               </div>
             </li>
             <li>
@@ -162,12 +163,12 @@ function CodeBlock({ code }: { code: string }) {
 
 const MORE: [string, string][] = [
   ['Real double-entry', 'Beancount is the engine. Every book exports to a Beancount file, and a new book can start from one.'],
-  ['Many books, shared', 'Any number of books per server, each independent, each shareable to view, edit or manage.'],
+  ['Many books, shared', 'Any number of books per server, each shareable to view, edit or manage. One bank connection serves the household book and a personal one.'],
   ['Rules and history', 'Your rules, then what each payee went to before, then the AI: categorized split by split.'],
   ['Investments', 'Holdings with lots, cost basis and gains, prices every morning, and revalued assets like a house.'],
   ['Scheduled transactions', 'Recurring bills staged as they come due, and matched when the bank sees them.'],
   ['Reconciliation', "Agree an account with its statement; bank-fed accounts reconcile themselves."],
-  ['Tags', "Tag a receipt's one item, and reports count only what's tagged."],
+  ['Tags, and HSA spending', "Tag a receipt's one item, and reports count only what's tagged. HSA and FSA purchases tag themselves, and say when they need a receipt."],
   ['Migrate in', "From GnuCash with its history, or a chart of accounts from a CSV, with rules learned on the way."],
 ]
 

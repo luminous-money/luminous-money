@@ -51,9 +51,9 @@ export function money(n: number, cents = true) {
 
 /** The app on a phone's bare screen, for compact designs: in a phone's column, the app is the
  * screen. 326 wide, a gutter from the tile's sides, running off its bottom. */
-export function PhoneScreen({ className, children }: { className?: string; children: ReactNode }) {
+export function PhoneScreen({ className, wallpaper = '#f3f4f6', children }: { className?: string; wallpaper?: string; children: ReactNode }) {
   return (
-    <Phone frame="bare" status width={326} wallpaper="#f3f4f6" className={`lm-bare${className ? ` ${className}` : ''}`}>
+    <Phone frame="bare" status width={326} wallpaper={wallpaper} className={`lm-bare${className ? ` ${className}` : ''}`}>
       {children}
     </Phone>
   )

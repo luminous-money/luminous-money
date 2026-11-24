@@ -4,7 +4,56 @@ Where We Left Off
 _Updated 2026-11-24._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-24): shared connections, and the headlines' copy, `v1.9.0`
+## Latest (2026-11-24, later): the site and video brought up to date, and the `update-marketing` skill
+
+Kael: the product has changed a lot since the site and the video were published, so (1) write a
+skill, `.agents/skills/update-marketing`, saying where the marketing assets are, how to find what
+changed since they were published, how to regenerate them, and the voice and the words that
+don't change; and (2) use it to bring them up to date. No app code changed, so there's no
+release.
+
+- **The skill** (`.agents/skills/update-marketing/SKILL.md`) covers every asset: the page, the
+  scenes and their copy, the video, the poster (which is also the **app's** `og:image`), the
+  app's pitch, the README and the repository's description. It covers finding what changed with
+  **`site/scripts/since-published.sh`** (new: the page's and the video's baselines from the
+  `gh-pages` commits' "The site, from <commit>", then main's commits since); rehearsing, recording,
+  the poster and publishing; the voice; and Kael's fixed words. It's in `.agents/skills/`, as
+  asked, so Claude Code doesn't pick it up by itself (that needs `.claude/skills/`). Ask for it
+  by path. site/README.md and design.md point to it.
+- **What had changed** (the baselines: the page from `392a6c9`, the video from `13bc37a`, recorded
+  2026-11-14 and never since, so it still had the old intro card and loans title) and where each
+  change went:
+  - **The MCP server** got a new scene, **"Your books, in Claude"** (`site/src/scenes/claude.tsx`,
+    tenth, after Bring your own AI). In claude.ai, "How did we do on restaurants in October?" is
+    answered through `read_budget_status` and `read_report`; then "Tag that one #date-night" goes
+    through `write_edit_transaction`. Its figures are the reports scene's October. It also went
+    in the meta description.
+  - **HSA tracking** went in Amazon's points and the Tags tile ("Tags, and HSA spending").
+  - **Shared connections** went in SimpleFIN's points (in place of the CSV point, which its line
+    already has), the "Many books, shared" tile, and Get started's third step (which also links
+    to "Connecting Claude").
+  - **The breakdown's months, pie or bars** went in Reports' points. **Bulk tagging** went in
+    Review's. **Starred budgets** went in Funds'.
+  - Fixes, security headers, the laptop's daily jobs and the icon: nothing to change.
+  - **The README's "What it does":** shared connections, HSA and FSA, the breakdown's months, bulk
+    actions in one go.
+- **Checked:** the new scene passes the rehearsal gate wide and at 390. Before passing, it had an
+  empty band at the start, a hard edge on filler leaving, and the kit's titled window failed
+  `uneven inset`, so it's claude.ai in the browser frame now (`site/REHEARSAL.md`). The whole
+  video was checked as a contact sheet every 3 s. The built page has ten features, and the
+  Claude feature plays in place at 1440 and 390. A full-page capture leaves every scene blank,
+  so viewport shots are used there. `npx tsc --noEmit` passes in `site/`. `pnpm test` was not
+  run: nothing in the workspace changed.
+- **The video:** re-recorded in full, 95.4 s (was 82.7), 1920 × 1080, 5.8 MB, with the current
+  intro card and loans title. **The poster** is the same frame as before (24 s, Receipts,
+  itemized, at its payoff), taken from the new video: it now shows ten progress dots.
+
+**Published:** main pushed first, then `site/scripts/publish.sh` (page, video and poster). Checked
+live afterwards.
+**Next:** unchanged: Kael creates Personal and shares the connection with it, reviews shared
+connections' nine calls, then HSA tracking's 7 calls (M99); docs/PLAN.md's Ahead.
+
+## Before that (2026-11-24): shared connections, and the headlines' copy, `v1.9.0`
 
 Kael is starting a "Personal" book on the household's SimpleFIN connection, and asked for
 connections to be people's, shared with each book they're in, "even when [one deployment serving

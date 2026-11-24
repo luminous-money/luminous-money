@@ -4,6 +4,7 @@ import SimplefinScene from './simplefin'
 import ReceiptsScene from './receipts'
 import AmazonScene from './amazon'
 import AiScene from './ai'
+import ClaudeScene from './claude'
 import ReportsScene from './reports'
 import FundsScene from './funds'
 import LoansScene from './loans'
@@ -17,7 +18,7 @@ export const SCENES: Scene[] = [
     line: 'Review what came in with a swipe: right to confirm, left to skip. Every page is built for a phone first.',
     points: [
       "Swipe right to confirm, left to skip",
-      "Select mode for bulk actions on any list",
+      "Select mode: tag, categorize or confirm dozens at once",
       "Search and filters everywhere",
     ],
     Component: ReviewScene,
@@ -28,8 +29,8 @@ export const SCENES: Scene[] = [
     line: 'Bring your own SimpleFIN connection and banks, cards and brokerages sync every morning. Or import CSVs and skip it.',
     points: [
       "Banks, cards and brokerages through SimpleFIN Bridge",
+      "One connection shared across books, account by account",
       "Matched to what's in the books, so nothing comes in twice",
-      "CSV imports that learn each bank's format",
     ],
     Component: SimplefinScene,
   },
@@ -51,7 +52,7 @@ export const SCENES: Scene[] = [
     points: [
       "The server signs in for you, its credentials sealed",
       "Each charge itemized into the card's own transaction",
-      "Items categorized from what they were before",
+      "HSA and FSA eligible items tagged, the invoice attached",
     ],
     Component: AmazonScene,
   },
@@ -67,13 +68,24 @@ export const SCENES: Scene[] = [
     Component: AiScene,
   },
   {
+    id: 'claude',
+    title: 'Your books, in Claude',
+    line: 'Connect Claude and ask about your money in plain words, or have it categorize, tag and enter for you. It works as you, once you allow it.',
+    points: [
+      "Claude on the web, its apps and Claude Code",
+      "Finds, categorizes, enters and reports",
+      "Allowed once; disconnect it any time",
+    ],
+    Component: ClaudeScene,
+  },
+  {
     id: 'reports',
     title: 'Follow the money down',
     line: "Cash flow, spending against budget, net worth. Open any line to see what it's made of, all the way to the transactions.",
     points: [
       "This month's spending against the budget, with a projection",
-      "Cash flow, net worth and the largest transactions",
-      "Breakdowns by account, down to each transaction",
+      "Breakdowns over any range of months, as a donut or a bar a month",
+      "Down to each transaction, split by split",
     ],
     Component: ReportsScene,
   },
@@ -82,7 +94,7 @@ export const SCENES: Scene[] = [
     title: 'Budgets, and money with a job',
     line: 'Budget any account for any period. Funds say what your money is for, and how close each goal is.',
     points: [
-      "Budgets on any account, for any period",
+      "Budgets on any account, for any period, starred onto home",
       "Funds hold dollars or shares",
       "Goals, and how close each one is",
     ],

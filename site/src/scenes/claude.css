@@ -1,0 +1,129 @@
+/* Claude's chat: a browser window pinned a gutter from the top and both sides, off the bottom just under
+   the composer (wide); the phone's screen (compact). The thread sits on the composer, as chat apps
+   anchor it, and older turns go up out of the window. Claude's look stays neutral: our blue only
+   on what's Luminous Money's (its tools). */
+
+.lm-claude {
+  .cl-win {
+    position: absolute;
+    top: 40px;
+    left: 40px;
+    width: 560px;
+    height: 600px;
+  }
+  .cl-win .ss-window__body { background: #faf9f7; }
+
+  .cl-chat {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    height: 100%;
+    /* The window runs 40px off the stage: the composer ends 28px above its edge */
+    padding: 16px 24px 68px;
+    background: #faf9f7;
+    font-family: var(--ss-font);
+  }
+
+  .cl-thread {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 0;
+    padding-bottom: 18px;
+    overflow: hidden;
+    /* What goes up out of the window fades as it goes */
+    mask-image: linear-gradient(to bottom, transparent 0, #000 56px);
+  }
+  .cl-thread > * + * { margin-top: 18px; }
+
+  .cl-past { display: flex; flex-direction: column; gap: 22px; flex: none; }
+  .cl-past__turn { display: flex; flex-direction: column; gap: 9px; }
+  .cl-past__q { align-self: flex-end; margin-bottom: 4px; }
+
+  .cl-turn { display: flex; flex-direction: column; }
+
+  .cl-q {
+    align-self: flex-end;
+    max-width: 78%;
+    padding: 9px 14px;
+    border-radius: 16px;
+    background: #ece9e4;
+    color: var(--lm-ink);
+    font-size: 15px;
+    line-height: 1.4;
+    text-wrap: pretty;
+  }
+
+  .cl-tools { display: flex; flex-direction: column; margin-top: 12px; }
+  .cl-tools > * + * { margin-top: 6px; }
+  .cl-tool {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+    max-width: 100%;
+    height: 34px;
+    /* The tick sits 3px inside its circle: 7px past it reads as the logo's 10 */
+    padding: 0 7px 0 10px;
+    border: 1px solid var(--lm-line);
+    border-radius: 10px;
+    background: var(--lm-card);
+    font-size: 13px;
+  }
+  .cl-tool svg:first-child { flex: none; }
+  .cl-tool__by { color: var(--lm-muted); font-weight: 600; white-space: nowrap; }
+  .cl-tool__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--lm-ink);
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 12.5px;
+  }
+  .cl-tool__state {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    flex: none;
+    border-radius: 50%;
+    color: var(--lm-muted);
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+  .cl-tool[data-done] .cl-tool__state { background: var(--lm-good-soft); color: var(--lm-good); }
+
+  .cl-a {
+    display: block;
+    padding-top: 12px;
+    color: var(--lm-ink);
+    font-size: 15px;
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+  /* A tag, as the app shows one */
+  .cl-a .ss-stream__w[data-mark] { background-color: var(--lm-accent-soft); color: var(--lm-accent); font-weight: 600; }
+
+  .cl-composer .ss-field__box { background: var(--lm-card); border-radius: 14px; }
+
+  /* Running: three dots in the state's place */
+  .cl-dots { display: inline-flex; gap: 2px; }
+  .cl-dots i {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: cl-dot 900ms ease-in-out infinite;
+  }
+  .cl-dots i:nth-child(2) { animation-delay: 150ms; }
+  .cl-dots i:nth-child(3) { animation-delay: 300ms; }
+
+  /* Compact: the phone's screen, the chat to the stage's foot (the phone runs past it) */
+  .cl-phone .cl-chat { height: 541px; margin: 0 -8px; padding: 8px 16px 34px; background: none; }
+  .cl-phone .cl-q { max-width: 86%; }
+  .cl-phone .cl-tool__by { display: none; }
+}
+
+@keyframes cl-dot {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
