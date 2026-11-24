@@ -36,6 +36,9 @@ donut's "per month", the layout, partial-month averaging, and no special case fo
   to a date" timed out once, in a run that also had a test of mine to fix, and passed on the
   rerun).
 
+**Released** as `v1.8.0` (the workflow and CI green; all seven images read anonymously from
+ghcr.io). **Emmer upgraded over SSH** to 1.8.0, every service healthy (its backup is
+`backups/luminous-money-20261124T013807Z-1.7.0.tar.gz`).
 **Next:** unchanged: Kael reviews HSA tracking's 7 calls (M99); then docs/PLAN.md's Ahead.
 
 ## Before that (2026-11-23): the breakdown over 3 to 12 months, as a donut or bars; its splits; budgets open it, `v1.7.0`
