@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { AppDb } from "./db.js";
 import { bankNotifications, needsFund, notifications } from "./notifications.js";
@@ -174,8 +174,15 @@ describe("a bank feed's problems", () => {
   });
 
   it("say a new account turned up under all its accounts, until it's linked", () => {
+    // Each step a second after the last: stamps are to the millisecond, and a fast machine
+    // makes a share and an account in the same one.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-24T12:00:00Z"));
+    const tick = () => vi.setSystemTime(Date.now() + 1000);
+    onTestFinished(() => void vi.useRealTimers());
     const { store, connection } = linked();
     const shared = (all: boolean) => {
+      tick();
       const share = store.share(connection.id, "b");
       store.putShare(
         connection.id,
@@ -183,6 +190,7 @@ describe("a bank feed's problems", () => {
         { all, accounts: ["plan", "chk"] },
         share?.updated_at ?? null
       );
+      tick();
     };
     shared(true);
     store.saveFetch(connection.id, [account("new", "Fake Credit Union")]);
