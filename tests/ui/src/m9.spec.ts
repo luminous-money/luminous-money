@@ -46,10 +46,17 @@ async function bank() {
   return setup_token!;
 }
 
-async function connect(page: Page, book: string) {
+async function connect(page: Page, book: string, setupToken?: string) {
   await page.goto(`/ui/books/${book}/connections`);
-  await page.getByRole("textbox", { name: "Setup token" }).fill(await bank());
+  await page.getByRole("textbox", { name: "Setup token" }).fill(setupToken ?? (await bank()));
   await page.getByRole("button", { name: "Connect", exact: true }).click();
+  // Connecting asks what this book sees, all of it to start with.
+  const share = page.getByRole("form", { name: "Shared with this book" });
+  await expect(share).toContainText("Which of its accounts should this book see?");
+  await expect(
+    share.getByRole("radio", { name: "All its accounts, including new ones" })
+  ).toBeChecked();
+  await share.getByRole("button", { name: "Share", exact: true }).click();
   await expect(page.getByRole("region", { name: /Connection to/ })).toContainText(
     "Everyday Checking"
   );
@@ -151,6 +158,11 @@ test("a bank feed's problem is its connection's, unless it names an account; the
   const connection = (await (await post("/simplefin/connections", { setup_token })).json()) as {
     id: string;
   };
+  await app(`/books/${book.id}/simplefin/connections/${connection.id}/share`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ all: true, accounts: [], updated_at: null }),
+  });
   for (const [account_id, account] of [
     ["chk", "Assets:Bank:Checking"],
     ["plan", "Assets:College:Plan"],
@@ -215,4 +227,47 @@ test("a bank feed's problem is its connection's, unless it names an account; the
   await expect(
     page.getByRole("listitem").filter({ hasText: "Fake 529 Plan wants you to log in again" })
   ).toBeVisible();
+});
+
+test("a connection shares only the accounts chosen with the book, and can be changed", async ({
+  page,
+}) => {
+  const { book } = await setUpUser(page);
+  const { user, setup_token } = await fake("/control/users", "POST");
+  for (const [id, name, institution] of [
+    ["chk", "Everyday Checking", "Fake Bank"],
+    ["card", "Personal Card", "Fake Card Co"],
+  ])
+    await fake(`/control/users/${user}/accounts/${id}`, "PUT", {
+      name,
+      institution,
+      balance: "1.00",
+    });
+  await page.goto(`/ui/books/${book.id}/connections`);
+  await page.getByRole("textbox", { name: "Setup token" }).fill(setup_token!);
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+
+  const connection = page.getByRole("region", { name: /Connection to/ });
+  const share = connection.getByRole("form", { name: "Shared with this book" });
+  await share.getByRole("radio", { name: "Only these:" }).check();
+  await share.getByRole("checkbox", { name: /Personal Card/ }).uncheck();
+  await share.getByRole("button", { name: "Share", exact: true }).click();
+  await expect(connection).toContainText("Shared with this book: 1 of its 2 accounts.");
+  await expect(connection.getByRole("list", { name: "Bank accounts" })).toHaveCount(1);
+  await expect(connection).toContainText("Everyday Checking");
+  await expect(connection.getByText("Personal Card")).toHaveCount(0);
+
+  // Changed to all its accounts: both are here to link.
+  await connection.getByRole("button", { name: "Change…" }).click();
+  await share.getByRole("radio", { name: "All its accounts, including new ones" }).check();
+  await share.getByRole("button", { name: "Save" }).click();
+  await expect(connection).toContainText("Shared with this book: all its accounts, new ones too.");
+  await expect(connection.getByRole("button", { name: "Link…" })).toHaveCount(2);
+
+  // Unshared: its owner still sees it, to share again.
+  await connection.getByRole("button", { name: "Change…" }).click();
+  await share.getByRole("button", { name: "Stop sharing" }).click();
+  await expect(connection).toContainText("Not shared with this book.");
+  await expect(connection.getByRole("button", { name: "Link…" })).toHaveCount(0);
+  await expect(connection.getByRole("button", { name: "Share…" })).toBeVisible();
 });

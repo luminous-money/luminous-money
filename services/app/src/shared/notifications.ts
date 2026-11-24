@@ -5,14 +5,15 @@
  * the transaction is saved with a fund that has it; and a shop's login Amazon wants a person
  * for (Amazon orders), which goes once a sync gets in. A bank feed's problem (a login its bank
  * wants, say) can be dismissed, by each person for themselves: the accounts it's about say so on
- * their pages, and Bank connections on its connection, until it's fixed.
+ * their pages, and Bank connections on its connection, until it's fixed. So can a new bank
+ * account on a connection shared with all its accounts, until it's linked.
  */
 export type Notification = {
   /** Stable while it lasts: the kind and what it's about. */
   id: string;
-  /** A sale needing a fund (Funds B), a shop's login needing a person (Amazon orders), or a
-   * bank feed's problem. */
-  kind: "needs-fund" | "shop-login" | "bank-feed";
+  /** A sale needing a fund (Funds B), a shop's login needing a person (Amazon orders), a bank
+   * feed's problem, or a new bank account to link (shared connections). */
+  kind: "needs-fund" | "shop-login" | "bank-feed" | "bank-account";
   /** When it was added (ISO 8601): the queue's order. */
   added: string;
   /** Whether it can be dismissed; if not, it goes once it's fixed. */

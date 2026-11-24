@@ -1,10 +1,12 @@
 /**
  * The ai service (M16), at /api/ai/v1 on the same origin: its health (what the PWA checks before
- * offering anything AI), each book's AI settings and credential. Receipts go through `app`
- * (appApi.ts), which stages what the service reads.
+ * offering anything AI), each book's AI settings and the key it uses, and the caller's own keys
+ * (shared connections: a key is a person's). Receipts go through `app` (appApi.ts), which stages
+ * what the service reads.
  */
 import {
   formatUsd,
+  type AiCredential,
   type AiHealth,
   type AiSettings,
   type AiSettingsPatch,
@@ -15,7 +17,13 @@ import { statusMessage } from "./format.js";
 import { ApiError } from "./ledger.js";
 import { apiFetch } from "./session.js";
 
-export type { AiHealth, AiSettings, AiSettingsPatch, Eagerness } from "@luminous-money/ai-api";
+export type {
+  AiCredential,
+  AiHealth,
+  AiSettings,
+  AiSettingsPatch,
+  Eagerness,
+} from "@luminous-money/ai-api";
 
 const base = (book: string) => `/api/ai/v1/books/${encodeURIComponent(book)}`;
 
@@ -55,8 +63,20 @@ export const aiApi = {
     json(await apiFetch(`${base(book)}/settings`)),
   patch: async (book: string, patch: AiSettingsPatch): Promise<AiSettings> =>
     json(await apiFetch(`${base(book)}/settings`, send("PATCH", patch))),
-  setKey: async (book: string, apiKey: string): Promise<AiSettings> =>
-    json(await apiFetch(`${base(book)}/credential`, send("PUT", { api_key: apiKey }))),
+  /** The book's key: a new one of the caller's (`api_key`), or one of theirs (`credential_id`). */
+  setKey: async (
+    book: string,
+    key: { api_key: string } | { credential_id: string }
+  ): Promise<AiSettings> => json(await apiFetch(`${base(book)}/credential`, send("PUT", key))),
   clearKey: async (book: string): Promise<AiSettings> =>
     json(await apiFetch(`${base(book)}/credential`, send("DELETE"))),
+  /** The caller's own keys, with the books using each. */
+  keys: async (): Promise<AiCredential[]> => json(await apiFetch("/api/ai/v1/credentials")),
+  deleteKey: async (id: string): Promise<void> => {
+    const response = await apiFetch(
+      `/api/ai/v1/credentials/${encodeURIComponent(id)}`,
+      send("DELETE")
+    );
+    if (!response.ok) await json(response);
+  },
 };

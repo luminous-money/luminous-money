@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 
 import type { LedgerPort, ShortTransaction } from "./ledger.js";
 import { concerns, explainError, isNotice } from "./simplefin/client.js";
-import type { SimplefinStore } from "./simplefin/store.js";
+import { errorsIn, type SimplefinStore } from "./simplefin/store.js";
 import type { Notification } from "../shared/notifications.js";
 
 const said = (n: { number: string; currency: string }) =>
@@ -38,26 +38,38 @@ export async function notifications(ledger: LedgerPort, book: string): Promise<N
 }
 
 /**
- * Each problem a bank feed in the book has (not the Bridge's notices), for as long as its syncs
- * report it: one a sync stops reporting goes, and one that comes back is new (its `since`), so a
- * dismissal lasts only while it does. One that names an account (`account_id`) is about that
- * account; anything else, the Bridge's plain strings included, is its connection's, named as Bank
- * connections names it, and links there.
+ * What the book's bank feeds need, for `viewer`, for as long as it lasts:
+ *
+ * - **Each problem** (not the Bridge's notices) its syncs report, where it's for them to see
+ *   (`errorsIn`: one naming an account where the account's shared, one about the connection
+ *   where it's shared with all its accounts, or to its owner). One a sync stops reporting goes,
+ *   and one that comes back is new (its `since`), so a dismissal lasts only while it does. One
+ *   naming an account linked here is about that account; anything else is its connection's,
+ *   named as Bank connections names it, and links there.
+ * - **A new bank account** on a connection shared with all its accounts (one that turned up since
+ *   that was chosen), until it's linked somewhere.
  */
-export function bankNotifications(store: SimplefinStore, book: string): Notification[] {
+export function bankNotifications(
+  store: SimplefinStore,
+  book: string,
+  viewer: string
+): Notification[] {
   const links = store.linksIn(book);
+  const shares = new Map(store.sharesIn(book).map((s) => [s.connection_id, s]));
   const found: Notification[] = [];
-  for (const connectionId of new Set(links.map((l) => l.connection_id))) {
-    const mine = links.filter((l) => l.connection_id === connectionId);
-    const connection = store.connection(mine[0]!.user_id, connectionId);
+  for (const connectionId of new Set([...shares.keys(), ...links.map((l) => l.connection_id)])) {
+    const connection = store.connectionById(connectionId);
     if (!connection) continue;
-    for (const error of connection.errors) {
+    const share = shares.get(connectionId);
+    const mine = links.filter((l) => l.connection_id === connectionId);
+    const href = `/books/${book}/connections?connection=${connectionId}`;
+    for (const error of errorsIn(connection, share, viewer)) {
       if (isNotice(error)) continue;
       const since = error.since ?? connection.last_sync_at ?? connection.created_at;
       const about = mine.filter((l) => concerns(error, l));
-      const institution = about
-        .map((l) => store.account(connectionId, l.account_id)?.institution)
-        .find(Boolean);
+      const institution = error.account_id
+        ? store.account(connectionId, error.account_id)?.institution
+        : undefined;
       const digest = createHash("sha256")
         .update(JSON.stringify([since, error.code, error.message, error.account_id]))
         .digest("hex")
@@ -73,9 +85,29 @@ export function bankNotifications(store: SimplefinStore, book: string): Notifica
             : `${institution} has a problem`
           : `SimpleFIN ${connectionId.slice(0, 8)} needs attention`,
         detail: explainError(error),
-        href: `/books/${book}/connections?connection=${connectionId}`,
+        href,
         accounts: about.map((l) => l.account),
         external: { label: "Open SimpleFIN Bridge", url: "https://bridge.simplefin.org/" },
+      });
+    }
+    if (!share?.all) continue;
+    const linked = new Set([
+      ...store.links(connectionId).map((l) => l.account_id),
+      ...store.attemptsIn(book).map((a) => a.account_id),
+    ]);
+    for (const account of store.accounts(connectionId)) {
+      // New since it was shared all its accounts (or that was last saved): not what was there.
+      if (linked.has(account.account_id) || account.created_at <= share.updated_at) continue;
+      const name = [account.institution, account.name].filter(Boolean).join(" ");
+      found.push({
+        id: `bank-account:${connectionId}:${account.account_id}`,
+        kind: "bank-account",
+        added: account.created_at,
+        dismissable: true,
+        title: `New at SimpleFIN: ${name}`,
+        detail:
+          "Its connection is shared with this book, all its accounts. Link it to an account here to bring its transactions in.",
+        href,
       });
     }
   }

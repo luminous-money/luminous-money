@@ -20,8 +20,14 @@ export type BankAccount = {
   holdings: number;
   /** A brokerage whose activity can be read (its institution's reader), else null. */
   reader: string | null;
+  /** In a book, on its owner's own connection: whether it's shared with the book (anyone else
+   * sees only shared ones). */
+  shared?: boolean;
   link: { id: string; book_id: string; book_name: string | null; account: string } | null;
 };
+
+/** What a connection shares with a book: all its accounts (new ones too), or those chosen. */
+export type BankShare = { all: boolean; accounts: string[]; updated_at: string };
 
 /** What a brokerage link's reading made of the bank's rows since its start. */
 export type BrokerageActivity = {
@@ -39,6 +45,14 @@ export type BankConnection = {
   last_sync_at: string | null;
   requests_left: number;
   requests_per_day: number;
+  /** The caller's own (else another member's, shared with the book). */
+  mine: boolean;
+  /** Its owner's name, when it isn't the caller's. */
+  owner: string | null;
+  /** What it shares with the book it was read in (null: nothing yet). */
+  share: BankShare | null;
+  /** The owner's own list (read outside a book): each book it's shared with. */
+  shares?: (BankShare & { book_id: string; book_name: string | null })[];
   errors: BankError[];
   accounts: BankAccount[];
 };

@@ -90,7 +90,7 @@ export function AccountLedger({ book, account }: { book: string; account: string
   const info = summary.data?.[0];
   const stars = useStars(book);
   const bank = useBankStatus(book);
-  const syncBank = useSyncBank();
+  const syncBank = useSyncBank(book);
   // A brokerage's feed is linked to the brokerage; its cash shows it too.
   const linked = bank.data?.[account] ?? bank.data?.[account.replace(/:Cash$/, "")];
   const setStar = useSetStar(book);

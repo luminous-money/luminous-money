@@ -1,10 +1,59 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-23._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-24._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-23, evening): the breakdown over any range of months; bars narrow to a month; its controls, `v1.8.0`
+## Latest (2026-11-24): shared connections, and the headlines' copy, `v1.9.0`
+
+Kael is starting a "Personal" book on the household's SimpleFIN connection, and asked for
+connections to be people's, shared with each book they're in, "even when [one deployment serving
+one household] is not the case": which accounts go to each book, with an explicit "all accounts"
+that takes new ones too. Then the same for the AI key and Amazon (his personal cards filtered into
+Personal; a no-card purchase goes to both, deleted by hand where it doesn't belong), writers
+allowed to sync, and "write up the detailed plan, then implement, publish and upgrade. BE
+CAREFUL." [The plan](docs/milestones/shared-connections/PLAN.md) has the brief, the model, and
+nine calls to review; design.md's "Shared connections" has the decisions.
+
+- **The copy** (Kael's, the site's subtext changed a little): "Household accounting for modern
+  life." / "Double-entry accounting to manage your assets, expenses, goals, budgets and loans on
+  mobile or desktop. Open source and self-hostable." On the login page, the app's description
+  and manifest, new `og:` link previews (the site's poster), the site's hero and
+  `og:description`, the README's opening and the repository's description. Kael typed "Double-entry
+  account to manage": read as "accounting" (say if not).
+- **Bank feeds** (`app`): `simplefin_share` (migration 27: each connection shared with the books
+  it was linked in, only the linked accounts). `GET /books/:book/simplefin/connections` (the
+  caller's and those shared with the book, only what's shared), `PUT`/`DELETE
+  …/connections/:id/share` (owner; what's linked here can't be unshared), `POST
+  …/connections/:id/sync` (any writer). Links, attempts, dividends and Read again: any writer of
+  the book, shared accounts only. Problems go where they're about (`errorsIn`), and the bell says
+  "New at SimpleFIN: …" for a new account under All accounts. A member leaving takes their
+  shares and every link on them (`leaveBook`). The page asks what to share right after
+  connecting; the MCP's two bank tools read the book's.
+- **AI keys** (`ai` migration 4): `ai_credential`, a book's `credential_id`; `GET`/`POST
+  /credentials`, `DELETE /credentials/:id`, `DELETE /me`; a manager puts one of theirs in the
+  book (or pastes one, theirs); its owner can take it out; it isn't used once they've left. The AI
+  page says whose key it is and lists "Your keys".
+- **Amazon** (`shops` migration 4): `amazon_login` with Amazon's session
+  (`amazon/logins/<id>/`), a book's `login_id`; `/amazon/logins` routes and `DELETE /me`; one sync
+  at a time per sign-in. The Amazon page's "Amazon account" card (whose, the owner's edits, a
+  manager's choice) apart from "This book's Amazon" (dates, cards, accounts).
+- **Keys and sign-ins from before** become the book owner's on the owner's first request to `ai`
+  or `shops` (`adopt`): neither knew who set them. Kael owns the household book (checked: its
+  other member writes). M99 has dropping the old columns once taken.
+- **Deleting an account:** `app`'s `DELETE /me` (moved to api.ts) tells `ai` and `shops` too.
+- **Tests:** app `shares.test.ts` (versions, leaving, the migration's backfill),
+  `notifications.test.ts` (who's told what; new accounts); ai `api.test.ts` (keys are people's,
+  adoption); shops `test_logins.py` (over ASGI); e2e `m9.test.ts` (two people, two books: what's
+  shared, who links and syncs, leaving), `m16.test.ts`; browser `m9.spec.ts` (connecting asks;
+  only these; changed; unshared). The others share before linking. `pnpm test` passed; `pnpm
+  e2e`: API 126 of 126 and the command test both runs; browser 158 of 159 in the first (the new
+  share editor's "Only these:" started unticked: fixed) and 158 of 159 in the second
+  (brokerage.spec's Read again took over 5 seconds under load; it passed 5 times on its own, at
+  about 8 seconds). Looked at in screenshots (Bank connections, Amazon, AI, the login page; light
+  and dark), on the e2e stack with `shops` added.
+
+## Before that (2026-11-23, evening): the breakdown over any range of months; bars narrow to a month; its controls, `v1.8.0`
 
 Kael asked for three things, the month range first with screenshots for approval, then "publish
 and update": the breakdown's months as an unlimited range ("From Jan 2026 through Dec 2027",

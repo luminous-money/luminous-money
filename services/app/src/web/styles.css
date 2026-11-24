@@ -4882,6 +4882,44 @@ button.info-button::after {
   justify-content: flex-end;
 }
 
+/* A book's AI key (shared connections): whose it is, and a manager's choices. */
+.key-choice {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.key-choice p {
+  margin: 0;
+}
+
+/* What the owner's connection shares with the book (shared connections): a line, or the editor. */
+.share-summary {
+  margin: 0;
+}
+
+.share-editor {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+}
+
+.share-editor .section-title,
+.share-editor p {
+  margin: 0;
+}
+
+.share-accounts {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 1.6rem;
+}
+
+.share-accounts label.check {
+  align-items: flex-start;
+}
+
 button.plain.danger {
   color: var(--bad);
 }

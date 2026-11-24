@@ -25,6 +25,12 @@ Two principles set the order:
 
 Roughly in order; each is elaborated with Kael when it starts.
 
+- [ ] **Shared connections** (Kael, 2026-11-24; [its plan](milestones/shared-connections/PLAN.md)):
+      SimpleFIN connections, AI keys and Amazon sign-ins are people's, shared with the books
+      they're in (a connection's accounts all, new ones too, or those chosen), so one serves a
+      household's book and a personal one without either seeing what isn't theirs. Built
+      2026-11-24 with the headline copy change.
+
 - [ ] **Funds B: Complex Fund Functionality** (Kael, 2026-11-02;
       [its plan](milestones/funds-b/PLAN.md)): everything else designed for funds, built in
       steps.

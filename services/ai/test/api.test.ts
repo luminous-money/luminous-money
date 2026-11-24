@@ -132,8 +132,115 @@ describe("a book's AI settings", () => {
     });
     const text = await keyed.text();
     expect(text).not.toContain("secret");
-    expect((JSON.parse(text) as AiSettings).credential).toEqual({ set: true, hint: "1234" });
-    expect(db.credential("b")).toMatch(/^v1:/); // sealed at rest
+    expect((JSON.parse(text) as AiSettings).credential).toEqual({
+      set: true,
+      hint: "1234",
+      mine: true,
+      owner_id: "owner",
+    });
+    expect(db.keyOf("b")!.credential).toMatch(/^v1:/); // sealed at rest
+  });
+});
+
+describe("keys are people's (shared connections)", () => {
+  const settings = async (user: string, book = "b") =>
+    (await (await call(user, `/books/${book}/settings`)).json()) as AiSettings;
+  const withKey = async () => {
+    await useFake();
+    roles.jess = "manage";
+    await call("owner", "/books/b/credential", "PUT", { api_key: "sk-ant-owners-1234" });
+  };
+
+  it("a manager puts one of their own in a book; others see whose it is, never which", async () => {
+    await withKey();
+    expect((await settings("jess")).credential).toEqual({
+      set: true,
+      hint: "1234",
+      mine: false,
+      owner_id: "owner",
+    });
+    expect((await call("writer", "/books/b/receipts/extract", "POST", EXTRACT)).status).toBe(200);
+
+    // Jess can't put someone else's key anywhere, only her own.
+    const [owners] = (await (await call("owner", "/credentials")).json()) as { id: string }[];
+    const taken = await call("jess", "/books/b/credential", "PUT", { credential_id: owners!.id });
+    expect(taken.status).toBe(422);
+    const hers = (await (
+      await call("jess", "/credentials", "POST", { api_key: "sk-ant-jesss-5678", provider: "fake" })
+    ).json()) as { id: string; books: string[] };
+    expect(hers.books).toEqual([]);
+    await call("jess", "/books/b/credential", "PUT", { credential_id: hers.id });
+    expect((await settings("owner")).credential).toMatchObject({ hint: "5678", owner_id: "jess" });
+    expect(
+      ((await (await call("jess", "/credentials")).json()) as { books: string[] }[])[0]!.books
+    ).toEqual(["b"]);
+  });
+
+  it("its owner can always take it out; deleting it takes it out everywhere", async () => {
+    await withKey();
+    roles.owner = "read"; // only reads the book now, but the key is still theirs
+    expect((await call("owner", "/books/b/credential", "DELETE")).status).toBe(200);
+    expect((await settings("jess")).credential.set).toBe(false);
+
+    roles.owner = "owner";
+    const [key] = (await (await call("owner", "/credentials")).json()) as { id: string }[];
+    await call("owner", "/books/b/credential", "PUT", { credential_id: key!.id });
+    expect((await call("jess", "/credentials/" + key!.id, "DELETE")).status).toBe(404);
+    expect((await call("owner", "/credentials/" + key!.id, "DELETE")).status).toBe(204);
+    expect((await settings("jess")).credential.set).toBe(false);
+  });
+
+  it("isn't used once its owner has left the book", async () => {
+    await withKey();
+    await call("owner", "/books/b/credential", "DELETE");
+    const hers = (await (
+      await call("jess", "/credentials", "POST", { api_key: "sk-ant-jesss-5678", provider: "fake" })
+    ).json()) as { id: string };
+    await call("jess", "/books/b/credential", "PUT", { credential_id: hers.id });
+    delete roles.jess; // she leaves
+    expect((await settings("owner")).credential.set).toBe(false);
+    expect(db.keyOf("b")).toBeNull(); // the book no longer uses it
+  });
+
+  it("a book's key from before becomes its owner's, the first time the owner comes", async () => {
+    await useFake();
+    const sealed = new Sealer(KEY).seal("sk-ant-older-9999");
+    db.db
+      .prepare("UPDATE ai_setting SET credential = ?, credential_hint = '9999' WHERE book_id = 'b'")
+      .run(sealed);
+    roles.jess = "manage";
+    // Anyone else sees it as the book's, and it's used as before.
+    expect((await settings("jess")).credential).toEqual({
+      set: true,
+      hint: "9999",
+      mine: false,
+      owner_id: null,
+    });
+    expect((await call("writer", "/books/b/receipts/extract", "POST", EXTRACT)).status).toBe(200);
+    // Its owner takes it.
+    expect((await settings("owner")).credential).toEqual({
+      set: true,
+      hint: "9999",
+      mine: true,
+      owner_id: "owner",
+    });
+    const row = db.db.prepare("SELECT credential FROM ai_setting WHERE book_id = 'b'").get() as {
+      credential: string | null;
+    };
+    expect(row.credential).toBeNull();
+    const keys = (await (await call("owner", "/credentials")).json()) as {
+      hint: string;
+      books: string[];
+    }[];
+    expect(keys).toMatchObject([{ hint: "9999", books: ["b"] }]);
+    expect(new Sealer(KEY).open(db.keyOf("b")!.credential)).toBe("sk-ant-older-9999");
+  });
+
+  it("are forgotten with their owner's account", async () => {
+    await withKey();
+    expect((await call("owner", "/me", "DELETE")).status).toBe(204);
+    expect(await (await call("owner", "/credentials")).json()).toEqual([]);
+    expect((await settings("jess")).credential.set).toBe(false);
   });
 });
 

@@ -1165,12 +1165,18 @@ export function writeSkipped(book: string, ids: string[]) {
 // Bank feeds
 
 const bankKeys = {
+  /** Every book's (a change in one may show in another: a link, a share). */
   connections: ["bank-feeds"] as const,
+  connectionsIn: (book: string) => ["bank-feeds", book] as const,
   status: (book: string) => ["book", book, "bank-status"] as const,
 };
 
-export function useBankConnections() {
-  return useQuery({ queryKey: bankKeys.connections, queryFn: bankFeeds.connections });
+/** The connections the book sees: the caller's own, and those shared with it. */
+export function useBankConnections(book: string) {
+  return useQuery({
+    queryKey: bankKeys.connectionsIn(book),
+    queryFn: () => bankFeeds.connections(book),
+  });
 }
 
 /** What each linked account's bank reports, by account. */
@@ -1192,7 +1198,17 @@ function useBankChange<A, R>(fn: (args: A) => Promise<R>) {
 
 export const useConnectBank = () => useBankChange(bankFeeds.connect);
 export const useDisconnectBank = () => useBankChange(bankFeeds.disconnect);
-export const useSyncBank = () => useBankChange(bankFeeds.sync);
+export const useSyncBank = (book: string) =>
+  useBankChange((id: string) => bankFeeds.sync(book, id));
+/** Share a connection of the caller's with the book, or change what's shared. */
+export const useShareBank = (book: string) =>
+  useBankChange((v: { id: string; all: boolean; accounts: string[]; updated_at: string | null }) =>
+    bankFeeds.share(book, v.id, { all: v.all, accounts: v.accounts, updated_at: v.updated_at })
+  );
+export const useUnshareBank = (book: string) =>
+  useBankChange((v: { id: string; updated_at: string }) =>
+    bankFeeds.unshare(book, v.id, v.updated_at)
+  );
 export const useLinkBank = (book: string) =>
   useBankChange((link: LinkRequest) => bankFeeds.link(book, link));
 
@@ -1431,13 +1447,35 @@ function useAiChange<A>(book: string, fn: (args: A) => Promise<unknown>) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: fn,
-    onSuccess: (settings) => client.setQueryData(["book", book, "ai"], settings),
+    onSuccess: (settings) => {
+      client.setQueryData(["book", book, "ai"], settings);
+      void client.invalidateQueries({ queryKey: ["ai", "keys"] });
+    },
+  });
+}
+
+/** The caller's own AI keys, with the books using each (shared connections). */
+export function useAiKeys(enabled = true) {
+  return useQuery({ queryKey: ["ai", "keys"], queryFn: aiApi.keys, enabled, retry: false });
+}
+
+/** Delete one of the caller's keys: every book using it has none. */
+export function useDeleteAiKey() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: aiApi.deleteKey,
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["ai", "keys"] });
+      void client.invalidateQueries({ queryKey: ["book"] });
+    },
   });
 }
 export const usePatchAi = (book: string) =>
   useAiChange(book, (patch: AiSettingsPatch) => aiApi.patch(book, patch));
 export const useSetAiKey = (book: string) =>
-  useAiChange(book, (key: string) => aiApi.setKey(book, key));
+  useAiChange(book, (key: { api_key: string } | { credential_id: string }) =>
+    aiApi.setKey(book, key)
+  );
 export const useClearAiKey = (book: string) => useAiChange(book, () => aiApi.clearKey(book));
 
 export function useCaptureReceipt(book: string) {

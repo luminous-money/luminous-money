@@ -40,8 +40,8 @@ function Landing() {
             <span className="lp-glow">for modern life.</span>
           </h1>
           <p className="lp-lede">
-            Manage your assets, expenses, goals, budgets and loans on mobile or desktop. Open source and
-            self-hostable.
+            Double-entry accounting to manage your assets, expenses, goals, budgets and loans on mobile
+            or desktop. Open source and self-hostable.
           </p>
           <div className="lp-ctas">
             <a className="lp-btn lp-btn--primary" href="#start">Get started<ArrowRight size={18} strokeWidth={2.25} /></a>

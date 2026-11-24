@@ -434,6 +434,49 @@ export const MIGRATIONS: Migration[] = [
   // 26: the tags a proposal put on splits, and who proposed each (HSA tracking; Tags, more):
   // JSON `[{index, tag, by}]`, for review to say where a tag came from.
   ["ALTER TABLE proposal ADD COLUMN tags TEXT"],
+  // 27: a bank connection shared with a book (shared connections, 2026-11-24): all its
+  // accounts, new ones too, or those chosen (JSON: the bank's account IDs). Each connection is
+  // shared with the books it's linked in, only the accounts linked there (or being linked).
+  [
+    createTable(
+      "simplefin_share",
+      [
+        "connection_id TEXT NOT NULL REFERENCES simplefin_connection(id) ON DELETE CASCADE",
+        "book_id TEXT NOT NULL",
+        "all_accounts INTEGER NOT NULL DEFAULT 0",
+        "accounts TEXT NOT NULL DEFAULT '[]'",
+      ],
+      ["PRIMARY KEY (connection_id, book_id)"]
+    ),
+    "CREATE INDEX simplefin_share_book ON simplefin_share(book_id)",
+    (db) => {
+      const used = db
+        .prepare(
+          `SELECT connection_id, book_id, account_id FROM simplefin_link
+           UNION SELECT connection_id, book_id, account_id FROM simplefin_attempt
+           ORDER BY connection_id, book_id, account_id`
+        )
+        .all() as { connection_id: string; book_id: string; account_id: string }[];
+      const shares = new Map<string, { connection: string; book: string; accounts: string[] }>();
+      for (const u of used) {
+        const key = `${u.connection_id} ${u.book_id}`;
+        const share = shares.get(key) ?? {
+          connection: u.connection_id,
+          book: u.book_id,
+          accounts: [],
+        };
+        share.accounts.push(u.account_id);
+        shares.set(key, share);
+      }
+      const insert = db.prepare(
+        `INSERT INTO simplefin_share (connection_id, book_id, all_accounts, accounts, created_at, updated_at)
+         VALUES (?, ?, 0, ?, ?, ?)`
+      );
+      const stamp = now();
+      for (const s of shares.values())
+        insert.run(s.connection, s.book, JSON.stringify(s.accounts), stamp, stamp);
+    },
+  ],
 ];
 
 type StoredRow = ImportRow & { fingerprint: string | null };
@@ -1692,6 +1735,7 @@ export class AppDb {
         "DELETE FROM book_setting WHERE book_id = ?",
         "DELETE FROM simplefin_link WHERE book_id = ?",
         "DELETE FROM simplefin_attempt WHERE book_id = ?",
+        "DELETE FROM simplefin_share WHERE book_id = ?",
         "DELETE FROM transfer_pair WHERE book_id = ?",
         "DELETE FROM book_invite WHERE book_id = ?",
         "DELETE FROM reconcile_draft WHERE book_id = ?",

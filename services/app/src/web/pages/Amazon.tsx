@@ -1,8 +1,9 @@
 /**
- * A book's Amazon (the Amazon orders spike, 2026-11-06): the connection (the Amazon account's
- * email, password and authenticator setup key, how far back to read, and where payments other
- * than a card come from), Sync now, and what it read: each charge with the order behind it.
- * Nothing here writes to the books yet; that's the next step, once reading is proven.
+ * A book's Amazon (the Amazon orders spike, 2026-11-06): the Amazon account it reads (a person's
+ * sign-in, shared connections: its email, password and authenticator setup key are its owner's,
+ * who puts it in the books they manage), the book's own choices (how far back to read, which
+ * cards' charges are its, and where payments other than a card come from), Sync now, and what it
+ * read: each charge with the order behind it.
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -13,13 +14,14 @@ import { AccountPicker } from "../components/AccountPicker.js";
 import { postable } from "../lib/accounts.js";
 import { appApi } from "../lib/appApi.js";
 import { formatAmount, formatFullDay, formatWhen, today } from "../lib/format.js";
-import { explain, useAccountCreation, useAccounts, useRole } from "../lib/queries.js";
+import { explain, useAccountCreation, useAccounts, useMembers, useRole } from "../lib/queries.js";
 import {
   amazonUrl,
   shopsApi,
   type AmazonCharge,
   type AmazonConnection,
   type AmazonPatch,
+  type OwnAmazonLogin,
 } from "../lib/shops.js";
 import { Loading } from "../components/Loading.js";
 import { Crumbs } from "../components/Crumbs.js";
@@ -44,6 +46,7 @@ const same = (a: string[], b: string[]) => a.join() === [...b].sort().join();
 
 const keys = {
   health: ["shops", "health"] as const,
+  logins: ["shops", "logins"] as const,
   amazon: (book: string) => ["shops", book, "amazon"] as const,
   sync: (book: string) => ["shops", book, "amazon", "sync"] as const,
   charges: (book: string) => ["shops", book, "amazon", "charges"] as const,
@@ -77,6 +80,12 @@ export function AmazonPage({ book }: { book: string }) {
       {connection.error && <p className="card error">{explain(connection.error)}</p>}
       {connection.data && (
         <>
+          <SignIn
+            key={`sign-in-${connection.data.login?.id ?? "none"}`}
+            book={book}
+            connection={connection.data}
+            manage={manage}
+          />
           <Settings
             key={connection.data.updated_at ?? "new"}
             book={book}
@@ -104,9 +113,6 @@ function Settings({
   const accounts = useAccounts(book);
   const create = useAccountCreation(book);
   const names = accounts.data ? postable(accounts.data, today()) : [];
-  const [email, setEmail] = useState(c.email);
-  const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState("");
   const [from, setFrom] = useState(c.sync_from ?? "");
   const [other, setOther] = useState(c.other_payments);
   const [rewards, setRewards] = useState(c.rewards ?? "");
@@ -127,9 +133,6 @@ function Settings({
 
   const save = async () => {
     const patch: AmazonPatch = { updated_at: c.updated_at };
-    if (email !== c.email) patch.email = email;
-    if (password) patch.password = password;
-    if (otp) patch.otp_secret = otp;
     if ((from || null) !== c.sync_from) patch.sync_from = from || null;
     if (other !== c.other_payments) patch.other_payments = other;
     if ((rewards || null) !== c.rewards) patch.rewards = rewards || null;
@@ -153,7 +156,8 @@ function Settings({
 
   const forget = async () => {
     if (!c.updated_at) return;
-    if (!window.confirm("Forget this Amazon account, and everything read from it?")) return;
+    if (!window.confirm("Forget this book's Amazon: its settings, and everything read for it?"))
+      return;
     try {
       await shopsApi.forgetAmazon(book, c.updated_at);
       void client.invalidateQueries({ queryKey: ["shops", book] });
@@ -165,56 +169,10 @@ function Settings({
   return (
     <form
       className="card editor"
-      aria-label="Amazon account"
+      aria-label="This book's Amazon"
       onSubmit={(e) => (e.preventDefault(), void save())}
     >
-      <h2 className="section-title">Amazon account</h2>
-      {!c.sealing && (
-        <p className="error small">
-          The shops service has no key to keep a password with (SHOPS_ENCRYPTION_KEY or
-          AI_ENCRYPTION_KEY): it can&apos;t be set up until it has one.
-        </p>
-      )}
-      <label>
-        Email
-        <input
-          type="email"
-          autoComplete="off"
-          value={email}
-          disabled={!manage}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-      </label>
-      <label>
-        Password
-        <input
-          type="password"
-          autoComplete="new-password"
-          value={password}
-          disabled={!manage}
-          placeholder={c.has_password ? "Set: type a new one to replace it" : ""}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </label>
-      <label>
-        Authenticator setup key
-        <input
-          autoComplete="off"
-          spellCheck={false}
-          value={otp}
-          disabled={!manage}
-          placeholder={
-            c.has_otp_secret ? "Set: type a new one to replace it" : "Like JBSW Y3DP EHPK 3PXP…"
-          }
-          onChange={(e) => setOtp(e.target.value)}
-        />
-      </label>
-      <p className="small muted">
-        So it can make Amazon&apos;s two-step codes itself. On Amazon: Your Account → Login &amp;
-        security → 2-Step Verification → Add new app, then &ldquo;Can&apos;t scan the
-        barcode?&rdquo; shows the key. Add the same key to your authenticator app too, and use its
-        code to finish on Amazon.
-      </p>
+      <h2 className="section-title">This book&apos;s Amazon</h2>
       <label>
         Read charges from
         <input
@@ -326,6 +284,331 @@ function Settings({
   );
 }
 
+/** "Jess's", "Kael's". */
+const possessive = (name: string) => `${name}${name.endsWith("s") ? "'" : "'s"}`;
+
+/**
+ * The Amazon account the book reads: whose it is (only its owner sees which), its owner's
+ * changes to it, and a manager's choice of one of their own (or a new one). A sign-in's owner can
+ * always take it out of the book.
+ */
+function SignIn({
+  book,
+  connection: c,
+  manage,
+}: {
+  book: string;
+  connection: AmazonConnection;
+  manage: boolean;
+}) {
+  const client = useQueryClient();
+  const members = useMembers(book);
+  const logins = useQuery({
+    queryKey: keys.logins,
+    queryFn: shopsApi.logins,
+    enabled: manage || !!c.login?.mine,
+  });
+  const login = c.login;
+  const own = logins.data?.find((l) => l.id === login?.id);
+  const [choosing, setChoosing] = useState(!login);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const refresh = (saved?: AmazonConnection) => {
+    if (saved) client.setQueryData(keys.amazon(book), saved);
+    void client.invalidateQueries({ queryKey: keys.amazon(book) });
+    void client.invalidateQueries({ queryKey: keys.logins });
+  };
+  const run = async (work: () => Promise<unknown>) => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await work();
+    } catch (e) {
+      setMessage(explain(e));
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+  /** Use a sign-in in the book (or, with null, none). */
+  const use = (id: string | null) =>
+    run(async () => {
+      const current = client.getQueryData<AmazonConnection>(keys.amazon(book)) ?? c;
+      refresh(await shopsApi.patchAmazon(book, { updated_at: current.updated_at, login_id: id }));
+    });
+  const owner = login?.owner_id
+    ? members.data?.members.find((m) => m.user_id === login.owner_id)?.name
+    : null;
+  return (
+    <section className="card editor" aria-label="Amazon account">
+      <h2 className="section-title">Amazon account</h2>
+      {!c.sealing && (
+        <p className="error small">
+          The shops service has no key to keep a password with (SHOPS_ENCRYPTION_KEY or
+          AI_ENCRYPTION_KEY): it can&apos;t be set up until it has one.
+        </p>
+      )}
+      {login ? (
+        <p>
+          {login.mine
+            ? `Yours: ${login.email}`
+            : login.owner_id
+              ? `${owner ? possessive(owner) : "Another member's"} Amazon account`
+              : `The book's own: ${login.email ?? "an Amazon account"}`}
+          {!login.has_password && (
+            <span className="error small block">It has no password yet.</span>
+          )}
+        </p>
+      ) : (
+        <p className="muted">No Amazon account yet.</p>
+      )}
+      {login && (manage || login.mine) && (
+        <div className="actions">
+          {manage && !choosing && (
+            <button type="button" onClick={() => setChoosing(true)}>
+              Use another…
+            </button>
+          )}
+          <button type="button" className="plain" disabled={busy} onClick={() => void use(null)}>
+            {login.mine && !manage ? "Take yours out of this book" : "Stop using it here"}
+          </button>
+        </div>
+      )}
+      {own && <EditLogin login={own} onSaved={() => refresh()} />}
+      {manage && choosing && (
+        <ChooseLogin
+          logins={(logins.data ?? []).filter((l) => l.id !== login?.id)}
+          busy={busy}
+          onUse={(id) => void use(id).then(() => setChoosing(false))}
+          onAdd={(fields) =>
+            void run(async () => {
+              const added = await shopsApi.addLogin(fields);
+              const current = client.getQueryData<AmazonConnection>(keys.amazon(book)) ?? c;
+              refresh(
+                await shopsApi.patchAmazon(book, {
+                  updated_at: current.updated_at,
+                  login_id: added.id,
+                })
+              );
+              setChoosing(false);
+            })
+          }
+          onCancel={login ? () => setChoosing(false) : undefined}
+        />
+      )}
+      {message && <p className="error">{message}</p>}
+      {!manage && !login?.mine && (
+        <p className="small muted">A manager of the book chooses its Amazon account.</p>
+      )}
+    </section>
+  );
+}
+
+/** One of the caller's own sign-ins, to choose for the book, or a new one. */
+function ChooseLogin({
+  logins,
+  busy,
+  onUse,
+  onAdd,
+  onCancel,
+}: {
+  logins: OwnAmazonLogin[];
+  busy: boolean;
+  onUse: (id: string) => void;
+  onAdd: (fields: { email: string; password?: string; otp_secret?: string }) => void;
+  onCancel?: () => void;
+}) {
+  const [chosen, setChosen] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  return (
+    <div className="key-choice">
+      {logins.length > 0 && (
+        <form
+          className="inline-form"
+          onSubmit={(e) => (e.preventDefault(), chosen && onUse(chosen))}
+        >
+          <label>
+            One of your Amazon accounts
+            <select value={chosen} onChange={(e) => setChosen(e.target.value)}>
+              <option value="">Choose…</option>
+              {logins.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.email}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" disabled={!chosen || busy}>
+            Use it here
+          </button>
+        </form>
+      )}
+      <form
+        className="editor"
+        aria-label="Add an Amazon account"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onAdd({ email, ...(password ? { password } : {}), ...(otp ? { otp_secret: otp } : {}) });
+        }}
+      >
+        <h3 className="section-title">{logins.length ? "Or add another of yours" : "Add yours"}</h3>
+        <LoginFields
+          email={email}
+          setEmail={setEmail}
+          password={password}
+          setPassword={setPassword}
+          otp={otp}
+          setOtp={setOtp}
+        />
+        <div className="actions">
+          {onCancel && (
+            <button type="button" onClick={onCancel}>
+              Cancel
+            </button>
+          )}
+          <button type="submit" className="primary" disabled={!email.trim() || !password || busy}>
+            Add and use it here
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/** The caller's own sign-in in the book: its email, password and setup key, changed (every
+ * book using it starts over), or deleted (from every book). */
+function EditLogin({ login, onSaved }: { login: OwnAmazonLogin; onSaved: () => void }) {
+  const [email, setEmail] = useState(login.email);
+  const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const save = async () => {
+    const patch: Parameters<typeof shopsApi.patchLogin>[1] = { updated_at: login.updated_at };
+    if (email !== login.email) patch.email = email;
+    if (password) patch.password = password;
+    if (otp) patch.otp_secret = otp;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await shopsApi.patchLogin(login.id, patch);
+      setPassword("");
+      setOtp("");
+      onSaved();
+    } catch (e) {
+      setMessage(explain(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async () => {
+    const others =
+      login.books.length > 1 ? " It's used in other books too: none will have it." : "";
+    if (!window.confirm(`Delete this Amazon account here?${others} What was read stays.`)) return;
+    try {
+      await shopsApi.deleteLogin(login.id, login.updated_at);
+      onSaved();
+    } catch (e) {
+      setMessage(explain(e));
+    }
+  };
+  return (
+    <form
+      className="editor"
+      aria-label="Your Amazon account"
+      onSubmit={(e) => (e.preventDefault(), void save())}
+    >
+      <LoginFields
+        email={email}
+        setEmail={setEmail}
+        password={password}
+        setPassword={setPassword}
+        otp={otp}
+        setOtp={setOtp}
+        has={login}
+      />
+      {login.books.length > 1 && (
+        <p className="small muted">
+          Used in {login.books.length} of your books: a change is for all of them.
+        </p>
+      )}
+      {message && <p className="error">{message}</p>}
+      <div className="actions">
+        <button type="button" className="plain danger" onClick={() => void remove()}>
+          Delete
+        </button>
+        <button type="submit" className="primary" disabled={busy}>
+          Save
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function LoginFields({
+  email,
+  setEmail,
+  password,
+  setPassword,
+  otp,
+  setOtp,
+  has,
+}: {
+  email: string;
+  setEmail: (v: string) => void;
+  password: string;
+  setPassword: (v: string) => void;
+  otp: string;
+  setOtp: (v: string) => void;
+  /** An existing sign-in: what it has set. */
+  has?: { has_password: boolean; has_otp_secret: boolean };
+}) {
+  return (
+    <>
+      <label>
+        Email
+        <input
+          type="email"
+          autoComplete="off"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </label>
+      <label>
+        Password
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={password}
+          placeholder={has?.has_password ? "Set: type a new one to replace it" : ""}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </label>
+      <label>
+        Authenticator setup key
+        <input
+          autoComplete="off"
+          spellCheck={false}
+          value={otp}
+          placeholder={
+            has?.has_otp_secret ? "Set: type a new one to replace it" : "Like JBSW Y3DP EHPK 3PXP…"
+          }
+          onChange={(e) => setOtp(e.target.value)}
+        />
+      </label>
+      <p className="small muted">
+        So it can make Amazon&apos;s two-step codes itself. On Amazon: Your Account → Login &amp;
+        security → 2-Step Verification → Add new app, then &ldquo;Can&apos;t scan the
+        barcode?&rdquo; shows the key. Add the same key to your authenticator app too, and use its
+        code to finish on Amazon. Yours: kept encrypted, never shown again, and used only in the
+        books you put it in.
+      </p>
+    </>
+  );
+}
+
 const STATUS: Record<AmazonConnection["status"], string> = {
   new: "Not synced yet",
   ok: "Synced",
@@ -368,7 +651,7 @@ function Sync({
       setError(explain(e));
     }
   };
-  const ready = !!c.email && c.has_password;
+  const ready = c.has_password;
   return (
     <section className="card" aria-label="Sync">
       <h2 className="section-title">Sync</h2>
@@ -390,7 +673,7 @@ function Sync({
             type="button"
             className="primary"
             disabled={!ready || running}
-            title={ready ? undefined : "Set the email and password first"}
+            title={ready ? undefined : "Choose an Amazon account first"}
             onClick={() => void start()}
           >
             {running ? "Syncing…" : "Sync now"}

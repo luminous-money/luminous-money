@@ -74,6 +74,7 @@ const ai: AiPort = {
   },
   loanTable: async () => ({ failed: "not in these tests" }),
   forgetBook: async () => {},
+  forgetUser: async () => {},
 };
 
 const waiting = (description: string, amount: string) =>

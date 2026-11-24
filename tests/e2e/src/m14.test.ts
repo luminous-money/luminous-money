@@ -231,6 +231,11 @@ describe("M14: reconciliation", () => {
     const connection = (await (
       await json(user, "/simplefin/connections", "POST", { setup_token: bank.setup_token })
     ).json()) as { id: string };
+    await json(user, `/books/${book}/simplefin/connections/${connection.id}/share`, "PUT", {
+      all: true,
+      accounts: [],
+      updated_at: null,
+    });
     const link = {
       connection_id: connection.id,
       account_id: "chk",

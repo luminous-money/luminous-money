@@ -77,9 +77,40 @@ async function setUp() {
 type Connection = {
   id: string;
   host: string;
+  mine: boolean;
+  owner: string | null;
+  share: { all: boolean; accounts: string[]; updated_at: string } | null;
   errors: { code: string; explained: string }[];
-  accounts: { account_id: string; link: unknown }[];
+  accounts: {
+    account_id: string;
+    shared?: boolean;
+    link: { book_id: string; book_name: string | null; account: string } | null;
+  }[];
 };
+
+type Me = Awaited<ReturnType<typeof newUser>>;
+
+const send = (me: Me, path: string, method: string, body?: unknown) =>
+  me.app(path, {
+    method,
+    headers: { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+/** Share a connection with a book (all its accounts, unless some are given). */
+async function share(me: Me, book: string, connection: string, accounts?: string[]) {
+  const shared = await send(me, `/books/${book}/simplefin/connections/${connection}/share`, "PUT", {
+    all: !accounts,
+    accounts: accounts ?? [],
+    updated_at: null,
+  });
+  assert.equal(shared.status, 200);
+  return (await shared.json()) as Connection;
+}
+
+/** The connections a book sees, as `me`. */
+const seen = async (me: Me, book: string) =>
+  (await (await me.app(`/books/${book}/simplefin/connections`)).json()) as Connection[];
 
 describe("M9: bank feeds (SimpleFIN)", () => {
   before(stackIsUp);
@@ -112,6 +143,7 @@ describe("M9: bank feeds (SimpleFIN)", () => {
     const connection = (await (
       await post("/simplefin/connections", { setup_token })
     ).json()) as Connection;
+    await share(me, book, connection.id);
     const link = {
       connection_id: connection.id,
       account_id: "chk",
@@ -185,6 +217,7 @@ describe("M9: bank feeds (SimpleFIN)", () => {
     const connection = (await (
       await post("/simplefin/connections", { setup_token })
     ).json()) as Connection;
+    await share(me, book, connection.id);
     const link = { connection_id: connection.id, account_id: "chk", account, mode: "reconcile" };
 
     const preview = (await (await post(`/books/${book}/simplefin/links/preview`, link)).json()) as {
@@ -234,5 +267,128 @@ describe("M9: bank feeds (SimpleFIN)", () => {
     const [listed] = (await (await me.app("/simplefin/connections")).json()) as Connection[];
     assert.equal(listed!.errors[0]!.code, "con.auth");
     assert.match(listed!.errors[0]!.explained, /log in again at SimpleFIN Bridge/);
+  });
+
+  it("shares a connection with a book: what its owner chooses, linked and synced by its writers, gone when they leave", async () => {
+    // Jess's book, Kael a writer in it; Kael's own book beside it.
+    const jess = await newUser();
+    const kael = await newUser();
+    const book = async (me: Me, name: string) =>
+      (
+        (await (
+          await send(me, "/books", "POST", { name, time_zone: "America/Chicago" })
+        ).json()) as { id: string }
+      ).id;
+    const home = await book(jess, "Home");
+    const personal = await book(kael, "Personal");
+    const invite = (await (
+      await send(jess, `/books/${home}/invites`, "POST", { role: "write", email: kael.email })
+    ).json()) as { token: string };
+    assert.equal((await send(kael, `/invites/${invite.token}/accept`, "POST")).status, 200);
+
+    // Kael's bank: a joint checking account and a card of his own.
+    const { user, setup_token } = await bank();
+    await fake(`/control/users/${user}/accounts/card`, "PUT", {
+      name: "Kael's Card",
+      institution: "Fake Card Co",
+      balance: "-10.00",
+    });
+    const connection = (await (
+      await send(kael, "/simplefin/connections", "POST", { setup_token })
+    ).json()) as Connection;
+    assert.deepEqual(connection.accounts.map((a) => a.account_id).sort(), ["card", "chk"]);
+
+    // Not shared yet: Kael sees it (to share), Jess doesn't, and nobody can link it.
+    const [unshared] = await seen(kael, home);
+    assert.deepEqual([unshared!.mine, unshared!.share], [true, null]);
+    assert.equal((await seen(jess, home)).length, 0);
+    const linkTo = (account_id: string, account: string) => ({
+      connection_id: connection.id,
+      account_id,
+      account,
+      mode: "new",
+    });
+    const joint = linkTo("chk", "Assets:Bank:Joint");
+    assert.equal((await send(jess, `/books/${home}/simplefin/links`, "POST", joint)).status, 404);
+
+    // Shared with Home: only the joint account. Only Kael chooses what.
+    await share(kael, home, connection.id, ["chk"]);
+    const refused = await send(
+      jess,
+      `/books/${home}/simplefin/connections/${connection.id}/share`,
+      "PUT",
+      {
+        all: true,
+        accounts: [],
+        updated_at: null,
+      }
+    );
+    assert.equal(refused.status, 403);
+    const [theirs] = await seen(jess, home);
+    assert.equal(theirs!.mine, false);
+    assert.deepEqual(
+      theirs!.accounts.map((a) => a.account_id),
+      ["chk"]
+    );
+
+    // Jess links the joint account; the card isn't Home's to link.
+    const card = linkTo("card", "Liabilities:Card");
+    assert.equal((await send(jess, `/books/${home}/simplefin/links`, "POST", card)).status, 422);
+    assert.equal((await send(jess, `/books/${home}/simplefin/links`, "POST", joint)).status, 201);
+    const synced = await send(
+      jess,
+      `/books/${home}/simplefin/connections/${connection.id}/sync`,
+      "POST",
+      {}
+    );
+    assert.equal(synced.status, 200);
+
+    // What's linked stays shared: unlink it first.
+    const [mine] = await seen(kael, home);
+    const narrowed = await send(
+      kael,
+      `/books/${home}/simplefin/connections/${connection.id}/share`,
+      "PUT",
+      {
+        all: false,
+        accounts: [],
+        updated_at: mine!.share!.updated_at,
+      }
+    );
+    assert.equal(narrowed.status, 422);
+    const stale = await send(
+      kael,
+      `/books/${home}/simplefin/connections/${connection.id}/share`,
+      "PUT",
+      {
+        all: false,
+        accounts: ["chk"],
+        updated_at: "2020-01-01T00:00:00.000000Z",
+      }
+    );
+    assert.equal(stale.status, 409);
+
+    // In Kael's own book, all its accounts: the joint one says where it's linked.
+    const everything = await share(kael, personal, connection.id);
+    assert.deepEqual(everything.share && everything.share.all, true);
+    const where = everything.accounts.find((a) => a.account_id === "chk")!.link!;
+    assert.deepEqual([where.book_id, where.book_name], [home, "Home"]);
+    assert.equal(
+      (await send(kael, `/books/${personal}/simplefin/links`, "POST", card)).status,
+      201
+    );
+
+    // Jess takes Kael out of Home: his connection, and the link Jess made on it, go with him.
+    const members = (await (await jess.app(`/books/${home}/members`)).json()) as {
+      members: { user_id: string }[];
+    };
+    assert.ok(members.members.some((m) => m.user_id === kael.id));
+    assert.equal((await send(jess, `/books/${home}/members/${kael.id}`, "DELETE")).status, 204);
+    assert.equal((await seen(jess, home)).length, 0);
+    const status = (await (await jess.app(`/books/${home}/simplefin/status`)).json()) as object;
+    assert.deepEqual(Object.keys(status), []);
+    // His own book keeps its link.
+    const left = (await (await kael.app(`/books/${personal}/simplefin/status`)).json()) as object;
+    assert.deepEqual(Object.keys(left), ["Liabilities:Card"]);
   });
 });

@@ -180,6 +180,14 @@ Mobile usability is [M20](../m20-design-polish/PLAN.md)'s.
 - **Email, once there's an email system:** invitations sent by email (M13's answer 1), and
   accounts required to verify their email (M8's question 1).
 - **Transferring a book's ownership** to a manager (M13's answer 3: not now).
+- **Drop the AI key and Amazon sign-in kept on a book from before they were people's**
+  ([shared connections](../shared-connections/PLAN.md)): once Emmer's have been taken by their
+  book's owner, a migration in `ai` (`ai_setting.credential`, `credential_hint`) and in `shops`
+  (`amazon_connection.email`, `password`, `otp_secret`), with the code that reads and adopts
+  them.
+- **Shared connections, not built:** a person's own page for their connections, keys and
+  sign-ins across books (each lives on its book's page now); spending per key across books (the
+  AI page has the book's).
 - **Per-account permissions** (a role covers the whole book) and **activity history** (who
   changed what) (M13, "Out of scope").
 - **Auth** (M8's other questions and "Out of scope"): session lifetime (proposed: 60 days

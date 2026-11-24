@@ -15,9 +15,10 @@ export function Login() {
   return (
     <main className="welcome">
       <section className="hero">
-        <h1>Your books, reviewed in seconds.</h1>
+        <h1>Household accounting for modern life.</h1>
         <p>
-          Double-entry accounting with Beancount underneath and a review queue built for your phone.
+          Double-entry accounting to manage your assets, expenses, goals, budgets and loans on
+          mobile or desktop. Open source and self-hostable.
         </p>
       </section>
       {mode === "log-in" && <LogIn email={email} setEmail={setEmail} setMode={setMode} />}

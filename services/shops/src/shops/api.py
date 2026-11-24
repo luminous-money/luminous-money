@@ -4,6 +4,16 @@ Every route but health needs the caller (X-User-Id, set by the gateway from thei
 role in the book is the ledger's. Members see a book's Amazon connection; managers change it;
 writers sync it. Secrets are taken, sealed and never sent back.
 
+**Sign-ins are people's** (shared connections, 2026-11-24): an Amazon account's email, password
+and setup key, and Amazon's session, are their owner's, who alone sees or changes them. A manager
+puts one of their own in a book (`login_id`); its owner can always take it out, and it isn't
+used once they've left the book. The book keeps the rest: its cards, dates and accounts, and what
+was read.
+
+- `GET /amazon/logins`, `POST /amazon/logins`: the caller's sign-ins (with the books using
+  each), a new one.
+- `PATCH /amazon/logins/{id}`, `DELETE /amazon/logins/{id}?updated_at=`: change or delete one.
+- `DELETE /me`: forget the caller's sign-ins (their account is being deleted).
 - `GET /books/{book}/amazon`: the connection (no secrets: whether each is set).
 - `PATCH /books/{book}/amazon`: change it, against the `updated_at` read (null before it exists).
 - `DELETE /books/{book}/amazon?updated_at=`: forget it, and everything read with it.
@@ -82,9 +92,7 @@ def roles_from(ledger_url: str) -> RoleOf:
 
 class ConnectionPatch(BaseModel):
     updated_at: str | None
-    email: str | None = None
-    password: str | None = None  # "" forgets it
-    otp_secret: str | None = None  # the authenticator app's setup key; "" forgets it
+    login_id: str | None = None  # one of the caller's sign-ins; null: none
     sync_from: datetime.date | None = None
     other_payments: str | None = None
     rewards: str | None = None  # "" or null: as other payments
@@ -92,19 +100,60 @@ class ConnectionPatch(BaseModel):
     exclude_cards: list[str] | None = None  # last fours: never charges on these
 
 
+class LoginIn(BaseModel):
+    email: str
+    password: str | None = None
+    otp_secret: str | None = None  # the authenticator app's setup key
+
+
+class LoginPatch(BaseModel):
+    updated_at: str
+    email: str | None = None
+    password: str | None = None  # "" forgets it
+    otp_secret: str | None = None  # "" forgets it
+
+
 def card_list(text: str | None) -> list[str]:
     return json.loads(text) if text else []
 
 
-def view(row: dict[str, Any] | None, cards: list[dict[str, Any]]) -> dict[str, Any]:
+def setup_key(text: str | None) -> str | None:
+    """An authenticator app's setup key, as typed (spaces, any case), or None; 422 if it isn't one."""
+    secret = "".join((text or "").split()).upper()
+    if not secret:
+        return None
+    try:
+        pyotp.TOTP(secret).now()
+    except Exception:
+        raise HTTPException(422, "That isn't an authenticator setup key (letters and digits, like JBSW Y3DP…)")
+    return secret
+
+
+def login_view(login: dict[str, Any] | None, caller: str) -> dict[str, Any] | None:
+    """A sign-in without its secrets. Only its owner sees which Amazon account it is (a book's
+    own, from before, shows as it did)."""
+    if not login:
+        return None
+    mine = login.get("user_id") == caller
+    return {
+        "id": login.get("id"),
+        "mine": mine,
+        "owner_id": login.get("user_id"),
+        "email": login["email"] if mine or login.get("user_id") is None else None,
+        "has_password": bool(login.get("password")),
+        "has_otp_secret": bool(login.get("otp_secret")),
+    }
+
+
+def view(row: dict[str, Any] | None, cards: list[dict[str, Any]], login: dict[str, Any] | None, caller: str) -> dict[str, Any]:
     row = row or {}
     return {
         "include_cards": card_list(row.get("include_cards")),
         "exclude_cards": card_list(row.get("exclude_cards")),
         "cards": cards,
-        "email": row.get("email", ""),
-        "has_password": bool(row.get("password")),
-        "has_otp_secret": bool(row.get("otp_secret")),
+        "login": login_view(login, caller),
+        # Whether it can sync (`app`'s morning sync asks).
+        "has_password": bool(login and login.get("password")),
         "sync_from": row.get("sync_from"),
         "other_payments": row.get("other_payments", "Income:Uncategorized"),
         "rewards": row.get("rewards"),
@@ -123,6 +172,8 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf, send_orders: SendOrders |
     api = APIRouter(prefix="/api/shops/v1")
     jobs: dict[str, dict[str, Any]] = {}
     jobs_lock = threading.Lock()
+    # One sync at a time per sign-in: books sharing one share Amazon's session.
+    sessions: dict[str, threading.Lock] = {}
 
     def health() -> dict[str, Any]:
         return {"status": "up", "version": VERSION, "schema": db.schema(), "sealing": seal.ready()}
@@ -135,37 +186,135 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf, send_orders: SendOrders |
             raise HTTPException(401, "not logged in")
         return x_user_id
 
-    def need(caller: str, book: str, rank: str) -> None:
+    def adopt(book: str, owner: str) -> None:
+        """The book's own sign-in, from before, becomes its owner's (`Db.adopt`), session and all."""
+        login_id = db.adopt(book, owner)
+        if login_id is None:
+            return
+        log.info("book %s: its Amazon sign-in is its owner's now (%s)", book, login_id)
+        try:
+            amazon.move_session(data_dir, book, login_id)
+        except OSError:
+            log.warning("book %s: Amazon's session couldn't move with its sign-in: the next sync signs in again", book, exc_info=True)
+
+    def need(caller: str, book: str, rank: str) -> str:
         role = role_of(caller, book)
         if role is None:
             raise HTTPException(404, "not found")
+        if role == "owner":
+            adopt(book, caller)
         if RANKS.index(role) < RANKS.index(rank):
             raise HTTPException(403, f"that needs {rank} access to the book")
+        return role
 
-    @api.get("/books/{book}/amazon")
-    def get_connection(book: str, caller: str = Depends(user)) -> dict[str, Any]:
-        need(caller, book, "read")
-        return view(db.connection(book), db.cards(book))
+    def book_login(book: str, caller: str) -> dict[str, Any] | None:
+        """The sign-in the book uses: a person's (none once they've left the book), or its own
+        from before."""
+        row = db.connection(book)
+        if not row:
+            return None
+        if row["login_id"]:
+            login = db.login(row["login_id"])
+            if login and login["user_id"] != caller and role_of(login["user_id"], book) is None:
+                log.info("book %s: its Amazon sign-in's owner has left it: it isn't used", book)
+                db.drop_login(book)
+                return None
+            return login
+        if row["email"] or row["password"]:
+            return {"id": None, "user_id": None, "email": row["email"], "password": row["password"], "otp_secret": row["otp_secret"]}
+        return None
 
-    @api.patch("/books/{book}/amazon")
-    def patch_connection(book: str, patch: ConnectionPatch, caller: str = Depends(user)) -> dict[str, Any]:
-        need(caller, book, "manage")
+    def forget_session(login_id: str) -> None:
+        shutil.rmtree(amazon.session_dir(data_dir, {"id": login_id}, ""), ignore_errors=True)
+
+    def own_view(login: dict[str, Any]) -> dict[str, Any]:
+        return {**login_view(login, login["user_id"]), "updated_at": login["updated_at"], "books": db.books_using(login["id"])}  # type: ignore[dict-item]
+
+    def sealing() -> None:
+        if not seal.ready():
+            raise HTTPException(503, "the shops service has no key to seal secrets with (SHOPS_ENCRYPTION_KEY)")
+
+    @api.get("/amazon/logins")
+    def my_logins(caller: str = Depends(user)) -> list[dict[str, Any]]:
+        return [own_view(login) for login in db.logins(caller)]
+
+    @api.post("/amazon/logins", status_code=201)
+    def add_login(body: LoginIn, caller: str = Depends(user)) -> dict[str, Any]:
+        sealing()
+        email = body.email.strip()
+        if not email:
+            raise HTTPException(422, "Enter the Amazon account's email")
+        secret = setup_key(body.otp_secret)
+        login = db.add_login(
+            caller, email, seal.seal(body.password) if body.password else None, seal.seal(secret) if secret else None
+        )
+        return own_view(login)
+
+    @api.patch("/amazon/logins/{id}")
+    def patch_login(id: str, patch: LoginPatch, caller: str = Depends(user)) -> dict[str, Any]:
+        login = db.login(id)
+        if not login or login["user_id"] != caller:
+            raise HTTPException(404, "not found")
         given = patch.model_fields_set - {"updated_at"}
         changes: dict[str, Any] = {}
         if "email" in given:
             changes["email"] = (patch.email or "").strip()
-        if given & {"password", "otp_secret"} and not seal.ready():
-            raise HTTPException(503, "the shops service has no key to seal secrets with (SHOPS_ENCRYPTION_KEY)")
+            if not changes["email"]:
+                raise HTTPException(422, "Enter the Amazon account's email")
+        if given & {"password", "otp_secret"}:
+            sealing()
         if "password" in given:
             changes["password"] = seal.seal(patch.password) if patch.password else None
         if "otp_secret" in given:
-            secret = "".join((patch.otp_secret or "").split()).upper()
-            if secret:
-                try:
-                    pyotp.TOTP(secret).now()
-                except Exception:
-                    raise HTTPException(422, "That isn't an authenticator setup key (letters and digits, like JBSW Y3DP…)")
+            secret = setup_key(patch.otp_secret)
             changes["otp_secret"] = seal.seal(secret) if secret else None
+        try:
+            saved = db.set_login(id, changes, patch.updated_at)
+        except StaleVersion as e:
+            raise HTTPException(409, {"message": "it changed since it was read", "current": e.current})
+        if changes.get("email", login["email"]) != login["email"]:
+            forget_session(id)  # another Amazon account: its own session
+        return own_view(saved)
+
+    @api.delete("/amazon/logins/{id}", status_code=204)
+    def delete_login(id: str, updated_at: str, caller: str = Depends(user)) -> None:
+        login = db.login(id)
+        if not login or login["user_id"] != caller:
+            raise HTTPException(404, "not found")
+        try:
+            db.delete_login(id, updated_at)
+        except StaleVersion as e:
+            raise HTTPException(409, {"message": "it changed since it was read", "current": e.current})
+        forget_session(id)
+
+    @api.delete("/me", status_code=204)
+    def forget_me(caller: str = Depends(user)) -> None:
+        for id in db.forget_user(caller):
+            forget_session(id)
+
+    @api.get("/books/{book}/amazon")
+    def get_connection(book: str, caller: str = Depends(user)) -> dict[str, Any]:
+        need(caller, book, "read")
+        return view(db.connection(book), db.cards(book), book_login(book, caller), caller)
+
+    @api.patch("/books/{book}/amazon")
+    def patch_connection(book: str, patch: ConnectionPatch, caller: str = Depends(user)) -> dict[str, Any]:
+        given = patch.model_fields_set - {"updated_at"}
+        current = db.connection(book)
+        using = db.login(current["login_id"]) if current and current["login_id"] else None
+        # A sign-in's owner can always take theirs out; anything else is a manager's.
+        theirs = given == {"login_id"} and patch.login_id is None and bool(using) and using["user_id"] == caller  # type: ignore[index]
+        need(caller, book, "read" if theirs else "manage")
+        changes: dict[str, Any] = {}
+        if "login_id" in given:
+            if patch.login_id is not None:
+                chosen = db.login(patch.login_id)
+                if not chosen or chosen["user_id"] != caller:
+                    raise HTTPException(422, "That isn't one of your Amazon accounts")
+            # Another Amazon account (or none): the book's own from before goes, and the next
+            # sync reads back to the start.
+            changes.update(login_id=patch.login_id, email="", password=None, otp_secret=None)
+            changes.update(read_back_to=None, status="new", status_detail=None)
         if "sync_from" in given:
             changes["sync_from"] = patch.sync_from.isoformat() if patch.sync_from else None
         if "other_payments" in given:
@@ -178,17 +327,20 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf, send_orders: SendOrders |
                 if any(not re.fullmatch(r"\d{2,6}", c) for c in cards):
                     raise HTTPException(422, "A card is its last four digits, like 1234")
                 changes[name] = json.dumps(cards) if cards else None
-        if given & {"email", "sync_from", "include_cards", "exclude_cards"}:
+        if given & {"sync_from", "include_cards", "exclude_cards"}:
             # What a sync keeps changed: the next reads back to `sync_from` again.
             changes["read_back_to"] = None
-        if given & {"email", "password", "otp_secret"}:
-            # New credentials: the next sync logs in afresh.
-            changes["status"] = "new"
-            changes["status_detail"] = None
         try:
-            return view(db.set_connection(book, changes, patch.updated_at), db.cards(book))
+            saved = db.set_connection(book, changes, patch.updated_at)
         except StaleVersion as e:
             raise HTTPException(409, {"message": "it changed since it was read", "current": e.current})
+        if "login_id" in given:
+            # The book's own session from before, if any, was its own sign-in's (its invoices stay).
+            own = os.path.join(data_dir, "amazon", book)
+            if os.path.exists(os.path.join(own, "cookies.json")):
+                os.remove(os.path.join(own, "cookies.json"))
+            shutil.rmtree(os.path.join(own, "output"), ignore_errors=True)
+        return view(saved, db.cards(book), book_login(book, caller), caller)
 
     @api.delete("/books/{book}/amazon", status_code=204)
     def forget(book: str, updated_at: str, caller: str = Depends(user)) -> None:
@@ -230,8 +382,16 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf, send_orders: SendOrders |
         def step(text: str) -> None:
             job["step"] = text
 
+        session: threading.Lock | None = None
         try:
-            result = amazon.sync(db, data_dir, book, step)
+            login = book_login(book, caller)
+            with jobs_lock:
+                lock = sessions.setdefault(login["id"] if login and login["id"] else f"book:{book}", threading.Lock())
+            if not lock.acquire(blocking=False):
+                step("Waiting for another book's sync with this Amazon account…")
+                lock.acquire()
+            session = lock
+            result = amazon.sync(db, data_dir, book, step, login)
             failed = f"; {len(result['failed'])} orders couldn't be read" if result["failed"] else ""
             invoices = f", {result['invoices']} invoices saved" if result["invoices"] else ""
             others = f" ({result['other_cards']} on other cards left out)" if result["other_cards"] else ""
@@ -257,6 +417,8 @@ def create_app(db: Db, data_dir: str, role_of: RoleOf, send_orders: SendOrders |
             db.set_status(book, "failed", f"{type(e).__name__}: {e}")
             job.update(state="failed", error=f"{type(e).__name__}: {e}")
         finally:
+            if session:
+                session.release()
             job["finished_at"] = datetime.datetime.now(datetime.UTC).isoformat()
 
     @api.post("/books/{book}/amazon/sync", status_code=202)

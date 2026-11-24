@@ -16,12 +16,20 @@ export type Eagerness = (typeof EAGERNESS)[number];
 /** `GET /api/ai/v1/health`: the service is up, and which providers it can use. */
 export type AiHealth = { status: "ok"; providers: ProviderName[] };
 
-/** A book's AI settings. The credential itself never comes back: only whether there is one. */
+/** A book's AI settings. The credential itself never comes back: only whether there is one,
+ * and whose (shared connections: a key is a person's, and a book uses one). */
 export type AiSettings = {
   book_id: string;
   enabled: boolean;
   provider: ProviderName;
-  credential: { set: boolean; hint: string | null };
+  credential: {
+    set: boolean;
+    hint: string | null;
+    /** The caller's own key. */
+    mine: boolean;
+    /** Whose it is (null: the book's own, from before keys were people's). */
+    owner_id: string | null;
+  };
   /** Enabled, with a provider the service has and a credential: receipts can be read. */
   ready: boolean;
   /** Receipt capture's "Itemize receipt?" default. */
@@ -49,6 +57,16 @@ export type AiSettingsPatch = Partial<
     | "suggest_tags"
   >
 > & { updated_at: string | null };
+
+/** A key of the caller's (`GET /api/ai/v1/credentials`), never the key itself: its last four,
+ * and the books using it. */
+export type AiCredential = {
+  id: string;
+  provider: ProviderName;
+  hint: string;
+  created_at: string;
+  books: string[];
+};
 
 /** What the person capturing a receipt said (all optional): hints, not answers. */
 export type ReceiptHints = {

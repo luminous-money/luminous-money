@@ -2,7 +2,9 @@
 
 Reads shops' order histories for a book, Amazon first, at `/api/shops/v1`, and hands the
 charges it reads to `app`, which itemizes them into the book ([the Amazon orders
-plan](../../docs/milestones/.archived/amazon-orders/PLAN.md)). It signs in to Amazon as the book's manager.
+plan](../../docs/milestones/.archived/amazon-orders/PLAN.md)). It signs in to Amazon as a person:
+a sign-in is its owner's, and a book's manager puts one of their own in the book ([shared
+connections](../../docs/milestones/shared-connections/PLAN.md)).
 Tests: `tests/` (pytest, run by `pnpm test`).
 
 Amazon has no API for a shopper's orders, so this parses Amazon's own pages through
@@ -13,8 +15,13 @@ image is large.
 | Route | What it does |
 |---|---|
 | `GET /health` (and `/api/shops/v1/health`) | Up, its version and schema, and whether it can seal secrets. |
-| `GET /books/{book}/amazon` | The connection, without its secrets (whether each is set). Read. |
-| `PATCH /books/{book}/amazon` | Change it against the `updated_at` read (null before it exists). Manage. |
+| `GET /amazon/logins` | The caller's sign-ins, without their secrets, with the books using each. |
+| `POST /amazon/logins` | A new sign-in of the caller's (`email`, `password`, `otp_secret`). |
+| `PATCH /amazon/logins/{id}` | Change one of the caller's against its `updated_at`: every book using it starts over. |
+| `DELETE /amazon/logins/{id}?updated_at=` | Delete it (and Amazon's session): the books using it have none, and keep what they read. |
+| `DELETE /me` | Forget the caller's sign-ins (`app` calls it when an account is deleted). |
+| `GET /books/{book}/amazon` | The connection: the sign-in it uses (only its owner sees its email), the book's choices. Read. |
+| `PATCH /books/{book}/amazon` | Change it against the `updated_at` read (null before it exists): `login_id` (one of the caller's), the dates, cards and accounts. Manage (a sign-in's owner may take theirs out). |
 | `DELETE /books/{book}/amazon?updated_at=` | Forget it, what was read, and Amazon's session. Manage. |
 | `POST /books/{book}/amazon/sync` | Start reading Amazon (202); `GET` says how it's going. Write. |
 | `GET /books/{book}/amazon/charges` | What was read, newest first, each charge with its order. Read. |
@@ -24,7 +31,8 @@ Roles are the ledger's, asked as the caller (`X-User-Id`, set by the gateway).
 
 ## How a sync goes
 
-1. Log in: reuse Amazon's session from last time (`/data/shops/amazon/<book>/cookies.json`),
+1. Log in as the sign-in the book uses, one sync at a time per sign-in: reuse Amazon's session
+   from last time (`/data/shops/amazon/logins/<id>/cookies.json`),
    or sign in in a headless Chromium as a person would: the email, the password, a two-step
    code made from the authenticator app's setup key, and Amazon's "I am human" box. Anything
    Amazon asks that only a person can answer (an image captcha, a code sent by email or text,

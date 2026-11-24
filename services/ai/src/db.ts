@@ -1,5 +1,5 @@
-/** The ai service's database: each book's AI settings, its provider's credential sealed, and
- * what its operations cost. */
+/** The ai service's database: people's keys (sealed), each book's AI settings and the key it
+ * uses, and what its operations cost. */
 import {
   after,
   createTable,
@@ -11,8 +11,11 @@ import {
   type Migration,
 } from "@luminous-money/db";
 
+import { randomUUID } from "node:crypto";
+
 import type {
   AiCost,
+  AiCredential,
   AiSettings,
   AiSettingsPatch,
   AiUsage,
@@ -56,7 +59,29 @@ export const MIGRATIONS: Migration[] = [
   ],
   // 3: "Suggest tags" (HSA tracking; Tags, more's decision 9: on by default).
   ["ALTER TABLE ai_setting ADD COLUMN suggest_tags INTEGER NOT NULL DEFAULT 1"],
+  // 4: keys are people's (shared connections, 2026-11-24): a key is its owner's, and a book uses
+  // one. A book's own (`ai_setting.credential`, from before) becomes its owner's the first time
+  // the owner's request comes (`adopt`): nothing here knew who set it.
+  [
+    createTable("ai_credential", [
+      "id TEXT PRIMARY KEY",
+      "user_id TEXT NOT NULL",
+      "provider TEXT NOT NULL",
+      "credential TEXT NOT NULL", // sealed (@luminous-money/db Sealer)
+      "hint TEXT NOT NULL", // its last four characters
+    ]),
+    "CREATE INDEX ai_credential_user ON ai_credential (user_id)",
+    "ALTER TABLE ai_setting ADD COLUMN credential_id TEXT REFERENCES ai_credential (id) ON DELETE SET NULL",
+  ],
 ];
+
+/** The key a book uses: a person's, or (`user_id` null) the book's own from before. */
+export type BookKey = {
+  id: string | null;
+  user_id: string | null;
+  credential: string;
+  hint: string;
+};
 
 /** An edit based on a version that has moved on. */
 export class StaleVersion extends Error {}
@@ -72,7 +97,17 @@ type Row = {
   eagerness: Eagerness;
   guidance: string | null;
   suggest_tags: number;
+  credential_id: string | null;
   updated_at: string;
+};
+
+type KeyRow = {
+  id: string;
+  user_id: string;
+  provider: ProviderName;
+  credential: string;
+  hint: string;
+  created_at: string;
 };
 
 export class AiDb {
@@ -89,16 +124,26 @@ export class AiDb {
   }
 
   /** The book's settings (the defaults until first saved); `ready` given the providers this
-   * service has. */
-  settings(book: string, providers: ProviderName[]): AiSettings {
+   * service has and the key it may use (`key`: the caller's call, `usableKey`). */
+  settings(
+    book: string,
+    providers: ProviderName[],
+    key: BookKey | null,
+    viewer: string
+  ): AiSettings {
     const r = this.row(book);
     const provider = r?.provider ?? "claude";
-    const set = !!r?.credential;
+    const set = !!key;
     return {
       book_id: book,
       enabled: r?.enabled === 1,
       provider,
-      credential: { set, hint: r?.credential_hint ?? null },
+      credential: {
+        set,
+        hint: key?.hint ?? null,
+        mine: !!key?.user_id && key.user_id === viewer,
+        owner_id: key?.user_id ?? null,
+      },
       ready: r?.enabled === 1 && providers.includes(provider) && (set || provider === "fake"),
       itemize: r?.itemize === 1,
       create_accounts: r?.create_accounts === 1,
@@ -129,16 +174,100 @@ export class AiDb {
     });
   }
 
-  /** Set (or, with null, clear) the provider's credential, sealed. */
-  setCredential(book: string, sealed: string | null, hint: string | null): void {
+  /** The key the book uses, if any (whether its owner may still lend it is the API's call). */
+  keyOf(book: string): BookKey | null {
+    const r = this.row(book);
+    if (r?.credential_id) {
+      const k = this.db.prepare("SELECT * FROM ai_credential WHERE id = ?").get(r.credential_id) as
+        KeyRow | undefined;
+      if (k) return { id: k.id, user_id: k.user_id, credential: k.credential, hint: k.hint };
+    }
+    return r?.credential
+      ? { id: null, user_id: null, credential: r.credential, hint: r.credential_hint ?? "" }
+      : null;
+  }
+
+  /** Use one of a person's keys in the book (or, with null, none): a change of its settings. */
+  useKey(book: string, key: string | null): void {
     transaction(this.db, () =>
-      this.upsert(book, this.row(book), { credential: sealed, credential_hint: hint })
+      this.upsert(book, this.row(book), {
+        credential_id: key,
+        credential: null,
+        credential_hint: null,
+      })
     );
   }
 
-  /** The sealed credential, if any. */
-  credential(book: string): string | null {
-    return this.row(book)?.credential ?? null;
+  /** The book's own key, from before keys were people's, becomes `owner`'s (the book's owner,
+   * the first time their request comes), and the book uses it as theirs. */
+  adopt(book: string, owner: string): void {
+    transaction(this.db, () => {
+      const r = this.row(book);
+      if (!r?.credential || r.credential_id) return;
+      const key = this.addKey(owner, r.provider, r.credential, r.credential_hint ?? "");
+      this.db
+        .prepare(
+          "UPDATE ai_setting SET credential_id = ?, credential = NULL, credential_hint = NULL WHERE book_id = ?"
+        )
+        .run(key.id, book);
+    });
+  }
+
+  // People's keys
+
+  private keyView(k: KeyRow): AiCredential {
+    const books = this.db
+      .prepare("SELECT book_id FROM ai_setting WHERE credential_id = ? ORDER BY book_id")
+      .all(k.id) as { book_id: string }[];
+    return {
+      id: k.id,
+      provider: k.provider,
+      hint: k.hint,
+      created_at: k.created_at,
+      books: books.map((b) => b.book_id),
+    };
+  }
+
+  /** A person's key, sealed. */
+  addKey(user: string, provider: ProviderName, sealed: string, hint: string): AiCredential {
+    const id = randomUUID().replace(/-/g, "");
+    const stamp = now();
+    this.db
+      .prepare(
+        `INSERT INTO ai_credential (id, user_id, provider, credential, hint, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(id, user, provider, sealed, hint, stamp, stamp);
+    return this.key(user, id)!;
+  }
+
+  /** One of the person's keys. */
+  key(user: string, id: string): AiCredential | undefined {
+    const k = this.db
+      .prepare("SELECT * FROM ai_credential WHERE id = ? AND user_id = ?")
+      .get(id, user) as KeyRow | undefined;
+    return k && this.keyView(k);
+  }
+
+  keys(user: string): AiCredential[] {
+    return (
+      this.db
+        .prepare("SELECT * FROM ai_credential WHERE user_id = ? ORDER BY created_at")
+        .all(user) as KeyRow[]
+    ).map((k) => this.keyView(k));
+  }
+
+  /** Delete one of the person's keys: every book using it has none. */
+  deleteKey(user: string, id: string): boolean {
+    return (
+      this.db.prepare("DELETE FROM ai_credential WHERE id = ? AND user_id = ?").run(id, user)
+        .changes > 0
+    );
+  }
+
+  /** Forget a person's keys (their account is being deleted). */
+  forgetUser(user: string): void {
+    this.db.prepare("DELETE FROM ai_credential WHERE user_id = ?").run(user);
   }
 
   /** Forget a book (once it's deleted). */
@@ -214,19 +343,21 @@ export class AiDb {
       eagerness: "average",
       guidance: null,
       suggest_tags: 1,
+      credential_id: null,
       ...current,
       ...changes,
     };
     this.db
       .prepare(
         `INSERT INTO ai_setting (book_id, enabled, provider, credential, credential_hint, itemize,
-           create_accounts, eagerness, guidance, suggest_tags, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           create_accounts, eagerness, guidance, suggest_tags, credential_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (book_id) DO UPDATE SET enabled = excluded.enabled, provider = excluded.provider,
            credential = excluded.credential, credential_hint = excluded.credential_hint,
            itemize = excluded.itemize, create_accounts = excluded.create_accounts,
            eagerness = excluded.eagerness, guidance = excluded.guidance,
-           suggest_tags = excluded.suggest_tags, updated_at = excluded.updated_at`
+           suggest_tags = excluded.suggest_tags, credential_id = excluded.credential_id,
+           updated_at = excluded.updated_at`
       )
       .run(
         book,
@@ -239,6 +370,7 @@ export class AiDb {
         next.eagerness,
         next.guidance,
         next.suggest_tags,
+        next.credential_id,
         stamp,
         stamp
       );

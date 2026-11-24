@@ -74,6 +74,7 @@ test("a brokerage says whether its activity is read; a linked one says what it d
   await page.getByRole("textbox", { name: "Setup token" }).fill(await brokerages());
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   const connection = page.getByRole("region", { name: /Connection to/ });
+  await connection.getByRole("button", { name: "Share", exact: true }).click();
   // Said once over each bank's accounts (2026-11-14), how it's read in its (i).
   const fidelity = connection.getByRole("region", { name: "Fidelity Investments" });
   await fidelity

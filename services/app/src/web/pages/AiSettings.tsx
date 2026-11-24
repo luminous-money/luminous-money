@@ -1,9 +1,10 @@
 /**
- * A book's AI (M16): on or off, the provider and its API key (set or replaced, never shown
- * again), whether receipts are itemized by default, whether the AI may open accounts (how
- * eagerly, with what guidance), and whether it suggests tags (HSA tracking). Managers change
- * them; members see them. If the ai service is down, it says so: nothing AI is offered until it's
- * back.
+ * A book's AI (M16): on or off, the provider and the API key it uses (a person's: shared
+ * connections; never shown again), whether receipts are itemized by default, whether the AI may
+ * open accounts (how eagerly, with what guidance), and whether it suggests tags (HSA tracking).
+ * Managers change them, putting one of their own keys in the book; a key's owner can always take
+ * it out; members see them. If the ai service is down, it says so: nothing AI is offered until
+ * it's back.
  */
 import { useState } from "react";
 
@@ -11,9 +12,13 @@ import { formatUsd, type AiSettings as Settings, type Eagerness } from "../lib/a
 import {
   explain,
   useAiHealth,
+  useAiKeys,
   useAiSettings,
   useAiUsage,
+  useBooks,
   useClearAiKey,
+  useDeleteAiKey,
+  useMembers,
   usePatchAi,
   useRole,
   useSetAiKey,
@@ -111,17 +116,170 @@ function Spending({ book }: { book: string }) {
   );
 }
 
-function Form({ book, settings, manage }: { book: string; settings: Settings; manage: boolean }) {
-  const patch = usePatchAi(book);
+/** Whose key the book uses, as a phrase: "your key", "Jess's key", "the book's key". */
+function useWhose(book: string, settings: Settings) {
+  const members = useMembers(book);
+  const { mine, owner_id } = settings.credential;
+  if (mine) return "your key";
+  if (!owner_id) return "the book's key";
+  const name = members.data?.members.find((m) => m.user_id === owner_id)?.name;
+  return name ? `${name}${name.endsWith("s") ? "'" : "'s"} key` : "another member's key";
+}
+
+/** The book's API key: whose it uses (never which), a manager's choice of their own or a new
+ * one of theirs, and taking it out (a manager, or the key's owner). */
+function KeyChoice({
+  book,
+  settings,
+  manage,
+}: {
+  book: string;
+  settings: Settings;
+  manage: boolean;
+}) {
   const setKey = useSetAiKey(book);
   const clearKey = useClearAiKey(book);
-  const health = useAiHealth();
+  const keys = useAiKeys(manage);
+  const whose = useWhose(book, settings);
   const [key, setKeyText] = useState("");
+  const { set, hint, mine } = settings.credential;
+  // A book uses one key: the caller's others, to choose from.
+  const others = (keys.data ?? []).filter((k) => !k.books.includes(book));
+  const [chosen, setChosen] = useState("");
+  const error = setKey.error ?? clearKey.error;
+  return (
+    <div className="key-choice">
+      <p className="small">
+        {set ? (
+          <>
+            Uses {whose}, <span className="muted">…{hint}</span>
+          </>
+        ) : (
+          <span className="muted">No API key yet.</span>
+        )}{" "}
+        {set && (manage || mine) && (
+          <button
+            type="button"
+            className="plain"
+            disabled={clearKey.isPending}
+            onClick={() => clearKey.mutate(undefined)}
+          >
+            {mine && !manage ? "Take yours out" : "Remove"}
+          </button>
+        )}
+      </p>
+      {manage && others.length > 0 && (
+        <form
+          className="inline-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (chosen)
+              setKey.mutate({ credential_id: chosen }, { onSuccess: () => setChosen("") });
+          }}
+        >
+          <label>
+            One of your keys
+            <select value={chosen} onChange={(e) => setChosen(e.target.value)}>
+              <option value="">Choose…</option>
+              {others.map((k) => (
+                <option key={k.id} value={k.id}>
+                  …{k.hint}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" disabled={!chosen || setKey.isPending}>
+            Use it here
+          </button>
+        </form>
+      )}
+      {manage && (
+        <form
+          className="inline-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (key.trim())
+              setKey.mutate({ api_key: key.trim() }, { onSuccess: () => setKeyText("") });
+          }}
+        >
+          <label>
+            {set ? "A new key of yours" : "Your API key"}
+            <input
+              type="password"
+              autoComplete="off"
+              value={key}
+              onChange={(e) => setKeyText(e.target.value)}
+              placeholder="sk-ant-…"
+              aria-label="API key"
+            />
+          </label>
+          <button type="submit" disabled={!key.trim() || setKey.isPending}>
+            {set ? "Replace" : "Save"}
+          </button>
+        </form>
+      )}
+      <p className="small muted">
+        A key is yours: kept encrypted on your server and never shown again, used in the books you
+        put it in (each book&apos;s spending is below, and the Claude Console bills you). From the
+        Claude Console (API keys).
+      </p>
+      {error && <p className="error">{explain(error)}</p>}
+    </div>
+  );
+}
+
+/** The caller's own keys: the books using each, and deleting one (from all of them). */
+function YourKeys() {
+  const keys = useAiKeys();
+  const books = useBooks();
+  const remove = useDeleteAiKey();
+  if (!keys.data?.length) return null;
+  const name = (id: string) => books.data?.find((b) => b.id === id)?.name ?? "another book";
+  return (
+    <section className="card" aria-label="Your keys">
+      <h2 className="section-title">Your keys</h2>
+      <ul className="plain-list">
+        {keys.data.map((k) => (
+          <li key={k.id} className="row-between">
+            <span>
+              …{k.hint}
+              <span className="small muted block">
+                {k.books.length ? `Used in ${k.books.map(name).join(", ")}` : "Not used in a book"}
+              </span>
+            </span>
+            <button
+              type="button"
+              className="plain danger"
+              disabled={remove.isPending}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    k.books.length
+                      ? "Delete this key? The books using it will have none."
+                      : "Delete this key?"
+                  )
+                )
+                  remove.mutate(k.id);
+              }}
+            >
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
+      {remove.error && <p className="error">{explain(remove.error)}</p>}
+    </section>
+  );
+}
+
+function Form({ book, settings, manage }: { book: string; settings: Settings; manage: boolean }) {
+  const patch = usePatchAi(book);
+  const health = useAiHealth();
   const [guidance, setGuidance] = useState(settings.guidance ?? "");
   const change = (changes: Partial<Settings>) =>
     patch.mutate({ ...changes, updated_at: settings.updated_at } as never);
   const providers = health.data?.providers ?? ["claude"];
-  const error = patch.error ?? setKey.error ?? clearKey.error;
+  const error = patch.error;
   return (
     <>
       <section className="card editor" aria-label="AI">
@@ -156,46 +314,10 @@ function Form({ book, settings, manage }: { book: string; settings: Settings; ma
           </select>
         </label>
         {settings.provider === "claude" && (
-          <form
-            className="inline-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (key.trim()) setKey.mutate(key.trim(), { onSuccess: () => setKeyText("") });
-            }}
-          >
-            <label>
-              API key
-              <input
-                type="password"
-                autoComplete="off"
-                value={key}
-                disabled={!manage}
-                onChange={(e) => setKeyText(e.target.value)}
-                placeholder={
-                  settings.credential.set ? `Set: …${settings.credential.hint}` : "sk-ant-…"
-                }
-                aria-label="API key"
-              />
-            </label>
-            <button type="submit" disabled={!manage || !key.trim() || setKey.isPending}>
-              {settings.credential.set ? "Replace" : "Save"}
-            </button>
-            {settings.credential.set && (
-              <button
-                type="button"
-                className="plain"
-                disabled={!manage || clearKey.isPending}
-                onClick={() => clearKey.mutate(undefined)}
-              >
-                Remove
-              </button>
-            )}
-          </form>
+          <KeyChoice book={book} settings={settings} manage={manage} />
         )}
-        <p className="small muted">
-          Kept encrypted on your server and never shown again. From the Claude Console (API keys).
-        </p>
       </section>
+      <YourKeys />
 
       <section className="card editor" aria-label="Receipts">
         <h2 className="section-title">Receipts</h2>

@@ -191,6 +191,23 @@ export function createApi({
   const owned = async (user: string, book: string) =>
     (await ledgerFor(user).book(book)) !== undefined;
 
+  /** Forget what's the caller's alone (auth calls this when their account is deleted): their
+   * bank connections here, and their AI keys and shop sign-ins in those services, as far as
+   * they can be reached (a service that's down or not deployed holds nothing anyone can use:
+   * what it seals was theirs alone). */
+  api.delete("/me", async (c) => {
+    const user = c.get("user");
+    simplefin?.store.forgetUser(user);
+    for (const [service, forget] of [
+      ["ai", () => aiFor?.(user).forgetUser()],
+      ["shops", () => shopsFor?.(user).forgetUser()],
+    ] as const)
+      await Promise.resolve(forget()).catch((error: unknown) =>
+        console.error(`forgetting user ${user} in ${service} failed:`, error)
+      );
+    return c.body(null, 204);
+  });
+
   // Work that outlasts a request (a receipt read, a brokerage read again): see below.
   const jobs = new Jobs();
   if (simplefin) simplefinRoutes(api, { ...simplefin, db, ledgerFor, categorizers }, owned, jobs);
@@ -996,7 +1013,7 @@ export function createApi({
     const queue = [
       ...(await notifications(ledgerFor(user), book)),
       ...(shopsFor ? await shopNotifications(shopsFor(user), book) : []),
-      ...(simplefin ? bankNotifications(simplefin.store, book) : []),
+      ...(simplefin ? bankNotifications(simplefin.store, book, user) : []),
     ];
     return queue.filter((n) => !dismissed.has(n.id)).sort((a, b) => a.added.localeCompare(b.added));
   };
@@ -1357,7 +1374,8 @@ export function createApi({
   });
 
   /** Take a member out (a manager), or leave (yourself). What acted as them in the book acts as
-   * its owner from then on, and their bank links into it go. */
+   * its owner from then on; the bank connections they shared with it go, with the links on them,
+   * and links they made on someone else's act as that connection's owner. */
   api.delete("/books/:book/members/:member", async (c) => {
     const { book, member } = c.req.param();
     const ledger = ledgerFor(c.get("user"));
@@ -1365,8 +1383,7 @@ export function createApi({
       const owner = (await ledger.members(book)).find((m) => m.role === "owner")?.user_id;
       await ledger.removeMember(book, member);
       if (owner) db.handOver(book, member, owner);
-      for (const link of simplefin?.store.linksIn(book) ?? [])
-        if (link.user_id === member) simplefin!.store.deleteLink(link.user_id, link.id);
+      simplefin?.store.leaveBook(member, book);
       return c.body(null, 204);
     } catch (error) {
       return c.json(...ledgerProblem(error));

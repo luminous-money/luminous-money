@@ -21,7 +21,7 @@ import { backfill, type SimplefinDeps } from "./sync.js";
 const running = new Set<string>();
 
 function inputOf(deps: SimplefinDeps, attempt: Attempt): LinkInput | undefined {
-  const connection = deps.store.connection(attempt.user_id, attempt.connection_id);
+  const connection = deps.store.connectionById(attempt.connection_id);
   return (
     connection && {
       user: attempt.user_id,

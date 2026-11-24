@@ -29,6 +29,8 @@ export interface AiPort {
   loanTable(book: string, input: LoanTableIn): Promise<Answer<LoanTableOut>>;
   /** Forget a deleted book. */
   forgetBook(book: string): Promise<void>;
+  /** Forget the user's keys (their account is being deleted). */
+  forgetUser(): Promise<void>;
 }
 
 export function httpAi(baseUrl: string, userId: string): AiPort {
@@ -70,6 +72,10 @@ export function httpAi(baseUrl: string, userId: string): AiPort {
     loanTable: (book, input) => post(`${books(book)}/loans/extract`, input, 900_000),
     async forgetBook(book) {
       await call(books(book), { method: "DELETE" }).catch(() => undefined);
+    },
+    async forgetUser() {
+      const response = await call("/me", { method: "DELETE" }, 10_000);
+      if (!response.ok) throw new Error(`the AI service said ${response.status}`);
     },
   };
 }

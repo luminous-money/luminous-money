@@ -42,6 +42,10 @@ export function NotificationsPage({ book }: { book: string }) {
               <p>{n.detail}</p>
               {n.kind === "bank-feed" ? (
                 <BankFeedLinks book={book} here={here} notification={n} />
+              ) : n.kind === "bank-account" && n.href ? (
+                <p className="small">
+                  <Link href={withBack(n.href, here)}>Link it ›</Link>
+                </p>
               ) : n.href ? (
                 <p className="small">
                   <Link href={n.href}>Log in again ›</Link>

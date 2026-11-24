@@ -85,6 +85,15 @@ describe("M16: receipt capture", () => {
     const text = await keyed.text();
     assert.doesNotMatch(text, /not-real/);
     assert.match(text, /"hint":"9876"/);
+    // The key is the user's (shared connections), the book using it.
+    const keys = (await (await ai(user, "/credentials")).json()) as {
+      hint: string;
+      books: string[];
+    }[];
+    assert.deepEqual(
+      keys.map((k) => [k.hint, k.books]),
+      [["9876", [book]]]
+    );
     // Someone else's book: not found.
     const stranger = await newUser();
     assert.equal((await ai(stranger, `/books/${book}/settings`)).status, 404);

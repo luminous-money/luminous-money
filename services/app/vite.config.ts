@@ -21,7 +21,8 @@ export default defineConfig({
       manifest: {
         name: "Luminous Money",
         short_name: "Luminous",
-        description: "Fast review and categorization for double-entry books.",
+        description:
+          "Double-entry accounting to manage your assets, expenses, goals, budgets and loans on mobile or desktop. Open source and self-hostable.",
         start_url: "/ui/",
         scope: "/ui/",
         display: "standalone",

@@ -1,4 +1,5 @@
-"""shops.sqlite: each book's Amazon connection, and the charges and orders read from Amazon.
+"""shops.sqlite: people's Amazon sign-ins, each book's Amazon connection (the sign-in it uses and
+its own choices), and the charges and orders read from Amazon.
 
 Every table is created with `create_table`, which adds `created_at` and `updated_at`; a row's
 `updated_at` is its version, and an edit naming another is refused (StaleVersion).
@@ -9,6 +10,7 @@ import json
 import os
 import sqlite3
 import threading
+import uuid
 from typing import Any
 
 TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -98,6 +100,25 @@ MIGRATIONS: list[list[str]] = [
     # 15 days before the last. Null when a full read back to `sync_from` is owed (none yet, or
     # the date, the cards or the account changed).
     ["ALTER TABLE amazon_connection ADD COLUMN read_back_to TEXT"],
+    # Sign-ins are people's (shared connections, 2026-11-24): the email, password and key are
+    # their owner's, with Amazon's session (`amazon/logins/<id>/`), and a book uses one
+    # (`login_id`), keeping everything else. A book's own (on `amazon_connection`, from before)
+    # becomes its owner's the first time the owner's request comes (`adopt`): nothing here knew
+    # who set it.
+    [
+        create_table(
+            "amazon_login",
+            [
+                "id TEXT PRIMARY KEY",
+                "user_id TEXT NOT NULL",
+                "email TEXT NOT NULL",
+                "password TEXT",  # sealed
+                "otp_secret TEXT",  # sealed: the authenticator app's setup key
+            ],
+        ),
+        "CREATE INDEX amazon_login_user ON amazon_login (user_id)",
+        "ALTER TABLE amazon_connection ADD COLUMN login_id TEXT",
+    ],
 ]
 
 
@@ -157,6 +178,112 @@ class Db:
                 self.conn.execute("UPDATE amazon_connection SET updated_at = ? WHERE book_id = ?", (stamp, book))
         return self.connection(book)  # type: ignore[return-value]
 
+    # People's sign-ins
+
+    def login(self, id: str) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM amazon_login WHERE id = ?", (id,)).fetchone()
+        return dict(row) if row else None
+
+    def logins(self, user: str) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM amazon_login WHERE user_id = ? ORDER BY created_at", (user,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def books_using(self, login: str) -> list[str]:
+        rows = self.conn.execute(
+            "SELECT book_id FROM amazon_connection WHERE login_id = ? ORDER BY book_id", (login,)
+        ).fetchall()
+        return [r["book_id"] for r in rows]
+
+    def add_login(self, user: str, email: str, password: str | None, otp_secret: str | None) -> dict[str, Any]:
+        id = uuid.uuid4().hex
+        stamp = now()
+        with self.lock:
+            self.conn.execute(
+                "INSERT INTO amazon_login (id, user_id, email, password, otp_secret, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (id, user, email, password, otp_secret, stamp, stamp),
+            )
+        return self.login(id)  # type: ignore[return-value]
+
+    def set_login(self, id: str, changes: dict[str, Any], expected: str | None) -> dict[str, Any]:
+        """Change a sign-in against the version read. New credentials start every book using it
+        over ("Not synced yet"), and a new email reads each back to its start again."""
+        with self.lock:
+            current = self.login(id)
+            if current is None or current["updated_at"] != expected:
+                raise StaleVersion(current["updated_at"] if current else None)
+            stamp = after(current["updated_at"])
+            self.conn.execute("BEGIN")
+            if changes:
+                columns = ", ".join(f"{k} = ?" for k in changes)
+                self.conn.execute(
+                    f"UPDATE amazon_login SET {columns}, updated_at = ? WHERE id = ?", (*changes.values(), stamp, id)
+                )
+                self.conn.execute(
+                    "UPDATE amazon_connection SET status = 'new', status_detail = NULL"
+                    + (", read_back_to = NULL" if "email" in changes else "")
+                    + " WHERE login_id = ?",
+                    (id,),
+                )
+            else:
+                self.conn.execute("UPDATE amazon_login SET updated_at = ? WHERE id = ?", (stamp, id))
+            self.conn.execute("COMMIT")
+        return self.login(id)  # type: ignore[return-value]
+
+    def delete_login(self, id: str, expected: str) -> None:
+        """Delete a sign-in: every book using it has none (keeping what it read)."""
+        with self.lock:
+            current = self.login(id)
+            if current is None or current["updated_at"] != expected:
+                raise StaleVersion(current["updated_at"] if current else None)
+            self.conn.execute("BEGIN")
+            self.conn.execute("UPDATE amazon_connection SET login_id = NULL WHERE login_id = ?", (id,))
+            self.conn.execute("DELETE FROM amazon_login WHERE id = ?", (id,))
+            self.conn.execute("COMMIT")
+
+    def forget_user(self, user: str) -> list[str]:
+        """Forget a person's sign-ins (their account is being deleted); returns their IDs."""
+        with self.lock:
+            ids = [r["id"] for r in self.conn.execute("SELECT id FROM amazon_login WHERE user_id = ?", (user,))]
+            self.conn.execute("BEGIN")
+            for id in ids:
+                self.conn.execute("UPDATE amazon_connection SET login_id = NULL WHERE login_id = ?", (id,))
+                self.conn.execute("DELETE FROM amazon_login WHERE id = ?", (id,))
+            self.conn.execute("COMMIT")
+        return ids
+
+    def drop_login(self, book: str) -> None:
+        """The book stops using its sign-in (its owner has left the book). Not an edit of the
+        book's settings, so it doesn't move their version."""
+        with self.lock:
+            self.conn.execute("UPDATE amazon_connection SET login_id = NULL WHERE book_id = ?", (book,))
+
+    def adopt(self, book: str, owner: str) -> str | None:
+        """The book's own sign-in, from before sign-ins were people's, becomes `owner`'s (the
+        book's owner, the first time their request comes), and the book uses it as theirs.
+        Returns the new sign-in's ID, for its session to move with it."""
+        with self.lock:
+            row = self.connection(book)
+            if not row or row["login_id"] or not (row["email"] or row["password"]):
+                return None
+            id = uuid.uuid4().hex
+            stamp = now()
+            self.conn.execute("BEGIN")
+            self.conn.execute(
+                "INSERT INTO amazon_login (id, user_id, email, password, otp_secret, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (id, owner, row["email"], row["password"], row["otp_secret"], stamp, stamp),
+            )
+            self.conn.execute(
+                "UPDATE amazon_connection SET login_id = ?, email = '', password = NULL, otp_secret = NULL "
+                "WHERE book_id = ?",
+                (id, book),
+            )
+            self.conn.execute("COMMIT")
+        return id
+
     def set_status(self, book: str, status: str, detail: str | None, synced: bool = False) -> None:
         """A sync's outcome. Not an edit of the settings, so it doesn't move their version."""
         with self.lock:
@@ -173,6 +300,8 @@ class Db:
             self.conn.execute("UPDATE amazon_connection SET read_back_to = ? WHERE book_id = ?", (date, book))
 
     def forget(self, book: str, expected: str) -> None:
+        """Forget a book's connection and everything read with it (not the sign-in it used, which
+        is a person's)."""
         with self.lock:
             current = self.connection(book)
             if current is None or current["updated_at"] != expected:

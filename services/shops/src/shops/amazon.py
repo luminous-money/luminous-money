@@ -643,19 +643,38 @@ def redated(kept: list[dict[str, Any]], rows: list[dict[str, Any]], since: datet
     return moves
 
 
-def sync(db: Db, data_dir: str, book: str, step: Callable[[str], None]) -> dict[str, Any]:
-    """Log in, read the charges since `sync_from` and the orders behind them, and keep them.
-    Returns counts; raises NeedsPerson, AmazonOrdersAuthError (Amazon refused the login) or
-    AmazonOrdersError."""
+def session_dir(data_dir: str, login: dict[str, Any] | None, book: str) -> str:
+    """Where Amazon's session is kept: with the person's sign-in (shared connections), or, for a
+    book's own from before, beside the book."""
+    if login and login.get("id"):
+        return os.path.join(data_dir, "amazon", "logins", login["id"])
+    return os.path.join(data_dir, "amazon", book)
+
+
+def move_session(data_dir: str, book: str, login_id: str) -> None:
+    """A book's own sign-in became a person's (`Db.adopt`): its session goes with it, so the
+    next sync needn't sign in again. Its invoices stay the book's."""
+    source = os.path.join(data_dir, "amazon", book)
+    target = os.path.join(data_dir, "amazon", "logins", login_id)
+    os.makedirs(target, mode=0o700, exist_ok=True)
+    for name in ("cookies.json", "output"):
+        if os.path.exists(os.path.join(source, name)):
+            os.replace(os.path.join(source, name), os.path.join(target, name))
+
+
+def sync(db: Db, data_dir: str, book: str, step: Callable[[str], None], login: dict[str, Any] | None) -> dict[str, Any]:
+    """Log in as `login` (the sign-in the book uses), read the charges since `sync_from` and the
+    orders behind them, and keep them for the book. Returns counts; raises NeedsPerson,
+    AmazonOrdersAuthError (Amazon refused the login) or AmazonOrdersError."""
     connection = db.connection(book)
-    if not connection or not connection["email"] or not connection["password"]:
+    if not connection or not login or not login["email"] or not login["password"]:
         raise AmazonOrdersAuthError("Set the Amazon account's email and password first.")
-    directory = os.path.join(data_dir, "amazon", book)
+    directory = session_dir(data_dir, login, book)
     config = _config(directory)
     session = Session(
-        connection["email"],
-        seal.unseal(connection["password"]),
-        otp_secret_key=seal.unseal(connection["otp_secret"]) if connection["otp_secret"] else None,
+        login["email"],
+        seal.unseal(login["password"]),
+        otp_secret_key=seal.unseal(login["otp_secret"]) if login["otp_secret"] else None,
         io=NoPrompts(),
         config=config,
         step=step,

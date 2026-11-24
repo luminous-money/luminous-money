@@ -1,9 +1,12 @@
 /**
  * The ai service's API, at /api/ai/v1 (M16). Every route but health needs the caller (X-User-Id,
  * set by Traefik after checking the session); what they may do in a book is the ledger's call:
- * a member reads a book's AI settings, a manager changes them (and its credential), a writer
- * uses its two operations (extract a receipt's facts, categorize splits). The credential is
- * sealed at rest and never sent back.
+ * a member reads a book's AI settings, a manager changes them (and chooses its key), a writer
+ * uses its two operations (extract a receipt's facts, categorize splits).
+ *
+ * **Keys are people's** (shared connections, 2026-11-24: `/credentials`): a manager puts one of
+ * their own in a book; its owner can always take it out, and it isn't used once they've left the
+ * book. A key is sealed at rest and never sent back.
  */
 import { bodyLimit } from "hono/body-limit";
 import { Hono, type Context } from "hono";
@@ -22,7 +25,7 @@ import {
   type ProviderName,
 } from "@luminous-money/ai-api";
 
-import { StaleVersion, type AiDb, type Operation } from "./db.js";
+import { StaleVersion, type AiDb, type BookKey, type Operation } from "./db.js";
 import { offeredTags, ReadFailed, untagged, type Meter, type Provider } from "./providers/types.js";
 
 type Env = { Variables: { user: string } };
@@ -63,16 +66,20 @@ export function createApi({
   /** Up, and with which providers: what the PWA checks before offering anything AI. */
   api.get("/health", (c) => c.json({ status: "ok", providers: names } satisfies AiHealth));
 
-  api.use("/books/*", async (c, next) => {
-    const user = c.req.header("x-user-id");
-    if (!user) return c.json({ detail: "not logged in" }, 401);
-    c.set("user", user);
-    return next();
-  });
+  for (const path of ["/books/*", "/credentials", "/credentials/*", "/me"])
+    api.use(path, async (c, next) => {
+      const user = c.req.header("x-user-id");
+      if (!user) return c.json({ detail: "not logged in" }, 401);
+      c.set("user", user);
+      return next();
+    });
 
-  /** The caller's role, or a response refusing them. */
+  /** The caller's role, or a response refusing them. The book's owner takes its key from
+   * before keys were people's, the first time they come. */
   const allowed = async (c: Context<Env>, need: Role) => {
-    const role = await roleOf(c.get("user"), c.req.param("book")!);
+    const book = c.req.param("book")!;
+    const role = await roleOf(c.get("user"), book);
+    if (role === "owner") db.adopt(book, c.get("user"));
     if (!role) return c.json({ detail: "not found" }, 404);
     if (!atLeast(role, need))
       return c.json(
@@ -87,10 +94,23 @@ export function createApi({
     return null;
   };
 
+  /** The key the book may use: none once its owner has left the book (it stops being used). */
+  const usableKey = async (book: string, caller: string): Promise<BookKey | null> => {
+    const key = db.keyOf(book);
+    if (!key?.user_id || key.user_id === caller) return key;
+    if (await roleOf(key.user_id, book)) return key;
+    db.useKey(book, null);
+    return null;
+  };
+
+  /** The book's settings, as the caller sees them. */
+  const settingsOf = async (book: string, caller: string) =>
+    db.settings(book, names, await usableKey(book, caller), caller);
+
   api.get("/books/:book/settings", async (c) => {
     const refused = await allowed(c, "read");
     if (refused) return refused;
-    return c.json(db.settings(c.req.param("book"), names));
+    return c.json(await settingsOf(c.req.param("book"), c.get("user")));
   });
 
   /** Change some settings, against `updated_at` (null when they've never been saved). */
@@ -120,27 +140,87 @@ export function createApi({
       if (error instanceof StaleVersion) return c.json({ detail: error.message }, 409);
       throw error;
     }
-    return c.json(db.settings(book, names));
+    return c.json(await settingsOf(book, c.get("user")));
   });
 
-  /** Set the provider's credential (an API key): sealed, and never sent back. */
+  /** A new key, the caller's: sealed, and never sent back. */
+  const newKey = (user: string, provider: ProviderName, apiKey: unknown) => {
+    const key = typeof apiKey === "string" ? apiKey.trim() : "";
+    if (key.length < 8) return null;
+    return db.addKey(user, provider, sealer.seal(key), key.slice(-4));
+  };
+
+  /** The book's key, as a manager: one of their own (`credential_id`), or a new one of theirs
+   * (`api_key`). */
   api.put("/books/:book/credential", async (c) => {
     const refused = await allowed(c, "manage");
     if (refused) return refused;
     const book = c.req.param("book");
-    const body = (await c.req.json().catch(() => ({}))) as { api_key?: unknown };
-    const key = typeof body.api_key === "string" ? body.api_key.trim() : "";
-    if (key.length < 8) return c.json({ detail: "paste the whole API key" }, 422);
-    db.setCredential(book, sealer.seal(key), key.slice(-4));
-    return c.json(db.settings(book, names));
+    const user = c.get("user");
+    const body = (await c.req.json().catch(() => ({}))) as {
+      api_key?: unknown;
+      credential_id?: unknown;
+    };
+    const provider = db.settings(book, names, null, user).provider;
+    const key =
+      typeof body.credential_id === "string"
+        ? db.key(user, body.credential_id)
+        : newKey(user, provider, body.api_key);
+    if (!key)
+      return c.json(
+        {
+          detail:
+            typeof body.credential_id === "string"
+              ? "that isn't one of your keys"
+              : "paste the whole API key",
+        },
+        422
+      );
+    db.useKey(book, key.id);
+    return c.json(await settingsOf(book, user));
   });
 
+  /** Stop using the book's key: a manager, or the key's owner (taking theirs back). */
   api.delete("/books/:book/credential", async (c) => {
-    const refused = await allowed(c, "manage");
-    if (refused) return refused;
     const book = c.req.param("book");
-    db.setCredential(book, null, null);
-    return c.json(db.settings(book, names));
+    const user = c.get("user");
+    const theirs = db.keyOf(book)?.user_id === user;
+    const refused = await allowed(c, theirs ? "read" : "manage");
+    if (refused) return refused;
+    db.useKey(book, null);
+    return c.json(await settingsOf(book, user));
+  });
+
+  // People's keys
+
+  /** The caller's keys (their last four), with the books using each. */
+  api.get("/credentials", (c) => c.json(db.keys(c.get("user"))));
+
+  /** A new key of the caller's (`{api_key, provider?}`), to put in books. */
+  api.post("/credentials", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      api_key?: unknown;
+      provider?: unknown;
+    };
+    const provider = (body.provider ?? "claude") as ProviderName;
+    if (!names.includes(provider))
+      return c.json({ detail: `the provider is one of ${names.join(", ")}` }, 422);
+    const key = newKey(c.get("user"), provider, body.api_key);
+    if (!key) return c.json({ detail: "paste the whole API key" }, 422);
+    return c.json(key, 201);
+  });
+
+  /** Delete one of the caller's keys: every book using it has none. */
+  api.delete("/credentials/:id", (c) =>
+    db.deleteKey(c.get("user"), c.req.param("id"))
+      ? c.body(null, 204)
+      : c.json({ detail: "not found" }, 404)
+  );
+
+  /** Forget the caller's keys (`app` calls this when their account is deleted). */
+  api.delete("/me", (c) => {
+    db.forgetUser(c.get("user"));
+    return c.body(null, 204);
   });
 
   /** The book's provider and its credential, once the caller may use them: a refusal
@@ -149,14 +229,14 @@ export function createApi({
     const refused = await allowed(c, "write");
     if (refused) return { refused };
     const book = c.req.param("book")!;
-    const settings = db.settings(book, names);
+    const key = await usableKey(book, c.get("user"));
+    const settings = db.settings(book, names, key, c.get("user"));
     if (!settings.ready) return { refused: c.json({ detail: "the book's AI isn't set up" }, 409) };
-    const sealed = db.credential(book);
     return {
       refused: null,
       settings,
       provider: providers.find((p) => p.name === settings.provider)!,
-      credential: sealed ? sealer.open(sealed) : null,
+      credential: key ? sealer.open(key.credential) : null,
     };
   };
 

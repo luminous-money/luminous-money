@@ -60,6 +60,7 @@ function setUp() {
     },
     loanTable: async () => ({ failed: "not in these tests" }),
     forgetBook: async () => undefined,
+    forgetUser: async () => {},
   };
   const deps: OrderDeps = {
     db,
@@ -285,6 +286,7 @@ describe("the morning's shop sync, and Amazon wanting a person", () => {
         },
       sync: async (book) => void synced.push(book),
       invoice: async () => null,
+      forgetUser: async () => {},
     };
     return { port, synced };
   };
@@ -439,6 +441,7 @@ describe("HSA tracking: a line the shop marks HSA or FSA eligible", () => {
       deps.shopsFor = () => ({
         amazon: async () => null,
         sync: async () => undefined,
+        forgetUser: async () => undefined,
         invoice: async (_book, _shop, order) => {
           asked.push(order);
           return kept.has(order)

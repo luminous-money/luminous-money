@@ -1,16 +1,38 @@
 /**
  * The shops service (the Amazon orders spike, 2026-11-06), at /api/shops/v1 on the same origin:
- * a book's Amazon connection, syncing it, and what it read. Optional: when it can't be reached,
- * the Amazon page says so.
+ * the caller's Amazon sign-ins (shared connections: a sign-in is a person's), a book's Amazon
+ * connection (the sign-in it uses and its own choices), syncing it, and what it read. Optional:
+ * when it can't be reached, the Amazon page says so.
  */
 import { statusMessage } from "./format.js";
 import { ApiError } from "./ledger.js";
 import { apiFetch } from "./session.js";
 
-export type AmazonConnection = {
-  email: string;
+/** A sign-in, never its secrets. Only its owner sees its email (a book's own from before, with
+ * no owner yet, shows as it did). */
+export type AmazonLogin = {
+  /** Null: the book's own, from before sign-ins were people's. */
+  id: string | null;
+  mine: boolean;
+  owner_id: string | null;
+  email: string | null;
   has_password: boolean;
   has_otp_secret: boolean;
+};
+
+/** One of the caller's own, with the books using it. */
+export type OwnAmazonLogin = AmazonLogin & {
+  id: string;
+  email: string;
+  updated_at: string;
+  books: string[];
+};
+
+export type AmazonConnection = {
+  /** The sign-in the book uses, if any. */
+  login: AmazonLogin | null;
+  /** Whether it can sync. */
+  has_password: boolean;
   sync_from: string | null;
   other_payments: string;
   rewards: string | null;
@@ -39,9 +61,8 @@ export type AmazonCard = {
 
 export type AmazonPatch = {
   updated_at: string | null;
-  email?: string;
-  password?: string;
-  otp_secret?: string;
+  /** One of the caller's sign-ins; null: none. */
+  login_id?: string | null;
   sync_from?: string | null;
   other_payments?: string;
   rewards?: string | null;
@@ -146,4 +167,27 @@ export const shopsApi = {
     json(await apiFetch(`${base(book)}/sync`)),
   charges: async (book: string): Promise<AmazonCharge[]> =>
     json(await apiFetch(`${base(book)}/charges`)),
+  /** The caller's own sign-ins. */
+  logins: async (): Promise<OwnAmazonLogin[]> =>
+    json(await apiFetch("/api/shops/v1/amazon/logins")),
+  addLogin: async (login: {
+    email: string;
+    password?: string;
+    otp_secret?: string;
+  }): Promise<OwnAmazonLogin> =>
+    json(await apiFetch("/api/shops/v1/amazon/logins", send("POST", login))),
+  patchLogin: async (
+    id: string,
+    patch: { updated_at: string; email?: string; password?: string; otp_secret?: string }
+  ): Promise<OwnAmazonLogin> =>
+    json(
+      await apiFetch(`/api/shops/v1/amazon/logins/${encodeURIComponent(id)}`, send("PATCH", patch))
+    ),
+  deleteLogin: async (id: string, updatedAt: string): Promise<void> => {
+    const response = await apiFetch(
+      `/api/shops/v1/amazon/logins/${encodeURIComponent(id)}?updated_at=${encodeURIComponent(updatedAt)}`,
+      send("DELETE")
+    );
+    if (!response.ok) await json(response);
+  },
 };

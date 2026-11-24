@@ -1,7 +1,10 @@
 Luminous Money
 ==================================================================================================
 
-A self-hostable, database-driven, double-entry accounting system. It uses
+**Household accounting for modern life.** Double-entry accounting to manage your assets,
+expenses, goals, budgets and loans on mobile or desktop. Open source and self-hostable.
+
+Under the hood, it's a database-driven double-entry accounting system. It uses
 [Beancount](https://github.com/beancount/beancount) as its accounting engine and its import/export
 format, and has a mobile-first app built for fast review and categorization. One server hosts many
 books, each independent: switching books is like switching profiles.

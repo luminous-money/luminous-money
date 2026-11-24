@@ -112,6 +112,11 @@ describe("Brokerage activity: a brokerage's rows read as what they are", () => {
       id: string;
       accounts: { account_id: string; reader: string | null }[];
     };
+    await send(
+      `/books/${book}/simplefin/connections/${connection.id}/share`,
+      { all: true, accounts: [], updated_at: null },
+      "PUT"
+    );
     assert.equal(connection.accounts[0]!.reader, "Fidelity");
     const link = { connection_id: connection.id, account_id: "brk", account: ACCOUNT, mode: "new" };
     const preview = (await (await send(`/books/${book}/simplefin/links/preview`, link)).json()) as {
@@ -186,6 +191,11 @@ describe("Brokerage activity: a brokerage's rows read as what they are", () => {
       id: string;
       accounts: { reader: string | null }[];
     };
+    await send(
+      `/books/${book}/simplefin/connections/${connection.id}/share`,
+      { all: true, accounts: [], updated_at: null },
+      "PUT"
+    );
     assert.equal(connection.accounts[0]!.reader, null);
     const link = { connection_id: connection.id, account_id: "brk", account: ACCOUNT, mode: "new" };
     assert.equal((await send(`/books/${book}/simplefin/links`, link)).status, 201);
@@ -265,6 +275,11 @@ describe("Brokerage activity: a brokerage's rows read as what they are", () => {
     const connection = (await (await send("/simplefin/connections", { setup_token })).json()) as {
       id: string;
     };
+    await send(
+      `/books/${book}/simplefin/connections/${connection.id}/share`,
+      { all: true, accounts: [], updated_at: null },
+      "PUT"
+    );
     const account = "Assets:Fidelity:Retirement:IRA";
     const link = { connection_id: connection.id, account_id: "ira", account, mode: "new" };
     assert.equal((await send(`/books/${book}/simplefin/links`, link)).status, 201);

@@ -72,6 +72,7 @@ function ai(
     categorize: async (_book, input) => (asked.push(input), { ok: categorize(input) }),
     loanTable: async () => ({ failed: "not in these tests" }),
     forgetBook: async () => undefined,
+    forgetUser: async () => {},
   };
   return { port, asked };
 }

@@ -2,11 +2,15 @@
  * Bank feeds' part of the app API.
  *
  * - **Connections are the user's** (`/simplefin/connections`): connect with a setup token, list
- *   (each with its accounts' last snapshot and where each is linked), sync now, disconnect.
+ *   (each with its accounts' last snapshot, where each is linked, and the books it's shared
+ *   with), sync now, disconnect.
+ * - **Sharing puts one in a book** (`/books/:book/simplefin/connections`, shared connections):
+ *   its owner shares all its accounts (new ones too) or those chosen. A book sees the caller's
+ *   own and those shared with it, only what's shared; its writers sync them.
  * - **Links go into a book** (`/books/:book/simplefin/...`): preview and make a link (mode
- *   `new`, `reconcile`, `start-over` or `from-date`), unlink, and what each linked account's bank
- *   reports (for account pages and home cards).
- * - `DELETE /me` forgets the user's connections (auth calls it when an account is deleted).
+ *   `new`, `reconcile`, `start-over` or `from-date`) to a shared account, unlink, and what each
+ *   linked account's bank reports (for account pages and home cards). Any writer of the book.
+ * - `DELETE /me` (api.ts) forgets the user's connections, when their account is deleted.
  *
  * The access URL never leaves the server: connections show their host.
  */
@@ -25,7 +29,7 @@ import {
 import { kindOf, LinkProblem, plan, type LinkMode } from "./link.js";
 import { attemptLink, confirmAttempt } from "./attempts.js";
 import type { Attempt, Connection, LinkKind } from "./store.js";
-import { DAILY_BUDGET } from "./store.js";
+import { covers, DAILY_BUDGET, errorsIn, StaleShare } from "./store.js";
 import {
   cashAccountOf,
   OutOfRequests,
@@ -79,9 +83,21 @@ export function simplefinRoutes(
   const { store, sealer } = deps;
   const ledgerFor = deps.ledgerFor;
 
-  const view = async (user: string, c: Connection) => {
+  /** The caller's books' names, by ID (a link elsewhere names its book, if they're in it). */
+  const bookNames = async (user: string) =>
+    new Map((await ledgerFor(user).listBooks()).map((b) => [b.id, b.name]));
+
+  /**
+   * A connection as the caller sees it. Its owner sees everything (in a book, each account
+   * saying whether it's shared with the book; without one, the books it's shared with); anyone
+   * else, in a book it's shared with, only what's shared, and only the problems they'd be told
+   * about (`errorsIn`).
+   */
+  const view = (user: string, c: Connection, books: Map<string, string>, book?: string) => {
+    const mine = c.user_id === user;
+    const share = book ? store.share(c.id, book) : undefined;
     const links = store.links(c.id);
-    const books = new Map((await ledgerFor(user).listBooks()).map((b) => [b.id, b.name]));
+    const errors = mine ? c.errors : errorsIn(c, share, user);
     return {
       id: c.id,
       host: c.host,
@@ -89,37 +105,66 @@ export function simplefinRoutes(
       last_sync_at: c.last_sync_at,
       requests_left: Math.max(0, store.budgetLeft(c)),
       requests_per_day: DAILY_BUDGET,
-      errors: errorsOf(c.errors),
-      accounts: store.accounts(c.id).map((a) => {
-        const link = links.find((l) => l.account_id === a.account_id);
-        return {
-          account_id: a.account_id,
-          name: a.name,
-          institution: a.institution,
-          currency: a.currency,
-          balance: a.balance,
-          available_balance: a.available_balance,
-          balance_date: a.balance_date,
-          kind: kindOf(a),
-          holdings: a.holdings.length,
-          // Whether a brokerage's activity can be read (else its rows come in as cash).
-          reader: kindOf(a) === "brokerage" ? (readerFor(a.institution)?.name ?? null) : null,
-          link: link
-            ? {
-                id: link.id,
-                book_id: link.book_id,
-                book_name: books.get(link.book_id) ?? null,
-                account: link.account,
-              }
-            : null,
-        };
-      }),
+      mine,
+      // Whose it is, when it isn't the caller's: their name.
+      owner: mine ? null : (deps.db.userProfiles([c.user_id]).get(c.user_id)?.name ?? null),
+      share: share
+        ? { all: share.all, accounts: share.accounts, updated_at: share.updated_at }
+        : null,
+      ...(mine && !book
+        ? {
+            shares: store.sharesOf(c.id).map((s) => ({
+              book_id: s.book_id,
+              book_name: books.get(s.book_id) ?? null,
+              all: s.all,
+              accounts: s.accounts,
+              updated_at: s.updated_at,
+            })),
+          }
+        : {}),
+      errors: errorsOf(errors),
+      accounts: store
+        .accounts(c.id)
+        .filter((a) => mine || covers(share, a.account_id))
+        .map((a) => {
+          const link = links.find((l) => l.account_id === a.account_id);
+          return {
+            account_id: a.account_id,
+            name: a.name,
+            institution: a.institution,
+            currency: a.currency,
+            balance: a.balance,
+            available_balance: a.available_balance,
+            balance_date: a.balance_date,
+            kind: kindOf(a),
+            holdings: a.holdings.length,
+            // Whether a brokerage's activity can be read (else its rows come in as cash).
+            reader: kindOf(a) === "brokerage" ? (readerFor(a.institution)?.name ?? null) : null,
+            ...(book ? { shared: covers(share, a.account_id) } : {}),
+            link: link
+              ? {
+                  id: link.id,
+                  book_id: link.book_id,
+                  book_name: books.get(link.book_id) ?? null,
+                  account: link.account,
+                }
+              : null,
+          };
+        }),
     };
+  };
+
+  /** The connection, if `book` sees it: the caller's own, or one shared with the book. */
+  const visible = (user: string, book: string, id: string) => {
+    const connection = store.connectionById(id);
+    if (!connection) return undefined;
+    return connection.user_id === user || store.share(id, book) ? connection : undefined;
   };
 
   api.get("/simplefin/connections", async (c) => {
     const user = c.get("user");
-    return c.json(await Promise.all(store.connections(user).map((x) => view(user, x))));
+    const books = await bookNames(user);
+    return c.json(store.connections(user).map((x) => view(user, x, books)));
   });
 
   /** Connect: claim the setup token, keep the access URL sealed, and list its accounts. */
@@ -138,7 +183,7 @@ export function simplefinRoutes(
       );
       // A day's window rather than balances only: holdings come only with transactions.
       await request(deps, connection, { start: Math.floor(Date.now() / 1000) - 86400 });
-      return c.json(await view(user, store.connection(user, connection.id)!), 201);
+      return c.json(view(user, store.connection(user, connection.id)!, await bookNames(user)), 201);
     } catch (error) {
       return c.json(...failure(error));
     }
@@ -158,19 +203,121 @@ export function simplefinRoutes(
       const results = await syncConnection(deps, connection);
       return c.json({
         ...summarize(results),
-        connection: await view(user, store.connection(user, connection.id)!),
+        connection: view(user, store.connection(user, connection.id)!, await bookNames(user)),
       });
     } catch (error) {
       return c.json(...failure(error));
     }
   });
 
-  api.delete("/me", (c) => {
-    store.forgetUser(c.get("user"));
+  // Connections in a book: the caller's own and those shared with it (shared connections)
+
+  api.get("/books/:book/simplefin/connections", async (c) => {
+    const { book } = c.req.param();
+    const user = c.get("user");
+    if (!(await owned(user, book))) return c.json({ detail: "not found" }, 404);
+    const seen = new Map(store.connections(user).map((x) => [x.id, x]));
+    for (const share of store.sharesIn(book)) {
+      const connection = store.connectionById(share.connection_id);
+      if (connection) seen.set(connection.id, connection);
+    }
+    const books = await bookNames(user);
+    return c.json(
+      [...seen.values()]
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+        .map((x) => view(user, x, books, book))
+    );
+  });
+
+  /** Share the caller's connection with the book (`{all, accounts, updated_at}`, null
+   * `updated_at` when it isn't yet), or change what's shared. What's linked here stays shared. */
+  api.put("/books/:book/simplefin/connections/:id/share", async (c) => {
+    const { book, id } = c.req.param();
+    const user = c.get("user");
+    if (!(await owned(user, book))) return c.json({ detail: "not found" }, 404);
+    const connection = store.connection(user, id);
+    if (!connection)
+      return visible(user, book, id)
+        ? c.json({ detail: "only its owner can change what's shared" }, 403)
+        : c.json({ detail: "not found" }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    if (typeof body.all !== "boolean")
+      return c.json({ detail: "say whether it's all its accounts (all: true or false)" }, 422);
+    if (
+      !("updated_at" in body) ||
+      (body.updated_at !== null && typeof body.updated_at !== "string")
+    )
+      return c.json({ detail: "send the updated_at you read (null if it isn't shared yet)" }, 422);
+    const accounts = body.all ? [] : body.accounts;
+    if (!Array.isArray(accounts) || !accounts.every((a) => typeof a === "string"))
+      return c.json({ detail: "say which accounts, by their account_id" }, 422);
+    const known = new Map(store.accounts(id).map((a) => [a.account_id, a]));
+    if (accounts.some((a) => !known.has(a)))
+      return c.json({ detail: "that isn't one of this connection's accounts" }, 422);
+    if (!body.all) {
+      const kept = new Set(accounts);
+      const used = [...store.linksIn(book), ...store.attemptsIn(book)].find(
+        (l) => l.connection_id === id && !kept.has(l.account_id)
+      );
+      if (used)
+        return c.json(
+          {
+            detail: `${known.get(used.account_id)?.name ?? "An account"} is linked in this book: unlink it first`,
+          },
+          422
+        );
+    }
+    try {
+      store.putShare(id, book, { all: body.all, accounts }, body.updated_at as string | null);
+    } catch (error) {
+      if (error instanceof StaleShare) return c.json({ detail: error.message }, 409);
+      throw error;
+    }
+    return c.json(view(user, connection, await bookNames(user), book));
+  });
+
+  /** Stop sharing the caller's connection with the book (`?updated_at=`): once nothing's linked. */
+  api.delete("/books/:book/simplefin/connections/:id/share", async (c) => {
+    const { book, id } = c.req.param();
+    const user = c.get("user");
+    if (!(await owned(user, book))) return c.json({ detail: "not found" }, 404);
+    const connection = store.connection(user, id);
+    if (!connection)
+      return visible(user, book, id)
+        ? c.json({ detail: "only its owner can change what's shared" }, 403)
+        : c.json({ detail: "not found" }, 404);
+    const updatedAt = c.req.query("updated_at");
+    if (!updatedAt) return c.json({ detail: "send the updated_at you read" }, 422);
+    if ([...store.linksIn(book), ...store.attemptsIn(book)].some((l) => l.connection_id === id))
+      return c.json({ detail: "its accounts are linked in this book: unlink them first" }, 422);
+    try {
+      store.deleteShare(id, book, updatedAt);
+    } catch (error) {
+      if (error instanceof StaleShare) return c.json({ detail: error.message }, 409);
+      throw error;
+    }
     return c.body(null, 204);
   });
 
-  // Links, in a book
+  /** Sync now, by any writer of a book the connection is shared with (it spends its owner's
+   * requests, and brings in every book's links). */
+  api.post("/books/:book/simplefin/connections/:id/sync", async (c) => {
+    const { book, id } = c.req.param();
+    const user = c.get("user");
+    const connection = visible(user, book, id);
+    if (!connection) return c.json({ detail: "not found" }, 404);
+    try {
+      const results = await syncConnection(deps, connection);
+      return c.json({
+        ...summarize(results),
+        connection: view(user, store.connectionById(id)!, await bookNames(user), book),
+      });
+    } catch (error) {
+      return c.json(...failure(error));
+    }
+  });
+
+  // Links, in a book: any writer's, to accounts shared with it
 
   const linkInput = async (
     c: { req: { json(): Promise<unknown> } },
@@ -179,11 +326,11 @@ export function simplefinRoutes(
   ) => {
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const connection =
-      typeof body.connection_id === "string"
-        ? store.connection(user, body.connection_id)
-        : undefined;
+      typeof body.connection_id === "string" ? visible(user, book, body.connection_id) : undefined;
     if (!connection) throw new LinkProblem(404, "there's no such connection");
     if (typeof body.account_id !== "string") throw new LinkProblem(422, "say which bank account");
+    if (!covers(store.share(connection.id, book), body.account_id))
+      throw new LinkProblem(422, "that bank account isn't shared with this book");
     if (typeof body.account !== "string" || !/^[A-Z][\w-]*(:[\w-]+)+$/.test(body.account))
       throw new LinkProblem(422, "say which account in the book, by its full name");
     if (!MODES.includes(body.mode as LinkMode))
@@ -259,7 +406,8 @@ export function simplefinRoutes(
   api.post("/books/:book/simplefin/attempts/:id/confirm", async (c) => {
     const { book, id } = c.req.param();
     const user = c.get("user");
-    const attempt = store.attempt(user, id);
+    if (!(await owned(user, book))) return c.json({ detail: "not found" }, 404);
+    const attempt = store.attemptById(id);
     if (!attempt || attempt.book_id !== book) return c.json({ detail: "not found" }, 404);
     try {
       return c.json({ link: await confirmAttempt(deps, attempt) }, 201);
@@ -268,9 +416,10 @@ export function simplefinRoutes(
     }
   });
 
-  api.delete("/books/:book/simplefin/attempts/:id", (c) => {
+  api.delete("/books/:book/simplefin/attempts/:id", async (c) => {
     const { book, id } = c.req.param();
-    const attempt = store.attempt(c.get("user"), id);
+    if (!(await owned(c.get("user"), book))) return c.json({ detail: "not found" }, 404);
+    const attempt = store.attemptById(id);
     if (!attempt || attempt.book_id !== book) return c.json({ detail: "not found" }, 404);
     store.deleteAttempt(id);
     return c.body(null, 204);
@@ -279,9 +428,10 @@ export function simplefinRoutes(
   api.delete("/books/:book/simplefin/links/:id", async (c) => {
     const { book, id } = c.req.param();
     const user = c.get("user");
-    const link = store.link(user, id);
+    if (!(await owned(user, book))) return c.json({ detail: "not found" }, 404);
+    const link = store.linkById(id);
     if (!link || link.book_id !== book) return c.json({ detail: "not found" }, 404);
-    store.deleteLink(user, id);
+    store.deleteLink(id);
     return c.body(null, 204);
   });
 
@@ -311,7 +461,7 @@ export function simplefinRoutes(
       return mine.filter((t) => !held.has(t.id)).map((t) => t.id);
     };
     for (const link of links) {
-      const connection = store.connection(link.user_id, link.connection_id);
+      const connection = store.connectionById(link.connection_id);
       const snapshot = store.account(link.connection_id, link.account_id);
       if (!connection || !snapshot) continue;
       status[link.account] = {
@@ -350,7 +500,7 @@ export function simplefinRoutes(
   api.patch("/books/:book/simplefin/links/:id", async (c) => {
     const { book, id } = c.req.param();
     const user = c.get("user");
-    const link = store.link(user, id);
+    const link = store.linkById(id);
     if (!(await owned(user, book)) || !link || link.book_id !== book)
       return c.json({ detail: "not found" }, 404);
     const body = (await c.req.json().catch(() => null)) as {
@@ -375,7 +525,7 @@ export function simplefinRoutes(
   api.post("/books/:book/simplefin/links/:id/reread/preview", async (c) => {
     const { book, id } = c.req.param();
     const user = c.get("user");
-    const link = store.link(user, id);
+    const link = store.linkById(id);
     if (!(await owned(user, book)) || !link || link.book_id !== book)
       return c.json({ detail: "not found" }, 404);
     try {
@@ -390,7 +540,7 @@ export function simplefinRoutes(
   api.post("/books/:book/simplefin/links/:id/reread", async (c) => {
     const { book, id } = c.req.param();
     const user = c.get("user");
-    const link = store.link(user, id);
+    const link = store.linkById(id);
     if (!(await owned(user, book)) || !link || link.book_id !== book)
       return c.json({ detail: "not found" }, 404);
     const work = async (step: (s: string) => void) => {

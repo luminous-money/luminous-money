@@ -23,6 +23,8 @@ export interface ShopsPort {
   sync(book: string): Promise<void>;
   /** An order's invoice as its shop's reader keeps it (a PDF); null if it has none. */
   invoice(book: string, shop: string, order: string): Promise<FileIn | null>;
+  /** Forget the user's shop sign-ins (their account is being deleted). */
+  forgetUser(): Promise<void>;
 }
 
 export function httpShops(baseUrl: string, userId: string): ShopsPort {
@@ -50,6 +52,10 @@ export function httpShops(baseUrl: string, userId: string): ShopsPort {
       // 409: one's running already, which is as good.
       if (!response.ok && response.status !== 409)
         throw new Error(`shops said ${response.status} starting the sync`);
+    },
+    async forgetUser() {
+      const response = await call("/me", { method: "DELETE" });
+      if (!response.ok) throw new Error(`shops said ${response.status}`);
     },
     async invoice(book, shop, order) {
       if (shop !== "amazon") return null;

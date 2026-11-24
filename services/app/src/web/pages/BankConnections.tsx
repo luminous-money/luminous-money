@@ -35,16 +35,20 @@ import {
   useBankAttempts,
   useCancelLink,
   useConfirmLink,
+  useShareBank,
   useSyncBank,
   useUnlinkBank,
+  useUnshareBank,
   useFunds,
 } from "../lib/queries.js";
 import { Loading } from "../components/Loading.js";
 
 /**
- * Bank connections (SimpleFIN): connect with a setup token from SimpleFIN Bridge, then link each
- * bank account to an account in this book. Connections are yours, across books; this page links
- * into the book you're in. New transactions arrive every morning, or with "Sync now".
+ * Bank connections (SimpleFIN): connect with a setup token from SimpleFIN Bridge, share it with
+ * this book (all its accounts, new ones too, or those chosen), then link each shared bank
+ * account to an account in this book. Connections are yours, across books; this page shares and
+ * links into the book you're in, where its other writers see what you shared, link it and sync
+ * it. New transactions arrive every morning, or with "Sync now".
  */
 export function BankConnections({ book }: { book: string }) {
   return (
@@ -60,7 +64,11 @@ export function BankConnections({ book }: { book: string }) {
               </a>
               . Transactions arrive every morning and go through review, like an import.
             </p>
-            <p>Connections are yours, across your books; links are this book's.</p>
+            <p>
+              Connections are yours, across your books. You share each with a book (all its
+              accounts, or the ones you choose), and the book&apos;s other members see only what you
+              share. Links are the book&apos;s.
+            </p>
           </Info>
         </h1>
       </header>
@@ -72,9 +80,11 @@ export function BankConnections({ book }: { book: string }) {
 /** The page's connections and Connect, also a migration's bank feeds step. `?connection=<id>`
  * (the bell's link to a connection's problem) scrolls to that one. */
 export function BankConnectionsPanel({ book }: { book: string }) {
-  const connections = useBankConnections();
+  const connections = useBankConnections(book);
   const attempts = useBankAttempts(book);
   const shown = useParam("connection");
+  // One just connected asks what to share with this book.
+  const [fresh, setFresh] = useState<string | null>(null);
   return (
     <>
       {connections.isPending && <Loading />}
@@ -86,15 +96,17 @@ export function BankConnectionsPanel({ book }: { book: string }) {
           connection={c}
           attempts={(attempts.data ?? []).filter((a) => a.connection_id === c.id)}
           shown={c.id === shown}
+          fresh={c.id === fresh}
+          onShared={() => setFresh(null)}
         />
       ))}
-      {connections.data && <Connect folded={connections.data.length > 0} />}
+      {connections.data && <Connect folded={connections.data.length > 0} onConnected={setFresh} />}
     </>
   );
 }
 
 /** Connect: open for the first connection; then a button that opens it, for another. */
-function Connect({ folded }: { folded: boolean }) {
+function Connect({ folded, onConnected }: { folded: boolean; onConnected: (id: string) => void }) {
   const connect = useConnectBank();
   const [token, setToken] = useState("");
   const [open, setOpen] = useState(!folded);
@@ -112,7 +124,12 @@ function Connect({ folded }: { folded: boolean }) {
       aria-label="Connect a bank"
       onSubmit={(e) => {
         e.preventDefault();
-        connect.mutate(token.trim(), { onSuccess: () => setToken("") });
+        connect.mutate(token.trim(), {
+          onSuccess: (connection) => {
+            setToken("");
+            onConnected(connection.id);
+          },
+        });
       }}
     >
       <h2 className="section-title with-info">
@@ -148,26 +165,40 @@ function ConnectionCard({
   connection,
   attempts,
   shown,
+  fresh,
+  onShared,
 }: {
   book: string;
   connection: BankConnection;
   attempts: LinkAttempt[];
   /** The one a link asked for: scrolled to. */
   shown: boolean;
+  /** Just connected: what to share with the book is asked at once. */
+  fresh: boolean;
+  onShared: () => void;
 }) {
-  const sync = useSyncBank();
+  const sync = useSyncBank(book);
   const disconnect = useDisconnectBank();
   const [linking, setLinking] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
   const card = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (shown) card.current?.scrollIntoView({ block: "start" });
-  }, [shown]);
+    if (shown || fresh) card.current?.scrollIntoView({ block: "start" });
+  }, [shown, fresh]);
+  // The owner's own lists every account (to share); the book links only what's shared.
+  const shared = connection.accounts.filter((a) => a.shared !== false);
   return (
     <section ref={card} className="card connection" aria-label={`Connection to ${connection.host}`}>
       <div className="connection-head">
         <div>
           {/* Named by its id: its banks are its accounts', and a connection can hold many. */}
           <h2 className="connection-name">SimpleFIN {connection.id.slice(0, 8)}</h2>
+          {!connection.mine && (
+            <p className="small muted">
+              {connection.owner ? `${possessive(connection.owner)} connection` : "Shared with you"},
+              shared with this book
+            </p>
+          )}
           <p className="small muted">
             {connection.last_sync_at
               ? `Synced ${formatWhen(connection.last_sync_at)}`
@@ -207,7 +238,21 @@ function ConnectionCard({
         </p>
       )}
       {sync.error && <p className="small error">{explain(sync.error)}</p>}
-      {institutions(connection.accounts).map(([institution, accounts]) => (
+      {connection.mine &&
+        (sharing || fresh ? (
+          <ShareEditor
+            book={book}
+            connection={connection}
+            fresh={fresh}
+            onDone={() => {
+              setSharing(false);
+              onShared();
+            }}
+          />
+        ) : (
+          <ShareSummary connection={connection} onChange={() => setSharing(true)} />
+        ))}
+      {institutions(shared).map(([institution, accounts]) => (
         <section key={institution} className="institution" aria-label={institution || "Accounts"}>
           <InstitutionHead institution={institution} accounts={accounts} />
           <ul className="plain-list bank-accounts" aria-label="Bank accounts">
@@ -227,24 +272,170 @@ function ConnectionCard({
           </ul>
         </section>
       ))}
-      <div className="connection-foot">
-        <button
-          type="button"
-          className="plain danger"
-          disabled={disconnect.isPending}
-          onClick={() => {
-            if (
-              window.confirm(
-                "Disconnect? Its links stop syncing; everything brought in stays. To revoke access entirely, also remove luminous-money at SimpleFIN Bridge."
+      {connection.mine && (
+        <div className="connection-foot">
+          <button
+            type="button"
+            className="plain danger"
+            disabled={disconnect.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Disconnect? Its links stop syncing in every book it's shared with; everything brought in stays. To revoke access entirely, also remove luminous-money at SimpleFIN Bridge."
+                )
               )
-            )
-              disconnect.mutate(connection.id);
-          }}
+                disconnect.mutate(connection.id);
+            }}
+          >
+            Disconnect
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** What the owner's connection shares with this book, in a line, and Change. */
+function ShareSummary({
+  connection,
+  onChange,
+}: {
+  connection: BankConnection;
+  onChange: () => void;
+}) {
+  const share = connection.share;
+  const count = share ? connection.accounts.filter((a) => a.shared).length : 0;
+  return (
+    <p className="small share-summary">
+      <span className={share ? "" : "muted"}>
+        {!share
+          ? "Not shared with this book."
+          : share.all
+            ? "Shared with this book: all its accounts, new ones too."
+            : `Shared with this book: ${count} of its ${connection.accounts.length} ${connection.accounts.length === 1 ? "account" : "accounts"}.`}
+      </span>{" "}
+      <button type="button" className="plain" onClick={onChange}>
+        {share ? "Change…" : "Share…"}
+      </button>
+    </p>
+  );
+}
+
+/** Which of the owner's connection's accounts this book sees: all (new ones too, the choice to
+ * start with), or those ticked. One linked here stays ticked: unlink it first. */
+function ShareEditor({
+  book,
+  connection,
+  fresh,
+  onDone,
+}: {
+  book: string;
+  connection: BankConnection;
+  fresh: boolean;
+  onDone: () => void;
+}) {
+  const share = useShareBank(book);
+  const unshare = useUnshareBank(book);
+  const current = connection.share;
+  const [all, setAll] = useState(current ? current.all : true);
+  // What's shared now; not shared yet, every account, to untick what isn't the book's.
+  const [chosen, setChosen] = useState(
+    () => new Set(connection.accounts.filter((a) => !current || a.shared).map((a) => a.account_id))
+  );
+  const linkedHere = (a: BankAccount) => a.link?.book_id === book;
+  const linked = connection.accounts.filter(linkedHere);
+  const toggle = (id: string) =>
+    setChosen((was) => {
+      const next = new Set(was);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const error = share.error ?? unshare.error;
+  return (
+    <form
+      className="share-editor"
+      aria-label="Shared with this book"
+      onSubmit={(e) => {
+        e.preventDefault();
+        share.mutate(
+          {
+            id: connection.id,
+            all,
+            accounts: all ? [] : [...chosen],
+            updated_at: current?.updated_at ?? null,
+          },
+          { onSuccess: onDone }
+        );
+      }}
+    >
+      <h3 className="section-title">
+        {fresh ? "Which of its accounts should this book see?" : "Shared with this book"}
+      </h3>
+      <p className="small muted">
+        Everyone in the book sees what you share, can link it and sync it. Only you change what it
+        shares.
+      </p>
+      <label className="check">
+        <input type="radio" name="share" checked={all} onChange={() => setAll(true)} />
+        All its accounts, including new ones
+      </label>
+      <label className="check">
+        <input type="radio" name="share" checked={!all} onChange={() => setAll(false)} />
+        Only these:
+      </label>
+      {!all && (
+        <ul className="plain-list share-accounts" aria-label="Accounts to share">
+          {connection.accounts.map((a) => (
+            <li key={a.account_id}>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={chosen.has(a.account_id) || linkedHere(a)}
+                  disabled={linkedHere(a)}
+                  onChange={() => toggle(a.account_id)}
+                />
+                <span>
+                  {a.name}
+                  <span className="small muted">
+                    {" "}
+                    {[a.institution, linkedHere(a) && "linked here"].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && <p className="small error">{explain(error)}</p>}
+      <div className="actions">
+        {current && !linked.length && (
+          <button
+            type="button"
+            className="plain"
+            disabled={unshare.isPending}
+            onClick={() =>
+              unshare.mutate(
+                { id: connection.id, updated_at: current.updated_at },
+                { onSuccess: onDone }
+              )
+            }
+          >
+            Stop sharing
+          </button>
+        )}
+        <button type="button" onClick={onDone}>
+          {fresh ? "Not now" : "Cancel"}
+        </button>
+        <button
+          type="submit"
+          className="primary"
+          disabled={share.isPending || (!all && chosen.size === 0 && !linked.length)}
         >
-          Disconnect
+          {current ? "Save" : "Share"}
         </button>
       </div>
-    </section>
+    </form>
   );
 }
 

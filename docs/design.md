@@ -972,11 +972,59 @@ same money in through another's, a day or so later. Both would sit in review, un
 - **Names:** auth's forwardAuth check passes on `X-User-Name` and `X-User-Email` (URI-encoded)
   beside `X-User-Id`; `app` remembers each user's (`user_profile`) for members' lists.
 - **Leaving or being removed:** what acted as them in the book (schedules, the price run) acts as
-  the owner from then on, and their bank links into it (through their own SimpleFIN connection)
-  go.
+  the owner from then on. What they shared with it goes ("Shared connections", below): their
+  bank connections, with every link on them; links they made on someone else's connection act
+  as that connection's owner. Their AI key and Amazon sign-in stop being used there.
 - **Read only in the PWA:** a notice under the masthead, and the main write entry points hidden
   (importing, adding transactions or accounts, the ledger's actions, budgets' editing); anything
   else is refused by the server, saying why.
+### Shared connections (2026-11-24)
+
+Kael started a second book ("Personal") fed by the household's SimpleFIN connection, and asked
+for it to work "even when [one deployment serving one household] is not the case". [The
+plan](milestones/shared-connections/PLAN.md) has his brief and the calls made without asking.
+
+- **A connection, key or sign-in is a person's; sharing puts it in a book.** One shape in all
+  three services, each keeping its own secrets (`app` SimpleFIN's, `ai` AI keys, `shops`
+  Amazon's): its owner alone changes or deletes it, and it goes into books they're a member of.
+  What's the book's (links, the AI's settings, Amazon's cards and accounts, what was read)
+  stays the book's. *Why:* one bank login, one Anthropic account or one Amazon account usually
+  serves more than one book, and its owner, not the book, is who pays for it and can revoke it.
+- **Bank feeds: a share is all its accounts, new ones too, or those chosen** (Kael: "an explicit
+  'all accounts' option [that] includes any future accounts"). A book sees only what's shared
+  with it, and only shared accounts can be linked, the owner's too: sharing is what puts an
+  account in a book. Its owner shares; any writer of the book links, unlinks, chooses dividends,
+  reads again and syncs (Kael agreed: Sync now spends the owner's requests, and syncs it
+  everywhere).
+- **A bank account still links into one book.** Shared with two, it's linked in one and the other
+  says where: importing one account into two books would bring everything twice.
+- **Unsharing what's linked is refused** ("unlink it first"), rather than unlinking it: nothing
+  stops syncing as a side effect of a sharing change.
+- **A bank's problems go where they're about** (`errorsIn`): one naming an account, to the books
+  it's shared with; one about the connection (the Bridge's plain strings, which name banks in
+  words), to books it's shared with all its accounts, and to its owner wherever it's shared.
+  *Why:* until this, a connection's problems went to every writer of every book linked to it,
+  so a personal bank's would have shown in the other person's bell.
+- **A new account under all its accounts is announced** ("New at SimpleFIN: …", dismissable),
+  in each book shared that way, until it's linked: not linked by itself, since a link needs an
+  account in the book and a way to start.
+- **Existing connections were shared with the books they were linked in, only the linked
+  accounts** (app migration 27): what those books already showed anyone but the owner.
+- **AI: a book uses one key, chosen by a manager from their own** (or pasted, becoming theirs);
+  others see whose ("Kael's key, …abcd"), never which. Its owner can always take it out, and
+  it isn't used once they've left the book (checked whenever the book's AI is read or used).
+- **Amazon: a book uses one sign-in, chosen by a manager from their own,** with Amazon's
+  session (`/data/shops/amazon/logins/<id>/`); only its owner sees its email. Each book syncs
+  on its own, one at a time per sign-in (one session), and keeps its own cards: Kael's personal
+  cards included in Personal, excluded from the household's. A charge with no card (points, a
+  gift card) goes to every book using the sign-in (Kael: deleted where it doesn't belong).
+- **Keys and sign-ins from before became their book owner's** the first time the owner's
+  request reached `ai` or `shops`: neither recorded who set them, and only the ledger knows a
+  book's owner. Until then they worked as before; the old columns go once Emmer's are taken
+  (M99).
+- **Deleting an account** forgets its connections, keys and sign-ins: `app`'s `DELETE /me` tells
+  `ai` and `shops` too, as far as they can be reached.
+
 ### Reconciliation (M14)
 
 - **Kept as Beancount,** so exports carry it: the statement as `custom "statement" <account>
@@ -1069,8 +1117,9 @@ same money in through another's, a day or so later. Both would sit in review, un
 
 ### Receipts and AI (M16)
 
-- **One `ai` service owns everything AI** (`/api/ai/v1`, TypeScript): each book's AI settings
-  and its credential, the providers, and two narrow operations `app` composes. Nothing else
+- **One `ai` service owns everything AI** (`/api/ai/v1`, TypeScript): people's keys, each
+  book's AI settings and the key it uses ("Shared connections"), the providers, and two narrow
+  operations `app` composes. Nothing else
   talks to a model, so M19's AI categorization lands in the same place, with the same key and
   guidance.
 - **Two operations that share no context** (Unix-style: small, composed):
@@ -1105,8 +1154,9 @@ same money in through another's, a day or so later. Both would sit in review, un
   only when `GET /api/ai/v1/health` answers and the book is **ready** (enabled, a provider, and
   a credential). With the service down, nothing AI shows and the rest is unchanged.
 - **Credentials are sealed** with `AI_ENCRYPTION_KEY` (the sealer SimpleFIN uses, now in
-  `@luminous-money/db`) and never sent back: the settings say only that one is set and its last four
-  characters. Claude takes an API key (it has no OAuth for third-party apps).
+  `@luminous-money/db`) and never sent back: the settings say only that one is set, whose it
+  is, and its last four characters. Claude takes an API key (it has no OAuth for third-party
+  apps). A key is a person's, put in books ("Shared connections").
 - **The paying account is matched, not guessed:** asset and liability accounts list their
   **payment cards** (brand optional, last four; on the `open`, so exports keep them; a card is
   one account's), and the receipt's card names the account; else the page it was captured from;
@@ -1147,12 +1197,13 @@ same money in through another's, a day or so later. Both would sit in review, un
 [The plan](milestones/.archived/amazon-orders/PLAN.md) has Kael's brief and answers; the service is
 `services/shops` (its README has the routes).
 
-- **A service of its own, in Python** (`shops`, `/api/shops/v1`), mirroring `ai`: it owns each
-  book's Amazon connection and its secrets, and narrow operations other services can compose.
+- **A service of its own, in Python** (`shops`, `/api/shops/v1`), mirroring `ai`: it owns
+  people's Amazon sign-ins and their secrets ("Shared connections"), each book's Amazon
+  connection, and narrow operations other services can compose.
   Python because [amazon-orders](https://github.com/alexdlaird/amazon-orders) is: Amazon has no
   API for a shopper's orders, and that library keeps up with Amazon's pages, its sign-in, its
   two-step codes and its bot checks, validated nightly. Porting it would be owning all of that.
-- **The server logs in as the book's manager** (Kael's choice, knowing it's against Amazon's
+- **The server logs in as the sign-in's owner** (Kael's choice, knowing it's against Amazon's
   conditions of use and can break when Amazon changes): the email, the password and the
   authenticator app's setup key (so it makes its own codes), sealed with
   `SHOPS_ENCRYPTION_KEY`, else `AI_ENCRYPTION_KEY` (every deployment has it, and backups and
@@ -1704,7 +1755,8 @@ and `holdings`, and errors either as coded `errlist` or as the older plain `erro
 
 - **Connections are the user's; links go into books.** One access URL usually covers every
   institution connected at the Bridge, so it's stored once and fetched once, wherever its
-  accounts are linked. A link ties one bank account to one account in one book.
+  accounts are linked. A link ties one bank account to one account in one book. Its owner
+  shares it with each book, all its accounts or those chosen ("Shared connections").
 - **A connection is named "SimpleFIN" and its id's first 8 characters** (Kael, 2026-11-07), not
   its institutions, which ran long with a Bridge holding many; its accounts are listed with a
   rule between each.
@@ -1832,7 +1884,7 @@ and `holdings`, and errors either as coded `errlist` or as the older plain `erro
   those strings, not coded errors with a connection's id (we don't ask for its protocol 2,
   whose accounts are shaped differently).
 - **And in the bell, dismissable:** each problem a sync reports (not a notice) is a
-  notification for the book's writers: a connection's titled as Bank connections names it
+  notification for the book's writers, where it's for them to see ("Shared connections"): a connection's titled as Bank connections names it
   ("SimpleFIN 1a2b3c4d needs attention"), one naming an account by its institution, each
   linking to its connection's card (`?connection=<id>` scrolls to it) and SimpleFIN Bridge.
   Dismissing it is the person's own (`app`'s `notification_dismissal`, migration 24); the
@@ -2084,10 +2136,15 @@ on GitHub Pages: https://luminous-money.github.io/luminous-money/. All of it is 
 - **A relative base** (`base: './'`), so the build works under Pages' `/luminous-money/` and
   anywhere else.
 - **The pitch, in Kael's words (2026-11-16):** "Household accounting for modern life." (the
-  second line keeps the white-to-cyan glow), then "Manage your assets, expenses, goals, budgets
-  and loans on mobile or desktop. Open source and self-hostable." The loans scene is "Managing
-  loans, made easy". The reel's intro card and the page's `<title>` and `og:description` follow
-  the same words, though the published video changes only when it's recorded again.
+  second line keeps the white-to-cyan glow), then "Double-entry accounting to manage your
+  assets, expenses, goals, budgets and loans on mobile or desktop. Open source and
+  self-hostable." (Kael added "Double-entry accounting to", 2026-11-24.) The loans scene is
+  "Managing loans, made easy". The reel's intro card and the page's `<title>` and
+  `og:description` follow the same words, though the published video changes only when it's
+  recorded again. **So does every headline elsewhere** (Kael, 2026-11-24): the login page's
+  hero, the app's description (`index.html`, the manifest) and its link previews (`og:` tags,
+  the site's poster as their image), the README's opening and the repository's description on
+  GitHub.
 
 ### The MCP server (2026-11-17, built 2026-11-18)
 

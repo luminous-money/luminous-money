@@ -190,8 +190,9 @@ const post = (body: unknown, method = "POST"): RequestInit => ({
 
 /** Bank feeds: connections are the user's; links go into a book. */
 export const bankFeeds = {
-  connections: async (): Promise<BankConnection[]> =>
-    json(await apiFetch("/api/app/v1/simplefin/connections")),
+  /** The connections the book sees: the caller's own, and those shared with it. */
+  connections: async (book: string): Promise<BankConnection[]> =>
+    json(await apiFetch(`${base(book)}/simplefin/connections`)),
   connect: async (setupToken: string): Promise<BankConnection> =>
     json(await apiFetch("/api/app/v1/simplefin/connections", post({ setup_token: setupToken }))),
   disconnect: async (id: string): Promise<void> => {
@@ -201,11 +202,32 @@ export const bankFeeds = {
     if (!response.ok) await json(response);
   },
   sync: async (
+    book: string,
     id: string
   ): Promise<{ batches: number; staged: number; matched: number; connection: BankConnection }> =>
     json(
-      await apiFetch(`/api/app/v1/simplefin/connections/${encodeURIComponent(id)}/sync`, post({}))
+      await apiFetch(`${base(book)}/simplefin/connections/${encodeURIComponent(id)}/sync`, post({}))
     ),
+  /** Share the caller's connection with the book, or change what's shared (null `updated_at`:
+   * not shared yet). */
+  share: async (
+    book: string,
+    id: string,
+    share: { all: boolean; accounts: string[]; updated_at: string | null }
+  ): Promise<BankConnection> =>
+    json(
+      await apiFetch(
+        `${base(book)}/simplefin/connections/${encodeURIComponent(id)}/share`,
+        post(share, "PUT")
+      )
+    ),
+  unshare: async (book: string, id: string, updatedAt: string): Promise<void> => {
+    const response = await apiFetch(
+      `${base(book)}/simplefin/connections/${encodeURIComponent(id)}/share?updated_at=${encodeURIComponent(updatedAt)}`,
+      { method: "DELETE" }
+    );
+    if (!response.ok) await json(response);
+  },
   preview: async (book: string, link: LinkRequest): Promise<LinkPreview> =>
     json(await apiFetch(`${base(book)}/simplefin/links/preview`, post(link))),
   link: async (book: string, link: LinkRequest): Promise<{ preview: LinkPreview }> =>
