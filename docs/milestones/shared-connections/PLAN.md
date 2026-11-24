@@ -173,9 +173,10 @@ The MCP's `read_bank_feeds` reads the book's connections; `write_sync_bank_feed`
        page; tests.
 4. [x] Amazon: `shops`' migration and adoption (the session moved), its routes, the sync's
        lock, the Amazon page; tests.
-5. [ ] design.md, RESUME, PLAN; `pnpm test`, `pnpm e2e`; release; Emmer upgraded (its backup
-       first), then checked: the shares made from its links, the key and sign-in taken by
-       Kael, a sync.
+5. [x] design.md, RESUME, PLAN; `pnpm test`, `pnpm e2e`; release; Emmer upgraded (its backup
+       first), then checked: the shares made from its links (8 of 12 accounts, the linked
+       ones), the key and sign-in taken by Kael (Amazon's session with it). No sync by hand:
+       it would write to the books, so the next morning's are the first.
 
 ## The copy (Kael, 2026-11-24)
 

@@ -51,7 +51,24 @@ nine calls to review; design.md's "Shared connections" has the decisions.
   share editor's "Only these:" started unticked: fixed) and 158 of 159 in the second
   (brokerage.spec's Read again took over 5 seconds under load; it passed 5 times on its own, at
   about 8 seconds). Looked at in screenshots (Bank connections, Amazon, AI, the login page; light
-  and dark), on the e2e stack with `shops` added.
+  and dark), on the e2e stack with `shops` added. CI then failed once on the new-account test
+  (the share and the account stamped in the same millisecond on a fast machine): fixed with a
+  fake clock (`2731c76`); the release's own run had passed.
+
+**Released** as `v1.9.0` (the Release workflow green; all seven images read anonymously from
+ghcr.io); the site republished to GitHub Pages; the repository's description changed. **Emmer
+upgraded over SSH** to 1.9.0, every service healthy, schemas app 27, ai 4, shops 4 (its backup
+is `backups/luminous-money-20261124T111711Z-1.8.0.tar.gz`). Checked there, by counts only: the
+household book's connection is shared with exactly its 8 linked accounts (4 more not shared
+anywhere: Kael shares them with Personal), the 8 links report as before; the AI key and the
+Amazon sign-in are Kael's (`adopt`, on his first request), the book's AI still ready, Amazon's
+status "ok", its cards kept, its session moved to `amazon/logins/<id>/` and the invoices left
+with the book. No sync was run by hand (it would write to the books): tomorrow morning's are
+the first on the new code.
+**Next:** Kael creates Personal, shares the connection with it (All accounts, or his own),
+puts his AI key and Amazon sign-in in it (Amazon: his personal cards included there, excluded
+from the household's), and reviews the plan's nine calls. Then unchanged: HSA tracking's 7
+calls (M99); docs/PLAN.md's Ahead.
 
 ## Before that (2026-11-23, evening): the breakdown over any range of months; bars narrow to a month; its controls, `v1.8.0`
 
