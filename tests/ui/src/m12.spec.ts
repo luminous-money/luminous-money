@@ -16,6 +16,13 @@ function dayOf(back: number, day: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/** The month `back` months ago, YYYY-MM, and as the breakdown's months read it ("Sep 2026"). */
+const monthOf = (back: number) => dayOf(back, 1).slice(0, 7);
+const named = (month: string) =>
+  new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" }).format(
+    new Date(`${month}-01T00:00:00Z`)
+  );
+
 /** A user with six months of rent and groceries before this one, and groceries today. */
 async function withHistory(page: Page) {
   const { session, book, account } = await setUpUser(page);
@@ -106,7 +113,8 @@ test("a charge shows as what left the card, though a discount is negative too", 
 
 test("Reports break spending down, and drill into a category", async ({ page }) => {
   const { book } = await withHistory(page);
-  await page.goto(`/ui/books/${book}/reports`);
+  // The three complete months before this one: no month in part.
+  await page.goto(`/ui/books/${book}/reports?from=${monthOf(3)}&through=${monthOf(1)}`);
 
   const breakdown = page.getByRole("region", { name: "Breakdown" });
   const categories = breakdown.getByRole("list", { name: "Categories" });
@@ -123,47 +131,105 @@ test("Reports break spending down, and drill into a category", async ({ page }) 
   );
 });
 
-test("the breakdown covers 3 to 12 months, as a donut of the average or a bar a month", async ({
+test("the breakdown covers a range of months, as a donut of the average or a bar a month", async ({
   page,
 }) => {
   const { book } = await withHistory(page);
-  await page.goto(`/ui/books/${book}/reports`);
+  const reports = `/ui/books/${book}/reports`;
+  await page.goto(reports);
 
   const breakdown = page.getByRole("region", { name: "Breakdown" });
-  const show = breakdown.getByLabel("Show");
-  await expect(show).toHaveValue("6");
-  await expect(show.getByRole("option")).toHaveText([
-    "This month",
-    "3 months",
-    "6 months",
-    "9 months",
-    "12 months",
-  ]);
+  const months = breakdown.getByRole("button", { name: /^Months:/ });
+  // By default, the last six months through this one.
+  await expect(months).toHaveAccessibleName(`Months: ${named(monthOf(5))} – ${named(monthOf(0))}`);
   const categories = breakdown.getByRole("list", { name: "Categories" });
-  await show.selectOption("12");
+  await page.goto(`${reports}?from=${monthOf(12)}&through=${monthOf(1)}`);
   await expect(categories).toContainText("$450"); // six months' rent, over twelve
-  await show.selectOption("3");
+  await page.goto(`${reports}?from=${monthOf(3)}&through=${monthOf(1)}`);
   await expect(categories).toContainText("$900");
-  await expect(breakdown.getByRole("img", { name: /a month, on average/ })).toBeVisible();
+  await expect(breakdown.getByRole("img", { name: /per month/ })).toBeVisible();
 
   // Bars: each month as it was, and the list the months summed.
   const chart = breakdown.getByRole("radiogroup", { name: "Chart" });
   await chart.getByRole("radio", { name: "Bars" }).click();
-  await expect(page).toHaveURL(/period=3.*chart=bars/);
-  await expect(breakdown).toContainText("$3,150 over the last 3 months");
+  await expect(page).toHaveURL(/from=.*through=.*chart=bars/);
+  await expect(breakdown).toContainText(`$3,150 over ${named(monthOf(3))} – ${named(monthOf(1))}`);
   await expect(categories).toContainText("$2,700");
   await expect(categories).toContainText("$450");
-  await expect(breakdown.getByRole("img", { name: /^By month: .*\$1,050/ })).toBeVisible();
+  const bars = breakdown.getByRole("img", { name: /^By month: .*\$1,050/ });
+  await expect(bars).toBeVisible();
+
+  // Tapping a bar narrows to its month, no category picked; then a tap on one picks it.
+  const tap = async (i: number, of: number) => {
+    const box = (await bars.boundingBox())!;
+    await page.mouse.click(
+      box.x + 4 + ((box.width - 52) * (i + 0.5)) / of,
+      box.y + box.height - 60
+    );
+  };
+  await tap(1, 3);
+  await expect(months).toHaveAccessibleName(`Months: ${named(monthOf(2))}`);
+  await expect(page).toHaveURL(new RegExp(`from=${monthOf(2)}&through=${monthOf(2)}`));
+  await expect(breakdown.getByRole("navigation", { name: "Drilled into" })).toHaveCount(0);
+  await expect(breakdown).toContainText(`$1,050 in ${named(monthOf(2))}`);
+  await tap(0, 1);
+  await expect(breakdown.getByRole("navigation", { name: "Drilled into" })).toContainText(
+    "Housing"
+  );
+  await expect(months).toHaveAccessibleName(`Months: ${named(monthOf(2))}`);
 
   // Drilling in keeps the bars and the months; this month is one bar.
-  await categories.getByRole("button", { name: /Food/ }).click();
+  await page.goto(`${reports}?of=Expenses%3AFood&chart=bars`);
   await expect(breakdown.getByRole("navigation", { name: "Drilled into" })).toContainText("Food");
-  await expect(page).toHaveURL(/period=3.*chart=bars/);
-  await show.selectOption("month");
+  await months.click();
+  await breakdown.getByRole("button", { name: "This month" }).click();
+  await expect(months).toHaveAccessibleName(`Months: ${named(monthOf(0))}`);
   await expect(breakdown).toContainText("$42 this month so far");
   await chart.getByRole("radio", { name: "Pie" }).click();
   await expect(page).not.toHaveURL(/chart=bars/);
   await expect(breakdown.getByRole("img", { name: /\$42 this month/ })).toBeVisible();
+});
+
+test("the breakdown's months are picked as a start and an end, in any year", async ({ page }) => {
+  const { book } = await withHistory(page);
+  await page.goto(`/ui/books/${book}/reports`);
+  const breakdown = page.getByRole("region", { name: "Breakdown" });
+  const months = breakdown.getByRole("button", { name: /^Months:/ });
+  const now = monthOf(0);
+  const yearAgo = monthOf(12);
+
+  await months.click();
+  const picker = breakdown.getByRole("dialog", { name: "Months" });
+  await expect(picker).toContainText("Choose a start and end month (can be the same)");
+  await expect(picker.getByRole("button", { name: "6 months" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  // A first tap is that month alone; a second, a year back, the other end.
+  await picker.getByRole("button", { name: named(now), exact: true }).click();
+  await expect(months).toHaveAccessibleName(`Months: ${named(now)}`);
+  await picker.getByRole("button", { name: "The year before" }).click();
+  await picker.getByRole("button", { name: named(yearAgo), exact: true }).click();
+  await expect(months).toHaveAccessibleName(`Months: ${named(yearAgo)} – ${named(now)}`);
+  await expect(picker).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`from=${yearAgo}&through=${now}`));
+  // Rent's six months over thirteen, this one counting as the part of it gone.
+  await expect(breakdown.getByRole("list", { name: "Categories" })).toContainText("Housing");
+
+  // A month ahead is offered, and the window stops at today.
+  await months.click();
+  await picker.getByRole("button", { name: "The year after" }).click();
+  await picker.getByRole("button", { name: named(monthOf(-12)), exact: true }).click();
+  await picker.getByRole("button", { name: named(monthOf(-12)), exact: true }).click();
+  await expect(breakdown.getByText(`Nothing in ${named(monthOf(-12))}.`)).toBeVisible();
+  await months.click();
+  await picker.getByRole("button", { name: "All time" }).click();
+  await expect(months).toHaveAccessibleName("Months: All time");
+  await expect(page).toHaveURL(/from=start/);
+
+  // Level is how deep, at the top only.
+  await breakdown.getByRole("radio", { name: "2" }).click();
+  await expect(breakdown.getByRole("list", { name: "Categories" })).toContainText("Rent");
 });
 
 test("the breakdown lists every transaction under where it is, and keeps its place", async ({
@@ -328,7 +394,8 @@ test("Reports can leave out what's excluded from budgets", async ({ page }) => {
   });
   await page.goto(`/ui/books/${book}/reports`);
   const breakdown = page.getByRole("region", { name: "Breakdown" });
-  await breakdown.getByLabel("Show").selectOption("month");
+  await breakdown.getByRole("button", { name: /^Months:/ }).click();
+  await breakdown.getByRole("button", { name: "This month" }).click();
   const categories = breakdown.getByRole("list", { name: "Categories" });
   await expect(categories).toContainText("$5,000");
   const largest = page.getByRole("region", { name: "Largest transactions" });

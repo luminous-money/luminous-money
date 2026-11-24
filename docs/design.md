@@ -880,20 +880,41 @@ same money in through another's, a day or so later. Both would sit in review, un
   percentile of 2,000 simulated months, each day drawn from the same day of one of the last 12
   (so rent on the 1st stays on the 1st), exclusions included.
 - **Reports page:** cash flow (6 months, this one so far), a breakdown of expenses or income
-  (this month, or the last 3, 6, 9 or 12 complete months, at a depth, 6 slices and Other,
-  drilling in), this month's
+  (over any range of months, the last 6 through this one by default, at a depth, 6 slices and
+  Other, drilling in), this month's
   largest expenses, and net worth (24 month ends backed out from today's balances, holdings at
   each month end's price; what has no price is named, not counted).
-- **The breakdown as a donut or a bar a month** (Kael, 2026-11-23): Show is This month, 3, 6, 9
-  or 12 months (All time too, with tags), and Pie or Bars beside it. The donut is a month's
-  average over the complete months (this month as itself); the bars are each of those months as
-  it was, stacked in the donut's colors with Other on top, and the list under them is the months
-  summed, so nothing in the bars reads as an average and Show says no "average". One dataset
-  draws both: ledger-graphs' `breakdown` has each month's amounts beside its slices (`byMonth`,
-  0.1.3) and its `BreakdownBarsChart` draws them, so the slices and their colors are the same in
-  both and the list is the legend. Where the breakdown is (`?side=`, `?of=`, `?period=`,
-  `?chart=bars`) is in the address, so coming back from one of its transactions finds it where
-  it was; a change of tags goes back to the default period (All time with tags, else 6 months).
+- **The breakdown as a donut or a bar a month** (Kael, 2026-11-23): the donut is a month's
+  average over the breakdown's months ("per month"); the bars are each of those months as it was,
+  stacked in the donut's colors with Other on top, and the list under them is the months summed,
+  so nothing in the bars reads as an average. One dataset draws both: ledger-graphs' `breakdown`
+  has each month's amounts beside its slices (`byMonth`) and its `BreakdownBarsChart` draws
+  them, so the slices and their colors are the same in both and the list is the legend.
+- **Its months are any range** (Kael, 2026-11-23, `v1.8.0`; ledger-graphs 1.0.0's `from` and
+  `through`), not a choice of 3 to 12: a button reads the range ("Jun 2026 – Nov 2026", one month
+  alone as "Nov 2026", "All time") and opens a year of months (any year, ‹ ›) with quick spans
+  (This month, 3, 6 and 12 months, This year, All time). A first tap picks a month alone, a
+  second the other end. By default the last 6 months through this one.
+  - **It stops at today,** silently: a range into next year is kept as picked, in the button and
+    the address, but a month ahead adds nothing, so it can't drag the average down. From is the
+    1st of its month.
+  - **Today's month counts as the part of it gone** in the average (on the 23rd of a 30-day
+    month, 23/30 of a month), so the day-to-day spending so far isn't spread over a whole month.
+    It overstates what's paid early in the month (rent on the 1st, divided by a few days' worth)
+    until the month fills in; Kael would rather that than understate the many small things.
+    A month alone isn't averaged: it's what it came to (so far).
+  - **Tags aren't a special case** (Kael, 2026-11-23): a tag's breakdown averages like any other,
+    the bars having each month's real amounts. With tags it starts on All time, as a past
+    trip's tag would otherwise show nothing. The API keeps `total=true` (summed, not averaged)
+    for the MCP: what a trip came to in all.
+- **Tapping the bars** (Kael, 2026-11-23): over several months, a bar narrows the breakdown to
+  its month, with no category picked; at one month, a tap on a category opens it, as the list
+  does. Either chart opens a leaf too (its own transactions), as the list already did.
+- **Its controls:** Expenses or Income across; the months beside Pie or Bars (icons, to leave
+  the months room); then Level, 1 to 4 across the card, or, drilled in, the trail back out.
+  Where it is (`?side=`, `?of=`, `?from=`, `?through=`, `?chart=bars`) is in the address, so
+  coming back from one of its transactions finds it where it was; a change of tags goes back to
+  the default months.
 - **The breakdown's transactions** (Kael, 2026-11-14): under the chart, a small window of its own
   lists everything under what's broken down (the root, or the account drilled into, and those
   under it), from the journal: newest first, paged as it scrolls. **Each row is a split, not a
@@ -1335,9 +1356,9 @@ pages: a shop's reader hands it charges (`shared/orders.ts`), and `server/orders
   and the largest count only the splits with every tag,** a receipt's `#gift` and not the
   groceries beside it (`reports.ts` keeps them from the compact stream; the outflows lens reads
   the whole transaction first, and a split it adds carries the tags of the one it comes from).
-  The breakdown gains **All time** (ledger-graphs' `total` window, 0.1.2) and starts on it, and
-  the largest covers all time, since a tag usually marks a trip or a project rather than this
-  month's spending. Net worth (balances) isn't filtered and is set aside, saying so; home's
+  The breakdown starts on **All time** and the largest covers all time, since a tag usually
+  marks a trip or a project rather than this month's spending (since 2026-11-23 the breakdown
+  averages a tag's months like any other's). Net worth (balances) isn't filtered and is set aside, saying so; home's
   "Spent this month" and an account's "Typically" aren't filtered.
 - **A filter's tags show as soon as it's focused** (Kael, 2026-11-14: it "should search as you
   type and present matching options as a dropdown"). It already narrowed as you typed, but only

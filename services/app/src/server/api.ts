@@ -524,20 +524,30 @@ export function createApi({
       )
     )
   );
-  /** The largest categories: `side` expenses or income, `depth`, `slices`, `window` (average
-   * over `months` complete months, 6 by default, this month, or `total`: all of it), or the
-   * accounts just under `of`; with each month's amounts (`byMonth`). */
+  /** The largest categories: `side` expenses or income, `depth`, `slices`, `from` (YYYY-MM, or
+   * `start` for the first posting's; by default the six months through `through`) through
+   * `through` (YYYY-MM, this month by default, and stopping at today), each its monthly average
+   * or (`total=true`) summed, or the accounts just under `of`; with each month's amounts
+   * (`byMonth`). */
   api.get(
     "/books/:book/reports/breakdown",
     report((c, book, ledger) => {
-      const window = c.req.query("window");
+      const month = (name: string) => {
+        const value = c.req.query(name);
+        if (value === undefined || value === "") return undefined;
+        if (name === "from" && value === "start") return value;
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))
+          throw new ReportProblem(422, `${name} must be a month, YYYY-MM`);
+        return value;
+      };
       return breakdownReport(ledger, book, reportOn(c, book), {
         side: c.req.query("side") === "income" ? "income" : "expenses",
         of: c.req.query("of") || undefined,
         depth: count(c.req.query("depth"), 1, 4, 1),
         slices: count(c.req.query("slices"), 2, 12, 6),
-        window: window === "month" || window === "total" ? window : "average",
-        months: count(c.req.query("months"), 1, 24, 6),
+        from: month("from"),
+        through: month("through"),
+        total: c.req.query("total") === "true",
         tags: tagsOf(c),
         lens: lensOf(c),
         budgeted: budgetedOf(c),

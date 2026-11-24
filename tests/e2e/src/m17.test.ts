@@ -178,7 +178,7 @@ describe("M17: tags, per split", () => {
     type Breakdown = { total: number; slices: { label: string; amount: number }[] };
     const breakdown = await report<Breakdown>(
       "breakdown",
-      "&side=expenses&window=total&tag=trip-2025"
+      "&side=expenses&from=start&total=true&tag=trip-2025"
     );
     assert.deepEqual(
       breakdown.slices.map((s) => [s.label, s.amount]),
@@ -188,7 +188,10 @@ describe("M17: tags, per split", () => {
         ["Gifts", 25], // the gift, not the food bought with it
       ]
     );
-    const gifts = await report<Breakdown>("breakdown", "&side=expenses&window=total&tag=gift");
+    const gifts = await report<Breakdown>(
+      "breakdown",
+      "&side=expenses&from=start&total=true&tag=gift"
+    );
     assert.equal(gifts.total, 25);
     const largest = await report<{ transactions: { payee: string }[] }>(
       "largest",

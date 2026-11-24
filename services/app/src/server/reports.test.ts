@@ -55,7 +55,8 @@ describe("reports", () => {
 
     const all = await breakdownReport(ledger, "b", "2026-10-15", {
       side: "expenses",
-      window: "total",
+      from: "start",
+      total: true,
       tags: ["italy-2025"],
     });
     expect(all.slices.map((s) => [s.label, s.amount])).toEqual([
@@ -64,7 +65,8 @@ describe("reports", () => {
     ]);
     const both = await breakdownReport(ledger, "b", "2026-10-15", {
       side: "expenses",
-      window: "total",
+      from: "start",
+      total: true,
       tags: ["italy-2025", "reimbursable"],
     });
     expect(both.total).toBe(600);
@@ -96,7 +98,8 @@ describe("reports", () => {
 
     const breakdown = await breakdownReport(ledger, "b", "2026-10-15", {
       side: "expenses",
-      window: "total",
+      from: "start",
+      total: true,
       tags: ["gift"],
     });
     expect(breakdown.slices.map((s) => [s.label, s.amount])).toEqual([["Home", 25]]);
@@ -106,17 +109,18 @@ describe("reports", () => {
     expect(flow.totals.expenses).toBe(25);
   });
 
-  it("average the breakdown over the complete months asked for, with each month's amounts", async () => {
-    spend("2026-04-10", "Expenses:Food", "300.00"); // seven months back: only in 9 and 12
+  it("average the breakdown over the months asked for, with each month's amounts", async () => {
+    spend("2026-04-10", "Expenses:Food", "300.00");
     spend("2026-07-10", "Expenses:Food", "90.00");
     spend("2026-09-10", "Expenses:Home", "60.00");
-    spend("2026-10-03", "Expenses:Food", "40.00"); // this month: not averaged
+    spend("2026-10-03", "Expenses:Food", "40.00"); // this month
 
     const three = await breakdownReport(ledger, "b", "2026-10-15", {
       side: "expenses",
-      months: 3,
+      from: "2026-07",
+      through: "2026-09",
     });
-    expect(three.months).toBe(3);
+    expect([three.from, three.through, three.months]).toEqual(["2026-07", "2026-09", 3]);
     expect(three.slices.map((s) => [s.label, s.amount])).toEqual([
       ["Food", 30],
       ["Home", 20],
@@ -126,22 +130,32 @@ describe("reports", () => {
       { month: "2026-08", partial: false, amounts: [0, 0], other: 0, total: 0 },
       { month: "2026-09", partial: false, amounts: [0, 60], other: 0, total: 60 },
     ]);
-    const nine = await breakdownReport(ledger, "b", "2026-10-15", {
+    // Through a year ahead: it stops at today, this month counting as the half of it gone.
+    const ahead = await breakdownReport(ledger, "b", "2026-10-15", {
       side: "expenses",
-      months: 9,
+      from: "2026-09",
+      through: "2027-09",
     });
-    expect(nine.total).toBe(50); // (300 + 90 + 60) / 9
-    expect(nine.byMonth.map((m) => m.month)).toEqual([
-      "2026-01",
-      "2026-02",
-      "2026-03",
-      "2026-04",
-      "2026-05",
-      "2026-06",
-      "2026-07",
-      "2026-08",
-      "2026-09",
+    expect([ahead.through, ahead.months]).toEqual(["2026-10", 1 + 15 / 31]);
+    expect(ahead.total).toBeCloseTo(100 / (1 + 15 / 31));
+    expect(ahead.byMonth.map((m) => [m.month, m.total])).toEqual([
+      ["2026-09", 60],
+      ["2026-10", 40],
     ]);
+    // One month: what it came to.
+    const october = await breakdownReport(ledger, "b", "2026-10-15", {
+      side: "expenses",
+      from: "2026-10",
+      through: "2026-10",
+    });
+    expect([october.months, october.total]).toEqual([1, 40]);
+    await expect(
+      breakdownReport(ledger, "b", "2026-10-15", {
+        side: "expenses",
+        from: "2026-10",
+        through: "2026-09",
+      })
+    ).rejects.toThrow(/after through/);
   });
 
   it("count what's kept out of budgets unless asked to leave it out", async () => {
@@ -150,12 +164,12 @@ describe("reports", () => {
 
     const all = await breakdownReport(ledger, "b", "2026-10-15", {
       side: "expenses",
-      window: "month",
+      from: "2026-10",
     });
     expect(all.total).toBe(9040);
     const budgeted = await breakdownReport(ledger, "b", "2026-10-15", {
       side: "expenses",
-      window: "month",
+      from: "2026-10",
       budgeted: true,
     });
     expect(budgeted.slices.map((s) => [s.label, s.amount])).toEqual([["Food", 40]]);
@@ -201,10 +215,13 @@ describe("reports", () => {
     });
   });
 
-  it("break down, and refuse drilling outside the side asked for", async () => {
+  it("break down the last six months, and refuse drilling outside the side asked for", async () => {
+    spend("2026-04-30", "Expenses:Food", "500.00"); // before them
     spend("2026-09-03", "Expenses:Food", "120.00");
     const report = await breakdownReport(ledger, "b", "2026-10-15", { side: "expenses" });
-    expect(report.slices.map((s) => [s.label, s.amount])).toEqual([["Food", 20]]); // 120 over 6
+    expect([report.from, report.through]).toEqual(["2026-05", "2026-10"]);
+    // 120 over May to September and half of October.
+    expect(report.total).toBeCloseTo(120 / (5 + 15 / 31));
     await expect(
       breakdownReport(ledger, "b", "2026-10-15", { side: "income", of: "Expenses:Food" })
     ).rejects.toThrow(/isn't under Income/);

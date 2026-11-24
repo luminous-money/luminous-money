@@ -31,6 +31,8 @@ import {
   useTags,
 } from "../lib/queries.js";
 import { Loading } from "../components/Loading.js";
+import { MonthRange } from "../components/MonthRange.js";
+import { addMonths, monthName, thisMonth, type MonthSpan } from "../lib/months.js";
 
 // The same order as the charts' palette (lib/chartTheme.ts), so a row's dot matches its slice.
 const PALETTE = [
@@ -59,8 +61,8 @@ const PALETTE = [
  * spending is spending, and what escrow pays for isn't counted again), or as the expense accounts
  * are booked (`?lens=expenses`), the traditional P&L view.
  *
- * Where the breakdown is (`?side=income`, `?of=` the account drilled into, `?period=` and
- * `?chart=bars`) is in the address, so coming back from one of its transactions finds it where
+ * Where the breakdown is (`?side=income`, `?of=` the account drilled into, `?from=` and
+ * `?through=` its months, and `?chart=bars`) is in the address, so coming back from one of its transactions finds it where
  * it was.
  */
 export function Reports({ book }: { book: string }) {
@@ -71,7 +73,8 @@ export function Reports({ book }: { book: string }) {
     budgeted: useParam("budgeted") === "only",
     side: useParam("side") === "income" ? "income" : "expenses",
     of: useParam("of") ?? undefined,
-    period: periodOf(useParam("period")),
+    from: monthParam(useParam("from"), true),
+    through: monthParam(useParam("through")),
     chart: useParam("chart") === "bars" ? "bars" : "pie",
   };
   const { tags, lens, budgeted } = where;
@@ -86,7 +89,8 @@ export function Reports({ book }: { book: string }) {
       ...(at.budgeted ? ["budgeted=only"] : []),
       ...(at.side === "income" ? ["side=income"] : []),
       ...(at.of ? [`of=${encodeURIComponent(at.of)}`] : []),
-      ...(at.period ? [`period=${at.period}`] : []),
+      ...(at.from ? [`from=${at.from}`] : []),
+      ...(at.through ? [`through=${at.through}`] : []),
       ...(at.chart === "bars" ? ["chart=bars"] : []),
     ].join("&");
   };
@@ -143,14 +147,16 @@ export function Reports({ book }: { book: string }) {
             choices={bookTags.data ?? []}
             allowNew={false}
             placeholder={bookTags.data?.length ? "Filter by tag" : "No tags yet"}
-            onChange={(chosen) => go({ tags: chosen, of: undefined, period: undefined })}
+            onChange={(chosen) =>
+              go({ tags: chosen, of: undefined, from: undefined, through: undefined })
+            }
           />
           {tags.length > 0 && (
             <p className="small muted">
               Only splits tagged {tagList(tags)}.{" "}
               <Link
                 href={withBack(
-                  `/books/${book}/transactions?${query({ lens: "outflows", budgeted: false, side: "expenses", of: undefined, period: undefined, chart: "pie" })}`,
+                  `/books/${book}/transactions?${query({ lens: "outflows", budgeted: false, side: "expenses", of: undefined, from: undefined, through: undefined, chart: "pie" })}`,
                   here
                 )}
               >
@@ -227,31 +233,53 @@ function CashFlowCard({ book, reading }: { book: string; reading: ReportReading 
   );
 }
 
-/** How long the breakdown covers: this month, the last 3 to 12 complete months (the donut
- * their monthly average, the bars each month), or all time (offered with tags). */
-type Period = "month" | 3 | 6 | 9 | 12 | "total";
-const PERIODS = [3, 6, 9, 12] as const;
+/** A month in the address (YYYY-MM), or, for `from`, "start" (the first there is). */
+const monthParam = (param: string | null, start = false): string | undefined =>
+  param && (/^\d{4}-(0[1-9]|1[0-2])$/.test(param) || (start && param === "start"))
+    ? param
+    : undefined;
 
-const periodOf = (param: string | null): Period | undefined =>
-  param === "month" || param === "total" ? param : PERIODS.find((n) => String(n) === param);
-
-/** Where the breakdown is: expenses or income, the account drilled into, if any, how long it
- * covers (by default, all time with tags, else 6 months), and as a donut or a bar a month. */
+/** Where the breakdown is: expenses or income, the account drilled into, if any, the months it
+ * covers (by default the last 6 through this one, or with tags all of them: a tag is often a
+ * trip, done with), and as a donut or a bar a month. */
 type BreakdownView = {
   side: BreakdownOptions["side"];
   of?: string | undefined;
-  period?: Period | undefined;
+  from?: string | undefined;
+  through?: string | undefined;
   chart: "pie" | "bars";
 };
 
-/** What a period covers, as the chart's caption and the empty card say it. */
-function covers(period: Period, chart: BreakdownView["chart"]) {
-  if (period === "month") return { caption: "this month", nothing: "this month" };
-  if (period === "total") return { caption: "in all", nothing: "with these tags" };
-  return {
-    caption: chart === "pie" ? "a month, on average" : `over the last ${period} months`,
-    nothing: `in the last ${period} months`,
-  };
+/** What the breakdown's months come to, as its captions and the empty card say it: one month
+ * ("in Sep 2026", "this month"), or a range. */
+function covers(span: MonthSpan, first: string) {
+  const one = span.from === span.through;
+  if (one) {
+    if (span.through === thisMonth())
+      return { caption: "this month", summed: "this month so far", nothing: "this month" };
+    const words = `in ${monthName(span.from)}`;
+    return { caption: words, summed: words, nothing: words };
+  }
+  const from = span.from === "start" ? first : span.from;
+  const range = `${monthName(from)} – ${monthName(span.through)}`;
+  return { caption: "per month", summed: `over ${range}`, nothing: `in ${range}` };
+}
+
+/** Pie or Bars, drawn small. */
+function ChartIcon({ kind }: { kind: "pie" | "bars" }) {
+  return (
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden fill="currentColor">
+      {kind === "pie" ? (
+        <path d="M10 2a8 8 0 1 0 8 8h-3a5 5 0 1 1-5-5Zm1 0v7h7a7 7 0 0 0-7-7Z" />
+      ) : (
+        <>
+          <rect x="2" y="9" width="4" height="9" rx="1" />
+          <rect x="8" y="3" width="4" height="15" rx="1" />
+          <rect x="14" y="6" width="4" height="12" rx="1" />
+        </>
+      )}
+    </svg>
+  );
 }
 
 /** A breakdown's slices and Other as each month's summed, not averaged: what the bars add up
@@ -283,9 +311,11 @@ function BreakdownCard({
   const { side, of, chart } = view;
   const tags = reading.tags ?? [];
   const [depth, setDepth] = useState(1);
-  const period: Period =
-    view.period === "total" && !tags.length ? 6 : (view.period ?? (tags.length ? "total" : 6));
-  const window = typeof period === "number" ? "average" : period;
+  const through = view.through ?? thisMonth();
+  const span: MonthSpan = {
+    from: view.from ?? (tags.length ? "start" : addMonths(through, -5)),
+    through,
+  };
   // Drilled into: each level's account under the root, outermost first.
   const parts = of?.split(":") ?? [];
   const path = parts.slice(1).map((_, i) => parts.slice(0, i + 2).join(":"));
@@ -293,111 +323,101 @@ function BreakdownCard({
   const report = useBreakdownReport(book, {
     side,
     depth,
-    window,
-    ...(typeof period === "number" ? { months: period } : {}),
+    ...span,
     of,
     ...reading,
   });
   const theme = useChartTheme();
   const d = report.data;
   const drill = (account: string) => onView({ ...view, of: account });
-  const { caption, nothing } = covers(period, chart);
+  const { caption, summed: over, nothing } = covers(span, d?.from ?? span.from);
+  // A bar a month: tapping one narrows to its month; at one month, to the category tapped.
+  const narrow =
+    span.from !== span.through
+      ? (month: string) => onView({ ...view, from: month, through: month })
+      : undefined;
   // The bars, and the list under them, are each month's amounts as they were.
   const listed = d && chart === "bars" ? summed(d) : d;
 
   return (
     <section className="card report" aria-label="Breakdown">
       <h2 className="section-title">Breakdown</h2>
-      <div className="segmented" role="radiogroup" aria-label="Breakdown of">
-        {(["expenses", "income"] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            role="radio"
-            aria-checked={side === s}
-            className={side === s ? "on" : ""}
-            onClick={() => onView({ ...view, side: s, of: undefined })}
-          >
-            {s === "expenses" ? "Expenses" : "Income"}
-          </button>
-        ))}
-      </div>
-      <div className="report-controls">
-        <label className="small">
-          Show
-          <select
-            aria-label="Show"
-            value={period}
-            onChange={(e) => onView({ ...view, period: periodOf(e.target.value) })}
-          >
-            {tags.length > 0 && <option value="total">All time</option>}
-            <option value="month">This month</option>
-            {PERIODS.map((n) => (
-              <option key={n} value={n}>
-                {n} months
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="breakdown-controls">
+        <div className="segmented" role="radiogroup" aria-label="Breakdown of">
+          {(["expenses", "income"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              role="radio"
+              aria-checked={side === s}
+              className={side === s ? "on" : ""}
+              onClick={() => onView({ ...view, side: s, of: undefined })}
+            >
+              {s === "expenses" ? "Expenses" : "Income"}
+            </button>
+          ))}
+        </div>
+        <MonthRange label="Months" value={span} onChange={(at) => onView({ ...view, ...at })} />
         <div className="segmented chart-kind" role="radiogroup" aria-label="Chart">
-          {(
-            [
-              ["pie", "Pie"],
-              ["bars", "Bars"],
-            ] as const
-          ).map(([value, label]) => (
+          {(["pie", "bars"] as const).map((value) => (
             <button
               key={value}
               type="button"
               role="radio"
               aria-checked={chart === value}
+              aria-label={value === "pie" ? "Pie" : "Bars"}
+              title={value === "pie" ? "Pie" : "Bars"}
               className={chart === value ? "on" : ""}
               onClick={() => onView({ ...view, chart: value })}
             >
-              {label}
+              <ChartIcon kind={value} />
             </button>
           ))}
         </div>
-        {path.length === 0 && (
-          <label className="small">
-            Level
-            <select
-              aria-label="Level"
-              value={depth}
-              onChange={(e) => setDepth(Number(e.target.value))}
-            >
+        {path.length === 0 ? (
+          <div className="breakdown-level small">
+            <span className="muted" id="breakdown-level">
+              Level
+            </span>
+            <div className="segmented levels" role="radiogroup" aria-labelledby="breakdown-level">
               {[1, 2, 3, 4].map((n) => (
-                <option key={n} value={n}>
+                <button
+                  key={n}
+                  type="button"
+                  role="radio"
+                  aria-checked={depth === n}
+                  className={depth === n ? "on" : ""}
+                  onClick={() => setDepth(n)}
+                >
                   {n}
-                </option>
+                </button>
               ))}
-            </select>
-          </label>
+            </div>
+          </div>
+        ) : (
+          <nav className="small breadcrumb" aria-label="Drilled into">
+            <button type="button" className="plain" onClick={() => setPath([])}>
+              {side === "expenses" ? "Expenses" : "Income"}
+            </button>
+            {path.map((account, i) => (
+              <span key={account}>
+                {" › "}
+                {i === path.length - 1 ? (
+                  <span>{account.split(":").at(-1)}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="plain"
+                    onClick={() => setPath(path.slice(0, i + 1))}
+                  >
+                    {account.split(":").at(-1)}
+                  </button>
+                )}
+              </span>
+            ))}
+          </nav>
         )}
       </div>
-      {path.length > 0 && (
-        <nav className="small breadcrumb" aria-label="Drilled into">
-          <button type="button" className="plain" onClick={() => setPath([])}>
-            {side === "expenses" ? "Expenses" : "Income"}
-          </button>
-          {path.map((account, i) => (
-            <span key={account}>
-              {" › "}
-              {i === path.length - 1 ? (
-                <span>{account.split(":").at(-1)}</span>
-              ) : (
-                <button
-                  type="button"
-                  className="plain"
-                  onClick={() => setPath(path.slice(0, i + 1))}
-                >
-                  {account.split(":").at(-1)}
-                </button>
-              )}
-            </span>
-          ))}
-        </nav>
-      )}
       {!d || !listed ? (
         <Pending error={report.error} height={420} />
       ) : d.slices.length === 0 ? (
@@ -405,10 +425,14 @@ function BreakdownCard({
       ) : chart === "bars" ? (
         <>
           <p className="small muted">
-            <strong className="num">{formatAmount(listed.total, d.currency)}</strong> {caption}
-            {period === "month" ? " so far" : ""}
+            <strong className="num">{formatAmount(listed.total, d.currency)}</strong> {over}
           </p>
-          <BreakdownBarsChart data={d} theme={theme} onSelect={drill} />
+          <BreakdownBarsChart
+            data={d}
+            theme={theme}
+            onSelect={drill}
+            {...(narrow ? { onMonth: narrow } : {})}
+          />
           <BreakdownList data={listed} onSelect={drill} />
         </>
       ) : (

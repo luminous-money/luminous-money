@@ -99,7 +99,7 @@ describe("M12: reports", () => {
     });
 
     type Slices = { slices: { label: string; amount: number; more: boolean }[] };
-    const spent = await report<Slices>("breakdown");
+    const spent = await report<Slices>("breakdown", "&from=2026-04&through=2026-09");
     assert.deepEqual(
       spent.slices.map((s) => [s.label, s.amount, s.more]),
       [

@@ -117,10 +117,10 @@ export type Invitation = BookInvite & {
 export type BreakdownOptions = {
   side: "expenses" | "income";
   depth: number;
-  /** "total": all of it, summed (offered when filtering by tag, M17). */
-  window: "average" | "month" | "total";
-  /** The window "average": the complete months it's over (6 by default). */
-  months?: number;
+  /** The first month (YYYY-MM), or "start": the first posting's. */
+  from: string;
+  /** The last month (YYYY-MM); the server stops at today. */
+  through: string;
   /** Drilled into: the accounts just under it. */
   of?: string;
 } & ReportReading;
@@ -731,8 +731,8 @@ export const appApi = {
             on,
             side: options.side,
             depth: String(options.depth),
-            window: options.window,
-            ...(options.months ? { months: String(options.months) } : {}),
+            from: options.from,
+            through: options.through,
             ...(options.of ? { of: options.of } : {}),
           })}${readingQuery(options)}`
         )

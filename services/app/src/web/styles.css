@@ -2636,30 +2636,154 @@ a.budget-link {
   font-weight: 700;
 }
 
-.report-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+/* The breakdown's controls: what's broken down, its months and how it's drawn, then how deep
+   (or, drilled in, where). */
+.breakdown-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
 }
 
-.report-controls label {
+/* Expenses or income, and how deep (or where), across; the months beside Pie or Bars. */
+.breakdown-controls > :first-child,
+.breakdown-controls > :nth-child(n + 4) {
+  grid-column: 1 / -1;
+}
+
+.breakdown-controls .chart-kind {
+  flex-wrap: nowrap;
+}
+
+.breakdown-controls .chart-kind button {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.7rem;
+}
+
+.breakdown-controls .chart-kind svg {
+  display: block;
+}
+
+.breakdown-level {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.6rem;
+}
+
+.segmented.levels {
+  flex: 1 1 auto;
+}
+
+.segmented.levels button {
+  flex: 1 1 0;
+  padding: 0.4rem 0;
+}
+
+/* Four short numbers fit a phone side by side: they don't stack as longer options do. */
+@media (max-width: 34rem) {
+  .segmented.levels > button:nth-last-child(n + 3),
+  .segmented.levels > button:nth-last-child(n + 3) ~ button {
+    flex-basis: 0;
+    justify-content: center;
+  }
+
+  .segmented.levels > button:nth-last-child(n + 3) ~ button {
+    border-top: 0;
+    border-left: 1px solid var(--line);
+  }
+}
+
+/* The breakdown's months (MonthRange): a button reading the range, opening a year of them. */
+.month-range-button {
+  width: 100%;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0 0.85rem;
+}
+
+.month-range-button > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.month-range-button [aria-hidden] {
   color: var(--muted);
+  font-size: 0.8rem;
 }
 
-.report-controls select {
-  font-size: 1rem;
+.month-range .menu-panel.month-range-panel {
+  left: 0;
+  right: auto;
+  width: min(20rem, calc(100vw - 2.5rem));
+  gap: 0.6rem;
+  padding: 0.75rem;
 }
 
-/* Pie or bars: beside Show and Level, only as wide as its two words. */
-.report-controls .chart-kind {
-  flex: 0 0 auto;
+.month-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
 }
 
-.report-controls .chart-kind button {
-  padding: 0.35rem 0.75rem;
+.month-presets button {
+  min-height: 2.25rem;
+  padding: 0 0.7rem;
+  font-size: 0.85rem;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.month-presets button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.month-year {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  padding-top: 0.5rem;
+}
+
+.month-year button.plain {
+  min-width: 2.75rem;
+  min-height: 2.5rem;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+}
+
+.month-grid button {
+  min-height: 2.6rem;
+  padding: 0;
+  border-color: transparent;
+  box-shadow: none;
+  font-weight: 500;
+}
+
+.month-grid button.now {
+  border-color: var(--edge);
+}
+
+.month-grid button.inside {
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--card));
+}
+
+.month-grid button.edge {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+.month-hint {
+  margin: 0;
 }
 
 .breadcrumb button.plain {

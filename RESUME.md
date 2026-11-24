@@ -4,7 +4,41 @@ Where We Left Off
 _Updated 2026-11-23._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-23): the breakdown over 3 to 12 months, as a donut or bars; its splits; budgets open it, `v1.7.0`
+## Latest (2026-11-23, evening): the breakdown over any range of months; bars narrow to a month; its controls, `v1.8.0`
+
+Kael asked for three things, the month range first with screenshots for approval, then "publish
+and update": the breakdown's months as an unlimited range ("From Jan 2026 through Dec 2027",
+clamped silently to today, from the 1st of its month, a single month as just "Nov 2026", 6 months
+by default); a tap on a bar narrowing to its month (and, at one month, opening the category
+tapped); and its scattered options cleaned up. Over three rounds of screenshots he settled the
+label ("Jun 2026 – Nov 2026"), the hint ("Choose a start and end month (can be the same)"), the
+donut's "per month", the layout, partial-month averaging, and no special case for tags.
+
+- **ledger-graphs `1.0.0`** (Kael: "stable enough"; its own repo, `pnpm release 1.0.0`, published
+  by its CI): `breakdown` takes `from` and `through` (months) and `average` in place of `window`
+  and `months`; it stops at today, today's month counting as the part of it gone (alone, it's
+  what it came to so far), and returns `from`, `through` and `months` (the divisor).
+  `BreakdownBarsChart` takes `onMonth`; either chart opens a leaf too. The app depends on
+  `^1.0.0`.
+- **`app`, server:** `/reports/breakdown` takes `from` (YYYY-MM, or `start`), `through` and
+  `total=true` (summed: only the MCP uses it now); 422 for a bad month or `from` after
+  `through`. The MCP's `read_report` and its reports skill say so.
+- **`app`, PWA:** `MonthRange` (`components/MonthRange.tsx`, helpers in `lib/months.ts`): a
+  button reading the range, opening quick spans and a year of months; `?from=`/`?through=` in the
+  address. The card: Expenses or Income; the months beside Pie or Bars (icons); Level 1–4 across
+  (drilled in, the trail). A tap on a bar narrows to its month. Tags average like the rest, and
+  still start on All time. The loan account's "Counted as spending here" asks for its months
+  explicitly (this month; the six complete months before it).
+- **Tests:** ledger-graphs `reports.test.ts`; app `reports.test.ts`, `months.test.ts`; e2e
+  `m12.test.ts`, `m17.test.ts`; browser `m12.spec.ts` (the range, the bars' taps, the picker
+  across years and ahead, Level), `m17.spec.ts`. Looked at in screenshots, light and dark.
+  `pnpm test` and `pnpm e2e` passed (API 125 of 125, browser 158 of 158; `ledger.spec`'s "going
+  to a date" timed out once, in a run that also had a test of mine to fix, and passed on the
+  rerun).
+
+**Next:** unchanged: Kael reviews HSA tracking's 7 calls (M99); then docs/PLAN.md's Ahead.
+
+## Before that (2026-11-23): the breakdown over 3 to 12 months, as a donut or bars; its splits; budgets open it, `v1.7.0`
 
 Kael asked for three things, then "publish the release when you're done and update the app via
 SSH": the breakdown's Show as This month, 3, 6, 9 and 12 months (no "average" in it), and a
@@ -1593,7 +1627,7 @@ How it's put together:
 
 ## The ledger-graphs libraries
 
-- **The app depends on them from npm** (`@luminous-money/ledger-graphs-api` and `-ui`, `^0.1.2`).
+- **The app depends on them from npm** (`@luminous-money/ledger-graphs-api` and `-ui`, `^1.0.0`).
   Their home is [luminous-money/ledger-graphs](https://github.com/luminous-money/ledger-graphs)
   (public, ISC; `libs/api`, `libs/ui`; CI on every push). Local clone:
   `~/Repos/luminous-money/ledger-graphs`.

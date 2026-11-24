@@ -5,8 +5,8 @@
  *
  * - **Spent this month:** expenses under the highest-level expense budgets (or all of them
  *   without budgets) against those budgets per month, and a month simulated from the last 12.
- * - **Cash flow** (6 months), **breakdowns** (averages over the last 6, or 3 to 12, complete
- *   months, this month, or all time; each with every month's amounts, for a bar a month),
+ * - **Cash flow** (6 months), **breakdowns** (over any range of months, stopping at today: their
+ *   monthly average, or with tags their sum; each with every month's amounts, for a bar a month),
  *   **largest transactions** (this month), **net worth** (24 month ends), and an account's
  *   **typical periods** (12 months for weeks and months, 5 years for years).
  * - **By tag** (M17): cash flow, breakdowns and the largest can count only the splits with every
@@ -142,6 +142,9 @@ export async function cashFlowReport(
   return cashFlow({ postings, today: on, currency, months, roots });
 }
 
+/** The month (YYYY-MM) `n` months before `month`. */
+const monthBefore = (month: string, n: number) => monthsBefore(`${month}-01`, n).slice(0, 7);
+
 export async function breakdownReport(
   ledger: LedgerPort,
   book: string,
@@ -151,28 +154,45 @@ export async function breakdownReport(
     of?: string;
     depth?: number;
     slices?: number;
-    /** "total": everything to date, summed (for a tag's trip or project). */
-    window?: "average" | "month" | "total";
-    /** The window "average": the complete months it's over (6). */
-    months?: number;
+    /** The first month (YYYY-MM) counted, or "start": the first posting's. By default, the
+     * six months through `through`. */
+    from?: string;
+    /** The last month counted (by default, and at the latest, `on`'s). */
+    through?: string;
+    /** Summed over the months, not their monthly average (for a tag's trip or project). */
+    total?: boolean;
     tags?: string[];
     lens?: Lens;
     /** Only what's counted in budgets. */
     budgeted?: boolean;
   }
 ) {
-  const { tags = [], lens = "outflows", budgeted = false, ...rest } = options;
-  const window = rest.window ?? "average";
-  const months = rest.months ?? 6;
-  const from = window === "total" ? undefined : monthsBefore(on, window === "average" ? months : 0);
+  const { tags = [], lens = "outflows", budgeted = false, total = false, ...rest } = options;
+  // Months ahead are asked for as they are, and the window stops at today.
+  const through = rest.through ?? on.slice(0, 7);
+  const from = rest.from === "start" ? undefined : (rest.from ?? monthBefore(through, 5));
+  if (from && from > through)
+    throw new ReportProblem(422, `from (${from}) is after through (${through})`);
   const [{ currency, roots }, postings] = await Promise.all([
     context(ledger, book),
-    stream(ledger, book, from, tags, lens, budgeted),
+    stream(ledger, book, from && `${from}-01`, tags, lens, budgeted),
   ]);
   const root = roots[rest.side];
   if (rest.of && !(rest.of === root || rest.of.startsWith(`${root}:`)))
     throw new ReportProblem(422, `${rest.of} isn't under ${root}`);
-  return breakdown({ postings, today: on, currency, roots, root, ...rest, window, months });
+  return breakdown({
+    postings,
+    today: on,
+    currency,
+    roots,
+    root,
+    ...(rest.of ? { of: rest.of } : {}),
+    ...(rest.depth ? { depth: rest.depth } : {}),
+    ...(rest.slices ? { slices: rest.slices } : {}),
+    ...(from ? { from } : {}),
+    through,
+    average: !total,
+  });
 }
 
 /** This month's largest expenses; with `tags`, the largest of all time, counting the splits with

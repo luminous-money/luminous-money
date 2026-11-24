@@ -6,6 +6,7 @@ import { toSegment } from "../../shared/names.js";
 import type { LoanView } from "../../shared/loans.js";
 import { shortName } from "../lib/accounts.js";
 import { formatAmount } from "../lib/format.js";
+import { addMonths, thisMonth } from "../lib/months.js";
 import { withBack } from "../lib/navigation.js";
 import {
   explain,
@@ -108,8 +109,14 @@ function CountedCard({
   here: string;
 }) {
   const options = { side: "expenses", depth: 1, of: account } as const;
-  const month = useBreakdownReport(book, { ...options, window: "month" }).data;
-  const average = useBreakdownReport(book, { ...options, window: "average" }).data;
+  const now = thisMonth();
+  const month = useBreakdownReport(book, { ...options, from: now, through: now }).data;
+  // The average over the six complete months before this one.
+  const average = useBreakdownReport(book, {
+    ...options,
+    from: addMonths(now, -6),
+    through: addMonths(now, -1),
+  }).data;
   const payments = counting.map((a) => `account=${encodeURIComponent(a.name)}`).join("&");
   return (
     <section className="card counted-here" aria-label="Counted as spending here">

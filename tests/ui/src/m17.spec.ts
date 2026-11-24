@@ -174,7 +174,9 @@ test("Reports filter by tag: All time, the largest tagged, and net worth set asi
   await expect(page.getByText("Only splits tagged #kitchen.")).toBeVisible();
 
   const breakdown = page.getByRole("region", { name: "Breakdown" });
-  await expect(breakdown.getByLabel("Show")).toHaveValue("total");
+  await expect(breakdown.getByRole("button", { name: /^Months:/ })).toHaveAccessibleName(
+    "Months: All time"
+  );
   await expect(breakdown.getByRole("list", { name: "Categories" })).toContainText("Home");
   await expect(breakdown.getByRole("list", { name: "Categories" })).not.toContainText("Food");
   const largest = page.getByRole("region", { name: "Largest transactions" });

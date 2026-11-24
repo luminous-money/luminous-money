@@ -459,3 +459,9 @@ Smaller improvements picked up between milestones. Those still open are in
       `byMonth` and `BreakdownBarsChart`); the transactions under it are the splits there, each
       with its own amount, read through the outflows lens as the report is; and a starred budget
       on home opens Reports drilled into its account.
+- [x] **The breakdown over any range of months; tapping a bar narrows to it; its controls**
+      (Kael, 2026-11-23, `v1.8.0`; design.md has the decisions): its months are a range picked
+      from a year of months (any years, stopping at today, today's month counted as the part
+      gone), "Jun 2026 – Nov 2026" or "Nov 2026"; a tap on a bar narrows to its month, and at one
+      month opens the category tapped; Expenses or Income, then the months beside Pie or Bars,
+      then Level across; tags average like the rest. ledger-graphs is 1.0.0.

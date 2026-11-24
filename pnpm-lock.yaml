@@ -117,11 +117,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ledger-client
       '@luminous-money/ledger-graphs-api':
-        specifier: ^0.1.3
-        version: 0.1.3
+        specifier: ^1.0.0
+        version: 1.0.0
       '@luminous-money/ledger-graphs-ui':
-        specifier: ^0.1.3
-        version: 0.1.3(echarts@6.1.0)(react@19.3.0)
+        specifier: ^1.0.0
+        version: 1.0.0(echarts@6.1.0)(react@19.3.0)
       '@wymp/config-simple':
         specifier: ^1.1.0
         version: 1.1.0
@@ -1029,11 +1029,11 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@luminous-money/ledger-graphs-api@0.1.3':
-    resolution: {integrity: sha512-9Wh6oBc98zm8M8H0UovITom1RAKulVI65BOcx9vFNIKWOOkNs9CzWoic3TxIJlqu5U4arYLNEEQxm2YimSvV2A==}
+  '@luminous-money/ledger-graphs-api@1.0.0':
+    resolution: {integrity: sha512-G5u/YZvFTwdWsodeLca5LuBOtjWNCn9xzrYVYj2xSGz/NvABDR8AiSqNoYoas56rD7Ff4qUGRdGOLGmVRppADg==}
 
-  '@luminous-money/ledger-graphs-ui@0.1.3':
-    resolution: {integrity: sha512-EoYW8ousKOdBYp9Yvy3gprTFEh5AtOxT3AhKdbXHrLtGTHF18glTEpGeGFr3D0Fw/sEp/Zb4nRFRY2yi3Yzx6A==}
+  '@luminous-money/ledger-graphs-ui@1.0.0':
+    resolution: {integrity: sha512-wfCqvpCdUAdPfM4B1EjIAmqB1EUWyyMLbBTMDAXMVGYzYUm08BBqQC3KnVB4+mM/x1sDxTcUYeJLWmRnIzEhRg==}
     peerDependencies:
       echarts: ^6.1.0
       react: ^19.0.0
@@ -3775,11 +3775,11 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@luminous-money/ledger-graphs-api@0.1.3': {}
+  '@luminous-money/ledger-graphs-api@1.0.0': {}
 
-  '@luminous-money/ledger-graphs-ui@0.1.3(echarts@6.1.0)(react@19.3.0)':
+  '@luminous-money/ledger-graphs-ui@1.0.0(echarts@6.1.0)(react@19.3.0)':
     dependencies:
-      '@luminous-money/ledger-graphs-api': 0.1.3
+      '@luminous-money/ledger-graphs-api': 1.0.0
       echarts: 6.1.0
       react: 19.3.0
 

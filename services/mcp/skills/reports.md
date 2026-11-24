@@ -5,8 +5,9 @@
 - `spending`: this month by day, against the budget and a typical month.
 - `cash_flow`: income and expenses for each of the last `months`.
 - `breakdown`: the largest categories (`side` expenses or income), at a `depth` of account
-  levels, over a `window` (a 6-month average, this month, or all of it), or the accounts just
-  under `of`.
+  levels, or the accounts just under `of`, from `from` through `through` (months, YYYY-MM; the
+  last 6 through this one by default; `from: "start"` for all of it), each a month's average
+  (`total: true` sums them). It stops at today, counting this month as the part of it gone.
 - `largest`: this month's largest expenses (with tags, the largest of all time).
 - `net_worth`: assets, liabilities and net worth at each month end.
 - `typical`: what an expense or income account's week, month and year usually come to.
