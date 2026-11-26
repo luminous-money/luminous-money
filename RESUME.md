@@ -31,7 +31,8 @@ Emmer, since tonight's upgrade takes care of it.
   ("Only splits tagged #kitchen." not shown within 5 s, on a slow 1.7-minute run); it passed
   on every run after. **Not tried on a phone yet:** that waits for Kael to install from Chrome.
 
-**Released** as `v1.10.0`, with the receipt card's Save and Cancel (below). **Emmer not
+**Released** as `v1.10.0` (the Release workflow and CI green; all seven images read
+anonymously from ghcr.io), with the receipt card's Save and Cancel (below). **Emmer not
 upgraded** (Kael: tonight's upgrade takes care of it).
 **Next:** Kael installs the app from Chrome on Android and tries a share; say if it doesn't
 show up. Then unchanged: Kael creates Personal and shares the connection with it, reviews
