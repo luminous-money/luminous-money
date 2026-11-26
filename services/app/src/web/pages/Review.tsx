@@ -31,6 +31,7 @@ import {
   useAccounts,
   useAssign,
   useConfirmMatch,
+  useDeleteTransaction,
   useDropOccurrence,
   useEditTransaction,
   useFunds,
@@ -68,13 +69,17 @@ import { Crumbs } from "../components/Crumbs.js";
  * every one) narrow what's shown. Back from a transaction opened here comes back to it.
  */
 /** The single transactions (`?only=`) seen in review this session: once one has been, its being
- * gone means it was confirmed or skipped (here, or on its page and back), so review goes back. */
+ * gone means it was confirmed, skipped or cancelled (here, or on its page and back), so review
+ * goes back. */
 const seenOnly = new Set<string>();
 
 export function Review({ book }: { book: string }) {
   const [, navigate] = useLocation();
   // Just one transaction (a receipt just captured, M16): confirming or skipping it goes `back`.
   const only = useParam("only");
+  // Made just now from a receipt (`?new=1`, not read into the bank's copy): it's saved unconfirmed
+  // or cancelled (deleted), not skipped.
+  const fresh = useParam("new") === "1" && !!only;
   // What reading it cost the AI, if it was read (an estimate, from the ai service).
   const aiCost = useParam("ai_cost");
   const back = useBack(`/books/${book}/review`);
@@ -240,6 +245,7 @@ export function Review({ book }: { book: string }) {
               onSelect={() => selection.toggle(t.id)}
               accounts={accounts.data ? postable(accounts.data, t.date) : []}
               create={create}
+              fresh={fresh}
               onSkip={() =>
                 only ? navigate(back) : setSkipped((s) => [...s.filter((x) => x !== t.id), t.id])
               }
@@ -274,6 +280,8 @@ type ItemProps = {
   onSelect: () => void;
   accounts: string[];
   create?: AccountCreation;
+  /** Made just now from a receipt: Cancel (deleting it) and Save (unconfirmed) in place of Skip. */
+  fresh: boolean;
   onSkip: () => void;
 };
 
@@ -293,11 +301,13 @@ function QueueItem({
   onSelect,
   accounts,
   create,
+  fresh,
   onSkip,
 }: ItemProps) {
   const [offer, setOffer] = useState<{ account: string; others: Transaction[] } | null>(null);
   const edit = useEditTransaction(book, t.id);
   const drop = useDropOccurrence(book);
+  const remove = useDeleteTransaction(book, t.id);
   const confirmMatch = useConfirmMatch(book);
   const swipe = useRef<SwipeHandle>(null);
   const [error, setError] = useState<string | null>(null);
@@ -315,7 +325,7 @@ function QueueItem({
 
   const view = useMemo(() => simple(t), [t]);
   const detail = withBack(`/books/${book}/transactions/${t.id}`, here);
-  const busy = edit.isPending || confirmMatch.isPending;
+  const busy = edit.isPending || confirmMatch.isPending || remove.isPending;
   const blocked = t.postings.some((p) => unresolved(p.account));
   // An itemized transaction (a receipt's or an order's lines, each with its memo) keeps every
   // split pickable, memo and all, after one's placed: so a pick can be changed where it was made.
@@ -370,6 +380,21 @@ function QueueItem({
     } catch (e) {
       setError(explain(e));
       return false;
+    }
+  };
+
+  // Saving it keeps it unconfirmed, the description too; cancelling it deletes it, receipt and
+  // all, and its leaving the queue goes back (as confirming does).
+  const keep = async () => {
+    if (narration === t.narration || (await save({ narration }))) onSkip();
+  };
+  const discard = async () => {
+    if (!window.confirm("Delete this new transaction and its receipt?")) return;
+    setError(null);
+    try {
+      await remove.mutateAsync();
+    } catch (e) {
+      setError(explain(e));
     }
   };
 
@@ -608,13 +633,29 @@ function QueueItem({
 
           {error && <p className="error">{error}</p>}
 
-          <div className="actions">
-            <button type="button" onClick={() => void swipe.current?.commit("skip")}>
-              Skip
-            </button>
+          <div className={`actions${fresh ? " cornered" : ""}`}>
+            {fresh ? (
+              <button
+                type="button"
+                className="plain"
+                disabled={remove.isPending}
+                onClick={() => void discard()}
+              >
+                Cancel
+              </button>
+            ) : (
+              <button type="button" onClick={() => void swipe.current?.commit("skip")}>
+                Skip
+              </button>
+            )}
             <Link href={detail} className="button">
               {view ? "Split…" : "Open"}
             </Link>
+            {fresh && (
+              <button type="button" disabled={remove.isPending} onClick={() => void keep()}>
+                Save
+              </button>
+            )}
             <button
               type="button"
               className="primary"

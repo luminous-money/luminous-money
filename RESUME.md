@@ -1,10 +1,32 @@
 Where We Left Off
 ==================================================================================================
 
-_Updated 2026-11-24._ Keep this current: every finalized change set updates it (see
+_Updated 2026-11-25._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-24, later): the site and video brought up to date, and the `update-marketing` skill
+## Latest (2026-11-25): save or cancel a new receipt's transaction
+
+Kael: confirming a receipt's transaction on save is usual, not universal; keep Confirm primary,
+add a secondary Save to its left and a Cancel link in the left corner.
+
+- **The card a capture lands on** (`Review.tsx`, `?only=<id>&new=1`) is Cancel (a plain button
+  in the left corner, `.actions.cornered`), Split… or Open, Save, Confirm. **Save** keeps it
+  unconfirmed (the description too, even if its field wasn't left) and goes back. **Cancel**
+  asks ("Delete this new transaction and its receipt?"), deletes it (the ledger deletes its
+  attachments with it), and its leaving the queue goes back, as confirming does.
+- **Only when the capture made it:** `CaptureReceipt` adds `&new=1` unless `matched`. A receipt
+  read into the bank's copy, Read receipt on a transaction's page, and a notification's link keep
+  Skip, since cancelling would delete a transaction that was already there. design.md has it.
+- **Checked:** `pnpm test` passes. `pnpm e2e` passes; its first run hit the brokerage "reads again"
+  flake (noted under 2026-11-18's S1, S2 and S4: a slow machine, 1.6 minutes), and the run again
+  passed all 160. A new browser test
+  in `m16.spec.ts` covers Save and Cancel, and the bank-copy test now checks that it keeps Skip.
+
+**Not released** yet: it goes out with the next version.
+**Next:** unchanged: Kael creates Personal and shares the connection with it, reviews shared
+connections' nine calls, then HSA tracking's 7 calls (M99); docs/PLAN.md's Ahead.
+
+## Before that (2026-11-24, later): the site and video brought up to date, and the `update-marketing` skill
 
 Kael: the product has changed a lot since the site and the video were published, so (1) write a
 skill, `.agents/skills/update-marketing`, saying where the marketing assets are, how to find what
@@ -493,7 +515,7 @@ one commit each, then a release.
   ledger's API document changed (a docstring): the client is regenerated.
 - **To run auth's tests outside Docker** you need Node 24 (Argon2 is new in its `crypto`);
   this machine's is 22, so they ran in `node:24-slim` with the repo mounted.
-- **A flake seen once:** brokerage's "reads again" (`brokerage.spec.ts`) waits 5 seconds for the
+- **A flake seen twice** (again 2026-11-25): brokerage's "reads again" (`brokerage.spec.ts`) waits 5 seconds for the
   reread's job; on a loaded machine (the browser suite at 1.4 minutes, not its usual 40
   seconds) it was still running. It passed on the run again, and on every other run.
 

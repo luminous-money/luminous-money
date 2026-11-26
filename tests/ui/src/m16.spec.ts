@@ -1,6 +1,6 @@
 /** M16: setting a book's AI up, capturing a receipt from a file, and reviewing it (its splits
- * too); a receipt read into the bank's copy, or into a transaction from its page; an iPhone's
- * photo kept as a JPEG; an account's payment cards. */
+ * too; a new one saved unconfirmed, or cancelled); a receipt read into the bank's copy, or into a
+ * transaction from its page; an iPhone's photo kept as a JPEG; an account's payment cards. */
 import { readFileSync } from "node:fs";
 
 import { expect, type Page } from "@playwright/test";
@@ -85,6 +85,56 @@ test("a receipt is captured from a file, read, and reviewed, coming back where i
     decodeURIComponent(url.pathname).endsWith(`/accounts/${account}`)
   );
   await expect(page.getByRole("list", { name: "Transactions" })).toContainText("Fake Store");
+});
+
+test("a new receipt's transaction is saved unconfirmed, or cancelled, coming back where it started", async ({
+  page,
+}) => {
+  const { session, book, account } = await setUpUser(page);
+  await fakeAi(page, book.id);
+  const capture = async (name: string) => {
+    await page.goto(`/ui/books/${book.id}/accounts/${encodeURIComponent(account)}`);
+    await page.getByRole("link", { name: "Capture a receipt" }).click();
+    await page.getByLabel("Upload a receipt").setInputFiles({
+      name,
+      mimeType: "image/jpeg",
+      buffer: JPEG,
+    });
+    await page.getByRole("button", { name: "Create transaction" }).click();
+    await expect(page).toHaveURL((url) => url.searchParams.has("only"));
+    return new URL(page.url()).searchParams.get("only")!;
+  };
+  const backHome = () =>
+    expect(page).toHaveURL((url) =>
+      decodeURIComponent(url.pathname).endsWith(`/accounts/${account}`)
+    );
+
+  // Saved: still unconfirmed, with the description typed (not left first).
+  const saved = await capture("kept.jpg");
+  const item = page.getByRole("article").filter({ hasText: "Fake Store" });
+  await expect(item.getByRole("button", { name: "Skip" })).toHaveCount(0);
+  await item.getByLabel("Description").fill("Snacks");
+  await item.getByRole("button", { name: "Save" }).click();
+  await backHome();
+  const t = await stored(book.id, saved);
+  expect([t.flag, t.narration]).toEqual(["!", "Snacks"]);
+
+  // Cancelled: asked first, then it's gone.
+  const cancelled = await capture("gone.jpg");
+  const asked: string[] = [];
+  page.once("dialog", (dialog) => (asked.push(dialog.message()), void dialog.accept()));
+  await page
+    .getByRole("article")
+    .filter({ hasText: "Fake Store" })
+    .getByRole("button", { name: "Cancel" })
+    .click();
+  await backHome();
+  expect(asked).toEqual(["Delete this new transaction and its receipt?"]);
+  const { response } = await session.ledger.GET(
+    "/api/ledger/v1/books/{book_id}/transactions/{directive_id}",
+    { params: { path: { book_id: book.id, directive_id: cancelled } } }
+  );
+  expect(response.status).toBe(404);
 });
 
 test("a receipt that isn't read waits in review for the account it was paid from", async ({
@@ -310,6 +360,9 @@ test("a receipt for a purchase already here is read into it, which is back in re
     `Receipt: It was read into the transaction already here from ${date}, which is back in review. Read by the fake provider.`
   );
   await expect(item.getByRole("button", { name: /^FIRST ITEM/ })).toBeVisible();
+  // It isn't new, so it's skipped, not cancelled: cancelling would delete the bank's copy.
+  await expect(item.getByRole("button", { name: "Skip" })).toBeVisible();
+  await expect(item.getByRole("button", { name: "Cancel" })).toHaveCount(0);
   const t = await stored(book.id, bank.id);
   expect([t.flag, t.postings.length, t.date]).toEqual(["!", 3, date]);
 });

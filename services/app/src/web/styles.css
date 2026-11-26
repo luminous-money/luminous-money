@@ -479,6 +479,15 @@ summary:focus-visible {
   margin-left: auto;
 }
 
+/* The first action alone in the left corner (a Cancel), the rest together on the right. */
+.actions.cornered > :first-child {
+  margin-right: auto;
+}
+
+.actions.cornered .primary {
+  margin-left: 0;
+}
+
 /* Actions that stay on screen while the page runs on below them, and settle back into place
    once it's scrolled past where they belong: a bar across the bottom, frosted. */
 .actions.pinned {

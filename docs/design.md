@@ -1191,6 +1191,12 @@ plan](milestones/shared-connections/PLAN.md) has his brief and the calls made wi
   stacks: `AI_PROVIDERS` lists what a stack offers).
 - **Review takes one item** (`?only=<id>&back=…`), so a capture lands on its transaction and
   confirming or skipping it returns to where the capture started.
+- **A new receipt's card is a form: Cancel, Save, Confirm** (Kael, 2026-11-25). Confirming is
+  still the primary action, but not every receipt is ready to confirm, so Save keeps it
+  unconfirmed (it's in review later) and Cancel, in the card's left corner, deletes it and its
+  receipt after asking. The capture says it's new (`&new=1`) only when it made the transaction:
+  one read into the bank's copy keeps Skip, since cancelling would delete the bank's
+  transaction.
 
 ### Shops: reading Amazon (the Amazon orders spike, 2026-11-06)
 

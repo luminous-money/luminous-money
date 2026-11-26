@@ -479,3 +479,7 @@ Smaller improvements picked up between milestones. Those still open are in
       again (95 seconds, the current intro card and loans title). How to do it next time is
       `.agents/skills/update-marketing/SKILL.md`, with `site/scripts/since-published.sh`
       saying what changed since the page and the video were each published.
+- [x] **Save or cancel a new receipt's transaction** (Kael, 2026-11-25): the review card a
+      capture lands on is Cancel (deletes it and its receipt, asking first), Split… or Open,
+      Save (keeps it unconfirmed) and Confirm, still the primary. A receipt read into the bank's
+      copy keeps Skip.

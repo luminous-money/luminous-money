@@ -4,7 +4,8 @@
  * "Upload instead", the base account (the account you came from, if it's an asset or
  * liability), "Itemize receipt?" (the book's default), and optional hints. Creating it sends the
  * lot to `app`, which has the ai service read it and stages it; then it's in review, and
- * confirming or skipping it comes back here, to where you started.
+ * confirming it, saving it unconfirmed or cancelling it (it's deleted, if it's new rather than
+ * read into the bank's copy) comes back here, to where you started.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -73,7 +74,7 @@ export function CaptureReceipt({ book }: { book: string }) {
       });
       navigate(
         withBack(
-          `/books/${book}/review?only=${made.transaction_id}${made.ai_cost !== null ? `&ai_cost=${made.ai_cost}` : ""}`,
+          `/books/${book}/review?only=${made.transaction_id}${made.matched ? "" : "&new=1"}${made.ai_cost !== null ? `&ai_cost=${made.ai_cost}` : ""}`,
           back
         )
       );
