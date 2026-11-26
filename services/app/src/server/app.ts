@@ -58,6 +58,9 @@ export function createApp(
   app.route("/", createApi(services));
 
   app.get("/ui", (c) => c.redirect("/ui/"));
+  // A share to the installed app is the service worker's (public/share-target.js); one that
+  // reaches here (no service worker yet) opens Capture receipt, which says the file didn't arrive.
+  app.post("/ui/share-receipt", (c) => c.redirect("/ui/receipt?shared=1", 303));
 
   // Content-hashed build assets never change; everything else (index.html, the service worker,
   // the manifest) must be revalidated so a new release is picked up.

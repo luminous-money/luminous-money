@@ -1,18 +1,13 @@
 /** M16: setting a book's AI up, capturing a receipt from a file, and reviewing it (its splits
  * too; a new one saved unconfirmed, or cancelled); a receipt read into the bank's copy, or into a
- * transaction from its page; an iPhone's photo kept as a JPEG; an account's payment cards. */
+ * transaction from its page; an iPhone's photo kept as a JPEG; an account's payment cards. A
+ * receipt shared to the installed app is share.spec.ts's. */
 import { readFileSync } from "node:fs";
 
 import { expect, type Page } from "@playwright/test";
 
 import { test } from "./fixtures.js";
-import { accounts, setUpUser, stored } from "./support.js";
-
-// A tiny JPEG (a white pixel), as a file to upload.
-const JPEG = Buffer.from(
-  "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/yQALCAABAAEBAREA/8wABgAQEAX/2gAIAQEAAD8A0s8g/9k=",
-  "base64"
-);
+import { accounts, JPEG, setUpUser, stored } from "./support.js";
 
 // A synthetic HEIC (as an iPhone's photos are), the app's own test fixture.
 const HEIC = readFileSync(

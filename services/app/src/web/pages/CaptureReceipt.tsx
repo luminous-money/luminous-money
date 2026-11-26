@@ -6,6 +6,9 @@
  * lot to `app`, which has the ai service read it and stages it; then it's in review, and
  * confirming it, saving it unconfirmed or cancelling it (it's deleted, if it's new rather than
  * read into the bank's copy) comes back here, to where you started.
+ *
+ * Shared to the installed app (`?shared=1`, lib/shared.ts), it opens with the file shared, and
+ * the book to put it in can be changed here: it's the one you'd start in.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -17,12 +20,22 @@ import { displayName } from "../lib/accounts.js";
 import { OutcomeUnknown, receiptStepWords, type ReceiptStep } from "../lib/appApi.js";
 import { isDecimal, negate } from "../lib/decimal.js";
 import { useBack, useParam, withBack } from "../lib/navigation.js";
-import { explain, useAccounts, useAiSettings, useCaptureReceipt } from "../lib/queries.js";
+import {
+  explain,
+  useAccounts,
+  useAiSettings,
+  useBooks,
+  useCaptureReceipt,
+} from "../lib/queries.js";
+import { forgetShared, sharedFile } from "../lib/shared.js";
 
 export function CaptureReceipt({ book }: { book: string }) {
   const [, navigate] = useLocation();
   const back = useBack(`/books/${book}`);
   const preset = useParam("account");
+  const shared = useParam("shared") === "1";
+  const books = useBooks();
+  const writable = (books.data ?? []).filter((b) => b.role !== "read");
   const accounts = useAccounts(book);
   const settings = useAiSettings(book);
   const capture = useCaptureReceipt(book);
@@ -41,6 +54,20 @@ export function CaptureReceipt({ book }: { book: string }) {
   // Where reading it is: the server reads it in the background (a minute or more of AI calls)
   // and this asks after it.
   const [step, setStep] = useState<ReceiptStep | null>(null);
+  // Shared, and nothing kept: the service worker wasn't there to take it, or it's been used.
+  const [lost, setLost] = useState(false);
+  useEffect(() => {
+    if (!shared) return;
+    let live = true;
+    void sharedFile().then(async (file) => {
+      if (!live) return;
+      if (file) setPhoto(await prepared(file));
+      else setLost(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [shared]);
 
   const chart = accounts.data ?? [];
   const bases = useMemo(() => baseAccounts(chart), [chart]);
@@ -72,6 +99,7 @@ export function CaptureReceipt({ book }: { book: string }) {
         },
         onStep: setStep,
       });
+      if (shared) await forgetShared();
       navigate(
         withBack(
           `/books/${book}/review?only=${made.transaction_id}${made.matched ? "" : "&new=1"}${made.ai_cost !== null ? `&ai_cost=${made.ai_cost}` : ""}`,
@@ -151,6 +179,31 @@ export function CaptureReceipt({ book }: { book: string }) {
                 }}
               />
             </div>
+            {lost && (
+              <p className="small muted" role="status">
+                The shared file didn't arrive: share it again, or upload it.
+              </p>
+            )}
+            {shared && writable.length > 1 && (
+              <label>
+                Book
+                <select
+                  aria-label="Book"
+                  value={book}
+                  onChange={(e) =>
+                    navigate(`/books/${encodeURIComponent(e.target.value)}/receipt?shared=1`, {
+                      replace: true,
+                    })
+                  }
+                >
+                  {writable.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <AccountPicker
               label="Paid from"
               accounts={bases}

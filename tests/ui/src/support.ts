@@ -176,6 +176,12 @@ export async function addAccount(book: string, account: string, balance: string 
   return account;
 }
 
+/** A tiny JPEG (a white pixel), as a file to upload. */
+export const JPEG = Buffer.from(
+  "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/yQALCAABAAEBAREA/8wABgAQEAX/2gAIAQEAAD8A0s8g/9k=",
+  "base64"
+);
+
 /** A new user with a book and one starred bank account (opened 2024-01-01 at 1,000.00). */
 export async function setUpUser(
   page: Page,

@@ -1197,6 +1197,21 @@ plan](milestones/shared-connections/PLAN.md) has his brief and the calls made wi
   receipt after asking. The capture says it's new (`&new=1`) only when it made the transaction:
   one read into the bank's copy keeps Skip, since cancelling would delete the bank's
   transaction.
+- **Shared to the installed app, a photo is a receipt** (Kael, 2026-11-25: take it with the
+  phone's camera, then Share). The manifest's `share_target` posts the file to
+  `/ui/share-receipt`. The service worker answers that (`public/share-target.js`, loaded with
+  Workbox's `importScripts` ahead of its routes), keeps the file in a cache of its own, and opens
+  `/ui/receipt?shared=1`. That goes to Capture receipt in the book you'd start in (or the first
+  you can change), with the file in place and a Book choice, since a household's receipt could
+  go in either book. The file stays until its transaction is made, so changing books keeps it;
+  the next share replaces it. Done in the browser, not by the server: the post comes from the
+  operating system, and the person still chooses the book, the account and whether to itemize.
+  A share that reaches the server (no service worker yet) opens Capture receipt, which says the
+  file didn't arrive.
+  - **Only on Android, and only installed from Chrome, Edge or Samsung Internet.** Those install
+    a WebAPK, which is what registers the share target. Brave and Firefox only add a home-screen
+    shortcut, and Safari has no share target, so iPhones can't. An installed app picks the
+    manifest up when Chrome updates its WebAPK (within a day or so), or at once if reinstalled.
 
 ### Shops: reading Amazon (the Amazon orders spike, 2026-11-06)
 

@@ -483,3 +483,7 @@ Smaller improvements picked up between milestones. Those still open are in
       capture lands on is Cancel (deletes it and its receipt, asking first), Split… or Open,
       Save (keeps it unconfirmed) and Confirm, still the primary. A receipt read into the bank's
       copy keeps Skip.
+- [x] **Share a photo to the installed app as a receipt** (Kael, 2026-11-25; design.md has
+      the decisions): the manifest's share target, the service worker keeping the file, and
+      Capture receipt opening with it and a Book choice. Android only, installed from Chrome,
+      Edge or Samsung Internet (not Brave).

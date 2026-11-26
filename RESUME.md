@@ -4,7 +4,40 @@ Where We Left Off
 _Updated 2026-11-25._ Keep this current: every finalized change set updates it (see
 [CLAUDE.md](CLAUDE.md)).
 
-## Latest (2026-11-25): save or cancel a new receipt's transaction
+## Latest (2026-11-25, later): a photo shared to the installed app is a receipt, `v1.10.0`
+
+Kael: can the PWA accept shares, so a photo taken with the phone's camera can be shared to
+Luminous Money and uploaded as a receipt? Then: publish the next release, but don't upgrade
+Emmer, since tonight's upgrade takes care of it.
+
+- **Where it works:** Android only, and only if the app is installed from **Chrome, Edge or
+  Samsung Internet**, which install it as a WebAPK; that's what puts it in the share sheet.
+  **Brave** (Kael's install) and Firefox only add a home-screen shortcut, which can't receive
+  shares. Safari has no share target, so iPhones can't either. Kael needs to install it from
+  Chrome; Brave can stay the default browser.
+- **How:** the manifest's `share_target` (`vite.config.ts`) posts the file to
+  `/ui/share-receipt`. `public/share-target.js` (Workbox's `importScripts`, ahead of its
+  routes) answers in the service worker: it keeps the file in the `shared-receipt` cache and
+  opens `/ui/receipt?shared=1`. `App.tsx` sends that to Capture receipt in the book you'd start
+  in (or the first you can change). Capture receipt (`lib/shared.ts`) opens with the file and
+  a **Book** choice, and lets the file go once the transaction is made. A share that reaches
+  the server (no service worker yet) is redirected there, and the page says the file didn't
+  arrive. design.md has the decisions.
+- **Checked:** `pnpm test` and `pnpm e2e` pass (161 in the browser). The new
+  `tests/ui/share.spec.ts` posts a file the way Android does, under full Chromium with the
+  stack's origin treated as secure (as `updates.spec.ts`; the headless shell has no service
+  workers on plain http). It covers changing the book, the cache emptied after creating, and
+  the server's fallback. The test JPEG is `support.ts`'s now. A run before that hit an m17 flake
+  ("Only splits tagged #kitchen." not shown within 5 s, on a slow 1.7-minute run); it passed
+  on every run after. **Not tried on a phone yet:** that waits for Kael to install from Chrome.
+
+**Released** as `v1.10.0`, with the receipt card's Save and Cancel (below). **Emmer not
+upgraded** (Kael: tonight's upgrade takes care of it).
+**Next:** Kael installs the app from Chrome on Android and tries a share; say if it doesn't
+show up. Then unchanged: Kael creates Personal and shares the connection with it, reviews
+shared connections' nine calls, then HSA tracking's 7 calls (M99); docs/PLAN.md's Ahead.
+
+## Before that (2026-11-25): save or cancel a new receipt's transaction
 
 Kael: confirming a receipt's transaction on save is usual, not universal; keep Confirm primary,
 add a secondary Save to its left and a Cancel link in the left corner.
@@ -22,9 +55,7 @@ add a secondary Save to its left and a Cancel link in the left corner.
   passed all 160. A new browser test
   in `m16.spec.ts` covers Save and Cancel, and the bank-copy test now checks that it keeps Skip.
 
-**Not released** yet: it goes out with the next version.
-**Next:** unchanged: Kael creates Personal and shares the connection with it, reviews shared
-connections' nine calls, then HSA tracking's 7 calls (M99); docs/PLAN.md's Ahead.
+**Released** with the share target, as `v1.10.0` (above).
 
 ## Before that (2026-11-24, later): the site and video brought up to date, and the `update-marketing` skill
 

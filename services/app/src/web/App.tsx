@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
-import { Link, Redirect, Route, Router, Switch, useLocation } from "wouter";
+import { Link, Redirect, Route, Router, Switch, useLocation, useSearch } from "wouter";
 
 import { Banners } from "./components/Banners.js";
 import { BookSwitcher } from "./components/BookSwitcher.js";
@@ -87,6 +87,7 @@ function Gate() {
   const user = me.data?.id ?? "";
   const inPath = useBookInPath();
   const [location] = useLocation();
+  const search = useSearch();
   // An invitation opens even before you have a book of your own (it may be your first).
   const invitation = /^\/invite\/([^/?]+)/.exec(location)?.[1];
   const [settingUp, setSettingUp] = useState(false);
@@ -185,6 +186,14 @@ function Gate() {
           <Switch>
             <Route path="/">
               <Redirect to={bookHome(start.id)} replace />
+            </Route>
+            {/* A file shared to the installed app (public/share-target.js): captured into the
+                book you'd start in, if you can change it, else the first you can. */}
+            <Route path="/receipt">
+              <Redirect
+                to={`${bookHome((start.role !== "read" ? start : (books.data.find((b) => b.role !== "read") ?? start)).id)}/receipt?${search}`}
+                replace
+              />
             </Route>
             <Route path="/books">
               <Books />
